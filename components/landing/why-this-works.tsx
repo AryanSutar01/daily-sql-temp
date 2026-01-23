@@ -19,30 +19,30 @@ export function WhyThisWorks() {
   ];
 
   return (
-    <section className="py-32 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-20 space-y-4">
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight">
+    <section className="py-16 px-4 sm:px-6 lg:px-8 border-b border-border/50">
+      <div className="max-w-5xl mx-auto space-y-12">
+        <div className="text-center space-y-4">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">
             Why this works
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Daily SQL is built around one idea: <span className="text-foreground font-semibold">consistency beats intensity</span>.
+            Built on one core idea: <span className="text-foreground font-semibold">consistency beats intensity</span>.
           </p>
         </div>
 
-        <div className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {principles.map((principle, index) => (
             <div
               key={index}
-              className="p-8 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm hover:border-brand-base/20 hover:bg-card/70 transition-all duration-300"
+              className="group p-6 rounded-2xl border border-border/40 bg-card/30 hover:bg-[#30B5A6]/5 hover:border-[#30B5A6]/30 transition-all duration-300"
             >
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-brand-base/20 flex items-center justify-center">
-                  <span className="text-brand-base font-bold text-xl">{index + 1}</span>
-                </div>
-                <div className="flex-1 space-y-2">
-                  <h3 className="text-xl font-semibold">{principle.title}</h3>
-                  <p className="text-muted-foreground leading-relaxed">
+                <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#30B5A6]/10 text-[#30B5A6] font-bold text-sm flex items-center justify-center border border-[#30B5A6]/20 group-hover:bg-[#30B5A6] group-hover:text-black transition-colors">
+                  {index + 1}
+                </span>
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-foreground text-lg">{principle.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     {principle.description}
                   </p>
                 </div>
@@ -51,16 +51,10 @@ export function WhyThisWorks() {
           ))}
         </div>
 
-        <div className="mt-12">
-          <div className="p-8 rounded-xl border-2 border-brand-base/30 bg-gradient-to-br from-card to-brand-base/5 shadow-lg">
-            <p className="text-center text-lg leading-relaxed">
-              <span className="font-semibold text-foreground">The result?</span>{" "}
-              <span className="text-muted-foreground">
-                A sustainable practice habit that keeps your SQL skills sharp without the burnout,
-                decision fatigue, or time commitment of traditional platforms.
-              </span>
-            </p>
-          </div>
+        <div className="text-center max-w-3xl mx-auto">
+          <p className="text-muted-foreground italic">
+            <span className="font-semibold text-[#30B5A6] not-italic">The result?</span> A sustainable practice habit without the burnout, decision fatigue, or time commitment.
+          </p>
         </div>
       </div>
     </section>

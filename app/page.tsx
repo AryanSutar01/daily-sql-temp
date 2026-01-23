@@ -1,5 +1,6 @@
 import { Hero } from "@/components/landing/hero";
 import { TrustStrip } from "@/components/landing/trust-strip";
+import { TargetAudience } from "@/components/landing/target-audience-new";
 import { Problem } from "@/components/landing/problem";
 import { Comparison } from "@/components/landing/comparison";
 import { HowItWorks } from "@/components/landing/how-it-works";
@@ -19,6 +20,7 @@ export default function Home() {
     <main className="min-h-screen">
       <Hero />
       <TrustStrip />
+      <TargetAudience />
       <Problem />
       <Comparison />
       <HowItWorks />
