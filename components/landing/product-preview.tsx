@@ -106,33 +106,52 @@ WHERE activity_month >= cohort_month;`,
 const HighlightCode = ({ code }: { code: string }) => {
   if (!code) return null;
 
-  // Simple regex-based syntax highlighting for demo purposes
-  const keywords = /\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|HAVING|LIMIT|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|WITH|AS|ON|AND|OR|CASE|WHEN|THEN|ELSE|END|PARTITION BY|OVER|DISTINCT|VALUES|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)\b/gi;
-  const functions = /\b(COUNT|SUM|AVG|MIN|MAX|LAG|LEAD|EXTRACT|DATE_TRUNC|NULLIF|COALESCE|NOW|Rank|ROW_NUMBER)\b/gi;
-  const strings = /'[^']*'/g;
-  const numbers = /\b\d+\b/g;
-
-  // We need to split and map to preserve React elements, but for a simple typing effect 
-  // where we reprint the whole string, we can process segments. 
-  // However, regex matching on partial strings during typing can be jumpy.
-  // A simpler approach for the "typing" visual is to colorize the *whole* current string.
-
-  const parts = code.split(/(\b(?:SELECT|FROM|WHERE|GROUP BY|ORDER BY|HAVING|LIMIT|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|WITH|AS|ON|AND|OR|CASE|WHEN|THEN|ELSE|END|PARTITION BY|OVER|DISTINCT|VALUES|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)\b|\b(?:COUNT|SUM|AVG|MIN|MAX|LAG|LEAD|EXTRACT|DATE_TRUNC|NULLIF|COALESCE|NOW|Rank|ROW_NUMBER)\b|'[^']*'|\b\d+\b)/gi);
+  // Enhanced SQL syntax highlighting with more vibrant colors
+  // Split by keywords, functions, strings, numbers, operators, and punctuation
+  const parts = code.split(/(\bSELECT\b|\bFROM\b|\bWHERE\b|\bGROUP\s+BY\b|\bORDER\s+BY\b|\bPARTITION\s+BY\b|\bLEFT\s+JOIN\b|\bRIGHT\s+JOIN\b|\bINNER\s+JOIN\b|\bOUTER\s+JOIN\b|\bCROSS\s+JOIN\b|\bFULL\s+JOIN\b|\bHAVING\b|\bLIMIT\b|\bJOIN\b|\bWITH\b|\bAS\b|\bON\b|\bAND\b|\bOR\b|\bNOT\b|\bIN\b|\bEXISTS\b|\bBETWEEN\b|\bLIKE\b|\bIS\b|\bNULL\b|\bTRUE\b|\bFALSE\b|\bCASE\b|\bWHEN\b|\bTHEN\b|\bELSE\b|\bEND\b|\bIF\b|\bWINDOW\b|\bDISTINCT\b|\bUNIQUE\b|\bALL\b|\bANY\b|\bSOME\b|\bVALUES\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bCREATE\b|\bDROP\b|\bALTER\b|\bTABLE\b|\bINDEX\b|\bVIEW\b|\bPROCEDURE\b|\bFUNCTION\b|\bTRIGGER\b|\bBEGIN\b|\bCOMMIT\b|\bROLLBACK\b|\bCOUNT\b|\bSUM\b|\bAVG\b|\bMIN\b|\bMAX\b|\bLAG\b|\bLEAD\b|\bFIRST_VALUE\b|\bLAST_VALUE\b|\bEXTRACT\b|\bDATE_TRUNC\b|\bNULLIF\b|\bCOALESCE\b|\bCAST\b|\bCONVERT\b|\bNOW\b|\bCURRENT_DATE\b|\bCURRENT_TIME\b|\bCURRENT_TIMESTAMP\b|\bROW_NUMBER\b|\bRANK\b|\bDENSE_RANK\b|\bNTILE\b|\bCUME_DIST\b|\bPERCENT_RANK\b|\bSUBSTRING\b|\bCONCAT\b|\bUPPER\b|\bLOWER\b|\bTRIM\b|\bLENGTH\b|\bROUND\b|\bFLOOR\b|\bCEIL\b|\bABS\b|\bOVER\b|'[^']*'|"[^"]*"|\b\d+\.?\d*\b|[(),;.]|[+\-*\/%=<>!]+)/gi);
 
   return (
     <>
       {parts.map((part, i) => {
-        if (part.match(keywords)) {
-          return <span key={i} className="text-[#ff79c6] font-bold">{part}</span>; // Pink/Purple for keywords
-        } else if (part.match(functions)) {
-          return <span key={i} className="text-[#8be9fd]">{part}</span>; // Cyan for functions
-        } else if (part.match(strings)) {
-          return <span key={i} className="text-[#f1fa8c]">{part}</span>; // Yellow for strings
-        } else if (part.match(numbers)) {
-          return <span key={i} className="text-[#bd93f9]">{part}</span>; // Purple for numbers
-        } else {
-          return <span key={i} className="text-[#f8f8f2]">{part}</span>; // Default text
+        if (!part) return null;
+
+        // SQL Keywords - Vibrant Pink/Magenta
+        if (/^(SELECT|FROM|WHERE|GROUP\s+BY|ORDER\s+BY|PARTITION\s+BY|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|OUTER\s+JOIN|CROSS\s+JOIN|FULL\s+JOIN|HAVING|LIMIT|JOIN|WITH|AS|ON|AND|OR|NOT|IN|EXISTS|BETWEEN|LIKE|IS|NULL|TRUE|FALSE|CASE|WHEN|THEN|ELSE|END|IF|WINDOW|DISTINCT|UNIQUE|ALL|ANY|SOME|VALUES|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|TABLE|INDEX|VIEW|PROCEDURE|FUNCTION|TRIGGER|BEGIN|COMMIT|ROLLBACK)$/i.test(part)) {
+          return <span key={i} className="text-[#ff79c6] font-semibold">{part}</span>;
         }
+
+        // Functions - Bright Green (including OVER for window functions)
+        if (/^(COUNT|SUM|AVG|MIN|MAX|LAG|LEAD|FIRST_VALUE|LAST_VALUE|EXTRACT|DATE_TRUNC|NULLIF|COALESCE|CAST|CONVERT|NOW|CURRENT_DATE|CURRENT_TIME|CURRENT_TIMESTAMP|ROW_NUMBER|RANK|DENSE_RANK|NTILE|CUME_DIST|PERCENT_RANK|SUBSTRING|CONCAT|UPPER|LOWER|TRIM|LENGTH|ROUND|FLOOR|CEIL|ABS|OVER)$/i.test(part)) {
+          return <span key={i} className="text-[#50fa7b] font-medium">{part}</span>;
+        }
+
+        // Strings - Golden/Orange
+        if (/^['"][^'"]*['"]$/.test(part)) {
+          return <span key={i} className="text-[#ffb86c]">{part}</span>;
+        }
+
+        // Numbers - Purple
+        if (/^\d+\.?\d*$/.test(part)) {
+          return <span key={i} className="text-[#bd93f9]">{part}</span>;
+        }
+
+        // Comments - Muted Gray
+        if (/^(--[^\n]*|\/\*[\s\S]*?\*\/)$/.test(part)) {
+          return <span key={i} className="text-zinc-600 italic">{part}</span>;
+        }
+
+        // Operators - Bright Red
+        if (/^[+\-*\/%=<>!]+$/.test(part)) {
+          return <span key={i} className="text-[#ff5555]">{part}</span>;
+        }
+
+        // Punctuation - Cyan
+        if (/^[(),;.]$/.test(part)) {
+          return <span key={i} className="text-[#8be9fd]">{part}</span>;
+        }
+
+        // Default text (identifiers, whitespace, etc.)
+        return <span key={i} className="text-zinc-300">{part}</span>;
       })}
     </>
   );
@@ -190,6 +209,11 @@ export function ProductPreview() {
     setShowResult(false);
   };
 
+  // Calculate actual line numbers for dynamic rendering (prevents layout shift)
+  const codeLines = code.split('\n').length;
+  const maxLines = activeQuestion ? activeQuestion.query.split('\n').length : 15;
+  const lineNumbers = Math.max(codeLines, maxLines, 15);
+
   return (
     <section className="py-24 px-4 sm:px-6 lg:px-8 bg-black/40 border-y border-white/5">
       <div className="max-w-7xl mx-auto space-y-12">
@@ -202,8 +226,8 @@ export function ProductPreview() {
           </p>
         </div>
 
-        {/* IDE Container */}
-        <div className="relative rounded-2xl border border-white/10 bg-[#09090b] shadow-2xl overflow-hidden min-h-[600px] flex flex-col md:flex-row">
+        {/* IDE Container - Fixed height to prevent layout shift */}
+        <div className="relative rounded-2xl border border-white/10 bg-[#09090b] shadow-2xl overflow-hidden flex flex-col md:flex-row" style={{ height: '650px' }}>
 
           {/* LEFT SIDEBAR: Question List */}
           <div className={`w-full md:w-72 border-r border-white/10 bg-[#0c0c0e] flex flex-col ${activeQuestion ? 'hidden md:flex' : 'flex'}`}>
@@ -227,8 +251,8 @@ export function ProductPreview() {
 
                   <div className="flex flex-col gap-1.5 pl-2">
                     <span className={`text-[10px] font-bold uppercase tracking-wider w-fit px-1.5 py-0.5 rounded-sm ${q.level === "Basic" ? "text-green-400 bg-green-400/10" :
-                        q.level === "Intermediate" ? "text-yellow-400 bg-yellow-400/10" :
-                          "text-red-400 bg-red-400/10"
+                      q.level === "Intermediate" ? "text-yellow-400 bg-yellow-400/10" :
+                        "text-red-400 bg-red-400/10"
                       }`}>
                       {q.level}
                     </span>
@@ -271,7 +295,7 @@ export function ProductPreview() {
               <div className="flex-1 flex flex-col h-full animate-in fade-in duration-500">
 
                 {/* IDE Header */}
-                <div className="h-12 border-b border-black/40 flex items-center justify-between px-4 bg-[#252526]">
+                <div className="h-12 border-b border-black/40 flex items-center justify-between px-4 bg-[#252526] flex-shrink-0">
                   <div className="flex items-center gap-3">
                     <button onClick={handleClose} className="md:hidden text-zinc-400 hover:text-white">
                       <ArrowLeft size={18} />
@@ -303,8 +327,8 @@ export function ProductPreview() {
                   <div className="hidden lg:block w-[40%] border-r border-black/40 p-6 overflow-y-auto bg-[#1e1e1e] custom-scrollbar">
                     <div className="mb-6 space-y-2">
                       <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${activeQuestion.level === "Basic" ? "text-green-400 bg-green-400/10 border border-green-400/20" :
-                          activeQuestion.level === "Intermediate" ? "text-yellow-400 bg-yellow-400/10 border border-yellow-400/20" :
-                            "text-red-400 bg-red-400/10 border border-red-400/20"
+                        activeQuestion.level === "Intermediate" ? "text-yellow-400 bg-yellow-400/10 border border-yellow-400/20" :
+                          "text-red-400 bg-red-400/10 border border-red-400/20"
                         }`}>
                         {activeQuestion.level}
                       </span>
@@ -331,12 +355,12 @@ export function ProductPreview() {
                   {/* Code Editor */}
                   <div className="flex-1 flex flex-col relative bg-[#1e1e1e]">
                     <div className="flex-1 p-6 font-mono text-sm leading-relaxed overflow-auto relative">
-                      {/* Line Numbers Sidebar (Visual only) */}
+                      {/* Line Numbers Sidebar (Visual only) - Dynamic count */}
                       <div className="absolute left-0 top-6 bottom-0 w-12 text-right pr-4 text-zinc-700 select-none font-mono text-sm leading-relaxed hidden sm:block">
-                        {Array.from({ length: 15 }).map((_, i) => <div key={i}>{i + 1}</div>)}
+                        {Array.from({ length: lineNumbers }).map((_, i) => <div key={i}>{i + 1}</div>)}
                       </div>
 
-                      <pre className="whitespace-pre-wrap pl-0 sm:pl-12">
+                      <pre className="whitespace-pre-wrap pl-0 sm:pl-12 min-h-[350px]">
                         <code>
                           <HighlightCode code={code} />
                           {isTyping && <span className="inline-block w-2 h-4 bg-[#30B5A6] ml-0.5 animate-pulse align-middle"></span>}
@@ -346,7 +370,7 @@ export function ProductPreview() {
 
                     {/* Results Pane (Slide Up) */}
                     <div className={`border-t border-black/40 bg-[#0c0c0e] transition-all duration-300 ease-in-out flex flex-col ${showResult ? "h-64" : "h-0 overflow-hidden"}`}>
-                      <div className="px-4 py-2 border-b border-white/5 bg-[#252526] flex items-center justify-between">
+                      <div className="px-4 py-2 border-b border-white/5 bg-[#252526] flex items-center justify-between flex-shrink-0">
                         <span className="text-xs font-semibold text-zinc-400 flex items-center gap-2">
                           <Terminal size={12} />
                           Query Result
