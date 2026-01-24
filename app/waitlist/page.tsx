@@ -2,16 +2,33 @@
 
 import { useState } from "react";
 import { WaitlistForm } from "@/components/waitlist/waitlist-form";
-import { GoogleSignIn } from "@/components/waitlist/google-signin";
 import { WaitlistFormData } from "@/types/waitlist";
+import { createClient } from "@/lib/supabase/client";
 
 export default function WaitlistPage() {
-  const [formData, setFormData] = useState<WaitlistFormData | null>(null);
-  const [step, setStep] = useState<"form" | "signin">("form");
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const supabase = createClient();
 
-  const handleFormSubmit = (data: WaitlistFormData) => {
-    setFormData(data);
-    setStep("signin");
+  const handleFormSubmit = async (data: WaitlistFormData) => {
+    setIsRedirecting(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/waitlist/callback?occupation=${encodeURIComponent(data.occupation)}&job_role=${encodeURIComponent(data.job_role)}&years_of_experience=${data.years_of_experience}`,
+        },
+      });
+
+      if (error) {
+        console.error("Error signing in:", error);
+        alert("Failed to sign in with Google. Please try again.");
+        setIsRedirecting(false);
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      alert("An unexpected error occurred. Please try again.");
+      setIsRedirecting(false);
+    }
   };
 
   return (
@@ -22,18 +39,12 @@ export default function WaitlistPage() {
             Join the waitlist
           </h1>
           <p className="text-muted-foreground text-lg">
-            {step === "form"
-              ? "Customize your Daily SQL experience."
-              : "Sign in with Google to complete your registration"}
+            Customize your Daily SQL experience.
           </p>
         </div>
 
         <div className="p-8 rounded-lg border border-border bg-card">
-          {step === "form" ? (
-            <WaitlistForm onSubmit={handleFormSubmit} />
-          ) : formData ? (
-            <GoogleSignIn formData={formData} />
-          ) : null}
+          <WaitlistForm onSubmit={handleFormSubmit} isLoading={isRedirecting} />
         </div>
       </div>
     </main>

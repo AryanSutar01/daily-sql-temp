@@ -1,66 +1,82 @@
+import { Terminal, Heart } from "lucide-react";
+
 export function Problem() {
   return (
-    <section className="relative py-16 px-4 sm:px-6 lg:px-8 border-b border-border/50 overflow-hidden">
+    <section className="relative py-24 px-4 sm:px-6 lg:px-8 border-b border-border/50 overflow-hidden">
       {/* Background Grid Pattern */}
       <div className="absolute inset-0 bg-grid-white pointer-events-none z-[-1] opacity-50" />
 
-      <div className="max-w-4xl mx-auto space-y-12">
-        {/* Main Problem Statement */}
-        <div className="text-center space-y-6">
-          <h2 className="text-4xl sm:text-5xl font-bold tracking-tight">
-            SQL skills decay without practice
-          </h2>
+      <div className="max-w-4xl mx-auto">
 
-          <div className="space-y-4 text-lg text-muted-foreground leading-relaxed">
-            <p>
-              You know SQL. You've written thousands of queries. But when that interview
-              question comes up—or when you need a complex window function on a deadline—something
-              feels off.
-            </p>
+        {/* Unified Narrative Container */}
+        <div className="text-center space-y-12">
 
-            <p>
-              Most professionals face the same problem: there's no time to grind through 500
-              practice problems. And when you do find time, the skills you built disappear
-              within weeks.
-            </p>
+          {/* Emotional Hook */}
+          <div className="space-y-6">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-tight">
+              The worst feeling isn't not knowing. <br className="hidden sm:block" />
+              <span className="text-[#30B5A6]">It's forgetting what you mastered.</span>
+            </h2>
 
-            <p className="text-xl font-semibold text-foreground pt-4">
-              The issue isn't learning SQL. It's maintaining it.
-            </p>
-          </div>
-        </div>
-
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8">
-          {/* Stat 1 */}
-          <div className="relative p-8 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm text-center space-y-3 hover:border-[#30B5A6]/30 transition-all duration-300">
-            <div className="text-5xl font-bold bg-gradient-to-br from-[#30B5A6] to-[#4DD4C4] bg-clip-text text-transparent">
-              73%
+            <div className="max-w-2xl mx-auto space-y-6 text-lg text-muted-foreground leading-relaxed">
+              <p>
+                You remember the late nights? The "Aha!" moments when window functions finally clicked?
+                You built that knowledge brick by brick. You earned it.
+              </p>
+              <p>
+                But technical careers are unforgiving. You shift focus to architecture, management, or Python,
+                and slowly, silently, that hard-earned muscle begins to atrophy.
+                <br />
+                <span className="text-foreground font-medium italic">Then comes the interview question you used to know by heart. And you freeze.</span>
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              of data professionals feel their SQL skills have gaps
-            </p>
           </div>
 
-          {/* Stat 2 */}
-          <div className="relative p-8 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm text-center space-y-3 hover:border-[#30B5A6]/30 transition-all duration-300">
-            <div className="text-5xl font-bold bg-gradient-to-br from-[#30B5A6] to-[#4DD4C4] bg-clip-text text-transparent">
-              2-4 hrs
+          {/* Validation Stats - Kept minimal but impactful */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 py-8 border-y border-white/5 bg-white/5 rounded-2xl p-6 backdrop-blur-sm">
+            <div className="space-y-1">
+              <div className="text-3xl font-bold text-white">73%</div>
+              <p className="text-xs text-zinc-400 uppercase tracking-wide">feel skills gap</p>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              average prep time before technical interviews
-            </p>
+            <div className="space-y-1">
+              <div className="text-3xl font-bold text-white">2-4 hrs</div>
+              <p className="text-xs text-zinc-400 uppercase tracking-wide">cramming time</p>
+            </div>
+            <div className="space-y-1">
+              <div className="text-3xl font-bold text-white">6 weeks</div>
+              <p className="text-xs text-zinc-400 uppercase tracking-wide">fade duration</p>
+            </div>
           </div>
 
-          {/* Stat 3 */}
-          <div className="relative p-8 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm text-center space-y-3 hover:border-[#30B5A6]/30 transition-all duration-300">
-            <div className="text-5xl font-bold bg-gradient-to-br from-[#30B5A6] to-[#4DD4C4] bg-clip-text text-transparent">
-              6 weeks
+          {/* The Solution / Empathy Bridge */}
+          <div className="max-w-3xl mx-auto space-y-8">
+            <div className="space-y-6 text-lg text-muted-foreground leading-relaxed">
+              <p>
+                We felt that gap too. We tried the weekend sprints. The "grind 500 questions" marathons.
+                They felt like punishment. We realized the industry had it wrong.
+                <span className="text-white font-semibold"> Mastery isn't about intensity. It's about consistency.</span>
+              </p>
+              <p>
+                Daily SQL wasn't built as a product; it was built as a lifeline for ourselves.
+                A way to keep our tools sharp without the burnout. Just 15 minutes. Just enough to ensure
+                that your skills belong to you, forever.
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              before complex SQL patterns start to fade
-            </p>
+
+            {/* Signature Block */}
+            <div className="pt-8 flex flex-col items-center justify-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-[#30B5A6]/10 flex items-center justify-center mb-2 animate-pulse">
+                <Heart className="w-5 h-5 text-[#30B5A6] fill-[#30B5A6]" />
+              </div>
+              <p className="text-[#30B5A6] font-medium tracking-wide text-sm uppercase">
+                Made with love & lots of caffeine
+              </p>
+              <p className="text-zinc-500 text-sm">
+                by engineers who refuse to rust.
+              </p>
+            </div>
           </div>
+
         </div>
       </div>
     </section>

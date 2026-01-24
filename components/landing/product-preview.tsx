@@ -11,80 +11,135 @@ import {
   Loader2
 } from "lucide-react";
 
-// --- Mock Data ---
+// --- Real World Scenarios Data ---
 const QUESTIONS = [
   {
-    id: "easy",
-    level: "Easy",
+    id: "basic",
+    level: "Basic",
     time: "15 min",
-    title: "Monthly Revenue by Category",
-    description: "Calculate the total revenue for each product category for the current month. Order by revenue descending.",
+    title: "Marketing Campaign ROI",
+    description: "You're analyzing the efficiency of Q4 marketing campaigns. Given tables for 'campaigns' and 'conversions', calculate the Click-Through Rate (CTR) and Cost Per Acquisition (CPA) for each campaign. Filter out campaigns with less than 500 impressions to ensure statistical significance. This helps the marketing team reallocate budget to high-performing channels.",
     query: `SELECT 
-  category,
-  SUM(amount) as revenue
-FROM sales
-WHERE 
-  date_trunc('month', sale_date) = 
-  date_trunc('month', current_date)
+  c.campaign_name,
+  SUM(c.clicks) * 100.0 / NULLIF(SUM(c.impressions), 0) as ctr_percentage,
+  SUM(c.spend) / NULLIF(COUNT(cv.conversion_id), 0) as cpa
+FROM campaigns c
+LEFT JOIN conversions cv ON c.id = cv.campaign_id
 GROUP BY 1
-ORDER BY 2 DESC;`,
+HAVING SUM(c.impressions) > 500
+ORDER BY 3 ASC;`,
     result: [
-      { category: "Enterprise", revenue: "$124,500" },
-      { category: "SMB", revenue: "$48,200" },
-      { category: "Consumer", revenue: "$12,150" }
+      { campaign_name: "Q4_Retargeting", ctr_percentage: "2.4%", cpa: "$14.20" },
+      { campaign_name: "BlackFriday_Email", ctr_percentage: "5.1%", cpa: "$8.50" },
+      { campaign_name: "Influencer_Collab", ctr_percentage: "1.8%", cpa: "$22.10" }
     ]
   },
   {
-    id: "medium",
-    level: "Medium",
+    id: "intermediate",
+    level: "Intermediate",
     time: "20 min",
-    title: "Top 10 Customers by LTV",
-    description: "Identify the top 10 customers based on their lifetime value (LTV) across all orders.",
-    query: `SELECT 
-  c.customer_name,
-  COUNT(o.order_id) as total_orders,
-  SUM(o.amount) as lifetime_value
-FROM customers c
-JOIN orders o ON c.id = o.customer_id
-GROUP BY 1
-ORDER BY 3 DESC
-LIMIT 10;`,
+    title: "User Sessionization",
+    description: "We need to reconstruct user sessions from raw event logs. A new session starts if there is a 30-minute gap between events. Write a query to identify session boundaries and assign a unique session_id to each user's activity stream. This is critical for calculating average time-on-site correctly.",
+    query: `WITH lagged_events AS (
+  SELECT 
+    user_id, 
+    timestamp,
+    LAG(timestamp) OVER (PARTITION BY user_id ORDER BY timestamp) as prev_ts
+  FROM page_views
+),
+new_sessions AS (
+  SELECT 
+    *,
+    CASE 
+      WHEN EXTRACT(EPOCH FROM (timestamp - prev_ts)) > 1800 THEN 1 
+      ELSE 0 
+    END as is_new_session
+  FROM lagged_events
+)
+SELECT 
+  user_id,
+  timestamp,
+  SUM(is_new_session) OVER (PARTITION BY user_id ORDER BY timestamp) as session_id
+FROM new_sessions;`,
     result: [
-      { customer_name: "Acme Corp", total_orders: 142, lifetime_value: "$892,100" },
-      { customer_name: "Globex Inc", total_orders: 85, lifetime_value: "$540,220" },
-      { customer_name: "Soylent Corp", total_orders: 63, lifetime_value: "$412,000" }
+      { user_id: "u_123", timestamp: "10:00:00", session_id: 1 },
+      { user_id: "u_123", timestamp: "10:05:00", session_id: 1 },
+      { user_id: "u_123", timestamp: "14:00:00", session_id: 2 }
     ]
   },
   {
     id: "advanced",
     level: "Advanced",
-    time: "30 min",
     title: "Cohort Retention Analysis",
-    description: "Calculate the monthly retention rate for each user cohort grouped by their first purchase month.",
-    query: `WITH cohorts AS (
+    description: "You're analyzing user retention for a SaaS product. Given a transactions table with `customer_id`, `transaction_date`, and `amount`, calculate the monthly retention rate for each cohort (grouped by first purchase month). Show which cohorts have the highest retention over time. This metric directly impacts our LTV projections.",
+    query: `WITH first_purchase AS (
   SELECT 
-    user_id, 
-    date_trunc('month', min(tx_date)) as cohort
+    customer_id, 
+    date_trunc('month', min(transaction_date)) as cohort_month
   FROM transactions
   GROUP BY 1
+),
+retention_matrix AS (
+  SELECT 
+    fp.cohort_month,
+    date_trunc('month', t.transaction_date) as activity_month,
+    COUNT(DISTINCT t.customer_id) as active_users
+  FROM transactions t
+  JOIN first_purchase fp ON t.customer_id = fp.customer_id
+  GROUP BY 1, 2
 )
 SELECT 
-  cohort,
-  COUNT(DISTINCT user_id) as users,
-  retention_rate
-FROM cohorts
--- (truncated for demo)
-LIMIT 5;`,
+  cohort_month,
+  activity_month,
+  active_users,
+  active_users::float / first_value(active_users) OVER (PARTITION BY cohort_month ORDER BY activity_month) as retention_rate
+FROM retention_matrix
+WHERE activity_month >= cohort_month;`,
     result: [
-      { cohort: "2024-01-01", users: 1250, retention_rate: "82%" },
-      { cohort: "2024-02-01", users: 1420, retention_rate: "79%" },
-      { cohort: "2024-03-01", users: 1680, retention_rate: "85%" }
+      { cohort_month: "2023-01-01", activity_month: "2023-01-01", retention_rate: "100%" },
+      { cohort_month: "2023-01-01", activity_month: "2023-02-01", retention_rate: "42%" },
+      { cohort_month: "2023-01-01", activity_month: "2023-03-01", retention_rate: "38%" }
     ]
   }
 ];
 
+const HighlightCode = ({ code }: { code: string }) => {
+  if (!code) return null;
+
+  // Simple regex-based syntax highlighting for demo purposes
+  const keywords = /\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|HAVING|LIMIT|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|WITH|AS|ON|AND|OR|CASE|WHEN|THEN|ELSE|END|PARTITION BY|OVER|DISTINCT|VALUES|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)\b/gi;
+  const functions = /\b(COUNT|SUM|AVG|MIN|MAX|LAG|LEAD|EXTRACT|DATE_TRUNC|NULLIF|COALESCE|NOW|Rank|ROW_NUMBER)\b/gi;
+  const strings = /'[^']*'/g;
+  const numbers = /\b\d+\b/g;
+
+  // We need to split and map to preserve React elements, but for a simple typing effect 
+  // where we reprint the whole string, we can process segments. 
+  // However, regex matching on partial strings during typing can be jumpy.
+  // A simpler approach for the "typing" visual is to colorize the *whole* current string.
+
+  const parts = code.split(/(\b(?:SELECT|FROM|WHERE|GROUP BY|ORDER BY|HAVING|LIMIT|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|WITH|AS|ON|AND|OR|CASE|WHEN|THEN|ELSE|END|PARTITION BY|OVER|DISTINCT|VALUES|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)\b|\b(?:COUNT|SUM|AVG|MIN|MAX|LAG|LEAD|EXTRACT|DATE_TRUNC|NULLIF|COALESCE|NOW|Rank|ROW_NUMBER)\b|'[^']*'|\b\d+\b)/gi);
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.match(keywords)) {
+          return <span key={i} className="text-[#ff79c6] font-bold">{part}</span>; // Pink/Purple for keywords
+        } else if (part.match(functions)) {
+          return <span key={i} className="text-[#8be9fd]">{part}</span>; // Cyan for functions
+        } else if (part.match(strings)) {
+          return <span key={i} className="text-[#f1fa8c]">{part}</span>; // Yellow for strings
+        } else if (part.match(numbers)) {
+          return <span key={i} className="text-[#bd93f9]">{part}</span>; // Purple for numbers
+        } else {
+          return <span key={i} className="text-[#f8f8f2]">{part}</span>; // Default text
+        }
+      })}
+    </>
+  );
+};
+
 export function ProductPreview() {
-  const [activeQuestion, setActiveQuestion] = useState<typeof QUESTIONS[0] | null>(null);
+  const [activeQuestion, setActiveQuestion] = useState<typeof QUESTIONS[0] | null>(QUESTIONS[2]); // Default to Advanced for "Real World" feel
   const [code, setCode] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -106,16 +161,17 @@ export function ProductPreview() {
 
     let currentIndex = 0;
     const interval = setInterval(() => {
+      // Speed increased: 2 chars per tick
       if (currentIndex < activeQuestion.query.length) {
-        setCode(activeQuestion.query.slice(0, currentIndex + 1));
-        currentIndex++;
+        setCode(activeQuestion.query.slice(0, currentIndex + 2));
+        currentIndex += 2;
       } else {
         setIsTyping(false);
         clearInterval(interval);
         // Auto-run after typing
-        setTimeout(() => handleRun(), 500);
+        setTimeout(() => handleRun(), 300);
       }
-    }, 30); // Typing speed
+    }, 5); // 5ms typing speed (very fast)
 
     return () => clearInterval(interval);
   }, [isTyping, activeQuestion]);
@@ -129,14 +185,14 @@ export function ProductPreview() {
   };
 
   const handleClose = () => {
-    setActiveQuestion(null);
+    setActiveQuestion(null); // This is reachable if we modify UI to allow closing, but mainly for type safety
     setCode("");
     setShowResult(false);
   };
 
   return (
     <section className="py-24 px-4 sm:px-6 lg:px-8 bg-black/40 border-y border-white/5">
-      <div className="max-w-6xl mx-auto space-y-12">
+      <div className="max-w-7xl mx-auto space-y-12">
         <div className="text-center space-y-4">
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
             See the <span className="text-brand-base">workflow</span> in action
@@ -146,33 +202,39 @@ export function ProductPreview() {
           </p>
         </div>
 
+        {/* IDE Container */}
         <div className="relative rounded-2xl border border-white/10 bg-[#09090b] shadow-2xl overflow-hidden min-h-[600px] flex flex-col md:flex-row">
 
           {/* LEFT SIDEBAR: Question List */}
-          <div className={`w-full md:w-64 border-r border-white/10 bg-[#0c0c0e] flex flex-col ${activeQuestion ? 'hidden md:flex' : 'flex'}`}>
+          <div className={`w-full md:w-72 border-r border-white/10 bg-[#0c0c0e] flex flex-col ${activeQuestion ? 'hidden md:flex' : 'flex'}`}>
             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
-              <span className="font-semibold text-sm tracking-wide">Today's Questions</span>
-              <span className="text-xs text-brand-base font-mono bg-brand-base/10 px-2 py-0.5 rounded">Day 47</span>
+              <span className="font-semibold text-sm tracking-wide text-zinc-300">Today's Practice</span>
+              <span className="text-xs text-brand-base font-mono bg-brand-base/10 px-2 py-0.5 rounded border border-brand-base/20">Day 47</span>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {QUESTIONS.map((q) => (
                 <button
                   key={q.id}
                   onClick={() => setActiveQuestion(q)}
-                  className={`w-full text-left p-3 rounded-md transition-all border group ${activeQuestion?.id === q.id
-                    ? "bg-white/5 border-white/10 text-white"
-                    : "bg-transparent border-transparent text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                  className={`w-full text-left p-4 rounded-xl transition-all border group relative overflow-hidden ${activeQuestion?.id === q.id
+                    ? "bg-[#30B5A6]/10 border-[#30B5A6]/50"
+                    : "bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-white/10"
                     }`}
                 >
-                  <div className="flex items-center gap-3">
-                    {/* Minimalist Level Indicator Dot */}
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${q.level === "Easy" ? "bg-green-500 shadow-[0_0_8px_-2px_rgba(34,197,94,0.5)]" :
-                      q.level === "Medium" ? "bg-yellow-500 shadow-[0_0_8px_-2px_rgba(234,179,8,0.5)]" :
-                        "bg-red-500 shadow-[0_0_8px_-2px_rgba(239,68,68,0.5)]"
-                      }`} />
+                  {/* Hover Glow */}
+                  <div className={`absolute left-0 top-0 bottom-0 w-1 bg-[#30B5A6] transition-opacity duration-300 ${activeQuestion?.id === q.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`} />
 
-                    <span className="text-sm font-medium truncate">{q.title}</span>
+                  <div className="flex flex-col gap-1.5 pl-2">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider w-fit px-1.5 py-0.5 rounded-sm ${q.level === "Basic" ? "text-green-400 bg-green-400/10" :
+                        q.level === "Intermediate" ? "text-yellow-400 bg-yellow-400/10" :
+                          "text-red-400 bg-red-400/10"
+                      }`}>
+                      {q.level}
+                    </span>
+                    <span className={`text-sm font-medium truncate ${activeQuestion?.id === q.id ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-200'}`}>
+                      {q.title}
+                    </span>
                   </div>
                 </button>
               ))}
@@ -181,19 +243,19 @@ export function ProductPreview() {
             {/* Compact Streak */}
             <div className="p-4 border-t border-white/10 bg-white/[0.02]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-zinc-500 font-medium uppercase tracking-wider">Streak</span>
+                <span className="text-xs text-zinc-500 font-medium uppercase tracking-wider">Daily Streak</span>
                 <span className="text-sm font-bold text-brand-base flex items-center gap-1">
                   47 <span className="text-orange-500">🔥</span>
                 </span>
               </div>
-              <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full bg-brand-base w-[80%]"></div>
+              <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                <div className="h-full bg-brand-base w-[80%] shadow-[0_0_10px_rgba(48,181,166,0.5)]"></div>
               </div>
             </div>
           </div>
 
           {/* RIGHT / MAIN CONTENT AREA */}
-          <div className={`flex-1 flex flex-col relative bg-[#09090b] ${!activeQuestion ? 'hidden md:flex' : 'flex'}`}>
+          <div className={`flex-1 flex flex-col relative bg-[#1e1e1e] ${!activeQuestion ? 'hidden md:flex' : 'flex'}`}>
 
             {!activeQuestion ? (
               // Empty State
@@ -208,25 +270,27 @@ export function ProductPreview() {
               // Active IDE State
               <div className="flex-1 flex flex-col h-full animate-in fade-in duration-500">
 
-                {/* Header */}
-                <div className="h-14 border-b border-white/10 flex items-center justify-between px-6 bg-white/[0.02]">
+                {/* IDE Header */}
+                <div className="h-12 border-b border-black/40 flex items-center justify-between px-4 bg-[#252526]">
                   <div className="flex items-center gap-3">
                     <button onClick={handleClose} className="md:hidden text-zinc-400 hover:text-white">
-                      <ArrowLeft size={20} />
+                      <ArrowLeft size={18} />
                     </button>
-                    <span className="font-mono text-sm text-zinc-400">query_editor.sql</span>
+                    <span className="font-mono text-xs text-zinc-400 flex items-center gap-2">
+                      <Terminal size={14} className="text-[#30B5A6]" />
+                      query_editor.sql
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button className="p-1.5 text-zinc-400 hover:text-white transition-colors">
-                      <Clock size={16} />
-                    </button>
-                    <div className="h-4 w-px bg-white/10 mx-1"></div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-black/20 rounded text-xs text-zinc-400 border border-white/5">
+                      <Clock size={12} /> {activeQuestion.time}
+                    </div>
                     <button
                       onClick={handleRun}
                       disabled={isRunning || isTyping}
-                      className="flex items-center gap-2 px-4 py-1.5 rounded-md bg-brand-base hover:bg-brand-light text-white text-xs font-semibold transition-all shadow-[0_0_15px_-3px_rgba(var(--brand-base-rgb),0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded bg-[#30B5A6] hover:bg-[#2A9D90] text-[#080C16] text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" />}
+                      {isRunning ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} fill="currentColor" />}
                       Run
                     </button>
                   </div>
@@ -236,49 +300,67 @@ export function ProductPreview() {
                 <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
 
                   {/* Question Description */}
-                  <div className="hidden lg:block w-1/3 border-r border-white/10 p-6 overflow-y-auto bg-[#0c0c0e]/50">
-                    <h2 className="text-xl font-bold mb-4">{activeQuestion.title}</h2>
-                    <p className="text-sm text-zinc-400 leading-relaxed mb-6">
+                  <div className="hidden lg:block w-[40%] border-r border-black/40 p-6 overflow-y-auto bg-[#1e1e1e] custom-scrollbar">
+                    <div className="mb-6 space-y-2">
+                      <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${activeQuestion.level === "Basic" ? "text-green-400 bg-green-400/10 border border-green-400/20" :
+                          activeQuestion.level === "Intermediate" ? "text-yellow-400 bg-yellow-400/10 border border-yellow-400/20" :
+                            "text-red-400 bg-red-400/10 border border-red-400/20"
+                        }`}>
+                        {activeQuestion.level}
+                      </span>
+                      <h2 className="text-2xl font-bold text-zinc-100 leading-tight">{activeQuestion.title}</h2>
+                    </div>
+
+                    <p className="text-sm text-zinc-400 leading-relaxed mb-8">
                       {activeQuestion.description}
                     </p>
-                    <div className="space-y-2">
+
+                    <div className="space-y-3">
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-2">
-                        <Database size={12} /> Schema
+                        <Database size={12} /> Database Schema
                       </h4>
-                      <div className="p-3 rounded bg-white/5 border border-white/5 text-xs font-mono text-zinc-300">
-                        sales (id, category, amount, sale_date)
+                      <div className="p-3 rounded bg-[#252526] border border-black/20 text-xs font-mono text-zinc-300">
+                        {/* Mock Schema based on question */}
+                        {activeQuestion.id === 'basic' ? 'campaigns(id, name, spend), conversions(id, campaign_id)' :
+                          activeQuestion.id === 'intermediate' ? 'page_views(user_id, timestamp, url)' :
+                            'transactions(id, customer_id, amount, date)'}
                       </div>
                     </div>
                   </div>
 
                   {/* Code Editor */}
-                  <div className="flex-1 flex flex-col relative bg-[#09090b]">
-                    <div className="flex-1 p-6 font-mono text-sm overflow-auto">
-                      <pre className="whitespace-pre-wrap">
-                        <code className="text-zinc-300">
-                          {code}
-                          {isTyping && <span className="inline-block w-2 h-4 bg-brand-base ml-1 animate-pulse align-middle"></span>}
+                  <div className="flex-1 flex flex-col relative bg-[#1e1e1e]">
+                    <div className="flex-1 p-6 font-mono text-sm leading-relaxed overflow-auto relative">
+                      {/* Line Numbers Sidebar (Visual only) */}
+                      <div className="absolute left-0 top-6 bottom-0 w-12 text-right pr-4 text-zinc-700 select-none font-mono text-sm leading-relaxed hidden sm:block">
+                        {Array.from({ length: 15 }).map((_, i) => <div key={i}>{i + 1}</div>)}
+                      </div>
+
+                      <pre className="whitespace-pre-wrap pl-0 sm:pl-12">
+                        <code>
+                          <HighlightCode code={code} />
+                          {isTyping && <span className="inline-block w-2 h-4 bg-[#30B5A6] ml-0.5 animate-pulse align-middle"></span>}
                         </code>
                       </pre>
                     </div>
 
                     {/* Results Pane (Slide Up) */}
-                    <div className={`border-t border-white/10 bg-[#0c0c0e] transition-all duration-500 ease-in-out flex flex-col ${showResult ? "h-64" : "h-0 overflow-hidden"}`}>
-                      <div className="px-4 py-2 border-b border-white/10 bg-white/5 flex items-center justify-between">
+                    <div className={`border-t border-black/40 bg-[#0c0c0e] transition-all duration-300 ease-in-out flex flex-col ${showResult ? "h-64" : "h-0 overflow-hidden"}`}>
+                      <div className="px-4 py-2 border-b border-white/5 bg-[#252526] flex items-center justify-between">
                         <span className="text-xs font-semibold text-zinc-400 flex items-center gap-2">
                           <Terminal size={12} />
                           Query Result
                         </span>
                         <span className="text-xs text-green-400 flex items-center gap-1">
-                          <CheckCircle2 size={12} /> 14ms
+                          <CheckCircle2 size={12} /> Success (14ms)
                         </span>
                       </div>
                       <div className="flex-1 overflow-auto p-0">
                         <table className="w-full text-left text-xs">
-                          <thead className="bg-white/5 text-zinc-400 sticky top-0">
+                          <thead className="bg-[#1e1e1e] text-zinc-400 sticky top-0">
                             <tr>
                               {activeQuestion.result.length > 0 && Object.keys(activeQuestion.result[0]).map(key => (
-                                <th key={key} className="px-6 py-3 font-medium capitalize border-b border-white/10">{key.replace('_', ' ')}</th>
+                                <th key={key} className="px-6 py-3 font-medium capitalize border-b border-white/5">{key.replace('_', ' ')}</th>
                               ))}
                             </tr>
                           </thead>

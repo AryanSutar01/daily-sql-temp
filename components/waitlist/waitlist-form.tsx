@@ -116,10 +116,10 @@ export function WaitlistForm({ onSubmit, isLoading = false }: WaitlistFormProps)
       <Button
         type="submit"
         size="lg"
-        className="w-full bg-brand-base hover:bg-brand-dark text-white font-semibold shadow-lg shadow-brand-base/20 hover:shadow-brand-base/30 transition-all duration-200"
+        className="w-full bg-[#30B5A6] hover:bg-[#2A9D90] text-[#080C16] font-semibold text-lg py-6 shadow-lg shadow-[#30B5A6]/20 hover:shadow-[#30B5A6]/30 transition-all duration-200"
         disabled={isLoading}
       >
-        {isLoading ? "Processing..." : "Continue"}
+        {isLoading ? "Processing..." : "Sign in with Google"}
       </Button>
     </form>
   );

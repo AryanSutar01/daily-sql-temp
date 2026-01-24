@@ -1,50 +1,70 @@
+import { Mail, Clock, TrendingUp } from "lucide-react";
+
 export function HowItWorks() {
   const steps = [
     {
-      number: "1",
-      title: "Receive your questions",
-      description: "Every morning, get exactly 3 SQL questions delivered: Easy, Medium, and Advanced. No browsing, no decisions—just practice.",
+      icon: Mail,
+      title: "Receive questions",
+      description: "3 daily problems delivered morning.",
     },
     {
-      number: "2",
-      title: "Practice in 15 minutes",
-      description: "Work through real business-style problems using window functions, CTEs, and complex aggregations. The same SQL you write at work.",
+      icon: Clock,
+      title: "15 min practice",
+      description: "Solve real business scenarios quickly.",
     },
     {
-      number: "3",
-      title: "Track your progress",
-      description: "Build streaks, track mastery, and maintain consistency. No leaderboards—just you and your daily practice.",
+      icon: TrendingUp,
+      title: "Track progress",
+      description: "Build streaks and maintain skills.",
     },
   ];
 
   return (
-    <section id="how-it-works" className="py-32 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-brand-dark/10 to-background">
+    <section id="how-it-works" className="py-20 px-4 sm:px-6 lg:px-8 border-b border-border/50 bg-gradient-to-b from-background to-brand-dark/5">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-20 space-y-4">
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight">
+
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
             How it works
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Three simple steps to consistent SQL mastery
+          <p className="text-muted-foreground text-base">
+            Your daily routine for SQL mastery.
           </p>
         </div>
-        <div className="grid md:grid-cols-3 gap-8">
-          {steps.map((step, index) => (
-            <div key={index} className="space-y-5 p-8 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm hover:border-brand-base/30 transition-all duration-300">
-              <div className="flex items-center gap-4 mb-2">
-                <div className="text-6xl font-bold text-brand-base leading-none">
-                  {step.number}
+
+        {/* Horizontal Container Card */}
+        <div className="relative p-8 md:p-12 rounded-3xl border border-white/10 bg-[#0C0E12]/50 backdrop-blur-sm overflow-hidden">
+
+          {/* Background Glow */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-[#30B5A6]/5 rounded-full blur-[100px] pointer-events-none" />
+
+          {/* Steps Grid */}
+          <div className="relative grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-0">
+
+            {/* Connecting Line (Desktop) */}
+            <div className="hidden md:block absolute top-[28px] left-[16%] right-[16%] h-[2px] bg-gradient-to-r from-transparent via-[#30B5A6]/20 to-transparent z-0" />
+
+            {steps.map((step, index) => {
+              const Icon = step.icon;
+              return (
+                <div key={index} className="relative z-10 flex flex-col items-center text-center group">
+                  {/* Icon Circle */}
+                  <div className="w-14 h-14 rounded-full bg-[#09090B] border-2 border-[#30B5A6]/20 group-hover:border-[#30B5A6] flex items-center justify-center mb-5 transition-all duration-300 shadow-[0_0_15px_-3px_rgba(48,181,166,0.1)] group-hover:shadow-[0_0_20px_-3px_rgba(48,181,166,0.3)] group-hover:scale-110">
+                    <Icon className="w-6 h-6 text-[#30B5A6]/70 group-hover:text-[#30B5A6] transition-colors" />
+                  </div>
+
+                  {/* Content */}
+                  <h3 className="text-lg font-bold text-foreground mb-2">
+                    {step.title}
+                  </h3>
+                  <p className="text-sm text-zinc-400 max-w-[240px] leading-relaxed mx-auto">
+                    {step.description}
+                  </p>
                 </div>
-                <div className="h-px flex-1 bg-gradient-to-r from-brand-base/50 to-transparent"></div>
-              </div>
-              <h3 className="text-2xl font-semibold">
-                {step.title}
-              </h3>
-              <p className="text-muted-foreground leading-relaxed">
-                {step.description}
-              </p>
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>
