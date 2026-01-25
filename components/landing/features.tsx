@@ -1,54 +1,68 @@
+import { Share2, Clock, Calendar, Database, CheckCircle, BarChart3 } from "lucide-react";
+
 export function Features() {
   const features = [
     {
-      title: "Never waste time deciding what to practice",
-      description: "Exactly 3 questions daily—Easy, Medium, and Advanced. No browsing, no choice paralysis, just practice.",
+      icon: Clock,
+      title: "Never waste time deciding",
+      description: "Exactly 3 questions daily—Easy, Medium, and Advanced. No browsing, no paralysis, just practice.",
     },
     {
-      title: "Real problems you'll encounter at work",
-      description: "Customer analytics, revenue analysis, cohort retention—the SQL scenarios you actually face, not abstract puzzles.",
+      icon: Database,
+      title: "Real work scenarios",
+      description: "Customer analytics, revenue analysis, cohorts—the actual SQL problems you face, not abstract puzzles.",
     },
     {
-      title: "Fresh challenges every day",
-      description: "New questions daily. No grinding through the same problems repeatedly. Consistent variety, consistent growth.",
+      icon: Calendar,
+      title: "Fresh challenges daily",
+      description: "New questions every morning. No grinding through the same problems. Consistent variety, consistent growth.",
     },
     {
-      title: "The SQL you actually write",
-      description: "Window functions, CTEs, complex aggregations, subqueries—advanced concepts you use at work, not toy examples.",
+      icon: Share2,
+      title: "The SQL you actually use",
+      description: "Window functions, CTEs, complex aggregations—advanced concepts for work, not just syntax memorization.",
     },
     {
-      title: "Fits your schedule, not the other way around",
+      icon: CheckCircle,
+      title: "Fits your schedule",
       description: "15 minutes designed for busy professionals. Quick, focused practice that doesn't compete with your priorities.",
     },
     {
-      title: "Track progress, not competition",
+      icon: BarChart3,
+      title: "Track progress",
       description: "Streaks, mastery tracking, and consistency metrics. No leaderboards—just you and your daily practice.",
     },
   ];
 
   return (
-    <section className="py-32 px-4 sm:px-6 lg:px-8">
+    <section className="py-24 px-4 sm:px-6 lg:px-8 border-b border-white/5 bg-black/20">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-20 space-y-4">
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight">
-            Features designed for consistency
+        <div className="text-center mb-16 space-y-4">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white">
+            Features designed for <span className="text-[#30B5A6]">consistency</span>
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg text-zinc-400 max-w-2xl mx-auto">
             Every feature serves one goal: making daily SQL practice sustainable
           </p>
         </div>
+
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature, index) => (
-            <div key={index} className="p-8 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm hover:border-[#2563EB]/20 hover:bg-card/70 transition-all duration-300 space-y-3">
-              <h3 className="text-xl font-semibold flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#2563EB]"></span>
-                {feature.title}
-              </h3>
-              <p className="text-muted-foreground leading-relaxed">
-                {feature.description}
-              </p>
-            </div>
-          ))}
+          {features.map((feature, index) => {
+            const Icon = feature.icon;
+            return (
+              <div key={index} className="group p-6 rounded-xl border border-white/10 bg-[#0A0A0B]/50 backdrop-blur-sm hover:border-[#30B5A6]/30 hover:bg-[#30B5A6]/5 transition-all duration-300">
+                <div className="w-10 h-10 rounded-lg bg-[#30B5A6]/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Icon className="w-5 h-5 text-[#30B5A6]" />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-[15px] text-zinc-400 leading-relaxed">
+                  {feature.description}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>

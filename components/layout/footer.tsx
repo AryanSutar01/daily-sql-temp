@@ -6,19 +6,23 @@ export function Footer() {
   return (
     <footer className="border-t border-border/50 bg-[#09090b]">
       {/* Final CTA Section */}
-      <div className="py-20 px-4 sm:px-6 lg:px-8 border-b border-border/50 bg-gradient-to-b from-background to-[#30B5A6]/5">
-        <div className="max-w-4xl mx-auto text-center space-y-8">
-          <div className="space-y-4">
-            <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-white">
-              Stay sharp with SQL
-            </h2>
-            <p className="text-lg text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-              Join early access and start building your daily SQL practice habit today.
-            </p>
-          </div>
-          <Button asChild size="lg" className="bg-[#30B5A6] hover:bg-[#2A9D90] text-[#080C16] font-bold px-10 py-7 text-lg shadow-lg shadow-[#30B5A6]/20 hover:shadow-[#30B5A6]/30 transition-all duration-200">
-            <Link href="/waitlist">Join Waitlist</Link>
+      <div className="max-w-4xl mx-auto text-center px-4 py-24 md:py-32">
+        <div className="space-y-6 mb-10">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight">
+            Start building your <span className="text-[#4DD4C4]">daily SQL habit</span>
+          </h2>
+          <p className="text-xl text-[#7b8ca3] max-w-2xl mx-auto leading-relaxed">
+            Join thousands of data professionals who practice SQL every day. 15 minutes. 3 questions. Consistent improvement.
+          </p>
+        </div>
+
+        <div className="flex flex-col items-center gap-4">
+          <Button asChild size="lg" className="bg-[#4DD4C4] hover:bg-[#3dbdb0] text-[#080c16] font-bold px-8 py-6 text-lg shadow-[0_0_30px_rgba(77,212,196,0.2)] hover:shadow-[0_0_40px_rgba(77,212,196,0.3)] transition-all duration-300">
+            <Link href="/login">Start your daily practice</Link>
           </Button>
+          <span className="text-sm text-[#7b8ca3] opacity-80">
+            Free during early access. No credit card required.
+          </span>
         </div>
       </div>
 
@@ -42,12 +46,12 @@ export function Footer() {
             <h3 className="text-sm font-semibold text-white">Product</h3>
             <ul className="space-y-2 text-sm text-zinc-400">
               <li>
-                <Link href="#how-it-works" className="hover:text-[#30B5A6] transition-colors">
+                <Link href="/#how-it-works" className="hover:text-[#30B5A6] transition-colors">
                   How it works
                 </Link>
               </li>
               <li>
-                <Link href="/pricing" className="hover:text-[#30B5A6] transition-colors">
+                <Link href="/#pricing" className="hover:text-[#30B5A6] transition-colors">
                   Pricing
                 </Link>
               </li>
@@ -63,11 +67,6 @@ export function Footer() {
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-white">Company</h3>
             <ul className="space-y-2 text-sm text-zinc-400">
-              <li>
-                <Link href="/team" className="hover:text-[#30B5A6] transition-colors">
-                  Team
-                </Link>
-              </li>
               <li>
                 <Link href="/contact" className="hover:text-[#30B5A6] transition-colors">
                   Contact
