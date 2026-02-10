@@ -133,7 +133,7 @@ WHERE activity_month >= cohort_month;`,
   }
 ];
 
-const HighlightCode = ({ code }: { code: string }) => {
+export const HighlightCode = ({ code }: { code: string }) => {
   if (!code) return null;
   // Simple syntax highlighting tailored for the visible query
   const parts = code.split(/(\bSELECT\b|\bFROM\b|\bWHERE\b|\bGROUP\s+BY\b|\bORDER\s+BY\b|\bPARTITION\s+BY\b|\bJOIN\b|\bWITH\b|\bAS\b|\bON\b|\bAND\b|\bOVER\b|'[^']*'|\b\d+\.?\d*\b|[(),;.]|[+\-*\/%=<>!]+)/gi);
