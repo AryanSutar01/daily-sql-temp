@@ -179,6 +179,20 @@ export function DailySetClient() {
     };
 
     // Monaco setup
+    const handleEditorWillMount = (monaco: any) => {
+        monaco.editor.defineTheme('dailySqlTheme', {
+            base: 'vs-dark',
+            inherit: true,
+            rules: [],
+            colors: {
+                'editor.background': '#0b101c', // Exact theme match instead of transparent
+                'editor.lineHighlightBackground': '#ffffff0a', // very subtle line highlight
+                'editorLineNumber.foreground': '#4f5b72',
+                'editorGutter.background': '#0b101c'
+            }
+        });
+    };
+
     const handleEditorMount = (editor: any) => {
         editor.onDidChangeCursorPosition((e: any) => {
             setCursorPos({ lineNumber: e.position.lineNumber, column: e.position.column });
@@ -186,26 +200,26 @@ export function DailySetClient() {
     };
 
     return (
-        <div className="h-[calc(100vh-64px)] bg-[#080c16] text-white flex flex-col font-sans overflow-hidden">
+        <div className="h-[calc(100vh-64px)] bg-[#080c16] text-white flex flex-col font-sans overflow-hidden [&_*::-webkit-scrollbar]:w-1.5 [&_*::-webkit-scrollbar-track]:bg-transparent [&_*::-webkit-scrollbar-thumb]:bg-[#202736] [&_*::-webkit-scrollbar-thumb]:rounded-full hover:[&_*::-webkit-scrollbar-thumb]:bg-zinc-600">
             {/* Split Workspace Layer 2 */}
             <div className="flex-1 flex overflow-hidden">
                 <Group orientation="horizontal" className="flex-1 w-full h-full">
 
                     {/* LEFT PANE (Navigation OR Details) */}
-                    <Panel defaultSize="40" minSize="25" maxSize="60" className="flex flex-col bg-[#0b101c] border-r border-[#202736]">
+                    <Panel defaultSize="40" minSize="25" maxSize="60" className="flex flex-col bg-[#080c16] border-r border-[#202736]">
 
                         {!viewingDetails ? (
                             // ==========================================
                             // STATE 1: List Navigation
                             // ==========================================
                             <div className="flex-1 flex flex-col h-full overflow-hidden">
-                                <div className="flex border-b border-[#202736] shrink-0">
+                                <div className="flex h-14 bg-[#131924] border-b border-[#202736] shrink-0">
                                     <button
-                                        className={`flex-1 py-3 text-xs font-semibold tracking-wide border-b-2 transition-colors ${activeSidebarTab === 'list' ? 'border-[#4DD4C4] text-[#4DD4C4]' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+                                        className={`flex-1 h-full flex items-center justify-center text-sm font-semibold tracking-wide border-b-2 transition-colors ${activeSidebarTab === 'list' ? 'border-[#4DD4C4] text-[#4DD4C4]' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
                                         onClick={() => setActiveSidebarTab('list')}
                                     >Problem List</button>
                                     <button
-                                        className={`flex-1 py-3 text-xs font-semibold tracking-wide border-b-2 transition-colors ${activeSidebarTab === 'today' ? 'border-[#4DD4C4] text-[#4DD4C4]' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+                                        className={`flex-1 h-full flex items-center justify-center text-sm font-semibold tracking-wide border-b-2 transition-colors ${activeSidebarTab === 'today' ? 'border-[#4DD4C4] text-[#4DD4C4]' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
                                         onClick={() => setActiveSidebarTab('today')}
                                     >Today's Set</button>
                                 </div>
@@ -218,10 +232,10 @@ export function DailySetClient() {
                                             </span>
                                             <div className="flex justify-between items-end">
                                                 <span className="font-semibold text-xl text-zinc-100">{todayStr}</span>
-                                                <div className="flex items-center gap-1.5 bg-[#0b101c] px-2 py-1 rounded border border-[#202736]">
-                                                    <span className="text-[10px] text-zinc-400 font-bold uppercase">Day</span>
-                                                    <span className="text-sm text-white font-mono font-bold">{streak}</span>
-                                                </div>
+                                                <button className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-[#202736] bg-[#0b101c] hover:bg-[#131924] transition-colors cursor-pointer active:scale-95">
+                                                    <Flame size={14} className="fill-[#4DD4C4] text-[#4DD4C4]" />
+                                                    <span className="text-sm text-zinc-300 font-bold tracking-wide">{streak} Days</span>
+                                                </button>
                                             </div>
                                         </div>
 
@@ -237,29 +251,29 @@ export function DailySetClient() {
                                                 return (
                                                     <div key={dLevel}
                                                         onClick={() => handleProblemSelect(pId)}
-                                                        className="p-3 bg-[#131924] rounded-lg cursor-pointer border border-[#202736] hover:border-[#4DD4C4]/50 transition-all flex flex-col gap-2 group"
+                                                        className="p-3 bg-[#131924] rounded-lg cursor-pointer border border-[#202736] hover:border-[#4DD4C4]/50 transition-all flex items-center justify-between group"
                                                     >
-                                                        <div className="flex justify-between items-center">
-                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
+                                                        <div className="text-sm font-medium text-white group-hover:text-[#4DD4C4] transition-colors line-clamp-1 pr-4">{pInfo.title}</div>
+                                                        <div className="flex items-center gap-4 shrink-0">
+                                                            <span className={`text-[9px] font-bold px-1.5 py-1 rounded border min-w-[100px] text-center ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
                                                                 {dStyle.label}
                                                             </span>
                                                             <CheckCircle2 size={16} className={isCompleted ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
                                                         </div>
-                                                        <div className="text-sm font-medium text-white group-hover:text-[#4DD4C4] transition-colors">{pInfo.title}</div>
                                                     </div>
                                                 )
                                             })}
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
-                                        <div className="flex items-center gap-3 shrink-0">
-                                            <div className="w-8 h-8 rounded-full border-2 border-[#4DD4C4] flex items-center justify-center relative">
-                                                <svg className="w-8 h-8 absolute -rotate-90" viewBox="0 0 36 36">
+                                    <div className="flex-1 flex flex-col p-6 space-y-6 overflow-hidden">
+                                        <div className="flex flex-col items-center justify-center gap-3 shrink-0 mb-2">
+                                            <div className="w-16 h-16 rounded-full border-2 border-[#202736] flex items-center justify-center relative shadow-[0_0_15px_rgba(77,212,196,0.1)]">
+                                                <svg className="w-16 h-16 absolute -rotate-90" viewBox="0 0 36 36">
                                                     <path className="text-[#202736]" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                                                     <path className="text-[#4DD4C4]" strokeDasharray="15, 100" strokeWidth="3" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                                                 </svg>
-                                                <span className="text-[9px] text-white font-bold">15%</span>
+                                                <span className="text-sm text-white font-bold">15%</span>
                                             </div>
                                             <span className="text-xs text-zinc-400 font-medium font-mono">15/100 Solved</span>
                                         </div>
@@ -281,8 +295,8 @@ export function DailySetClient() {
                                         <div className="space-y-2 overflow-y-auto pr-1 pb-4 flex-1">
                                             {filteredProblems.map(p => (
                                                 <div key={p.id} onClick={() => handleProblemSelect(p.id)} className="flex items-center justify-between p-3 rounded bg-[#131924] border border-[#202736] hover:border-[#4DD4C4]/30 cursor-pointer transition-colors group">
-                                                    <span className="text-sm font-medium text-zinc-300 group-hover:text-white">{p.id}. {p.title}</span>
-                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${getDiffStyle(p.difficulty).color} ${getDiffStyle(p.difficulty).bg} ${getDiffStyle(p.difficulty).border}`}>
+                                                    <span className="text-sm font-medium text-zinc-300 group-hover:text-white truncate pr-4">{p.id}. {p.title}</span>
+                                                    <span className={`shrink-0 text-[9px] font-bold px-1.5 py-1 rounded border min-w-[100px] text-center ${getDiffStyle(p.difficulty).color} ${getDiffStyle(p.difficulty).bg} ${getDiffStyle(p.difficulty).border}`}>
                                                         {getDiffStyle(p.difficulty).label}
                                                     </span>
                                                 </div>
@@ -297,7 +311,7 @@ export function DailySetClient() {
                             // STATE 2: Drill-down Problem Details
                             // ==========================================
                             <div className="flex-1 flex flex-col h-full bg-[#0d121c] overflow-hidden">
-                                <div className="h-12 border-b border-[#202736] bg-[#0b101c] px-4 flex items-center justify-between shrink-0">
+                                <div className="h-14 border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0">
                                     <button onClick={handleBackToList} className="flex items-center gap-2 text-xs font-mono text-zinc-400 hover:text-white transition-colors">
                                         <ArrowLeft size={14} /> Back
                                     </button>
@@ -418,7 +432,7 @@ export function DailySetClient() {
 
                     {/* RIGHT PANE (SQL Editor & Output) */}
                     <Panel minSize="30" className="flex flex-col bg-[#0b101c]">
-                        <div className="h-12 border-b border-[#202736] bg-[#0b101c] flex items-center justify-between px-4 shrink-0">
+                        <div className="h-14 border-b border-[#202736] bg-[#131924] flex items-center justify-between px-4 shrink-0">
                             <span className="text-xs font-mono font-medium text-[#4DD4C4] flex items-center gap-2">
                                 <span className="text-zinc-500">&gt;_</span> solution.sql
                             </span>
@@ -440,13 +454,14 @@ export function DailySetClient() {
                             </div>
                         </div>
 
-                        <div className="flex-1 relative pt-4 overflow-hidden">
+                        <div className="flex-1 relative pt-4 overflow-hidden bg-[#0b101c]">
                             <Editor
                                 height="100%"
                                 language="sql"
-                                theme="vs-dark"
+                                theme="dailySqlTheme"
                                 value={code}
                                 onChange={(val) => setCode(val || "")}
+                                beforeMount={handleEditorWillMount}
                                 onMount={handleEditorMount}
                                 options={{
                                     minimap: { enabled: false },
@@ -462,7 +477,7 @@ export function DailySetClient() {
                                 }}
                             />
                             {/* Cursor position indicator */}
-                            <div className="absolute right-6 bottom-4 text-[10px] text-zinc-500 font-mono pointer-events-none bg-[#0b101c] px-2 py-1 rounded">
+                            <div className="absolute right-6 bottom-4 text-[10px] text-zinc-500 font-mono pointer-events-none bg-transparent px-2 py-1 rounded">
                                 Ln {cursorPos.lineNumber}, Col {cursorPos.column}
                             </div>
                         </div>
@@ -521,7 +536,7 @@ export function DailySetClient() {
                                         <button
                                             onClick={handleSubmit}
                                             disabled={executionResult?.status !== 'correct'}
-                                            className={`px-6 py-2 rounded text-xs font-bold transition-all shadow-lg ${executionResult?.status === 'correct' ? 'bg-white text-black hover:bg-zinc-200' : 'bg-[#18212f] text-zinc-500 cursor-not-allowed border border-[#202736]'}`}
+                                            className={`px-6 py-2 rounded text-xs font-bold transition-all shadow-[0_0_10px_rgba(77,212,196,0.2)] ${executionResult?.status === 'correct' ? 'bg-[#4DD4C4] text-[#080C16] hover:bg-[#3dbdb0]' : 'bg-[#18212f] text-zinc-500 cursor-not-allowed border border-[#202736] shadow-none'}`}
                                         >
                                             SUBMIT
                                         </button>
