@@ -192,7 +192,7 @@ export function DailySetClient() {
                 <Group orientation="horizontal" className="flex-1 w-full h-full">
 
                     {/* LEFT PANE (Navigation OR Details) */}
-                    <Panel defaultSize={40} minSize={25} maxSize={60} className="flex flex-col bg-[#0b101c] border-r border-[#202736]">
+                    <Panel defaultSize="40" minSize="25" maxSize="60" className="flex flex-col bg-[#0b101c] border-r border-[#202736]">
 
                         {!viewingDetails ? (
                             // ==========================================
@@ -417,7 +417,7 @@ export function DailySetClient() {
                     </Separator>
 
                     {/* RIGHT PANE (SQL Editor & Output) */}
-                    <Panel minSize={30} className="flex flex-col bg-[#0b101c]">
+                    <Panel minSize="30" className="flex flex-col bg-[#0b101c]">
                         <div className="h-12 border-b border-[#202736] bg-[#0b101c] flex items-center justify-between px-4 shrink-0">
                             <span className="text-xs font-mono font-medium text-[#4DD4C4] flex items-center gap-2">
                                 <span className="text-zinc-500">&gt;_</span> solution.sql
