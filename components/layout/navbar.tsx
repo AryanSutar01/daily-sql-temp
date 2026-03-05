@@ -9,7 +9,7 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
 
   const navItems = [
-    { name: "Practice", href: "#" },
+    { name: "Practice", href: "/waitlist" },
     { name: "Pricing", href: "/#pricing" },
     { name: "FAQ", href: "/#faq" },
     { name: "Contact", href: "/contact" },
