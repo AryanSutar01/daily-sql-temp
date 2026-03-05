@@ -25,156 +25,126 @@ import {
 import { useState, useRef, useEffect } from "react";
 import { Panel, Group, Separator } from "react-resizable-panels";
 import Editor from "@monaco-editor/react";
+import { api } from "@/lib/api";
+import { Problem, DailyPractice, Dataset, ExecutionResponse } from "@/types/api";
 
-// ==========================================
-// ROBUST MOCK DATA (Replaces API Calls)
-// ==========================================
-type Difficulty = 'easy' | 'medium' | 'hard';
-
-const MOCK_PROBLEMS = [
-    { id: '1', title: 'Find Active Users', difficulty: 'easy' as Difficulty, tags: ['SELECT', 'WHERE'], success: '85%', time: '5m', desc: "Write a query to find all active users.\n\nAn active user is someone who has logged in within the last 30 days. You need to return their `user_id` and `email`." },
-    { id: '2', title: 'Monthly Revenue', difficulty: 'easy' as Difficulty, tags: ['GROUP BY', 'SUM'], success: '72%', time: '10m', desc: "Calculate the total revenue generated each month.\n\nReturn `month` and `total_revenue`. Order the results chronologically." },
-    { id: '3', title: 'Second Highest Salary', difficulty: 'medium' as Difficulty, tags: ['SUBQUERY', 'MAX'], success: '55%', time: '15m', desc: "Find the employee with the second highest salary.\n\nIf there is no second highest salary, return null." },
-    { id: '4', title: 'Department Top Three Salaries', difficulty: 'hard' as Difficulty, tags: ['WINDOW FUNCTION', 'DENSE_RANK'], success: '32%', time: '25m', desc: "Find the employees who earn the top three salaries in each of the company's departments.\n\nA company's executives are interested in seeing who earns the most money in each of the company's departments." },
-    { id: '5', title: 'Consecutive Numbers', difficulty: 'medium' as Difficulty, tags: ['JOIN', 'LEAD'], success: '48%', time: '20m', desc: "Find all numbers that appear at least three times consecutively in the `Logs` table." },
-    { id: '6', title: 'Game Play Analysis', difficulty: 'medium' as Difficulty, tags: ['MIN', 'GROUP BY'], success: '61%', time: '12m', desc: "Report the first login date for each player." },
-];
-
-const MOCK_DAILY_SET = {
-    easy: '1',
-    medium: '3',
-    hard: '4'
-};
-
-const MOCK_DATASETS: Record<string, any> = {
-    '1': [
-        {
-            table_name: 'Users',
-            sample_rows: [
-                { user_id: 101, email: 'john@example.com', last_login: '2023-10-15' },
-                { user_id: 102, email: 'jane@example.com', last_login: '2022-01-05' },
-                { user_id: 103, email: 'bob@example.com', last_login: '2023-11-01' }
-            ]
-        }
-    ],
-    '3': [
-        {
-            table_name: 'Employee',
-            sample_rows: [
-                { id: 1, salary: 100 },
-                { id: 2, salary: 200 },
-                { id: 3, salary: 300 }
-            ]
-        }
-    ],
-    '4': [
-        {
-            table_name: 'Employee',
-            sample_rows: [
-                { id: 1, name: 'Joe', salary: 85000, departmentId: 1 },
-                { id: 2, name: 'Henry', salary: 80000, departmentId: 2 },
-                { id: 3, name: 'Sam', salary: 60000, departmentId: 2 },
-                { id: 4, name: 'Max', salary: 90000, departmentId: 1 }
-            ]
-        },
-        {
-            table_name: 'Department',
-            sample_rows: [
-                { id: 1, name: 'IT' },
-                { id: 2, name: 'Sales' }
-            ]
-        }
-    ]
-};
-
-const MOCK_EXPECTED: Record<string, any> = {
-    '1': [{ user_id: 101, email: 'john@example.com' }, { user_id: 103, email: 'bob@example.com' }],
-    '3': [{ SecondHighestSalary: 200 }],
-    '4': [{ Department: 'IT', Employee: 'Max', Salary: 90000 }, { Department: 'IT', Employee: 'Joe', Salary: 85000 }]
-};
-
-// ==========================================
+type Difficulty = 'easy' | 'medium' | 'hard' | 'advanced';
 
 export function DailySetClient() {
     // Top-Level State
-    const [streak, setStreak] = useState<number>(47); // Mock streak
+    const [streak, setStreak] = useState<number>(0);
     const [activeSidebarTab, setActiveSidebarTab] = useState<'today' | 'list'>('today');
     const [searchQuery, setSearchQuery] = useState('');
+
+    const [problems, setProblems] = useState<Problem[]>([]);
+    const [dailySet, setDailySet] = useState<DailyPractice | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     // Drill-down State
     const [activeProblemId, setActiveProblemId] = useState<string | null>(null);
     const [viewingDetails, setViewingDetails] = useState<boolean>(false);
+    const [activeDatasets, setActiveDatasets] = useState<Dataset[]>([]);
 
     // Editor & Results State
     const [code, setCode] = useState("-- Select a problem to begin\n");
     const [isRunning, setIsRunning] = useState(false);
     const [showResult, setShowResult] = useState(false);
-    const [executionResult, setExecutionResult] = useState<any>(null);
+    const [executionResult, setExecutionResult] = useState<ExecutionResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     // Monaco Location State
     const [cursorPos, setCursorPos] = useState({ lineNumber: 1, column: 1 });
 
+    useEffect(() => {
+        async function loadData() {
+            try {
+                const [probs, daily, streakData] = await Promise.all([
+                    api.getProblems(),
+                    api.getDailyPractice().catch(() => null),
+                    api.getStreak().catch(() => ({ current_streak: 0, last_active_date: null })),
+                ]);
+                setProblems(probs);
+                setDailySet(daily);
+                setStreak(streakData?.current_streak || 0);
+            } catch (err) {
+                console.error("Failed to load initial data", err);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+        loadData();
+    }, []);
+
     // Computed Variables
     const todayStr = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date()).toUpperCase();
 
-    const activeProblem = MOCK_PROBLEMS.find(p => p.id === activeProblemId);
-    const activeDatasets = activeProblemId ? MOCK_DATASETS[activeProblemId] || [] : [];
-    const filteredProblems = MOCK_PROBLEMS.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    const activeProblem = problems.find(p => p.id === activeProblemId);
+    const filteredProblems = problems.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
     // Handlers
-    const handleProblemSelect = (id: string) => {
+    const handleProblemSelect = async (id: string) => {
         setActiveProblemId(id);
         setViewingDetails(true);
         setShowResult(false);
         setError(null);
         setExecutionResult(null);
+        setActiveDatasets([]);
 
-        const p = MOCK_PROBLEMS.find(x => x.id === id);
-        const ds = MOCK_DATASETS[id]?.[0]?.table_name || 'table_name';
-        setCode(`-- Write your query for: ${p?.title}\nSELECT * FROM ${ds};\n`);
+        try {
+            const datasets = await api.getDatasets(id);
+            // Normalize sample_rows: Postgres JSONB can sometimes come back as a string
+            const normalizedDatasets = datasets.map(ds => ({
+                ...ds,
+                sample_rows: typeof ds.sample_rows === 'string'
+                    ? JSON.parse(ds.sample_rows)
+                    : (Array.isArray(ds.sample_rows) ? ds.sample_rows : []),
+            }));
+            setActiveDatasets(normalizedDatasets);
+
+            const p = problems.find(x => x.id === id);
+            const dsName = datasets[0]?.table_name || 'table_name';
+            setCode(`-- Write your query for: ${p?.title}\nSELECT * FROM ${dsName};\n`);
+        } catch (err) {
+            console.error("Failed to load datasets", err);
+        }
     };
 
     const handleBackToList = () => {
         setViewingDetails(false);
-        // We keep the activeProblemId so the editor doesn't wipe, 
-        // but we navigate the left pane back to the list.
     };
 
-    const handleRun = () => {
+    const handleRun = async () => {
         if (!activeProblemId) return;
         setIsRunning(true);
         setError(null);
         setShowResult(true);
 
-        // Simulate network delay for Mock execution
-        setTimeout(() => {
-            setIsRunning(false);
-            if (code.trim().toUpperCase().includes('DROP')) {
-                setError("Execution Error: DROP permissions denied.");
-                setExecutionResult(null);
-            } else {
-                const isCorrect = MOCK_EXPECTED[activeProblemId] !== undefined;
-                setExecutionResult({
-                    status: isCorrect ? 'correct' : 'incorrect',
-                    time_ms: Math.floor(Math.random() * 20) + 5,
-                    columns: isCorrect ? Object.keys(MOCK_EXPECTED[activeProblemId][0]) : ['output'],
-                    rows: isCorrect ? MOCK_EXPECTED[activeProblemId].map((r: any) => Object.values(r)) : [['Empty or incorrect result set']]
-                });
+        try {
+            const res = await api.execute(activeProblemId, code);
+            setExecutionResult(res);
+            if (res.status === 'error' && res.error) {
+                setError(res.error);
             }
-        }, 600);
+        } catch (err: any) {
+            setError(err.message || "Execution failed");
+            setExecutionResult(null);
+        } finally {
+            setIsRunning(false);
+        }
     };
 
     const handleSubmit = () => {
-        alert(`Solution Submitted for ${activeProblem?.title}! Streak +1`);
         if (executionResult?.status === 'correct') {
-            setStreak(prev => prev + 1);
+            alert(`Solution Submitted for ${activeProblem?.title}! Streaks are updated automatically!`);
+            // We could re-fetch streak here if we want
+            api.getStreak().then(s => setStreak(s.current_streak)).catch(console.error);
         }
     };
 
     const getDiffStyle = (diff: string) => {
-        if (diff === 'easy') return { label: 'BASIC', color: 'text-[#4DD4C4]', bg: 'bg-[#4DD4C4]/10', border: 'border-[#4DD4C4]/30', hex: '#4DD4C4' };
-        if (diff === 'medium') return { label: 'INTERMEDIATE', color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', hex: '#eab308' };
+        const diffLower = diff?.toLowerCase();
+        if (diffLower === 'easy') return { label: 'BASIC', color: 'text-[#4DD4C4]', bg: 'bg-[#4DD4C4]/10', border: 'border-[#4DD4C4]/30', hex: '#4DD4C4' };
+        if (diffLower === 'medium') return { label: 'INTERMEDIATE', color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', hex: '#eab308' };
         return { label: 'ADVANCED', color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/30', hex: '#f87171' };
     };
 
@@ -198,6 +168,17 @@ export function DailySetClient() {
             setCursorPos({ lineNumber: e.position.lineNumber, column: e.position.column });
         });
     };
+
+    if (isLoading) {
+        return (
+            <div className="h-[calc(100vh-64px)] bg-[#080c16] text-white flex items-center justify-center font-sans">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 size={32} className="animate-spin text-[#4DD4C4]" />
+                    <span className="text-sm font-mono text-zinc-400">Loading Environment...</span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="h-[calc(100vh-64px)] bg-[#080c16] text-white flex flex-col font-sans overflow-hidden [&_*::-webkit-scrollbar]:w-1.5 [&_*::-webkit-scrollbar-track]:bg-transparent [&_*::-webkit-scrollbar-thumb]:bg-[#202736] [&_*::-webkit-scrollbar-thumb]:rounded-full hover:[&_*::-webkit-scrollbar-thumb]:bg-zinc-600">
@@ -240,13 +221,13 @@ export function DailySetClient() {
                                         </div>
 
                                         <div className="space-y-3">
-                                            {['easy', 'medium', 'hard'].map((dLevel, idx) => {
-                                                const pId = MOCK_DAILY_SET[dLevel as Difficulty];
+                                            {dailySet ? (['easy', 'medium', 'advanced'] as ('easy' | 'medium' | 'advanced')[]).map((dLevel) => {
+                                                const pId = dailySet[dLevel];
                                                 if (!pId) return null;
-                                                const pInfo = MOCK_PROBLEMS.find(p => p.id === pId);
+                                                const pInfo = problems.find(p => p.id === pId);
                                                 if (!pInfo) return null;
-                                                const dStyle = getDiffStyle(dLevel);
-                                                const isCompleted = streak > 47 && executionResult?.status === 'correct' && activeProblemId === pId;
+                                                const dStyle = getDiffStyle(pInfo.difficulty);
+                                                const isCompleted = false; // We could fetch 'me/attempts/today' to check this
 
                                                 return (
                                                     <div key={dLevel}
@@ -264,7 +245,9 @@ export function DailySetClient() {
                                                         </div>
                                                     </div>
                                                 )
-                                            })}
+                                            }) : (
+                                                <div className="text-xs text-zinc-500 italic p-4 text-center border border-[#202736] rounded bg-[#131924]">No daily set found.</div>
+                                            )}
                                         </div>
                                     </div>
                                 ) : (
@@ -295,10 +278,10 @@ export function DailySetClient() {
                                         </div>
 
                                         <div className="space-y-2 overflow-y-auto pr-1 pb-4 flex-1">
-                                            {filteredProblems.map(p => (
+                                            {filteredProblems.map((p, index) => (
                                                 <div key={p.id} onClick={() => handleProblemSelect(p.id)} className="flex items-center justify-between p-3 rounded bg-[#131924] border border-[#202736] hover:border-[#4DD4C4]/30 cursor-pointer transition-colors group">
                                                     <div className="flex items-center gap-2 overflow-hidden">
-                                                        <span className="text-sm font-medium text-zinc-300 group-hover:text-white shrink-0 w-[20px]">{p.id}.</span>
+                                                        <span className="text-[10px] font-mono text-zinc-500 shrink-0 w-[40px] truncate" title={p.id}>{index + 1}.</span>
                                                         <span className="text-sm font-medium text-zinc-300 group-hover:text-white truncate">{p.title}</span>
                                                     </div>
                                                     <div className="w-[100px] flex justify-center shrink-0">
@@ -308,7 +291,7 @@ export function DailySetClient() {
                                                     </div>
                                                 </div>
                                             ))}
-                                            {filteredProblems.length === 0 && <div className="text-center text-xs text-zinc-500 mt-8">No problems match your search.</div>}
+                                            {filteredProblems.length === 0 && <div className="text-center text-xs text-zinc-500 mt-8">No problems found.</div>}
                                         </div>
                                     </div>
                                 )}
@@ -336,13 +319,12 @@ export function DailySetClient() {
                                         )}
                                         <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">{activeProblem?.title}</h1>
                                         <div className="flex gap-4 text-xs text-zinc-500 mb-6 font-mono font-medium">
-                                            <span className="flex items-center gap-1.5"><CheckCircle2 size={12} /> Success rate: {activeProblem?.success}</span>
-                                            <span className="flex items-center gap-1.5"><Clock size={12} /> {activeProblem?.time} Avg</span>
+                                            <span className="flex items-center gap-1.5"><Clock size={12} /> {activeProblem?.estimated_time_minutes}m Avg</span>
                                         </div>
                                         <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2">Task</h3>
                                         <div className="h-px w-full bg-[#202736] mb-4"></div>
                                         <p className="text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap">
-                                            {activeProblem?.desc}
+                                            {activeProblem?.description}
                                         </p>
                                     </div>
 
@@ -353,7 +335,7 @@ export function DailySetClient() {
                                         <div className="h-px w-full bg-[#202736] mb-4"></div>
 
                                         {activeDatasets.length === 0 && <span className="text-xs text-zinc-600 font-mono italic">No datasets available</span>}
-                                        {activeDatasets.map((ds: any, idx: number) => (
+                                        {activeDatasets.map((ds, idx) => (
                                             <div key={idx} className="border border-[#202736] rounded-lg overflow-hidden mb-4">
                                                 <div className="bg-[#131924] px-4 py-2 border-b border-[#202736] flex justify-between items-center">
                                                     <span className="text-xs font-bold text-zinc-400 font-mono">
@@ -372,7 +354,7 @@ export function DailySetClient() {
                                                         <tbody>
                                                             {ds.sample_rows.map((row: any, i: number) => (
                                                                 <tr key={i} className="border-b border-[#202736]/50 last:border-0 text-zinc-400 font-mono hover:bg-white/[0.02]">
-                                                                    {Object.values(row).map((cell: any, j: number) => <td key={j} className="px-3 py-1.5">{cell}</td>)}
+                                                                    {Object.values(row).map((cell: any, j: number) => <td key={j} className="px-3 py-1.5">{cell?.toString()}</td>)}
                                                                 </tr>
                                                             ))}
                                                         </tbody>
@@ -385,27 +367,27 @@ export function DailySetClient() {
                                     <div className="pt-2">
                                         <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2">Expected Output</h3>
                                         <div className="h-px w-full bg-[#202736] mb-4"></div>
-                                        {activeProblemId && MOCK_EXPECTED[activeProblemId] ? (
+                                        {executionResult?.expected ? (
                                             <div className="border border-[#202736] rounded-lg overflow-hidden mb-4">
                                                 <table className="w-full text-[11px] text-left">
                                                     <thead className="bg-[#131924] text-zinc-400">
                                                         <tr>
-                                                            {Object.keys(MOCK_EXPECTED[activeProblemId][0]).map(h => (
+                                                            {executionResult.expected.columns.map(h => (
                                                                 <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">{h}</th>
                                                             ))}
                                                         </tr>
                                                     </thead>
                                                     <tbody className="bg-[#0b101c]">
-                                                        {MOCK_EXPECTED[activeProblemId].map((row: any, i: number) => (
+                                                        {executionResult.expected.rows.map((row: any, i: number) => (
                                                             <tr key={i} className="border-b border-[#202736]/50 last:border-0 text-green-400/80 font-mono hover:bg-white/[0.02]">
-                                                                {Object.values(row).map((cell: any, j: number) => <td key={j} className="px-3 py-1.5">{cell}</td>)}
+                                                                {row.map((cell: any, j: number) => <td key={j} className="px-3 py-1.5">{cell?.toString()}</td>)}
                                                             </tr>
                                                         ))}
                                                     </tbody>
                                                 </table>
                                             </div>
                                         ) : (
-                                            <div className="p-4 bg-[#131924] rounded-lg border border-[#202736] text-xs text-zinc-500 font-mono italic">Expected Output hidden</div>
+                                            <div className="p-4 bg-[#131924] rounded-lg border border-[#202736] text-xs text-zinc-500 font-mono italic">Run your query to see expected output.</div>
                                         )}
                                     </div>
 
@@ -502,7 +484,7 @@ export function DailySetClient() {
                                             <TerminalSquare size={14} /> Query Output
                                         </span>
                                         <span className={`text-xs font-bold font-mono flex items-center gap-1.5 ${executionResult?.status === 'correct' ? 'text-green-400' : executionResult?.status === 'incorrect' ? 'text-red-400' : 'text-zinc-400'}`}>
-                                            {executionResult?.status === 'correct' ? <><CheckCircle2 size={14} /> Success ({executionResult.time_ms}ms)</> :
+                                            {executionResult?.status === 'correct' ? <><CheckCircle2 size={14} /> Success ({executionResult.user?.execution_time_ms}ms)</> :
                                                 executionResult?.status === 'incorrect' ? <><XCircle size={14} /> Incorrect Result</> :
                                                     error ? <><AlertCircle size={14} /> Execution Error</> :
                                                         "Executing..."}
@@ -511,30 +493,42 @@ export function DailySetClient() {
 
                                     <div className="flex-1 overflow-auto p-4 bg-[#0d121c]">
                                         {error ? (
-                                            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 font-mono text-sm whitespace-pre-wrap flex items-start gap-3">
-                                                <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                                                {error}
+                                            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 font-mono text-sm whitespace-pre-wrap flex items-start flex-col gap-3">
+                                                <div className="flex items-start gap-3">
+                                                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                                                    {error}
+                                                </div>
+                                                {executionResult?.diff_reason && (
+                                                    <div className="bg-red-500/20 w-full p-2 mt-2 rounded">
+                                                        Reason: {executionResult.diff_reason}
+                                                    </div>
+                                                )}
                                             </div>
-                                        ) : executionResult ? (
+                                        ) : executionResult?.user ? (
                                             <div className="rounded-lg border border-[#202736] overflow-hidden bg-[#131924]">
                                                 <table className="w-full text-left text-xs">
                                                     <thead className="bg-[#0b101c] text-zinc-400">
                                                         <tr>
-                                                            {executionResult.columns.map((k: string) => (
+                                                            {executionResult.user.columns.map((k: string) => (
                                                                 <th key={k} className="px-4 py-2 border-b border-[#202736] font-mono whitespace-nowrap">{k}</th>
                                                             ))}
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-[#202736]/50">
-                                                        {executionResult.rows.map((row: any[], i: number) => (
+                                                        {executionResult.user.rows.map((row: any[], i: number) => (
                                                             <tr key={i} className="hover:bg-white/[0.02]">
                                                                 {row.map((cell: any, j: number) => (
-                                                                    <td key={j} className="px-4 py-2 text-zinc-300 font-mono whitespace-nowrap">{cell}</td>
+                                                                    <td key={j} className="px-4 py-2 text-zinc-300 font-mono whitespace-nowrap">{cell?.toString()}</td>
                                                                 ))}
                                                             </tr>
                                                         ))}
                                                     </tbody>
                                                 </table>
+                                                {executionResult?.diff_reason && (
+                                                    <div className="bg-red-500/10 text-red-400 w-full p-3 font-mono mt-4 rounded-b-lg border-t border-red-500/20">
+                                                        Failed against expected output: {executionResult.diff_reason}
+                                                    </div>
+                                                )}
                                             </div>
                                         ) : null}
                                     </div>

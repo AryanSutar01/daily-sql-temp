@@ -4,15 +4,18 @@ import { Attempt, DailyPractice, Dataset, ExecutionResponse, Problem, Streak } f
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 async function getAuthHeaders() {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-
     const headers: HeadersInit = {
         'Content-Type': 'application/json',
     };
 
-    if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
+    try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+            headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+    } catch {
+        // Supabase not configured (local dev without env vars) — skip auth header
     }
 
     return headers;
@@ -49,6 +52,7 @@ export const api = {
     getDailyPractice: () => fetchApi<DailyPractice>('/practice/today'),
 
     // Problems
+    getProblems: () => fetchApi<Problem[]>('/problems'),
     getProblem: (id: string) => fetchApi<Problem>(`/problems/${id}`),
     getDatasets: (id: string) => fetchApi<Dataset[]>(`/problems/${id}/datasets`),
 
