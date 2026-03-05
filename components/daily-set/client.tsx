@@ -255,9 +255,11 @@ export function DailySetClient() {
                                                     >
                                                         <div className="text-sm font-medium text-white group-hover:text-[#4DD4C4] transition-colors line-clamp-1 pr-4">{pInfo.title}</div>
                                                         <div className="flex items-center gap-4 shrink-0">
-                                                            <span className={`text-[9px] font-bold px-1.5 py-1 rounded border min-w-[100px] text-center ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
-                                                                {dStyle.label}
-                                                            </span>
+                                                            <div className="w-[100px] flex justify-center shrink-0">
+                                                                <span className={`text-[10px] font-bold px-2 py-1 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
+                                                                    {dStyle.label}
+                                                                </span>
+                                                            </div>
                                                             <CheckCircle2 size={16} className={isCompleted ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
                                                         </div>
                                                     </div>
@@ -295,10 +297,15 @@ export function DailySetClient() {
                                         <div className="space-y-2 overflow-y-auto pr-1 pb-4 flex-1">
                                             {filteredProblems.map(p => (
                                                 <div key={p.id} onClick={() => handleProblemSelect(p.id)} className="flex items-center justify-between p-3 rounded bg-[#131924] border border-[#202736] hover:border-[#4DD4C4]/30 cursor-pointer transition-colors group">
-                                                    <span className="text-sm font-medium text-zinc-300 group-hover:text-white truncate pr-4">{p.id}. {p.title}</span>
-                                                    <span className={`shrink-0 text-[9px] font-bold px-1.5 py-1 rounded border min-w-[100px] text-center ${getDiffStyle(p.difficulty).color} ${getDiffStyle(p.difficulty).bg} ${getDiffStyle(p.difficulty).border}`}>
-                                                        {getDiffStyle(p.difficulty).label}
-                                                    </span>
+                                                    <div className="flex items-center gap-2 overflow-hidden">
+                                                        <span className="text-sm font-medium text-zinc-300 group-hover:text-white shrink-0 w-[20px]">{p.id}.</span>
+                                                        <span className="text-sm font-medium text-zinc-300 group-hover:text-white truncate">{p.title}</span>
+                                                    </div>
+                                                    <div className="w-[100px] flex justify-center shrink-0">
+                                                        <span className={`text-[10px] font-bold px-2 py-1 rounded border ${getDiffStyle(p.difficulty).color} ${getDiffStyle(p.difficulty).bg} ${getDiffStyle(p.difficulty).border}`}>
+                                                            {getDiffStyle(p.difficulty).label}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             ))}
                                             {filteredProblems.length === 0 && <div className="text-center text-xs text-zinc-500 mt-8">No problems match your search.</div>}
@@ -454,7 +461,7 @@ export function DailySetClient() {
                             </div>
                         </div>
 
-                        <div className="flex-1 relative pt-4 overflow-hidden bg-[#0b101c]">
+                        <div className="flex-1 relative overflow-hidden bg-[#0b101c]">
                             <Editor
                                 height="100%"
                                 language="sql"
@@ -465,10 +472,14 @@ export function DailySetClient() {
                                 onMount={handleEditorMount}
                                 options={{
                                     minimap: { enabled: false },
+                                    overviewRulerLanes: 0,
+                                    hideCursorInOverviewRuler: true,
+                                    overviewRulerBorder: false,
+                                    scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
                                     fontSize: 14,
                                     fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
                                     lineHeight: 24,
-                                    padding: { top: 16 },
+                                    padding: { top: 4 },
                                     scrollBeyondLastLine: false,
                                     smoothScrolling: true,
                                     cursorBlinking: "smooth",
@@ -486,8 +497,8 @@ export function DailySetClient() {
                         <div className={`border-t border-[#202736] bg-[#0d121c] flex flex-col transition-all duration-300 shrink-0 ${showResult ? 'h-[280px]' : 'h-0 border-t-0'}`}>
                             {showResult && (
                                 <>
-                                    <div className="h-10 border-b border-[#202736] bg-[#0b101c] px-4 flex items-center justify-between shrink-0">
-                                        <span className="text-xs font-bold uppercase tracking-widest text-zinc-500 font-mono flex items-center gap-2">
+                                    <div className="h-10 border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0">
+                                        <span className="text-xs font-bold uppercase tracking-widest text-white font-mono flex items-center gap-2">
                                             <TerminalSquare size={14} /> Query Output
                                         </span>
                                         <span className={`text-xs font-bold font-mono flex items-center gap-1.5 ${executionResult?.status === 'correct' ? 'text-green-400' : executionResult?.status === 'incorrect' ? 'text-red-400' : 'text-zinc-400'}`}>
