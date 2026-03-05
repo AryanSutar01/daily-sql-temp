@@ -148,6 +148,22 @@
   html {
     scroll-behavior: smooth;
   }
+
+  /* Custom Global Scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #202736;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #52525b; /* zinc-600 */
+  }
 }
 
 @layer utilities {
