@@ -52,7 +52,7 @@ export function Hero() {
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-2">
           <Link
-            href="/practice/daily"
+            href="#"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#30B5A6] hover:bg-[#2A9D90] text-[#0a0f1c] font-medium transition-all duration-200 shadow-lg shadow-[#30B5A6]/20 hover:shadow-[#30B5A6]/30"
           >
             Start your daily practice
