@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
     Database, Plus, Calendar, Lock, Search, CheckCircle2,
     AlertCircle, Loader2, ChevronRight, Edit3, Eye,
-    Code, FileText, Clock
+    Code, FileText, Clock, Trash2
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -136,6 +136,29 @@ export default function AdminDashboard() {
                 showToast('error', data.detail || 'Failed to create problem');
             }
         } catch (e: any) { showToast('error', e.message); }
+        setLoading(false);
+    };
+
+    // DELETE PROBLEM
+    const handleDeleteProblem = async (problemId: string) => {
+        if (!confirm("Are you sure you want to delete this problem? This will cascade and delete its datasets, solution, and any associated historical records.")) return;
+
+        setLoading(true);
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/problems/${problemId}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                showToast('success', 'Problem deleted successfully!');
+                loadProblems();
+                loadSchedule();
+            } else {
+                const data = await res.json();
+                showToast('error', data.detail || 'Failed to delete problem');
+            }
+        } catch (e: any) {
+            showToast('error', e.message);
+        }
         setLoading(false);
     };
 
@@ -321,8 +344,15 @@ export default function AdminDashboard() {
                                             <h3 className="text-lg font-semibold text-white">{p.title}</h3>
                                             <p className="text-sm text-zinc-500 max-w-2xl">{p.description}</p>
                                         </div>
-                                        <div className="text-right">
+                                        <div className="text-right flex flex-col items-end gap-3">
                                             <code className="text-[10px] text-zinc-600 font-mono">{p.id.slice(0, 8)}...</code>
+                                            <button
+                                                onClick={() => handleDeleteProblem(p.id)}
+                                                className="text-zinc-600 hover:text-red-400 transition-colors p-1"
+                                                title="Delete Problem"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -344,8 +374,8 @@ export default function AdminDashboard() {
                             {['problem', 'datasets', 'solution', 'done'].map((step, i) => (
                                 <div key={step} className="flex items-center">
                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${createStep === step ? 'bg-[#4DD4C4] text-black' :
-                                            ['problem', 'datasets', 'solution', 'done'].indexOf(createStep) > i ? 'bg-green-500 text-white' :
-                                                'bg-[#202736] text-zinc-500'
+                                        ['problem', 'datasets', 'solution', 'done'].indexOf(createStep) > i ? 'bg-green-500 text-white' :
+                                            'bg-[#202736] text-zinc-500'
                                         }`}>
                                         {['problem', 'datasets', 'solution', 'done'].indexOf(createStep) > i ? <CheckCircle2 size={16} /> : i + 1}
                                     </div>
