@@ -25,6 +25,7 @@ import {
 import { useState, useRef, useEffect } from "react";
 import { Panel, Group, Separator } from "react-resizable-panels";
 import Editor from "@monaco-editor/react";
+import ReactMarkdown from 'react-markdown';
 import { api } from "@/lib/api";
 import { Problem, DailyPractice, Dataset, ExecutionResponse } from "@/types/api";
 
@@ -44,6 +45,7 @@ export function DailySetClient() {
     const [activeProblemId, setActiveProblemId] = useState<string | null>(null);
     const [viewingDetails, setViewingDetails] = useState<boolean>(false);
     const [activeDatasets, setActiveDatasets] = useState<Dataset[]>([]);
+    const [showHint, setShowHint] = useState<boolean>(false);
 
     // Editor & Results State
     const [code, setCode] = useState("-- Select a problem to begin\n");
@@ -81,6 +83,36 @@ export function DailySetClient() {
     const activeProblem = problems.find(p => p.id === activeProblemId);
     const filteredProblems = problems.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
+    const descriptionText = activeProblem?.description || '';
+    const descParts = descriptionText.split('### Hint');
+    const mainDesc = descParts[0];
+    const hintText = descParts.length > 1 ? descParts[1].trim() : null;
+
+    const markdownComponents = {
+        h1: ({ node, ...props }: any) => <h1 className="text-xl font-bold text-white mt-4 mb-2" {...props} />,
+        h2: ({ node, ...props }: any) => <h2 className="text-lg font-bold text-white mt-4 mb-2" {...props} />,
+        h3: ({ node, ...props }: any) => <h3 className="text-md font-bold text-zinc-300 mt-3 mb-1" {...props} />,
+        p: ({ node, ...props }: any) => <p className="mb-2" {...props} />,
+        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-2 space-y-1" {...props} />,
+        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-2 space-y-1" {...props} />,
+        li: ({ node, ...props }: any) => <li className="" {...props} />,
+        code: ({ node, className, children, ...props }: any) => {
+            const match = /language-(\w+)/.exec(className || '');
+            const isInline = !match && !className;
+            return isInline ? (
+                <code className="bg-[#202736] px-1.5 py-0.5 rounded text-xs text-[#4DD4C4] font-mono" {...props}>
+                    {children}
+                </code>
+            ) : (
+                <div className="bg-[#131924] p-3 rounded border border-[#202736] overflow-x-auto text-xs my-3 font-mono">
+                    <code className="text-[#4DD4C4]" {...props}>
+                        {children}
+                    </code>
+                </div>
+            );
+        },
+    };
+
     // Handlers
     const handleProblemSelect = async (id: string) => {
         setActiveProblemId(id);
@@ -89,6 +121,7 @@ export function DailySetClient() {
         setError(null);
         setExecutionResult(null);
         setActiveDatasets([]);
+        setShowHint(false);
 
         try {
             const datasets = await api.getDatasets(id);
@@ -323,9 +356,11 @@ export function DailySetClient() {
                                         </div>
                                         <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2">Task</h3>
                                         <div className="h-px w-full bg-[#202736] mb-4"></div>
-                                        <p className="text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap">
-                                            {activeProblem?.description}
-                                        </p>
+                                        <div className="text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap">
+                                            <ReactMarkdown components={markdownComponents}>
+                                                {mainDesc}
+                                            </ReactMarkdown>
+                                        </div>
                                     </div>
 
                                     <div className="pt-2">
@@ -391,13 +426,25 @@ export function DailySetClient() {
                                         )}
                                     </div>
 
-                                    <div className="pt-2">
-                                        <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2 cursor-pointer hover:text-white transition-colors flex justify-between items-center">
-                                            <span>Hints</span>
-                                            <span className="text-[10px]">&darr;</span>
-                                        </h3>
-                                        <div className="h-px w-full bg-[#202736] mb-4"></div>
-                                    </div>
+                                    {hintText && (
+                                        <div className="pt-2">
+                                            <h3
+                                                className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2 cursor-pointer hover:text-white transition-colors flex justify-between items-center"
+                                                onClick={() => setShowHint(!showHint)}
+                                            >
+                                                <span>Hints</span>
+                                                <span className={`text-[10px] transform transition-transform ${showHint ? 'rotate-180' : ''}`}>&darr;</span>
+                                            </h3>
+                                            <div className="h-px w-full bg-[#202736] mb-4"></div>
+                                            {showHint && (
+                                                <div className="p-4 bg-[#131924] rounded-lg border border-[#202736] text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap mb-4">
+                                                    <ReactMarkdown components={markdownComponents}>
+                                                        {hintText}
+                                                    </ReactMarkdown>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="border-t border-[#202736] bg-[#0b101c] p-4 flex justify-between items-center text-zinc-400 shrink-0">
                                     <div className="flex gap-4">
