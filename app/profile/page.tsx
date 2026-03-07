@@ -5,8 +5,54 @@ import Link from "next/link";
 import { ArrowLeft, Edit2, Share2, Search, Filter } from "lucide-react";
 import { StandaloneNavbar } from "@/components/auth/standalone-navbar";
 
+function polarToCartesian(centerX: number, centerY: number, radius: number, angleInDegrees: number) {
+    const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
+    return {
+        x: centerX + (radius * Math.cos(angleInRadians)),
+        y: centerY + (radius * Math.sin(angleInRadians))
+    };
+}
+
+function describeArc(x: number, y: number, r: number, startAngle: number, endAngle: number) {
+    if (Math.abs(endAngle - startAngle) < 0.1) endAngle = startAngle + 0.1;
+    const start = polarToCartesian(x, y, r, startAngle);
+    const end = polarToCartesian(x, y, r, endAngle);
+    let largeArcFlag = "0";
+    if (endAngle >= startAngle) {
+        largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+    } else {
+        largeArcFlag = (endAngle + 360.0) - startAngle <= 180 ? "0" : "1";
+    }
+    return [
+        "M", start.x, start.y,
+        "A", r, r, 0, largeArcFlag, 1, end.x, end.y
+    ].join(" ");
+}
+
 export default function ProfilePage() {
     const [searchQuery, setSearchQuery] = useState("");
+    const [hoveredSegment, setHoveredSegment] = useState<string | null>(null);
+
+    const stats = {
+        easy: { solved: 8, total: 346, color: "#4DD4C4" },
+        medium: { solved: 13, total: 476, color: "#eab308" },
+        hard: { solved: 7, total: 254, color: "#f87171" },
+    };
+    const totalQuestions = stats.easy.total + stats.medium.total + stats.hard.total;
+    const totalSolved = stats.easy.solved + stats.medium.solved + stats.hard.solved;
+
+    const gap = 16;
+    const availableAngle = 360 - gap * 3;
+
+    const easyAngle = (stats.easy.total / totalQuestions) * availableAngle;
+    const mediumAngle = (stats.medium.total / totalQuestions) * availableAngle;
+    const hardAngle = (stats.hard.total / totalQuestions) * availableAngle;
+
+    const segments = [
+        { id: 'easy', start: 0, end: easyAngle, solved: stats.easy.solved, total: stats.easy.total, color: stats.easy.color },
+        { id: 'medium', start: easyAngle + gap, end: easyAngle + gap + mediumAngle, solved: stats.medium.solved, total: stats.medium.total, color: stats.medium.color },
+        { id: 'hard', start: easyAngle + mediumAngle + gap * 2, end: easyAngle + mediumAngle + hardAngle + gap * 2, solved: stats.hard.solved, total: stats.hard.total, color: stats.hard.color }
+    ];
 
     const MOCK_SUBMISSIONS = [
         { id: 2, title: "Monthly Revenue", difficulty: "basic" },
@@ -124,69 +170,96 @@ export default function ProfilePage() {
                         {/* Stats Card */}
                         <div className="p-6 rounded-2xl border border-[#202736] bg-[#131924] flex flex-col sm:flex-row items-center justify-center gap-10 shadow-xl">
                             <div className="relative w-40 h-40 shrink-0">
-                                <svg className="w-40 h-40 -rotate-90 transform" viewBox="0 0 36 36">
-                                    {/* Background Track */}
-                                    <circle cx="18" cy="18" r="15.9155" fill="none" className="text-[#202736]" stroke="currentColor" strokeWidth="2" />
+                                <svg className="w-full h-full" viewBox="0 0 100 100">
+                                    <circle strokeWidth="2" cx="50" cy="50" r="36" fill="transparent" stroke="currentColor" className="text-zinc-800" opacity="0.3"></circle>
 
-                                    {/* Hard (Red) - 0% */}
-                                    {/* Medium (Yellow) - 0% */}
+                                    {segments.map((seg) => {
+                                        const solvedRatio = seg.total > 0 ? seg.solved / seg.total : 0;
+                                        // Reduce the progress angle slightly so it doesn't touch the start of the next segment
+                                        let progressAngle = solvedRatio * (seg.end - seg.start - 2);
+                                        if (seg.solved > 0 && progressAngle < 0.1) progressAngle = 0.1;
+                                        const progressEnd = seg.start + progressAngle;
+                                        const isHovered = hoveredSegment === seg.id;
 
-                                    {/* Easy (Green) - ~3.75% of total */}
-                                    <circle
-                                        cx="18"
-                                        cy="18"
-                                        r="15.9155"
-                                        fill="none"
-                                        className="text-[#4DD4C4] drop-shadow-[0_0_8px_rgba(77,212,196,0.6)]"
-                                        stroke="currentColor"
-                                        strokeWidth="2.5"
-                                        strokeDasharray="4, 100"
-                                        strokeLinecap="round"
-                                    />
-                                    {/* Glow effect duplicate circle */}
-                                    <circle
-                                        cx="18"
-                                        cy="18"
-                                        r="15.9155"
-                                        fill="none"
-                                        className="text-[#4DD4C4] opacity-40 blur-[2px]"
-                                        stroke="currentColor"
-                                        strokeWidth="3"
-                                        strokeDasharray="4, 100"
-                                        strokeLinecap="round"
-                                    />
+                                        return (
+                                            <g key={seg.id}
+                                                onMouseEnter={() => setHoveredSegment(seg.id)}
+                                                onMouseLeave={() => setHoveredSegment(null)}
+                                            >
+                                                {/* Hit area */}
+                                                <path
+                                                    d={describeArc(50, 50, 36, seg.start, seg.end)}
+                                                    stroke="transparent"
+                                                    strokeWidth="26"
+                                                    strokeLinecap="round"
+                                                    fill="none"
+                                                    className="cursor-pointer pointer-events-stroke"
+                                                />
+                                                {/* Base track */}
+                                                <path
+                                                    d={describeArc(50, 50, 34, seg.start, seg.end)}
+                                                    stroke={seg.color}
+                                                    strokeLinecap="round"
+                                                    fill="none"
+                                                    strokeWidth="6"
+                                                    opacity={isHovered ? 0.4 : 0.2}
+                                                    className="transition-all duration-300 pointer-events-none"
+                                                    style={{ filter: isHovered ? `drop-shadow(0 0 6px ${seg.color})` : 'none' }}
+                                                />
+                                                {/* Progress track */}
+                                                {seg.solved > 0 && (
+                                                    <path
+                                                        d={describeArc(50, 50, 36, seg.start, progressEnd)}
+                                                        stroke={seg.color}
+                                                        strokeLinecap="round"
+                                                        fill="none"
+                                                        strokeWidth="2"
+                                                        className="transition-all duration-300 pointer-events-none"
+                                                        style={{ filter: isHovered ? `drop-shadow(0 0 6px ${seg.color}) drop-shadow(0 0 4px ${seg.color})` : `drop-shadow(0 0 2px ${seg.color})` }}
+                                                    />
+                                                )}
+                                            </g>
+                                        );
+                                    })}
                                 </svg>
-                                <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                     <div className="flex flex-col items-center">
-                                        <span className="text-3xl font-bold text-white leading-none">13</span>
+                                        <span className="text-3xl font-bold text-white leading-none">{totalSolved}</span>
                                         <hr className="w-8 border-t border-zinc-600 my-1" />
-                                        <span className="text-xs text-zinc-400 font-medium">1076</span>
+                                        <span className="text-xs text-zinc-400 font-medium">{totalQuestions}</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="flex flex-col gap-5 w-full sm:w-auto">
-                                <div className="flex items-center justify-between gap-6">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-3 h-3 rounded-full bg-[#4DD4C4] shadow-[0_0_8px_rgba(77,212,196,0.6)]" />
-                                        <span className="text-sm text-zinc-400 font-medium">Easy</span>
-                                    </div>
-                                    <span className="text-sm font-semibold text-zinc-300">13 <span className="text-zinc-600 font-normal">/ 346</span></span>
-                                </div>
-                                <div className="flex items-center justify-between gap-6">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-3 h-3 rounded-full bg-[#eab308]" />
-                                        <span className="text-sm text-zinc-400 font-medium">Medium</span>
-                                    </div>
-                                    <span className="text-sm font-semibold text-zinc-300">0 <span className="text-zinc-600 font-normal">/ 476</span></span>
-                                </div>
-                                <div className="flex items-center justify-between gap-6">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-3 h-3 rounded-full bg-[#f87171]" />
-                                        <span className="text-sm text-zinc-400 font-medium">Hard</span>
-                                    </div>
-                                    <span className="text-sm font-semibold text-zinc-300">0 <span className="text-zinc-600 font-normal">/ 254</span></span>
-                                </div>
+                                {segments.map(seg => {
+                                    const isHovered = hoveredSegment === seg.id;
+                                    return (
+                                        <div
+                                            key={seg.id}
+                                            className="flex items-center justify-between gap-6 cursor-pointer group"
+                                            onMouseEnter={() => setHoveredSegment(seg.id)}
+                                            onMouseLeave={() => setHoveredSegment(null)}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <div
+                                                    className="w-3 h-3 rounded-full transition-all duration-300"
+                                                    style={{
+                                                        backgroundColor: seg.color,
+                                                        boxShadow: isHovered ? `0 0 10px ${seg.color}` : (seg.solved > 0 ? `0 0 6px ${seg.color}60` : 'none')
+                                                    }}
+                                                />
+                                                <span className={`text-sm font-medium capitalize transition-colors duration-300 ${isHovered ? 'text-zinc-200' : 'text-zinc-400'}`}>
+                                                    {seg.id}
+                                                </span>
+                                            </div>
+                                            <span className={`text-sm font-semibold flex items-center gap-1 transition-colors duration-300 ${isHovered ? 'text-white' : 'text-zinc-200'}`}>
+                                                <span>{seg.solved}</span>
+                                                <span className="font-normal">/ {seg.total}</span>
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
