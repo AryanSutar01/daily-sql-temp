@@ -139,30 +139,32 @@ export default function ProfilePage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                         {/* Profile Card */}
-                        <div className="p-6 rounded-2xl border border-[#202736] bg-[#131924] flex justify-between items-start shadow-xl">
-                            <div className="flex gap-6">
-                                <div className="w-24 h-24 rounded-2xl bg-[#4DD4C4] flex items-center justify-center shadow-lg shrink-0 overflow-hidden">
-                                    <svg className="w-16 h-16 text-[#080c16]/30 mt-4" fill="currentColor" viewBox="0 0 24 24">
+                        <div className="p-6 rounded-2xl border border-[#202736] bg-[#131924] flex justify-between items-center shadow-xl">
+                            <div className="flex gap-6 items-center">
+                                <div className="w-24 h-24 rounded-[20px] bg-[#4DD4C4] flex items-center justify-center shadow-lg shrink-0 overflow-hidden relative">
+                                    <svg className="w-[84px] h-[84px] text-[#080c16]/20 mt-6" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                                     </svg>
                                 </div>
-                                <div className="space-y-1 mt-1">
-                                    <h2 className="text-2xl font-bold text-white tracking-tight">Name</h2>
-                                    <p className="text-sm font-medium text-zinc-400">user_name</p>
-                                    <div className="pt-2 space-y-0.5">
-                                        <p className="text-sm text-zinc-300">Rank: <span className="font-bold text-white">1549</span></p>
-                                        <p className="text-sm text-zinc-400">vedant@example.com</p>
+                                <div className="flex flex-col gap-2">
+                                    <div className="space-y-0.5">
+                                        <h2 className="text-[20px] font-bold text-white tracking-tight leading-none mb-1">Name</h2>
+                                        <p className="text-[13px] text-zinc-400">user_name</p>
+                                    </div>
+                                    <div className="space-y-0.5 pt-2">
+                                        <p className="text-[13px] text-zinc-400">Rank: <span className="font-semibold text-white">1549</span></p>
+                                        <p className="text-[13px] text-zinc-400">vedant@example.com</p>
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex flex-col gap-3">
+                            <div className="flex flex-col gap-3 h-24">
                                 <Link href="/profile/edit">
-                                    <button className="p-2 rounded bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-[#4DD4C4]/50 transition-colors shadow-sm" title="Edit Profile">
-                                        <Edit2 size={16} />
+                                    <button className="p-2.5 rounded-lg bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-[#4DD4C4]/50 transition-colors shadow-sm flex items-center justify-center w-10 h-10" title="Edit Profile">
+                                        <Edit2 size={16} strokeWidth={2} />
                                     </button>
                                 </Link>
-                                <button className="p-2 rounded bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-[#4DD4C4]/50 transition-colors shadow-sm" title="Share Profile">
-                                    <Share2 size={16} />
+                                <button className="p-2.5 rounded-lg bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-[#4DD4C4]/50 transition-colors shadow-sm flex items-center justify-center w-10 h-10" title="Share Profile">
+                                    <Share2 size={16} strokeWidth={2} />
                                 </button>
                             </div>
                         </div>
