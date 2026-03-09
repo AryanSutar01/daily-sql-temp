@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Edit2, Share2, Search, Filter } from "lucide-react";
+import { ArrowLeft, Edit2, Share2, Search, Filter, Loader2, Sparkles, User, Briefcase, GraduationCap, History } from "lucide-react";
 import { StandaloneNavbar } from "@/components/auth/standalone-navbar";
+import { api } from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 function polarToCartesian(centerX: number, centerY: number, radius: number, angleInDegrees: number) {
     const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
@@ -30,14 +32,67 @@ function describeArc(x: number, y: number, r: number, startAngle: number, endAng
 }
 
 export default function ProfilePage() {
+    const router = useRouter();
+    const [profile, setProfile] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [hoveredSegment, setHoveredSegment] = useState<string | null>(null);
 
-    const stats = {
-        easy: { solved: 8, total: 346, color: "#4DD4C4" },
-        medium: { solved: 13, total: 476, color: "#eab308" },
-        hard: { solved: 7, total: 254, color: "#f87171" },
+    // Form State
+    const [formData, setFormData] = useState({
+        full_name: "",
+        occupation: "",
+        job_role: "",
+        experience_years: 0
+    });
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        async function loadProfile() {
+            try {
+                const data = await api.getProfile();
+                setProfile(data);
+                if (data.exists) {
+                    setFormData({
+                        full_name: data.full_name || "",
+                        occupation: data.occupation || "",
+                        job_role: data.job_role || "",
+                        experience_years: data.experience_years || 0
+                    });
+                } else if (data.in_waitlist) {
+                    // Pre-fill from waitlist? We'd need to fetch waitlist details if not in payload
+                    // For now, let's assume they fill it again or we fetch waitlist separately
+                }
+            } catch (err) {
+                console.error("Failed to load profile", err);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+        loadProfile();
+    }, []);
+
+    const handleOnboard = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        try {
+            await api.updateProfile(formData);
+            const updated = await api.getProfile();
+            setProfile(updated);
+        } catch (err) {
+            console.error("Failed to save profile", err);
+        } finally {
+            setIsSaving(false);
+        }
     };
+
+    const stats = {
+        easy: { solved: 0, total: 346, color: "#4DD4C4" },
+        medium: { solved: 0, total: 476, color: "#eab308" },
+        hard: { solved: 0, total: 254, color: "#f87171" },
+    };
+    // Note: We can expand this once we have real problem stats in the backend response
+
     const totalQuestions = stats.easy.total + stats.medium.total + stats.hard.total;
     const totalSolved = stats.easy.solved + stats.medium.solved + stats.hard.solved;
 
@@ -117,6 +172,108 @@ export default function ProfilePage() {
         return data;
     }, []);
 
+    if (isLoading) {
+        return (
+            <div className="fixed inset-0 flex flex-col items-center justify-center bg-[#080c16] text-white">
+                <Loader2 size={32} className="animate-spin text-[#4DD4C4] mb-4" />
+                <p className="text-zinc-500 font-mono text-sm">Authenticating Profile...</p>
+            </div>
+        );
+    }
+
+    if (profile && !profile.exists) {
+        return (
+            <div className="fixed inset-0 top-0 z-[100] flex flex-col overflow-y-auto bg-[#080c16] text-zinc-200">
+                <StandaloneNavbar />
+                <div className="flex-1 flex items-center justify-center p-6">
+                    <div className="max-w-md w-full p-8 rounded-3xl border border-[#202736] bg-[#131924] shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#4DD4C4] to-transparent opacity-50"></div>
+
+                        <div className="flex flex-col items-center mb-8 text-center">
+                            <div className="w-16 h-16 rounded-2xl bg-[#4DD4C4]/10 flex items-center justify-center mb-4 border border-[#4DD4C4]/20">
+                                <Sparkles className="text-[#4DD4C4]" size={32} />
+                            </div>
+                            <h2 className="text-2xl font-bold text-white mb-2">Complete Your Profile</h2>
+                            <p className="text-zinc-400 text-sm">Welcome back! Tell us a bit about yourself to unlock practice problems and track your progress.</p>
+                        </div>
+
+                        <form onSubmit={handleOnboard} className="space-y-5">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Full Name</label>
+                                <div className="relative">
+                                    <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="Vedant Sharma"
+                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                        value={formData.full_name}
+                                        onChange={e => setFormData({ ...formData, full_name: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Occupation</label>
+                                    <div className="relative">
+                                        <GraduationCap size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                                        <select
+                                            required
+                                            className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all appearance-none inline-block align-middle cursor-pointer"
+                                            value={formData.occupation}
+                                            onChange={e => setFormData({ ...formData, occupation: e.target.value })}
+                                        >
+                                            <option value="">Select...</option>
+                                            <option value="student">Student</option>
+                                            <option value="professional">Professional</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Exp (Years)</label>
+                                    <input
+                                        required
+                                        type="number"
+                                        min="0"
+                                        max="50"
+                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 px-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                        value={formData.experience_years}
+                                        onChange={e => setFormData({ ...formData, experience_years: parseInt(e.target.value) || 0 })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Job Role / Interest</label>
+                                <div className="relative">
+                                    <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="Data Analyst, Student, etc."
+                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                        value={formData.job_role}
+                                        onChange={e => setFormData({ ...formData, job_role: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                disabled={isSaving}
+                                type="submit"
+                                className="w-full bg-[#4DD4C4] text-[#080c16] font-bold py-3 rounded-xl mt-6 hover:bg-[#3dbdb0] transition-colors flex items-center justify-center gap-2 group shadow-xl shadow-[#4DD4C4]/20"
+                            >
+                                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <>Start Journey <ArrowLeft size={18} className="rotate-180 group-hover:translate-x-1 transition-transform" /></>}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="fixed inset-0 top-0 z-[100] flex flex-col overflow-y-auto bg-[#080c16] text-zinc-200">
             <StandaloneNavbar />
@@ -148,21 +305,19 @@ export default function ProfilePage() {
                                 </div>
                                 <div className="flex flex-col gap-2">
                                     <div className="space-y-0.5">
-                                        <h2 className="text-[20px] font-bold text-white tracking-tight leading-none mb-1">Name</h2>
-                                        <p className="text-[13px] text-zinc-400">user_name</p>
+                                        <h2 className="text-[20px] font-bold text-white tracking-tight leading-none mb-1">{profile.full_name || 'Member'}</h2>
+                                        <p className="text-[13px] text-zinc-400 capitalize">{profile.job_role || profile.occupation || 'Learner'}</p>
                                     </div>
                                     <div className="space-y-0.5 pt-2">
-                                        <p className="text-[13px] text-zinc-400">Rank: <span className="font-semibold text-white">1549</span></p>
-                                        <p className="text-[13px] text-zinc-400">vedant@example.com</p>
+                                        <p className="text-[13px] text-zinc-400">Rank: <span className="font-semibold text-white">#--</span></p>
+                                        <p className="text-[13px] text-zinc-400 lowercase">{profile.email}</p>
                                     </div>
                                 </div>
                             </div>
                             <div className="flex flex-col gap-3 h-24">
-                                <Link href="/profile/edit">
-                                    <button className="p-2.5 rounded-lg bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-[#4DD4C4]/50 transition-colors shadow-sm flex items-center justify-center w-10 h-10" title="Edit Profile">
-                                        <Edit2 size={16} strokeWidth={2} />
-                                    </button>
-                                </Link>
+                                <button className="p-2.5 rounded-lg bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-[#4DD4C4]/50 transition-colors shadow-sm flex items-center justify-center w-10 h-10" title="Edit Profile">
+                                    <Edit2 size={16} strokeWidth={2} />
+                                </button>
                                 <button className="p-2.5 rounded-lg bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-[#4DD4C4]/50 transition-colors shadow-sm flex items-center justify-center w-10 h-10" title="Share Profile">
                                     <Share2 size={16} strokeWidth={2} />
                                 </button>
@@ -348,7 +503,6 @@ export default function ProfilePage() {
                                 {filteredSubmissions.length === 0 && <div className="text-center text-xs text-zinc-500 mt-8">No matching submissions.</div>}
                             </div>
                         </div>
-
                     </div>
 
                 </div>

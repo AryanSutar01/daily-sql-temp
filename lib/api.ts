@@ -59,4 +59,16 @@ export const api = {
     // User Progress
     getStreak: () => fetchApi<Streak>('/me/streak'),
     getTodayAttempts: () => fetchApi<Attempt[]>('/me/attempts/today'),
+
+    // Profiles & Onboarding
+    getProfile: () => fetchApi<any>('/me/profile'),
+    updateProfile: (data: any) =>
+        fetchApi<any>('/me/profile', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    // Solutions
+    getSavedSolution: (problemId: string) =>
+        fetchApi<{ submitted_query: string | null }>(`/me/solutions/${problemId}`),
 };

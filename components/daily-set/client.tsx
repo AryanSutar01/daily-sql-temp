@@ -23,6 +23,7 @@ import {
     ArrowLeft
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Panel, Group, Separator } from "react-resizable-panels";
 import Editor from "@monaco-editor/react";
 import ReactMarkdown from 'react-markdown';
@@ -32,6 +33,7 @@ import { Problem, DailyPractice, Dataset, ExecutionResponse } from "@/types/api"
 type Difficulty = 'easy' | 'medium' | 'hard' | 'advanced';
 
 export function DailySetClient() {
+    const router = useRouter();
     // Top-Level State
     const [streak, setStreak] = useState<number>(0);
     const [activeSidebarTab, setActiveSidebarTab] = useState<'today' | 'list'>('today');
@@ -124,7 +126,11 @@ export function DailySetClient() {
         setShowHint(false);
 
         try {
-            const datasets = await api.getDatasets(id);
+            const [datasets, savedSol] = await Promise.all([
+                api.getDatasets(id),
+                api.getSavedSolution(id).catch(() => ({ submitted_query: null }))
+            ]);
+
             // Normalize sample_rows: Postgres JSONB can sometimes come back as a string
             const normalizedDatasets = datasets.map(ds => ({
                 ...ds,
@@ -134,9 +140,13 @@ export function DailySetClient() {
             }));
             setActiveDatasets(normalizedDatasets);
 
-            const p = problems.find(x => x.id === id);
-            const dsName = datasets[0]?.table_name || 'table_name';
-            setCode(`-- Write your query for: ${p?.title}\nSELECT * FROM ${dsName};\n`);
+            if (savedSol?.submitted_query) {
+                setCode(savedSol.submitted_query);
+            } else {
+                const p = problems.find(x => x.id === id);
+                const dsName = datasets[0]?.table_name || 'table_name';
+                setCode(`-- Write your query for: ${p?.title}\nSELECT * FROM ${dsName};\n`);
+            }
         } catch (err) {
             console.error("Failed to load datasets", err);
         }
@@ -155,6 +165,13 @@ export function DailySetClient() {
         try {
             const res = await api.execute(activeProblemId, code);
             setExecutionResult(res);
+
+            if (res.status === 'error' && res.error === 'PROFILE_REQUIRED') {
+                setError("Profile Setup Required");
+                // Optionally show a more prominent UI, but for now we'll use the error box
+                return;
+            }
+
             if (res.status === 'error' && res.error) {
                 setError(res.error);
             }
@@ -254,8 +271,8 @@ export function DailySetClient() {
                                         </div>
 
                                         <div className="space-y-3">
-                                            {dailySet ? (['easy', 'medium', 'advanced'] as ('easy' | 'medium' | 'advanced')[]).map((dLevel) => {
-                                                const pId = dailySet[dLevel];
+                                            {dailySet ? (['easy', 'medium', 'advanced'] as const).map((dLevel) => {
+                                                const pId = dailySet[dLevel as keyof DailyPractice];
                                                 if (!pId) return null;
                                                 const pInfo = problems.find(p => p.id === pId);
                                                 if (!pInfo) return null;
@@ -277,7 +294,7 @@ export function DailySetClient() {
                                                             <CheckCircle2 size={16} className={isCompleted ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
                                                         </div>
                                                     </div>
-                                                )
+                                                );
                                             }) : (
                                                 <div className="text-xs text-zinc-500 italic p-4 text-center border border-[#202736] rounded bg-[#131924]">No daily set found.</div>
                                             )}
@@ -545,6 +562,14 @@ export function DailySetClient() {
                                                     <AlertCircle size={16} className="shrink-0 mt-0.5" />
                                                     {error}
                                                 </div>
+                                                {error === "Profile Setup Required" && (
+                                                    <button
+                                                        onClick={() => router.push('/profile')}
+                                                        className="mt-2 text-xs font-bold text-white bg-red-500 hover:bg-red-600 px-4 py-2 rounded transition-colors uppercase tracking-widest"
+                                                    >
+                                                        Complete Profile Now
+                                                    </button>
+                                                )}
                                                 {executionResult?.diff_reason && (
                                                     <div className="bg-red-500/20 w-full p-2 mt-2 rounded">
                                                         Reason: {executionResult.diff_reason}
