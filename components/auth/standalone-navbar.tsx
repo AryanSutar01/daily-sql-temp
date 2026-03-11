@@ -16,8 +16,6 @@ export function StandaloneNavbar() {
     const router = useRouter();
 
     useEffect(() => {
-        document.body.style.overflow = "hidden";
-        
         async function fetchUser() {
             try {
                 const supabase = createClient();
@@ -36,7 +34,6 @@ export function StandaloneNavbar() {
         }
 
         fetchUser();
-        return () => { document.body.style.overflow = "unset"; };
     }, []);
 
     const handleLogout = async () => {
@@ -56,11 +53,10 @@ export function StandaloneNavbar() {
             </Link>
 
             {/* Nav Items */}
-            <div className="hidden md:flex items-center justify-center flex-1 space-x-8">
-                <Link href="/practice/daily" className="text-sm text-zinc-400 hover:text-white transition-colors">Practice</Link>
-                <Link href="/#pricing" className="text-sm text-zinc-400 hover:text-white transition-colors">Pricing</Link>
-                <Link href="#" className="text-sm text-zinc-400 hover:text-white transition-colors">Leaderboard</Link>
-                <Link href="/contact" className="text-sm text-zinc-400 hover:text-white transition-colors">Contact</Link>
+            <div className="hidden md:flex items-center justify-center flex-1 space-x-12">
+                <Link href="/practice/daily" className={`text-sm font-semibold transition-colors ${pathname === '/practice/daily' ? 'text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}>Practice</Link>
+                <Link href="#" className="text-sm font-semibold text-zinc-400 hover:text-white transition-colors">Leaderboard</Link>
+                <Link href="/pricing" className="text-sm font-semibold text-zinc-400 hover:text-white transition-colors">Pro</Link>
             </div>
 
             {/* Right side CTA or User Menu */}
@@ -76,11 +72,15 @@ export function StandaloneNavbar() {
                         <div className="relative">
                             <button
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                className="w-9 h-9 rounded-full bg-[#4DD4C4] border-2 border-[#202736] hover:border-[#4DD4C4] transition-colors flex items-center justify-center overflow-hidden focus:outline-none"
+                                className="w-9 h-9 rounded-full bg-[#131924] border-2 border-[#202736] hover:border-[#4DD4C4] transition-colors flex items-center justify-center overflow-hidden focus:outline-none"
                             >
-                                <svg className="w-6 h-6 text-[#080c16]/30 mt-1" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                                </svg>
+                                {user.profile?.avatar_url ? (
+                                    <img src={user.profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                                ) : (
+                                    <svg className="w-6 h-6 text-[#4DD4C4] mt-1" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                                    </svg>
+                                )}
                             </button>
 
                             {isDropdownOpen && (
