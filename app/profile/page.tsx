@@ -37,6 +37,10 @@ export default function ProfilePage() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [hoveredSegment, setHoveredSegment] = useState<string | null>(null);
+    const [realStats, setRealStats] = useState<any>(null);
+    const [submissions, setSubmissions] = useState<any[]>([]);
+    const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
+    const [isEditing, setIsEditing] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -50,8 +54,18 @@ export default function ProfilePage() {
     useEffect(() => {
         async function loadProfile() {
             try {
-                const data = await api.getProfile();
+                const [data, s, sub, h] = await Promise.all([
+                    api.getProfile(),
+                    api.getStats(),
+                    api.getRecentSubmissions(),
+                    api.getHeatmap()
+                ]);
+
                 setProfile(data);
+                setRealStats(s);
+                setSubmissions(sub);
+                setHeatmapData(h);
+
                 if (data.exists) {
                     setFormData({
                         full_name: data.full_name || "",
@@ -59,9 +73,6 @@ export default function ProfilePage() {
                         job_role: data.job_role || "",
                         experience_years: data.experience_years || 0
                     });
-                } else if (data.in_waitlist) {
-                    // Pre-fill from waitlist? We'd need to fetch waitlist details if not in payload
-                    // For now, let's assume they fill it again or we fetch waitlist separately
                 }
             } catch (err) {
                 console.error("Failed to load profile", err);
@@ -79,6 +90,7 @@ export default function ProfilePage() {
             await api.updateProfile(formData);
             const updated = await api.getProfile();
             setProfile(updated);
+            setIsEditing(false);
         } catch (err) {
             console.error("Failed to save profile", err);
         } finally {
@@ -87,11 +99,10 @@ export default function ProfilePage() {
     };
 
     const stats = {
-        easy: { solved: 0, total: 346, color: "#4DD4C4" },
-        medium: { solved: 0, total: 476, color: "#eab308" },
-        hard: { solved: 0, total: 254, color: "#f87171" },
+        easy: { solved: realStats?.easy?.solved || 0, total: realStats?.easy?.total || 1, color: "#4DD4C4" },
+        medium: { solved: realStats?.medium?.solved || 0, total: realStats?.medium?.total || 1, color: "#eab308" },
+        hard: { solved: realStats?.advanced?.solved || 0, total: realStats?.advanced?.total || 1, color: "#f87171" },
     };
-    // Note: We can expand this once we have real problem stats in the backend response
 
     const totalQuestions = stats.easy.total + stats.medium.total + stats.hard.total;
     const totalSolved = stats.easy.solved + stats.medium.solved + stats.hard.solved;
@@ -109,23 +120,20 @@ export default function ProfilePage() {
         { id: 'hard', start: easyAngle + mediumAngle + gap * 2, end: easyAngle + mediumAngle + hardAngle + gap * 2, solved: stats.hard.solved, total: stats.hard.total, color: stats.hard.color }
     ];
 
-    const MOCK_SUBMISSIONS = [
-        { id: 2, title: "Monthly Revenue", difficulty: "basic" },
-        { id: 3, title: "Second Highest Salary", difficulty: "basic" },
-        { id: 4, title: "Department Top Three Salaries", difficulty: "intermediate" },
-        { id: 5, title: "Consecutive Numbers", difficulty: "advanced" },
-    ];
-
     const getDiffStyle = (level: string) => {
-        switch (level) {
+        const l = level.toLowerCase();
+        switch (l) {
+            case "easy":
             case "basic": return { color: "text-[#4DD4C4]", bg: "bg-[#4DD4C4]/10", border: "border-[#4DD4C4]/20", label: "BASIC" };
+            case "medium":
             case "intermediate": return { color: "text-[#eab308]", bg: "bg-[#eab308]/10", border: "border-[#eab308]/20", label: "INTERMEDIATE" };
-            case "advanced": return { color: "text-[#f87171]", bg: "bg-[#f87171]/10", border: "border-[#f87171]/20", label: "ADVANCED" };
+            case "advanced":
+            case "hard": return { color: "text-[#f87171]", bg: "bg-[#f87171]/10", border: "border-[#f87171]/20", label: "ADVANCED" };
             default: return { color: "text-zinc-400", bg: "bg-zinc-500/10", border: "border-zinc-500/20", label: "UNKNOWN" };
         }
     };
 
-    const filteredSubmissions = MOCK_SUBMISSIONS.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()) || p.id.toString().includes(searchQuery));
+    const filteredSubmissions = submissions.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
     // Generate mock heatmap grouped by month (March 2025 - Feb 2026) to match the Striver-style visual gaps
     const heatmapMonths = useMemo(() => {
@@ -145,17 +153,9 @@ export default function ProfilePage() {
 
             for (let day = 1; day <= daysInMonth; day++) {
                 const dayOfWeek = (startDay + day - 1) % 7;
-
-                let activity = 0;
-
-                // Add dummy activity for recent months (Jan / Feb) to show the glowing blocks
-                if (i === 10 && day === 15) activity = 3;
-                if (i === 10 && day === 16) activity = 4;
-                if (i === 10 && day === 18) activity = 1;
-                if (i === 11 && day === 5) activity = 2;
-                if (i === 11 && Math.random() > 0.8) {
-                    activity = Math.floor(Math.random() * 3) + 1;
-                }
+                
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                let activity = heatmapData[dateStr] || 0;
 
                 currentWeek[dayOfWeek] = activity;
 
@@ -197,7 +197,7 @@ export default function ProfilePage() {
         );
     }
 
-    if (profile && !profile.exists) {
+    if (profile && (!profile.exists || isEditing)) {
         return (
             <div className="fixed inset-0 top-0 z-[100] flex flex-col overflow-y-auto bg-[#080c16] text-zinc-200">
                 <StandaloneNavbar />
@@ -331,7 +331,10 @@ export default function ProfilePage() {
                                 </div>
                             </div>
                             <div className="flex flex-col gap-3 h-24">
-                                <button className="p-2.5 rounded-lg bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-[#4DD4C4]/50 transition-colors shadow-sm flex items-center justify-center w-10 h-10" title="Edit Profile">
+                                <button 
+                                    onClick={() => setIsEditing(true)}
+                                    className="p-2.5 rounded-lg bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-[#4DD4C4]/50 transition-colors shadow-sm flex items-center justify-center w-10 h-10" title="Edit Profile"
+                                >
                                     <Edit2 size={16} strokeWidth={2} />
                                 </button>
                                 <button className="p-2.5 rounded-lg bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-[#4DD4C4]/50 transition-colors shadow-sm flex items-center justify-center w-10 h-10" title="Share Profile">

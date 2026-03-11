@@ -20,10 +20,16 @@ import {
     MessageSquare,
     TerminalSquare,
     ChevronRight,
-    ArrowLeft
+    ArrowLeft,
+    User,
+    Lock,
+    Sparkles,
+    ArrowRight as ArrowRightIcon
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Panel, Group, Separator } from "react-resizable-panels";
 import Editor from "@monaco-editor/react";
 import ReactMarkdown from 'react-markdown';
@@ -42,6 +48,8 @@ export function DailySetClient() {
     const [problems, setProblems] = useState<Problem[]>([]);
     const [dailySet, setDailySet] = useState<DailyPractice | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [authStatus, setAuthStatus] = useState<'loading' | 'unauthenticated' | 'authenticated'>('loading');
+    const [userProfile, setUserProfile] = useState<any>(null);
 
     // Drill-down State
     const [activeProblemId, setActiveProblemId] = useState<string | null>(null);
@@ -63,10 +71,22 @@ export function DailySetClient() {
     useEffect(() => {
         async function loadData() {
             try {
+                const supabase = createClient();
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                let profileData = null;
+                if (!session) {
+                    setAuthStatus('unauthenticated');
+                } else {
+                    setAuthStatus('authenticated');
+                    profileData = await api.getProfile().catch(() => ({ exists: false }));
+                    setUserProfile(profileData);
+                }
+
                 const [probs, daily, streakData] = await Promise.all([
                     api.getProblems(),
                     api.getDailyPractice().catch(() => null),
-                    api.getStreak().catch(() => ({ current_streak: 0, last_active_date: null })),
+                    (session ? api.getStreak().catch(() => ({ current_streak: 0 })) : Promise.resolve({ current_streak: 0 })),
                 ]);
                 setProblems(probs);
                 setDailySet(daily);
@@ -165,6 +185,17 @@ export function DailySetClient() {
 
     const handleRun = async () => {
         if (!activeProblemId) return;
+
+        if (authStatus === 'unauthenticated') {
+            setError("LOGIN_REQUIRED");
+            return;
+        }
+
+        if (userProfile && !userProfile.exists) {
+            setError("PROFILE_REQUIRED");
+            return;
+        }
+
         setIsRunning(true);
         setError(null);
         setShowResult(true);
@@ -174,8 +205,7 @@ export function DailySetClient() {
             setExecutionResult(res);
 
             if (res.status === 'error' && res.error === 'PROFILE_REQUIRED') {
-                setError("Profile Setup Required");
-                // Optionally show a more prominent UI, but for now we'll use the error box
+                setError("PROFILE_REQUIRED");
                 return;
             }
 
@@ -191,6 +221,14 @@ export function DailySetClient() {
     };
 
     const handleSubmit = () => {
+        if (authStatus === 'unauthenticated') {
+            setError("LOGIN_REQUIRED");
+            return;
+        }
+        if (userProfile && !userProfile.exists) {
+            setError("PROFILE_REQUIRED");
+            return;
+        }
         if (executionResult?.status === 'correct') {
             alert(`Solution Submitted for ${activeProblem?.title}! Streaks are updated automatically!`);
             // We could re-fetch streak here if we want
@@ -569,25 +607,40 @@ export function DailySetClient() {
                                     </div>
 
                                     <div className="flex-1 overflow-auto p-4 bg-[#0d121c]">
-                                        {error ? (
-                                            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 font-mono text-sm whitespace-pre-wrap flex items-start flex-col gap-3">
-                                                <div className="flex items-start gap-3">
-                                                    <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                                        {error === "LOGIN_REQUIRED" ? (
+                                            <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
+                                                <div className="w-12 h-12 rounded-xl bg-[#4DD4C4]/10 flex items-center justify-center border border-[#4DD4C4]/20 mb-2 shadow-inner">
+                                                    <Lock size={24} className="text-[#4DD4C4]" />
+                                                </div>
+                                                <h3 className="text-lg font-bold text-white tracking-tight">Practice is Locked</h3>
+                                                <p className="text-zinc-500 text-sm max-w-xs leading-relaxed">Join our community of data pros to run queries, track streaks, and save your progress.</p>
+                                                <div className="flex gap-4 pt-2">
+                                                    <Link href="/login" className="px-6 py-2 bg-[#4DD4C4] text-[#080c16] rounded-xl font-bold text-sm hover:bg-[#3dbdb0] transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-[#4DD4C4]/20">Log In</Link>
+                                                    <Link href="/signup" className="px-6 py-2 bg-[#131924] border border-[#202736] text-white rounded-xl font-bold text-sm hover:bg-[#202736] transition-all">Sign Up</Link>
+                                                </div>
+                                            </div>
+                                        ) : error === "PROFILE_REQUIRED" ? (
+                                            <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
+                                                <div className="w-12 h-12 rounded-xl bg-[#60a5fa]/10 flex items-center justify-center border border-[#60a5fa]/20 mb-2">
+                                                    <Sparkles size={24} className="text-[#60a5fa]" />
+                                                </div>
+                                                <h3 className="text-lg font-bold text-white tracking-tight">One Last Step!</h3>
+                                                <p className="text-zinc-500 text-sm max-w-xs leading-relaxed">Complete your profile setup to unlock full access to the daily practice engine.</p>
+                                                <button
+                                                    onClick={() => router.push('/profile')}
+                                                    className="px-8 py-2.5 bg-[#60a5fa] text-white rounded-xl font-bold text-sm hover:bg-[#4f83cc] transition-all flex items-center gap-2 group shadow-lg shadow-[#60a5fa]/20"
+                                                >
+                                                    Complete Setup <ArrowRightIcon size={16} className="group-hover:translate-x-1 transition-transform" />
+                                                </button>
+                                            </div>
+                                        ) : error ? (
+                                            <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-xl text-red-400 font-mono text-sm flex flex-col gap-3">
+                                                <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-widest opacity-80">
+                                                    <AlertCircle size={14} /> Execution Error
+                                                </div>
+                                                <div className="p-4 bg-[#080c16] border border-red-500/20 rounded-lg text-red-200/90 leading-relaxed whitespace-pre-wrap">
                                                     {error}
                                                 </div>
-                                                {error === "Profile Setup Required" && (
-                                                    <button
-                                                        onClick={() => router.push('/profile')}
-                                                        className="mt-2 text-xs font-bold text-white bg-red-500 hover:bg-red-600 px-4 py-2 rounded transition-colors uppercase tracking-widest"
-                                                    >
-                                                        Complete Profile Now
-                                                    </button>
-                                                )}
-                                                {executionResult?.diff_reason && (
-                                                    <div className="bg-red-500/20 w-full p-2 mt-2 rounded">
-                                                        Reason: {executionResult.diff_reason}
-                                                    </div>
-                                                )}
                                             </div>
                                         ) : executionResult?.user ? (
                                             <div className="rounded-lg border border-[#202736] overflow-hidden bg-[#131924]">

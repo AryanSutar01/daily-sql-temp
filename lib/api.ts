@@ -68,6 +68,9 @@ export const api = {
             method: 'POST',
             body: JSON.stringify(data),
         }),
+    getStats: () => fetchApi<any>('/me/stats'),
+    getRecentSubmissions: () => fetchApi<any[]>('/me/submissions'),
+    getHeatmap: () => fetchApi<Record<string, number>>('/me/heatmap'),
 
     // Solutions
     getSavedSolution: (problemId: string) =>

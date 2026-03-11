@@ -5,40 +5,65 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { createClient } from "@/lib/supabase/client";
 
 export function SignupForm() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
-        username: "",
+        email: "",
         password: "",
         confirmPassword: "",
-        email: "",
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (formData.password !== formData.confirmPassword) {
+            alert("Passwords do not match");
+            return;
+        }
+
         setIsLoading(true);
-        // Simulate signup completion & redirect to complete profile info
-        setTimeout(() => {
+        const supabase = createClient();
+        try {
+            const { error } = await supabase.auth.signUp({
+                email: formData.email,
+                password: formData.password,
+            });
+
+            if (error) throw error;
+
+            alert("Check your email for the confirmation link!");
+            router.push("/login");
+        } catch (err: any) {
+            console.error("Signup failed", err);
+            alert(err.message || "Signup failed");
+        } finally {
             setIsLoading(false);
-            router.push("/profile/edit");
-        }, 600);
+        }
     };
 
-    const handleGoogleSignup = () => {
+    const handleGoogleSignup = async () => {
         setIsLoading(true);
-        setTimeout(() => {
+        const supabase = createClient();
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: "google",
+                options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                }
+            });
+            if (error) throw error;
+        } catch (err: any) {
+            alert(err.message || "Google signup failed");
             setIsLoading(false);
-            router.push("/profile/edit");
-        }, 600);
+        }
     };
 
     return (
         <div className="w-full">
             <div className="flex flex-col items-center justify-center mb-8">
                 <span className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                    {/* Mock Logo Mark */}
                     <div className="w-8 h-8 rounded bg-gradient-to-br from-[#4DD4C4] to-[#30B5A6] flex items-center justify-center shadow-lg shadow-[#4DD4C4]/20">
                         <svg className="w-5 h-5 text-[#0a0f1c]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
@@ -50,13 +75,14 @@ export function SignupForm() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                    <Label htmlFor="username" className="text-zinc-400">Username</Label>
+                    <Label htmlFor="email" className="text-zinc-400">E-mail</Label>
                     <Input
-                        id="username"
-                        type="text"
+                        id="email"
+                        type="email"
                         required
-                        value={formData.username}
-                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                        placeholder="you@example.com"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         className="bg-[#0b101c] border-[#202736] text-zinc-200 focus:border-[#4DD4C4]/50 h-10"
                     />
                 </div>
@@ -81,18 +107,6 @@ export function SignupForm() {
                         required
                         value={formData.confirmPassword}
                         onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                        className="bg-[#0b101c] border-[#202736] text-zinc-200 focus:border-[#4DD4C4]/50 h-10"
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <Label htmlFor="email" className="text-zinc-400">E-mail</Label>
-                    <Input
-                        id="email"
-                        type="email"
-                        required
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         className="bg-[#0b101c] border-[#202736] text-zinc-200 focus:border-[#4DD4C4]/50 h-10"
                     />
                 </div>
