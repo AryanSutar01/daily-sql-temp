@@ -181,6 +181,22 @@ export default function ProfilePage() {
         );
     }
 
+    if (!profile) {
+        return (
+            <div className="fixed inset-0 flex flex-col items-center justify-center bg-[#080c16] text-white p-6 text-center">
+                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4 border border-red-500/20">
+                    <History className="text-red-400" size={32} />
+                </div>
+                <h2 className="text-xl font-bold mb-2">Session Expired or Invalid</h2>
+                <p className="text-zinc-400 max-w-sm mb-6">We couldn't verify your session. Please try logging in again to access your profile.</p>
+                <div className="flex gap-4">
+                    <button onClick={() => window.location.reload()} className="px-6 py-2 bg-[#131924] border border-[#202736] rounded-xl text-sm font-bold">Retry</button>
+                    <Link href="/"><button className="px-6 py-2 bg-[#4DD4C4] text-[#080c16] rounded-xl text-sm font-bold">Go Home</button></Link>
+                </div>
+            </div>
+        );
+    }
+
     if (profile && !profile.exists) {
         return (
             <div className="fixed inset-0 top-0 z-[100] flex flex-col overflow-y-auto bg-[#080c16] text-zinc-200">
