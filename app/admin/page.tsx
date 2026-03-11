@@ -49,7 +49,7 @@ export default function AdminDashboard() {
         title: "", difficulty: "easy", description: "", estimated_time_minutes: 15
     });
     const [datasetForm, setDatasetForm] = useState({
-        table_name: "", schema_sql: "", seed_sql: "", sample_rows: "[]"
+        table_name: "", schema_sql: "", seed_sql: "", column_types: ""
     });
     const [solutionForm, setSolutionForm] = useState({
         reference_query: "", order_sensitive: false, notes: ""
@@ -167,17 +167,25 @@ export default function AdminDashboard() {
         if (!createdProblemId) return;
         setLoading(true);
         try {
-            let rows = [];
-            try { rows = JSON.parse(datasetForm.sample_rows); }
-            catch { showToast('error', 'Invalid JSON for sample_rows'); setLoading(false); return; }
+            // Parse column_types (e.g. "id: int \n name: varchar") into JSON object
+            const colTypesObj: Record<string, string> = {};
+            if (datasetForm.column_types.trim()) {
+                const lines = datasetForm.column_types.split('\n');
+                for (const line of lines) {
+                    if (line.includes(':')) {
+                        const [key, val] = line.split(':');
+                        colTypesObj[key.trim()] = val.trim();
+                    }
+                }
+            }
 
             const res = await fetchWithAuth(`${API_URL}/admin/problems/${createdProblemId}/datasets`, {
                 method: 'POST',
-                body: JSON.stringify({ ...datasetForm, sample_rows: rows })
+                body: JSON.stringify({ ...datasetForm, column_types: colTypesObj })
             });
             if (res.ok) {
                 showToast('success', `Dataset "${datasetForm.table_name}" added!`);
-                setDatasetForm({ table_name: "", schema_sql: "", seed_sql: "", sample_rows: "[]" });
+                setDatasetForm({ table_name: "", schema_sql: "", seed_sql: "", column_types: "" });
             } else {
                 const data = await res.json();
                 showToast('error', data.detail || 'Failed to add dataset');
@@ -229,7 +237,7 @@ export default function AdminDashboard() {
         setCreateStep('problem');
         setCreatedProblemId(null);
         setProblemForm({ title: "", difficulty: "easy", description: "", estimated_time_minutes: 15 });
-        setDatasetForm({ table_name: "", schema_sql: "", seed_sql: "", sample_rows: "[]" });
+        setDatasetForm({ table_name: "", schema_sql: "", seed_sql: "", column_types: "" });
         setSolutionForm({ reference_query: "", order_sensitive: false, notes: "" });
     };
 
@@ -420,7 +428,7 @@ export default function AdminDashboard() {
                                 <input className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white" placeholder="Table Name (e.g. users, orders)" value={datasetForm.table_name} onChange={e => setDatasetForm({ ...datasetForm, table_name: e.target.value })} />
                                 <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-24 font-mono text-xs text-white" placeholder="CREATE TABLE SQL..." value={datasetForm.schema_sql} onChange={e => setDatasetForm({ ...datasetForm, schema_sql: e.target.value })} />
                                 <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-24 font-mono text-xs text-white" placeholder="INSERT INTO SQL (seed data)..." value={datasetForm.seed_sql} onChange={e => setDatasetForm({ ...datasetForm, seed_sql: e.target.value })} />
-                                <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-20 font-mono text-xs text-white" placeholder='Sample rows JSON: [{"id": 1, "name": "Alice"}]' value={datasetForm.sample_rows} onChange={e => setDatasetForm({ ...datasetForm, sample_rows: e.target.value })} />
+                                <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-20 font-mono text-xs text-white" placeholder="Column Types (e.g. id: int \n name: varchar)" value={datasetForm.column_types} onChange={e => setDatasetForm({ ...datasetForm, column_types: e.target.value })} />
                                 <div className="flex gap-3">
                                     <Button onClick={handleAddDataset} disabled={!datasetForm.table_name || loading} className="flex-1 bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold">
                                         {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : <Plus size={16} className="mr-2" />}

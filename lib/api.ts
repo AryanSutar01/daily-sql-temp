@@ -55,6 +55,7 @@ export const api = {
     getProblems: () => fetchApi<Problem[]>('/problems'),
     getProblem: (id: string) => fetchApi<Problem>(`/problems/${id}`),
     getDatasets: (id: string) => fetchApi<Dataset[]>(`/problems/${id}/datasets`),
+    getExpectedOutput: (id: string) => fetchApi<{ columns: string[]; rows: any[][] }>(`/problems/${id}/expected`),
 
     // User Progress
     getStreak: () => fetchApi<Streak>('/me/streak'),

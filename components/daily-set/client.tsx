@@ -46,6 +46,7 @@ export function DailySetClient() {
     const [viewingDetails, setViewingDetails] = useState<boolean>(false);
     const [activeDatasets, setActiveDatasets] = useState<Dataset[]>([]);
     const [showHint, setShowHint] = useState<boolean>(false);
+    const [expectedOutput, setExpectedOutput] = useState<{ columns: string[]; rows: any[][] } | null>(null);
 
     // Editor & Results State
     const [code, setCode] = useState("-- Select a problem to begin\n");
@@ -122,6 +123,7 @@ export function DailySetClient() {
         setExecutionResult(null);
         setActiveDatasets([]);
         setShowHint(false);
+        setExpectedOutput(null);
 
         try {
             const datasets = await api.getDatasets(id);
@@ -137,6 +139,11 @@ export function DailySetClient() {
             const p = problems.find(x => x.id === id);
             const dsName = datasets[0]?.table_name || 'table_name';
             setCode(`-- Write your query for: ${p?.title}\nSELECT * FROM ${dsName};\n`);
+
+            // Fetch expected output in background
+            api.getExpectedOutput(id)
+                .then(data => setExpectedOutput(data))
+                .catch(() => setExpectedOutput(null));
         } catch (err) {
             console.error("Failed to load datasets", err);
         }
@@ -382,7 +389,14 @@ export function DailySetClient() {
                                                         <thead className="bg-[#0b101c] text-zinc-500">
                                                             <tr>
                                                                 {ds.sample_rows.length > 0 && Object.keys(ds.sample_rows[0]).map(h => (
-                                                                    <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">{h}</th>
+                                                                    <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">
+                                                                        <span>{h}</span>
+                                                                        {ds.column_types?.[h] && (
+                                                                            <span className="ml-2 text-[10px] text-[#4DD4C4]/70 tracking-tight">
+                                                                                ({ds.column_types[h]})
+                                                                            </span>
+                                                                        )}
+                                                                    </th>
                                                                 ))}
                                                             </tr>
                                                         </thead>
@@ -402,28 +416,34 @@ export function DailySetClient() {
                                     <div className="pt-2">
                                         <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2">Expected Output</h3>
                                         <div className="h-px w-full bg-[#202736] mb-4"></div>
-                                        {executionResult?.expected ? (
-                                            <div className="border border-[#202736] rounded-lg overflow-hidden mb-4">
-                                                <table className="w-full text-[11px] text-left">
-                                                    <thead className="bg-[#131924] text-zinc-400">
-                                                        <tr>
-                                                            {executionResult.expected.columns.map(h => (
-                                                                <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">{h}</th>
-                                                            ))}
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="bg-[#0b101c]">
-                                                        {executionResult.expected.rows.map((row: any, i: number) => (
-                                                            <tr key={i} className="border-b border-[#202736]/50 last:border-0 text-green-400/80 font-mono hover:bg-white/[0.02]">
-                                                                {row.map((cell: any, j: number) => <td key={j} className="px-3 py-1.5">{cell?.toString()}</td>)}
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        ) : (
-                                            <div className="p-4 bg-[#131924] rounded-lg border border-[#202736] text-xs text-zinc-500 font-mono italic">Run your query to see expected output.</div>
-                                        )}
+                                        {(() => {
+                                            const output = executionResult?.expected || expectedOutput;
+                                            if (output && output.columns.length > 0) {
+                                                return (
+                                                    <div className="border border-[#202736] rounded-lg overflow-hidden mb-4">
+                                                        <table className="w-full text-[11px] text-left">
+                                                            <thead className="bg-[#131924] text-zinc-400">
+                                                                <tr>
+                                                                    {output.columns.map(h => (
+                                                                        <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">{h}</th>
+                                                                    ))}
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="bg-[#0b101c]">
+                                                                {output.rows.map((row: any, i: number) => (
+                                                                    <tr key={i} className="border-b border-[#202736]/50 last:border-0 text-green-400/80 font-mono hover:bg-white/[0.02]">
+                                                                        {row.map((cell: any, j: number) => <td key={j} className="px-3 py-1.5">{cell?.toString()}</td>)}
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <div className="p-4 bg-[#131924] rounded-lg border border-[#202736] text-xs text-zinc-500 font-mono italic">Loading expected output...</div>
+                                            );
+                                        })()}
                                     </div>
 
                                     {hintText && (
