@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, Edit2, Share2, Search, Filter, Loader2, Sparkles, User, Briefcase, GraduationCap, History } from "lucide-react";
-import { StandaloneNavbar } from "@/components/auth/standalone-navbar";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -135,7 +134,6 @@ export default function ProfilePage() {
 
     const filteredSubmissions = submissions.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    // Generate mock heatmap grouped by month (March 2025 - Feb 2026) to match the Striver-style visual gaps
     const heatmapMonths = useMemo(() => {
         const data = [];
         const startYear = 2025;
@@ -146,35 +144,29 @@ export default function ProfilePage() {
             const year = date.getFullYear();
             const month = date.getMonth();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const startDay = date.getDay(); // 0 = Sunday
+            const startDay = date.getDay();
 
             const weeks = [];
             let currentWeek = Array(7).fill(-1);
 
             for (let day = 1; day <= daysInMonth; day++) {
                 const dayOfWeek = (startDay + day - 1) % 7;
-                
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 let activity = heatmapData[dateStr] || 0;
-
                 currentWeek[dayOfWeek] = activity;
-
                 if (dayOfWeek === 6 || day === daysInMonth) {
                     weeks.push([...currentWeek]);
                     currentWeek = Array(7).fill(-1);
                 }
             }
-            data.push({
-                name: date.toLocaleString('default', { month: 'short' }),
-                weeks
-            });
+            data.push({ name: date.toLocaleString('default', { month: 'short' }), weeks });
         }
         return data;
-    }, []);
+    }, [heatmapData]);
 
     if (isLoading) {
         return (
-            <div className="fixed inset-0 flex flex-col items-center justify-center bg-[#080c16] text-white">
+            <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-[#080c16] text-white">
                 <Loader2 size={32} className="animate-spin text-[#4DD4C4] mb-4" />
                 <p className="text-zinc-500 font-mono text-sm">Authenticating Profile...</p>
             </div>
@@ -183,7 +175,7 @@ export default function ProfilePage() {
 
     if (!profile) {
         return (
-            <div className="fixed inset-0 flex flex-col items-center justify-center bg-[#080c16] text-white p-6 text-center">
+            <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-[#080c16] text-white p-6 text-center">
                 <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4 border border-red-500/20">
                     <History className="text-red-400" size={32} />
                 </div>
@@ -199,114 +191,101 @@ export default function ProfilePage() {
 
     if (profile && (!profile.exists || isEditing)) {
         return (
-            <div className="fixed inset-0 top-0 z-[100] flex flex-col overflow-y-auto bg-[#080c16] text-zinc-200">
-                <StandaloneNavbar />
-                <div className="flex-1 flex items-center justify-center p-6">
-                    <div className="max-w-md w-full p-8 rounded-3xl border border-[#202736] bg-[#131924] shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#4DD4C4] to-transparent opacity-50"></div>
+            <div className="min-h-[calc(100vh-64px)] bg-[#080c16] flex flex-col items-center justify-center p-6">
+                <div className="max-w-md w-full p-8 rounded-3xl border border-[#202736] bg-[#131924] shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#4DD4C4] to-transparent opacity-50"></div>
+                    <div className="flex flex-col items-center mb-8 text-center">
+                        <div className="w-16 h-16 rounded-2xl bg-[#4DD4C4]/10 flex items-center justify-center mb-4 border border-[#4DD4C4]/20">
+                            <Sparkles className="text-[#4DD4C4]" size={32} />
+                        </div>
+                        <h2 className="text-2xl font-bold text-white mb-2">{profile.exists && isEditing ? "Update Your Profile" : "Complete Your Profile"}</h2>
+                        <p className="text-zinc-400 text-sm">
+                            {profile.exists && isEditing 
+                                ? "Update your details below to keep your profile accurate and professional." 
+                                : "Welcome back! Tell us a bit about yourself to unlock practice problems and track your progress."}
+                        </p>
+                    </div>
 
-                        <div className="flex flex-col items-center mb-8 text-center">
-                            <div className="w-16 h-16 rounded-2xl bg-[#4DD4C4]/10 flex items-center justify-center mb-4 border border-[#4DD4C4]/20">
-                                <Sparkles className="text-[#4DD4C4]" size={32} />
+                    <form onSubmit={handleOnboard} className="space-y-5">
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Full Name</label>
+                            <div className="relative">
+                                <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                                <input
+                                    required
+                                    type="text"
+                                    placeholder="Vedant Sharma"
+                                    className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                    value={formData.full_name}
+                                    onChange={e => setFormData({ ...formData, full_name: e.target.value })}
+                                />
                             </div>
-                            <h2 className="text-2xl font-bold text-white mb-2">Complete Your Profile</h2>
-                            <p className="text-zinc-400 text-sm">Welcome back! Tell us a bit about yourself to unlock practice problems and track your progress.</p>
                         </div>
 
-                        <form onSubmit={handleOnboard} className="space-y-5">
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Full Name</label>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Occupation</label>
                                 <div className="relative">
-                                    <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-                                    <input
+                                    <GraduationCap size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                                    <select
                                         required
-                                        type="text"
-                                        placeholder="Vedant Sharma"
-                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
-                                        value={formData.full_name}
-                                        onChange={e => setFormData({ ...formData, full_name: e.target.value })}
-                                    />
+                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all appearance-none inline-block align-middle cursor-pointer"
+                                        value={formData.occupation}
+                                        onChange={e => setFormData({ ...formData, occupation: e.target.value })}
+                                    >
+                                        <option value="">Select...</option>
+                                        <option value="student">Student</option>
+                                        <option value="professional">Professional</option>
+                                        <option value="other">Other</option>
+                                    </select>
                                 </div>
                             </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Occupation</label>
-                                    <div className="relative">
-                                        <GraduationCap size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-                                        <select
-                                            required
-                                            className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all appearance-none inline-block align-middle cursor-pointer"
-                                            value={formData.occupation}
-                                            onChange={e => setFormData({ ...formData, occupation: e.target.value })}
-                                        >
-                                            <option value="">Select...</option>
-                                            <option value="student">Student</option>
-                                            <option value="professional">Professional</option>
-                                            <option value="other">Other</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Exp (Years)</label>
-                                    <input
-                                        required
-                                        type="number"
-                                        min="0"
-                                        max="50"
-                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 px-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
-                                        value={formData.experience_years}
-                                        onChange={e => setFormData({ ...formData, experience_years: parseInt(e.target.value) || 0 })}
-                                    />
-                                </div>
-                            </div>
-
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Job Role / Interest</label>
-                                <div className="relative">
-                                    <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-                                    <input
-                                        required
-                                        type="text"
-                                        placeholder="Data Analyst, Student, etc."
-                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
-                                        value={formData.job_role}
-                                        onChange={e => setFormData({ ...formData, job_role: e.target.value })}
-                                    />
-                                </div>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Exp (Years)</label>
+                                <input
+                                    required
+                                    type="number"
+                                    min="0"
+                                    max="50"
+                                    className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 px-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                    value={formData.experience_years}
+                                    onChange={e => setFormData({ ...formData, experience_years: parseInt(e.target.value) || 0 })}
+                                />
                             </div>
+                        </div>
 
-                            <button
-                                disabled={isSaving}
-                                type="submit"
-                                className="w-full bg-[#4DD4C4] text-[#080c16] font-bold py-3 rounded-xl mt-6 hover:bg-[#3dbdb0] transition-colors flex items-center justify-center gap-2 group shadow-xl shadow-[#4DD4C4]/20"
-                            >
-                                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <>Start Journey <ArrowLeft size={18} className="rotate-180 group-hover:translate-x-1 transition-transform" /></>}
-                            </button>
-                        </form>
-                    </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Job Role / Interest</label>
+                            <div className="relative">
+                                <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                                <input
+                                    required
+                                    type="text"
+                                    placeholder="Data Analyst, Student, etc."
+                                    className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                    value={formData.job_role}
+                                    onChange={e => setFormData({ ...formData, job_role: e.target.value })}
+                                />
+                            </div>
+                        </div>
+
+                        <button
+                            disabled={isSaving}
+                            type="submit"
+                            className="w-full bg-[#4DD4C4] text-[#080c16] font-bold py-3 rounded-xl mt-6 hover:bg-[#3dbdb0] transition-colors flex items-center justify-center gap-2 group shadow-xl shadow-[#4DD4C4]/20"
+                        >
+                            {isSaving ? <Loader2 size={18} className="animate-spin" /> : <>{profile.exists && isEditing ? "Save Changes" : "Start Journey"} {profile.exists && isEditing ? <Edit2 size={18} /> : <ArrowLeft size={18} className="rotate-180 group-hover:translate-x-1 transition-transform" />}</>}
+                        </button>
+                    </form>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="fixed inset-0 top-0 z-[100] flex flex-col overflow-y-auto bg-[#080c16] text-zinc-200">
-            <StandaloneNavbar />
+        <div className="min-h-[calc(100vh-64px)] bg-[#080c16] text-zinc-200">
             <div className="py-12 px-4 sm:px-6 lg:px-8 shrink-0">
                 <div className="max-w-5xl mx-auto space-y-6">
-
-                    {/* Header / Nav */}
-                    <div className="flex items-center justify-between mb-8">
-                        <Link href="/practice/daily">
-                            <button className="text-zinc-400 hover:text-white transition-colors flex items-center gap-2 text-sm font-medium">
-                                <ArrowLeft size={16} /> Back to Practice
-                            </button>
-                        </Link>
-                        <div className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                            DailySQL
-                        </div>
-                    </div>
 
                     {/* Top Row: User Info & Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -315,9 +294,13 @@ export default function ProfilePage() {
                         <div className="p-6 rounded-2xl border border-[#202736] bg-[#131924] flex justify-between items-center shadow-xl">
                             <div className="flex gap-6 items-center">
                                 <div className="w-24 h-24 rounded-[20px] bg-[#4DD4C4] flex items-center justify-center shadow-lg shrink-0 overflow-hidden relative">
-                                    <svg className="w-[84px] h-[84px] text-[#080c16]/20 mt-6" fill="currentColor" viewBox="0 0 24 24">
-                                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                                    </svg>
+                                    {profile.avatar_url ? (
+                                        <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <svg className="w-[84px] h-[84px] text-[#080c16]/20 mt-6" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                                        </svg>
+                                    )}
                                 </div>
                                 <div className="flex flex-col gap-2">
                                     <div className="space-y-0.5">
@@ -325,7 +308,6 @@ export default function ProfilePage() {
                                         <p className="text-[13px] text-zinc-400 capitalize">{profile.job_role || profile.occupation || 'Learner'}</p>
                                     </div>
                                     <div className="space-y-0.5 pt-2">
-                                        <p className="text-[13px] text-zinc-400">Rank: <span className="font-semibold text-white">#--</span></p>
                                         <p className="text-[13px] text-zinc-400 lowercase">{profile.email}</p>
                                     </div>
                                 </div>
@@ -337,7 +319,12 @@ export default function ProfilePage() {
                                 >
                                     <Edit2 size={16} strokeWidth={2} />
                                 </button>
-                                <button className="p-2.5 rounded-lg bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-[#4DD4C4]/50 transition-colors shadow-sm flex items-center justify-center w-10 h-10" title="Share Profile">
+                                <button 
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(window.location.href);
+                                        alert("Profile link copied to clipboard!");
+                                    }}
+                                    className="p-2.5 rounded-lg bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-[#4DD4C4]/50 transition-colors shadow-sm flex items-center justify-center w-10 h-10" title="Share Profile">
                                     <Share2 size={16} strokeWidth={2} />
                                 </button>
                             </div>
@@ -351,7 +338,6 @@ export default function ProfilePage() {
 
                                     {segments.map((seg) => {
                                         const solvedRatio = seg.total > 0 ? seg.solved / seg.total : 0;
-                                        // Reduce the progress angle slightly so it doesn't touch the start of the next segment
                                         let progressAngle = solvedRatio * (seg.end - seg.start - 2);
                                         if (seg.solved > 0 && progressAngle < 0.1) progressAngle = 0.1;
                                         const progressEnd = seg.start + progressAngle;
@@ -362,7 +348,6 @@ export default function ProfilePage() {
                                                 onMouseEnter={() => setHoveredSegment(seg.id)}
                                                 onMouseLeave={() => setHoveredSegment(null)}
                                             >
-                                                {/* Hit area */}
                                                 <path
                                                     d={describeArc(50, 50, 36, seg.start, seg.end)}
                                                     stroke="transparent"
@@ -371,7 +356,6 @@ export default function ProfilePage() {
                                                     fill="none"
                                                     className="cursor-pointer pointer-events-stroke"
                                                 />
-                                                {/* Base track */}
                                                 <path
                                                     d={describeArc(50, 50, 34, seg.start, seg.end)}
                                                     stroke={seg.color}
@@ -382,7 +366,6 @@ export default function ProfilePage() {
                                                     className="transition-all duration-300 pointer-events-none"
                                                     style={{ filter: isHovered ? `drop-shadow(0 0 6px ${seg.color})` : 'none' }}
                                                 />
-                                                {/* Progress track */}
                                                 {seg.solved > 0 && (
                                                     <path
                                                         d={describeArc(50, 50, 36, seg.start, progressEnd)}
@@ -444,7 +427,7 @@ export default function ProfilePage() {
                     <div className="p-6 rounded-2xl border border-[#202736] bg-[#131924] shadow-xl">
                         <div className="flex justify-between items-end mb-6">
                             <h3 className="text-zinc-200 font-medium flex items-center gap-2">
-                                <span className="text-xl font-bold text-white">7</span> submissions in the past one year <span className="text-zinc-600 text-sm cursor-pointer">ⓘ</span>
+                                <span className="text-xl font-bold text-white">{submissions.length}</span> submissions in the past one year <span className="text-zinc-600 text-sm cursor-pointer">ⓘ</span>
                             </h3>
                             <div className="flex gap-4 text-xs">
                                 <span className="text-zinc-400">Total active days: <span className="font-bold text-white">3</span></span>
@@ -506,10 +489,10 @@ export default function ProfilePage() {
 
                         <div className="flex">
                             <div className="w-full space-y-2">
-                                {filteredSubmissions.map(p => (
+                                {filteredSubmissions.map((p, idx) => (
                                     <div key={p.id} className="flex items-center justify-between p-3 rounded bg-[#0b101c] border border-[#202736] hover:border-[#4DD4C4]/30 cursor-pointer transition-colors group">
                                         <div className="flex items-center gap-2 overflow-hidden">
-                                            <span className="text-sm font-medium text-zinc-300 group-hover:text-white shrink-0 w-[20px]">{p.id}.</span>
+                                            <span className="text-sm font-medium text-zinc-300 group-hover:text-white shrink-0 w-[25px]">{idx + 1}.</span>
                                             <span className="text-sm font-medium text-zinc-300 group-hover:text-white truncate">{p.title}</span>
                                         </div>
                                         <div className="w-[100px] flex justify-center shrink-0">
