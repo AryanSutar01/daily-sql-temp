@@ -73,7 +73,7 @@ export function DailySetClient() {
             try {
                 const supabase = createClient();
                 const { data: { session } } = await supabase.auth.getSession();
-                
+
                 let profileData = null;
                 if (!session) {
                     setAuthStatus('unauthenticated');
@@ -444,7 +444,14 @@ export function DailySetClient() {
                                                         <thead className="bg-[#0b101c] text-zinc-500">
                                                             <tr>
                                                                 {ds.sample_rows.length > 0 && Object.keys(ds.sample_rows[0]).map(h => (
-                                                                    <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">{h}</th>
+                                                                    <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">
+                                                                        <span>{h}</span>
+                                                                        {ds.column_types?.[h] && (
+                                                                            <span className="ml-2 text-[10px] text-[#4DD4C4]/70 tracking-tight">
+                                                                                ({ds.column_types[h]})
+                                                                            </span>
+                                                                        )}
+                                                                    </th>
                                                                 ))}
                                                             </tr>
                                                         </thead>
