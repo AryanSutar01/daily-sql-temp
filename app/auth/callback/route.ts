@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
-import { api } from '@/lib/api'
+import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
@@ -9,21 +8,13 @@ export async function GET(request: Request) {
   const next = searchParams.get('next') ?? '/practice/daily'
 
   if (code) {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
+    
     if (!error) {
-           // Successfully logged in, now check if profile exists
-           try {
-             const profile = await api.getProfile().catch(() => ({ exists: false }))
-             if (!profile.exists) {
-               return NextResponse.redirect(`${origin}/profile`)
-             }
-           } catch (err) {
-             console.error("Profile check failed during callback", err);
-           }
-      
       const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer
       const isLocalEnv = process.env.NODE_ENV === 'development'
+      
       if (isLocalEnv) {
         // we can be sure that origin is localhost
         return NextResponse.redirect(`${origin}${next}`)
