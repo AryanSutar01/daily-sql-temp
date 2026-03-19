@@ -1,31 +1,41 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
+/**
+ * Google OAuth callback handler.
+ *
+ * FastAPI redirects here after completing Google OAuth with a short-lived JWT:
+ *   /auth/callback?token=<jwt>
+ *
+ * We set it as an httpOnly cookie so it can't be read by JS (XSS protection),
+ * then redirect the user to the appropriate page.
+ */
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
-  const code = searchParams.get('code')
-  // if "next" is in search params, use it as the redirection URL
-  const next = searchParams.get('next') ?? '/practice/daily'
+    const { searchParams, origin } = new URL(request.url)
+    const token = searchParams.get('token')
+    const error = searchParams.get('error')
 
-  if (code) {
-    const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    
-    if (!error) {
-      const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer
-      const isLocalEnv = process.env.NODE_ENV === 'development'
-      
-      if (isLocalEnv) {
-        // we can be sure that origin is localhost
-        return NextResponse.redirect(`${origin}${next}`)
-      } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`)
-      } else {
-        return NextResponse.redirect(`${origin}${next}`)
-      }
+    if (error || !token) {
+        return NextResponse.redirect(`${origin}/login?error=auth_failed`)
     }
-  }
 
-  // return the user to an error page with instructions
-  return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+    const cookieStore = await cookies()
+
+    // Set the JWT as a cookie (7 days)
+    // httpOnly: false is required so client-side api.ts can read it and send as Bearer token
+    cookieStore.set('ds_token', token, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7, // 7 days in seconds
+        path: '/',
+    })
+
+    // Redirect to practice or profile depending on whether we need onboarding
+    // We use a client-side redirect target so the page can check profile state
+    const forwardedHost = request.headers.get('x-forwarded-host')
+    const isLocal = process.env.NODE_ENV === 'development'
+
+    const base = isLocal ? origin : forwardedHost ? `https://${forwardedHost}` : origin
+    return NextResponse.redirect(`${base}/auth/complete`)
 }
