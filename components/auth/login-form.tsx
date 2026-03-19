@@ -6,12 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { saveToken } from "@/lib/auth";
 import { api } from "@/lib/api";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export function LoginForm() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         email: "",
         password: "",
@@ -20,47 +23,37 @@ export function LoginForm() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-        const supabase = createClient();
-        
+        setError(null);
+
         try {
-            const { error } = await supabase.auth.signInWithPassword({
-                email: formData.email,
-                password: formData.password,
+            const res = await fetch(`${API_URL}/auth/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: formData.email, password: formData.password }),
             });
 
-            if (error) throw error;
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.detail || "Invalid credentials");
+            }
+
+            const { access_token } = await res.json();
+            saveToken(access_token);
 
             // Check if profile exists to determine where to redirect
             const profile = await api.getProfile().catch(() => ({ exists: false }));
-            if (profile.exists) {
-                router.push("/practice/daily");
-            } else {
-                router.push("/profile");
-            }
+            router.push(profile.exists ? "/practice/daily" : "/profile");
             router.refresh();
         } catch (err: any) {
-            console.error("Login failed", err);
-            alert(err.message || "Invalid credentials");
+            setError(err.message || "Login failed. Please try again.");
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleGoogleLogin = async () => {
-        setIsLoading(true);
-        const supabase = createClient();
-        try {
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: "google",
-                options: {
-                    redirectTo: `${window.location.origin}/auth/callback`,
-                }
-            });
-            if (error) throw error;
-        } catch (err: any) {
-            alert(err.message || "Google login failed");
-            setIsLoading(false);
-        }
+    const handleGoogleLogin = () => {
+        // Redirect browser directly to FastAPI's Google OAuth endpoint
+        window.location.href = `${API_URL}/auth/google`;
     };
 
     return (
@@ -75,6 +68,12 @@ export function LoginForm() {
                     DailySQL
                 </span>
             </div>
+
+            {error && (
+                <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
+                    {error}
+                </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">

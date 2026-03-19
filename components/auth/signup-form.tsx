@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createClient } from "@/lib/supabase/client";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export function SignupForm() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         email: "",
         password: "",
@@ -18,46 +20,42 @@ export function SignupForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
+
         if (formData.password !== formData.confirmPassword) {
-            alert("Passwords do not match");
+            setError("Passwords do not match");
+            return;
+        }
+        if (formData.password.length < 8) {
+            setError("Password must be at least 8 characters");
             return;
         }
 
         setIsLoading(true);
-        const supabase = createClient();
+
         try {
-            const { error } = await supabase.auth.signUp({
-                email: formData.email,
-                password: formData.password,
+            const res = await fetch(`${API_URL}/auth/register`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: formData.email, password: formData.password }),
             });
 
-            if (error) throw error;
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.detail || "Signup failed");
+            }
 
-            alert("Check your email for the confirmation link!");
-            router.push("/login");
+            // Account created — redirect to login
+            router.push("/login?registered=true");
         } catch (err: any) {
-            console.error("Signup failed", err);
-            alert(err.message || "Signup failed");
+            setError(err.message || "Signup failed. Please try again.");
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleGoogleSignup = async () => {
-        setIsLoading(true);
-        const supabase = createClient();
-        try {
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: "google",
-                options: {
-                    redirectTo: `${window.location.origin}/auth/callback`,
-                }
-            });
-            if (error) throw error;
-        } catch (err: any) {
-            alert(err.message || "Google signup failed");
-            setIsLoading(false);
-        }
+    const handleGoogleSignup = () => {
+        window.location.href = `${API_URL}/auth/google`;
     };
 
     return (
@@ -72,6 +70,12 @@ export function SignupForm() {
                     DailySQL
                 </span>
             </div>
+
+            {error && (
+                <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
+                    {error}
+                </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Flame, User, Settings, LogOut, ArrowRight, Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { api } from "@/lib/api";
 
 export function StandaloneNavbar() {
@@ -18,16 +17,15 @@ export function StandaloneNavbar() {
     useEffect(() => {
         async function fetchUser() {
             try {
-                const supabase = createClient();
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session?.user) {
-                    const profile = await api.getProfile().catch(() => ({ full_name: session.user.email?.split('@')[0], email: session.user.email }));
-                    const s = await api.getStreak().catch(() => ({ current_streak: 0 }));
-                    setUser({ ...session.user, profile });
-                    setStreak(s.current_streak);
-                }
+                // If profile is fetched successfully, user is logged in
+                const profile = await api.getProfile();
+                const s = await api.getStreak().catch(() => ({ current_streak: 0 }));
+                setUser({ profile, email: profile?.email || 'User' });
+                setStreak(s.current_streak);
             } catch (err) {
-                console.error("Auth check failed", err);
+                // Not logged in or error
+                console.error("Auth check failed or not logged in");
+                setUser(null);
             } finally {
                 setIsLoading(false);
             }
@@ -36,9 +34,9 @@ export function StandaloneNavbar() {
         fetchUser();
     }, []);
 
-    const handleLogout = async () => {
-        const supabase = createClient();
-        await supabase.auth.signOut();
+    const handleLogout = () => {
+        // Clear token cookie
+        document.cookie = "ds_token=; path=/; max-age=0; SameSite=Lax;";
         router.push("/login");
         router.refresh();
     };

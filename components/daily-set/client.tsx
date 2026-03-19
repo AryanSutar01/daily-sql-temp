@@ -26,7 +26,7 @@ import {
     Sparkles,
     ArrowRight as ArrowRightIcon
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -71,22 +71,19 @@ export function DailySetClient() {
     useEffect(() => {
         async function loadData() {
             try {
-                const supabase = createClient();
-                const { data: { session } } = await supabase.auth.getSession();
-
                 let profileData = null;
-                if (!session) {
-                    setAuthStatus('unauthenticated');
-                } else {
+                try {
+                    profileData = await api.getProfile();
                     setAuthStatus('authenticated');
-                    profileData = await api.getProfile().catch(() => ({ exists: false }));
                     setUserProfile(profileData);
+                } catch {
+                    setAuthStatus('unauthenticated');
                 }
 
                 const [probs, daily, streakData] = await Promise.all([
                     api.getProblems(),
                     api.getDailyPractice().catch(() => null),
-                    (session ? api.getStreak().catch(() => ({ current_streak: 0 })) : Promise.resolve({ current_streak: 0 })),
+                    api.getProfile().then(() => api.getStreak()).catch(() => ({ current_streak: 0 })),
                 ]);
                 setProblems(probs);
                 setDailySet(daily);
