@@ -54,7 +54,6 @@ export function StandaloneNavbar() {
             <div className="hidden md:flex items-center justify-center flex-1 space-x-12">
                 <Link href="/practice/daily" className={`text-sm font-semibold transition-colors ${pathname === '/practice/daily' ? 'text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}>Practice</Link>
                 <Link href="#" className="text-sm font-semibold text-zinc-400 hover:text-white transition-colors">Leaderboard</Link>
-                <Link href="/pricing" className="text-sm font-semibold text-zinc-400 hover:text-white transition-colors">Pro</Link>
             </div>
 
             {/* Right side CTA or User Menu */}
