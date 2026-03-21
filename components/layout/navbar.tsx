@@ -17,7 +17,7 @@ export function Navbar() {
   const router = useRouter();
 
   const navItems = [
-    { name: "Practice", href: "/practice/daily" },
+    { name: "Practice", href: "/waitlist" },
     { name: "Pricing", href: "/#pricing" },
     { name: "FAQ", href: "/#faq" },
     { name: "Contact", href: "/contact" },
