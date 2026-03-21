@@ -24,6 +24,7 @@ import {
     User,
     Lock,
     Sparkles,
+    UploadCloud,
     ArrowRight as ArrowRightIcon
 } from "lucide-react";
 
@@ -551,14 +552,45 @@ export function DailySetClient() {
                                     <button className="hover:text-zinc-200 transition-colors" title="Download Code"><Download size={14} /></button>
                                     <button className="hover:text-zinc-200 transition-colors" title="Fullscreen"><Maximize2 size={14} /></button>
                                 </div>
-                                <button
-                                    onClick={handleRun}
-                                    disabled={!activeProblemId}
-                                    className={`flex items-center gap-2 px-5 py-1.5 text-[#080C16] text-xs font-bold rounded transition-colors shadow-[0_0_10px_rgba(77,212,196,0.2)] ${activeProblemId ? 'bg-[#4DD4C4] hover:bg-[#3dbdb0]' : 'bg-zinc-600 cursor-not-allowed shadow-none'}`}
-                                >
-                                    {isRunning ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} fill="currentColor" />}
-                                    Run
-                                </button>
+                                {/* Run button */}
+                                <div className="relative group/run">
+                                    <button
+                                        onClick={handleRun}
+                                        disabled={!activeProblemId}
+                                        className={`flex items-center gap-2 px-5 py-1.5 text-[#080C16] text-xs font-bold rounded transition-colors shadow-[0_0_10px_rgba(77,212,196,0.2)] ${activeProblemId ? 'bg-[#4DD4C4] hover:bg-[#3dbdb0]' : 'bg-zinc-600 cursor-not-allowed shadow-none'}`}
+                                    >
+                                        {isRunning ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} fill="currentColor" />}
+                                        Run
+                                    </button>
+                                    {authStatus === 'unauthenticated' && (
+                                        <div className="absolute top-full right-0 mt-2 px-3 py-1.5 bg-[#0b101c] border border-[#202736] rounded-lg text-xs text-zinc-300 whitespace-nowrap opacity-0 group-hover/run:opacity-100 transition-opacity duration-150 pointer-events-none shadow-xl z-[200]">
+                                            <div className="absolute -top-[5px] right-3 w-0 h-0 border-l-4 border-r-4 border-b-[5px] border-l-transparent border-r-transparent border-b-[#202736]" />
+                                            <span className="flex items-center gap-1.5"><Lock size={10} className="text-[#4DD4C4]" /> Sign in to run queries</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Submit button (icon only) */}
+                                <div className="relative group/submit-top">
+                                    <button
+                                        onClick={handleSubmit}
+                                        disabled={executionResult?.status !== 'correct'}
+                                        title="Submit solution"
+                                        className={`flex items-center justify-center w-8 h-8 rounded transition-colors ${
+                                            executionResult?.status === 'correct'
+                                                ? 'bg-[#4DD4C4]/15 border border-[#4DD4C4]/40 text-[#4DD4C4] hover:bg-[#4DD4C4]/25 shadow-[0_0_8px_rgba(77,212,196,0.15)]'
+                                                : 'text-zinc-600 border border-[#202736] cursor-not-allowed bg-transparent'
+                                        }`}
+                                    >
+                                        <UploadCloud size={14} />
+                                    </button>
+                                    {authStatus === 'unauthenticated' && (
+                                        <div className="absolute top-full right-0 mt-2 px-3 py-1.5 bg-[#0b101c] border border-[#202736] rounded-lg text-xs text-zinc-300 whitespace-nowrap opacity-0 group-hover/submit-top:opacity-100 transition-opacity duration-150 pointer-events-none shadow-xl z-[200]">
+                                            <div className="absolute -top-[5px] right-3 w-0 h-0 border-l-4 border-r-4 border-b-[5px] border-l-transparent border-r-transparent border-b-[#202736]" />
+                                            <span className="flex items-center gap-1.5"><Lock size={10} className="text-[#4DD4C4]" /> Sign in to submit</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -680,13 +712,21 @@ export function DailySetClient() {
                                             <span className="cursor-pointer hover:text-zinc-300 transition-colors">Hint</span>
                                             <span className="cursor-pointer hover:text-zinc-300 transition-colors border-l border-[#202736] pl-4">Solution</span>
                                         </div>
-                                        <button
-                                            onClick={handleSubmit}
-                                            disabled={executionResult?.status !== 'correct'}
-                                            className={`px-6 py-2 rounded text-xs font-bold transition-all shadow-[0_0_10px_rgba(77,212,196,0.2)] ${executionResult?.status === 'correct' ? 'bg-[#4DD4C4] text-[#080C16] hover:bg-[#3dbdb0]' : 'bg-[#18212f] text-zinc-500 cursor-not-allowed border border-[#202736] shadow-none'}`}
-                                        >
-                                            SUBMIT
-                                        </button>
+                                        <div className="relative group/submit">
+                                            <button
+                                                onClick={handleSubmit}
+                                                disabled={executionResult?.status !== 'correct'}
+                                                className={`px-6 py-2 rounded text-xs font-bold transition-all shadow-[0_0_10px_rgba(77,212,196,0.2)] ${executionResult?.status === 'correct' ? 'bg-[#4DD4C4] text-[#080C16] hover:bg-[#3dbdb0]' : 'bg-[#18212f] text-zinc-500 cursor-not-allowed border border-[#202736] shadow-none'}`}
+                                            >
+                                                SUBMIT
+                                            </button>
+                                            {authStatus === 'unauthenticated' && (
+                                                <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-[#0b101c] border border-[#202736] rounded-lg text-xs text-zinc-300 whitespace-nowrap opacity-0 group-hover/submit:opacity-100 transition-opacity duration-150 pointer-events-none shadow-xl z-[200]">
+                                                    <span className="flex items-center gap-1.5"><Lock size={10} className="text-[#4DD4C4]" /> Sign in to submit</span>
+                                                    <div className="absolute top-full right-3 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-[#202736]" />
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </>
                             )}

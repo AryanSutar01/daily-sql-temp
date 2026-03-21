@@ -276,6 +276,18 @@ export default function ProfilePage() {
                         >
                             {isSaving ? <Loader2 size={18} className="animate-spin" /> : <>{profile.exists && isEditing ? "Save Changes" : "Start Journey"} {profile.exists && isEditing ? <Edit2 size={18} /> : <ArrowLeft size={18} className="rotate-180 group-hover:translate-x-1 transition-transform" />}</>}
                         </button>
+
+                        {!isEditing && !profile.exists && (
+                            <div className="text-center mt-4">
+                                <Link
+                                    href="/practice/daily"
+                                    className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors inline-flex items-center gap-1 group"
+                                >
+                                    Skip for now
+                                    <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+                                </Link>
+                            </div>
+                        )}
                     </form>
                 </div>
             </div>
