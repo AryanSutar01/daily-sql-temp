@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Flame, User, Settings, LogOut, ArrowRight, Loader2 } from "lucide-react";
+import { Flame, User, LogOut, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 
 export function StandaloneNavbar() {
@@ -13,6 +13,7 @@ export function StandaloneNavbar() {
     const [isLoading, setIsLoading] = useState(true);
     const pathname = usePathname();
     const router = useRouter();
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         async function fetchUser() {
@@ -34,6 +35,17 @@ export function StandaloneNavbar() {
         fetchUser();
     }, []);
 
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
     const handleLogout = () => {
         // Clear token cookie
         document.cookie = "ds_token=; path=/; max-age=0; SameSite=Lax;";
@@ -44,7 +56,7 @@ export function StandaloneNavbar() {
     const isAuthPage = pathname === "/login" || pathname === "/signup";
 
     return (
-        <nav className="w-full h-16 border-b border-white/5 bg-[#0a0f1c]/95 backdrop-blur z-50 px-12 sm:px-20 lg:px-40 flex items-center justify-between shrink-0">
+        <nav className="sticky top-0 relative w-full h-16 border-b border-white/5 bg-[#0a0f1c]/95 backdrop-blur z-[100] px-12 sm:px-20 lg:px-40 flex items-center justify-between shrink-0">
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2">
                 <span className="text-xl font-bold text-white">DailySQL</span>
@@ -67,7 +79,7 @@ export function StandaloneNavbar() {
                             <span className="text-sm font-bold text-[#4DD4C4]">{streak}</span>
                             <Flame size={14} className="text-[#4DD4C4] fill-[#4DD4C4]" />
                         </div>
-                        <div className="relative">
+                        <div className="relative" ref={dropdownRef}>
                             <button
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                                 className="w-9 h-9 rounded-full bg-[#131924] border-2 border-[#202736] hover:border-[#4DD4C4] transition-colors flex items-center justify-center overflow-hidden focus:outline-none"
@@ -82,7 +94,7 @@ export function StandaloneNavbar() {
                             </button>
 
                             {isDropdownOpen && (
-                                <div className="absolute top-12 right-0 w-48 bg-[#131924] border border-[#202736] rounded-xl shadow-2xl overflow-hidden py-1 z-50">
+                                <div className="absolute top-12 right-0 w-48 bg-[#131924] border border-[#202736] rounded-xl shadow-2xl overflow-hidden py-1 z-[200]">
                                     <div className="px-4 py-3 border-b border-[#202736] bg-[#0b101c]">
                                         <p className="text-sm font-semibold text-white truncate">{user.profile?.full_name || user.email?.split('@')[0]}</p>
                                         <p className="text-xs text-zinc-400 truncate">{user.email}</p>
