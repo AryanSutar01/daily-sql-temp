@@ -52,6 +52,53 @@ export default function ProfilePage() {
 
     useEffect(() => {
         async function loadProfile() {
+            // SET USE_MOCK to false to fetch real data
+            const USE_MOCK = false;
+
+            if (USE_MOCK) {
+                const mockProfile = {
+                    exists: true,
+                    full_name: "John Doe",
+                    email: "john.doe@example.com",
+                    occupation: "Professional",
+                    job_role: "Senior Data Analyst",
+                    avatar_url: null,
+                    experience_years: 5
+                };
+                const mockStats = {
+                    easy: { solved: 55, total: 100 },
+                    medium: { solved: 32, total: 80 },
+                    advanced: { solved: 12, total: 40 }
+                };
+                const mockSubmissions = [
+                    { id: 1, title: "Find Top 3 Sales by Department", difficulty: "Medium", status: "Success" },
+                    { id: 2, title: "Calculate Monthly Growth Rate", difficulty: "Hard", status: "Success" },
+                    { id: 3, title: "Basic Select and Filter", difficulty: "Easy", status: "Success" },
+                    { id: 4, title: "Group by and Having Clause", difficulty: "Medium", status: "Success" },
+                ];
+                const mockHeatmap = {
+                    "2025-03-25": 3,
+                    "2025-03-24": 2,
+                    "2025-03-23": 5,
+                    "2025-03-22": 1,
+                    "2025-03-21": 0,
+                    "2025-03-20": 4
+                };
+
+                setProfile(mockProfile);
+                setRealStats(mockStats);
+                setSubmissions(mockSubmissions);
+                setHeatmapData(mockHeatmap);
+                setFormData({
+                    full_name: mockProfile.full_name,
+                    occupation: mockProfile.occupation,
+                    job_role: mockProfile.job_role,
+                    experience_years: mockProfile.experience_years
+                });
+                setIsLoading(false);
+                return;
+            }
+
             try {
                 const [data, s, sub, h] = await Promise.all([
                     api.getProfile(),
@@ -98,9 +145,9 @@ export default function ProfilePage() {
     };
 
     const stats = {
-        easy: { solved: realStats?.easy?.solved || 0, total: realStats?.easy?.total || 1, color: "#4DD4C4" },
-        medium: { solved: realStats?.medium?.solved || 0, total: realStats?.medium?.total || 1, color: "#eab308" },
-        hard: { solved: realStats?.advanced?.solved || 0, total: realStats?.advanced?.total || 1, color: "#f87171" },
+        easy: { solved: realStats?.easy?.solved || 0, total: realStats?.easy?.total || 1, color: "#00b8a3" },
+        medium: { solved: realStats?.medium?.solved || 0, total: realStats?.medium?.total || 1, color: "#ffc01e" },
+        hard: { solved: realStats?.advanced?.solved || 0, total: realStats?.advanced?.total || 1, color: "#ff375f" },
     };
 
     const totalQuestions = stats.easy.total + stats.medium.total + stats.hard.total;
@@ -376,65 +423,123 @@ export default function ProfilePage() {
                 </div>
 
                 {/* --- RIGHT COLUMN: Stats & Data --- */}
-                {/* Stats Row */}
                 <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-5 gap-6">
                     {/* Performance Donut */}
-                    <div className="md:col-span-2 bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-8 flex flex-col items-center justify-center shadow-lg relative overflow-hidden">
-                        <div className="flex items-center gap-2 absolute top-8 left-8 w-full">
-                            <div className="w-5 h-5 rounded flex items-center justify-center bg-[#34d399]/20 text-[#34d399]">
-                                <BarChart2 size={12} strokeWidth={3} />
+                    <div className="md:col-span-2 bg-[#131924]/60 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-6 flex flex-col shadow-lg relative min-h-[250px]">
+                        <div className="w-full flex justify-start items-center mb-4 z-20">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#202736]/50 text-[#00b8a3] border border-[#202736] shadow-sm">
+                                    <BarChart2 size={16} strokeWidth={2.5} />
+                                </div>
+                                <h3 className="text-[15px] font-bold text-white tracking-wide">Performance</h3>
                             </div>
-                            <h3 className="text-[13px] font-bold text-white tracking-wide">Performance</h3>
                         </div>
-                        
-                        <div className="relative w-48 h-48 mt-6 z-10 transition-transform duration-700 hover:scale-105">
-                            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                                {/* Background Thick Track */}
-                                <circle cx="50" cy="50" r="38" stroke="#1c2333" strokeWidth="4" fill="transparent" />
-                                
-                                {/* Inner Decorative Dashed Ring */}
-                                <circle cx="50" cy="50" r="28" stroke="#202736" strokeWidth="1" fill="transparent" strokeDasharray="3 4" opacity="0.6" />
+                        <div className="flex-1 flex items-center justify-center">
+                            <div className="relative w-[160px] h-[160px] flex items-center justify-center group">
+                                <svg className="w-full h-full transform -rotate-90 absolute top-0 left-0" viewBox="0 0 100 100">
+                                {segments.map(seg => {
+                                    // Make sure segment isn't negative
+                                    if (seg.end <= seg.start) return null;
 
-                                {/* Mint Progress Ring */}
-                                <circle 
-                                    cx="50" cy="50" r="38" 
-                                    stroke="#34d399" 
-                                    strokeWidth="4" 
-                                    fill="transparent" 
-                                    strokeDasharray="238.76"
-                                    strokeDashoffset={totalQuestions > 0 ? 238.76 - (238.76 * (totalSolved / totalQuestions)) : 238.76}
-                                    strokeLinecap="round"
-                                    className="transition-all duration-1000 ease-out"
-                                />
+                                    const solvedAngle = seg.start + (seg.solved / seg.total) * (seg.end - seg.start);
+                                    
+                                    return (
+                                        <g key={seg.id} 
+                                           onMouseEnter={() => setHoveredSegment(seg.id)}
+                                           onMouseLeave={() => setHoveredSegment(null)}
+                                           className="cursor-pointer"
+                                        >
+                                            {/* Faint Colored Background Track matching the reference image */}
+                                            <path 
+                                                d={describeArc(50, 50, 42, seg.start, seg.end)} 
+                                                stroke={seg.color} 
+                                                strokeWidth="5" 
+                                                fill="transparent" 
+                                                strokeLinecap="round" 
+                                                className="transition-all duration-300"
+                                                opacity={hoveredSegment && hoveredSegment !== seg.id ? 0.05 : 0.15}
+                                            />
+                                            
+                                            {/* Bright Progress Track */}
+                                            {seg.solved > 0 && (
+                                                <path 
+                                                    d={describeArc(50, 50, 42, seg.start, solvedAngle)} 
+                                                    stroke={seg.color} 
+                                                    strokeWidth="5" 
+                                                    fill="transparent" 
+                                                    strokeLinecap="round" 
+                                                    className="transition-all duration-700 ease-out"
+                                                    style={{
+                                                        opacity: hoveredSegment && hoveredSegment !== seg.id ? 0.3 : 1
+                                                    }}
+                                                />
+                                            )}
+                                            {/* Invisible wider path for easier hovering */}
+                                            <path d={describeArc(50, 50, 42, seg.start, seg.end)} stroke="transparent" strokeWidth="20" fill="transparent" strokeLinecap="round" />
+                                        </g>
+                                    );
+                                })}
                             </svg>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-1">
-                                <span className="text-[10px] text-[#6B7280] font-bold uppercase tracking-widest leading-none mb-1.5">Solved</span>
-                                <span className="text-[44px] font-black text-white leading-none tracking-tight">{totalSolved}</span>
+                            
+                            {/* Center Numbers with visual dividers mimicking the target image */}
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none transition-all duration-300">
+                                {hoveredSegment ? (
+                                    <>
+                                        <span className="text-[32px] font-bold text-white leading-none tracking-tight group-hover:scale-105 transition-transform">
+                                            {segments.find(s=>s.id === hoveredSegment)?.solved}
+                                        </span>
+                                        <div className="w-8 h-[1px] bg-[#202736] my-2"></div>
+                                        <span className="text-[14px] font-medium text-zinc-500">
+                                            {segments.find(s=>s.id === hoveredSegment)?.total}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="text-[32px] font-bold text-white leading-none tracking-tight group-hover:scale-105 transition-transform">
+                                            {totalSolved}
+                                        </span>
+                                        <div className="w-8 h-[1px] bg-[#202736] my-2"></div>
+                                        <span className="text-[14px] font-medium text-zinc-500">
+                                            {totalQuestions}
+                                        </span>
+                                    </>
+                                )}
                             </div>
+                        </div>
                         </div>
                     </div>
 
-                    {/* Difficulty Stats List */}
-                    <div className="md:col-span-3 bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-8 flex flex-col justify-center shadow-lg relative overflow-hidden group">
+                    {/* Difficulty Stats List (LeetCode Wide Rows style) */}
+                    <div className="md:col-span-3 bg-[#131924]/60 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-8 flex flex-col justify-center shadow-lg relative group overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-b from-[#202736]/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                        <div className="relative z-10 space-y-7 w-full px-2">
+                        <div className="relative z-10 flex flex-col gap-8 w-full px-2 max-w-[320px] mx-auto">
                             {[
-                                { id: 'EASY', val: stats.easy.solved, max: stats.easy.total, color: '#34d399' },
-                                { id: 'MEDIUM', val: stats.medium.solved, max: stats.medium.total, color: '#fbbf24' },
-                                { id: 'HARD', val: stats.hard.solved, max: stats.hard.total, color: '#f87171' }
+                                { id: 'EASY', key: 'easy', val: stats.easy.solved, max: stats.easy.total, color: stats.easy.color },
+                                { id: 'MEDIUM', key: 'medium', val: stats.medium.solved, max: stats.medium.total, color: stats.medium.color },
+                                { id: 'HARD', key: 'hard', val: stats.hard.solved, max: stats.hard.total, color: stats.hard.color }
                             ].map(s => (
-                                <div key={s.id} className="relative w-full">
-                                    <div className="flex justify-between items-end mb-3">
-                                        <div className="px-3 py-1 rounded-full border" style={{ borderColor: `${s.color}40`, backgroundColor: `${s.color}10` }}>
-                                            <span className="text-[10px] font-extrabold tracking-widest" style={{ color: s.color }}>{s.id}</span>
+                                <div key={s.id} 
+                                     className="relative w-full cursor-pointer flex flex-col"
+                                     onMouseEnter={() => setHoveredSegment(s.key)}
+                                     onMouseLeave={() => setHoveredSegment(null)}
+                                >
+                                    <div className="flex justify-between items-center mb-3">
+                                        <div className="px-4 py-1.5 rounded-[20px] border shadow-sm" 
+                                             style={{ 
+                                                 borderColor: `${s.color}30`, 
+                                                 backgroundColor: `${s.color}10`, 
+                                                 color: s.color 
+                                             }}>
+                                            <span className="text-[11px] font-black tracking-widest uppercase">{s.id}</span>
                                         </div>
-                                        <div className="flex items-baseline gap-1.5">
+                                        <div className="flex items-baseline gap-1.5 pr-1">
                                             <span className="text-[18px] font-bold text-white leading-none tracking-tight">{s.val}</span>
-                                            <span className="text-[13px] font-bold text-[#6B7280]">/ {s.max}</span>
+                                            <span className="text-[13px] font-bold text-zinc-500">/ {s.max}</span>
                                         </div>
                                     </div>
-                                    <div className="w-[85%] h-1.5 bg-[#1c2333] rounded-full overflow-hidden relative">
-                                        <div className="absolute top-0 left-0 h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${s.max ? (s.val / s.max) * 100 : 0}%`, backgroundColor: s.color }}></div>
+                                    <div className="w-full h-1.5 bg-[#171e2e] rounded-full overflow-hidden relative" style={{ opacity: 0.8 }}>
+                                        {/* Very faint inner track, matching image */}
+                                        <div className="absolute top-0 left-0 h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${s.max ? (s.val / s.max) * 100 : 0}%`, backgroundColor: `${s.color}30` }}></div>
                                     </div>
                                 </div>
                             ))}

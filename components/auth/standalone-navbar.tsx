@@ -62,14 +62,19 @@ export function StandaloneNavbar() {
                 <span className="text-xl font-bold text-white">DailySQL</span>
             </Link>
 
-            {/* Nav Items */}
-            <div className="hidden md:flex items-center justify-center flex-1 space-x-12">
-                <Link href="/practice/daily" className={`text-sm font-semibold transition-colors ${pathname === '/practice/daily' ? 'text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}>Practice</Link>
-                <Link href="#" className="text-sm font-semibold text-zinc-400 hover:text-white transition-colors">Leaderboard</Link>
-            </div>
+            {/* Nav Items - Center (Hidden on Profile) */}
+            {!pathname.startsWith('/profile') && (
+                <div className="hidden md:flex items-center justify-center flex-1 space-x-12">
+                    <Link href="/practice/daily" className={`text-sm font-semibold transition-colors ${pathname === '/practice/daily' ? 'text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}>Practice</Link>
+                </div>
+            )}
 
             {/* Right side CTA or User Menu */}
-            <div className="hidden md:flex items-center gap-4 relative">
+            <div className={`hidden md:flex items-center gap-4 relative ${!pathname.startsWith('/profile') ? '' : 'flex-1 justify-end gap-8'}`}>
+                {pathname.startsWith('/profile') && (
+                    <Link href="/practice/daily" className={`text-sm font-semibold transition-colors ${pathname === '/practice/daily' ? 'text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}>Practice</Link>
+                )}
+                <div className="flex items-center gap-4 relative">
                 {isLoading ? (
                     <Loader2 size={18} className="animate-spin text-zinc-500" />
                 ) : user ? (
@@ -128,6 +133,7 @@ export function StandaloneNavbar() {
                         </Link>
                     </>
                 )}
+                </div>
             </div>
         </nav>
     );
