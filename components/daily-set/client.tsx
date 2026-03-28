@@ -154,6 +154,64 @@ export function DailySetClient() {
         return () => document.removeEventListener('fullscreenchange', onChange);
     }, []);
 
+    // ── Helpers ──────────────────────────────────────────
+    /**
+     * Extracts column names in declaration order from a CREATE TABLE ... SQL string.
+     * Falls back to Object.keys(row) (which may be alphabetical due to JSONB) if parsing fails.
+     */
+    const getColumnOrder = (schemaSql: string, fallbackRow?: Record<string, any>): string[] => {
+        try {
+            // Match the body between the first '(' and the matching last ')'
+            const bodyMatch = schemaSql.replace(/\n/g, ' ').match(/CREATE\s+TABLE\s+[\w"`.]+\s*\((.+)\)/i);
+            if (!bodyMatch) throw new Error('no match');
+            const body = bodyMatch[1];
+
+            const columns: string[] = [];
+            // Split by commas that are NOT inside parentheses (to handle CHECK(...), DEFAULT(...), etc.)
+            let depth = 0;
+            let current = '';
+            for (const ch of body) {
+                if (ch === '(') depth++;
+                else if (ch === ')') depth--;
+                else if (ch === ',' && depth === 0) {
+                    current = current.trim();
+                    if (current) {
+                        // Skip table-level constraints: PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK, INDEX
+                        const upper = current.toUpperCase();
+                        if (!upper.startsWith('PRIMARY') && !upper.startsWith('FOREIGN') &&
+                            !upper.startsWith('UNIQUE') && !upper.startsWith('CHECK') &&
+                            !upper.startsWith('INDEX') && !upper.startsWith('KEY')) {
+                            // First token is the column name (strip quotes/backticks)
+                            const nameMatch = current.match(/^[`"']?([\w]+)[`"']?/);
+                            if (nameMatch) columns.push(nameMatch[1]);
+                        }
+                    }
+                    current = '';
+                    continue;
+                }
+                current += ch;
+            }
+            // Handle the last column (no trailing comma)
+            current = current.trim();
+            if (current) {
+                const upper = current.toUpperCase();
+                if (!upper.startsWith('PRIMARY') && !upper.startsWith('FOREIGN') &&
+                    !upper.startsWith('UNIQUE') && !upper.startsWith('CHECK') &&
+                    !upper.startsWith('INDEX') && !upper.startsWith('KEY')) {
+                    const nameMatch = current.match(/^[`"']?([\w]+)[`"']?/);
+                    if (nameMatch) columns.push(nameMatch[1]);
+                }
+            }
+
+            // Validate: at least one column must exist in the fallback row (if provided)
+            if (columns.length === 0) throw new Error('no columns parsed');
+            return columns;
+        } catch {
+            // Fallback: use Object.keys of the first row (may be alphabetical due to JSONB)
+            return fallbackRow ? Object.keys(fallbackRow) : [];
+        }
+    };
+
     // ── Computed ─────────────────────────────────────────
     const todayStr = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date()).toUpperCase();
     const activeProblem = problems.find(p => p.id === activeProblemId);
@@ -660,7 +718,14 @@ export function DailySetClient() {
                                         </h3>
                                         <div className="h-px w-full bg-[#202736] mb-4" />
                                         {activeDatasets.length === 0 && <span className="text-xs text-zinc-600 font-mono italic">No datasets available</span>}
-                                        {activeDatasets.map((ds, idx) => (
+                                        {activeDatasets.map((ds, idx) => {
+                                            // Derive column order from schema_sql (TEXT, order-preserving)
+                                            // to avoid JSONB alphabetical ordering of sample_rows keys
+                                            const colOrder = getColumnOrder(
+                                                ds.schema_sql,
+                                                ds.sample_rows[0]
+                                            );
+                                            return (
                                             <div key={idx} className="border border-[#202736] rounded-lg overflow-hidden mb-4">
                                                 <div className="bg-[#131924] px-4 py-2 border-b border-[#202736]">
                                                     <span className="text-xs font-bold text-zinc-400 font-mono">{ds.table_name}</span>
@@ -669,7 +734,7 @@ export function DailySetClient() {
                                                     <table className="w-full text-[11px] text-left">
                                                         <thead className="bg-[#0b101c] text-zinc-500">
                                                             <tr>
-                                                                {ds.sample_rows.length > 0 && Object.keys(ds.sample_rows[0]).map(h => (
+                                                                {colOrder.map(h => (
                                                                     <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">
                                                                         <span>{h}</span>
                                                                         {ds.column_types?.[h] && <span className="ml-2 text-[10px] text-[#4DD4C4]/70">({ds.column_types[h]})</span>}
@@ -680,14 +745,17 @@ export function DailySetClient() {
                                                         <tbody>
                                                             {ds.sample_rows.map((row: any, i: number) => (
                                                                 <tr key={i} className="border-b border-[#202736]/50 last:border-0 text-zinc-400 font-mono hover:bg-white/[0.02]">
-                                                                    {Object.values(row).map((cell: any, j: number) => <td key={j} className="px-3 py-1.5">{cell?.toString()}</td>)}
+                                                                    {colOrder.map((col: string) => (
+                                                                        <td key={col} className="px-3 py-1.5">{row[col]?.toString() ?? ''}</td>
+                                                                    ))}
                                                                 </tr>
                                                             ))}
                                                         </tbody>
                                                     </table>
                                                 </div>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
 
                                     <div className="pt-2">
