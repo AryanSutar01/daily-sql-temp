@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Edit2, Share2, Search, Filter, Loader2, Sparkles, User, Briefcase, GraduationCap, History, BarChart2, Flame, Calendar, ChevronRight } from "lucide-react";
+import { ArrowLeft, Edit2, Search, Loader2, Sparkles, User, Briefcase, GraduationCap, History, BarChart2, Flame, X, Code } from "lucide-react";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -40,6 +40,9 @@ export default function ProfilePage() {
     const [submissions, setSubmissions] = useState<any[]>([]);
     const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
     const [isEditing, setIsEditing] = useState(false);
+    const [viewingCode, setViewingCode] = useState<{ title: string; query: string } | null>(null);
+    const [loadingCode, setLoadingCode] = useState(false);
+    const [selectedYear, setSelectedYear] = useState<string>('last_12');
 
     // Form State
     const [formData, setFormData] = useState({
@@ -181,35 +184,79 @@ export default function ProfilePage() {
 
     const filteredSubmissions = submissions.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const heatmapMonths = useMemo(() => {
-        const data = [];
-        const startYear = 2025;
-        const startMonth = 2; // March (0-indexed)
+    const { heatmapWeeks, monthLabels, heatmapRangeLabel } = useMemo(() => {
+        const now = new Date();
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        let endDate: Date;
+        let startDate: Date;
+        let finalLabel = "";
 
-        for (let i = 0; i < 12; i++) {
-            const date = new Date(startYear, startMonth + i, 1);
-            const year = date.getFullYear();
-            const month = date.getMonth();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const startDay = date.getDay();
-
-            const weeks = [];
-            let currentWeek = Array(7).fill(-1);
-
-            for (let day = 1; day <= daysInMonth; day++) {
-                const dayOfWeek = (startDay + day - 1) % 7;
-                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                let activity = heatmapData[dateStr] || 0;
-                currentWeek[dayOfWeek] = activity;
-                if (dayOfWeek === 6 || day === daysInMonth) {
-                    weeks.push([...currentWeek]);
-                    currentWeek = Array(7).fill(-1);
-                }
+        if (selectedYear === 'last_12') {
+            endDate = new Date(todayMidnight);
+            const endDayOfWeek = endDate.getDay();
+            startDate = new Date(endDate);
+            startDate.setDate(endDate.getDate() - (52 * 7) - endDayOfWeek);
+            
+            const startStr = startDate.toLocaleString('default', { month: 'short', year: 'numeric' }).toUpperCase();
+            const endStr = endDate.toLocaleString('default', { month: 'short', year: 'numeric' }).toUpperCase();
+            finalLabel = `${startStr} — ${endStr}`;
+        } else {
+            const year = parseInt(selectedYear, 10);
+            startDate = new Date(year, 0, 1); // Jan 1st
+            const startDay = startDate.getDay();
+            if (startDay !== 0) {
+                startDate.setDate(startDate.getDate() - startDay);
             }
-            data.push({ name: date.toLocaleString('default', { month: 'short' }), weeks });
+            // Always generate full year grid to maintain layout width
+            endDate = new Date(year, 11, 31); 
+            finalLabel = selectedYear;
         }
-        return data;
-    }, [heatmapData]);
+
+        const weeks = [];
+        const labels: { name: string, colIndex: number }[] = [];
+        let currentMonth = -1;
+
+        let currentDate = new Date(startDate);
+        let col = 0;
+        
+        while (currentDate <= endDate) {
+            const week = [];
+            for (let row = 0; row < 7; row++) {
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                const day = currentDate.getDate();
+                
+                // Labels processing (only push if it belongs to the target year view)
+                if ((selectedYear === 'last_12' || year === parseInt(selectedYear)) && 
+                   ((month !== currentMonth && row === 0) || (month !== currentMonth && day === 1))) {
+                    labels.push({ name: currentDate.toLocaleString('default', { month: 'short' }), colIndex: col });
+                    currentMonth = month;
+                }
+
+                // Push -1 for future days if "last_12" mode, OR padding days of other years in specific year mode
+                if (selectedYear === 'last_12' && currentDate > todayMidnight) {
+                    week.push(-1); 
+                } else if (selectedYear !== 'last_12' && year !== parseInt(selectedYear, 10)) {
+                    week.push(-1); 
+                } else {
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const activity = heatmapData[dateStr] || 0;
+                    week.push(activity);
+                }
+                
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            weeks.push(week);
+            col++;
+        }
+
+        return { 
+            heatmapWeeks: weeks, 
+            monthLabels: labels,
+            heatmapRangeLabel: finalLabel 
+        };
+    }, [heatmapData, selectedYear]);
 
     if (isLoading) {
         return (
@@ -342,6 +389,7 @@ export default function ProfilePage() {
     }
 
     return (
+        <>
         <div className="min-h-[calc(100vh-64px)] bg-[#080c16] text-zinc-300 font-sans pb-16 relative overflow-hidden">
             
             {/* Ambient Background Glows */}
@@ -354,7 +402,7 @@ export default function ProfilePage() {
             <div className="max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8 relative z-10 w-full grid grid-cols-1 lg:grid-cols-12 gap-6 pt-8 lg:pt-12">
                 
                 {/* --- LEFT COLUMN: Profile & Quick Info --- */}
-                <div className="lg:col-span-4 lg:row-span-2 flex flex-col gap-6">
+                <div className="lg:col-span-3 flex flex-col gap-6">
                     
                     {/* Main Profile Card */}
                     <div className="group relative bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-8 flex flex-col items-center text-center shadow-xl hover:border-[#4DD4C4]/30 transition-all duration-500 overflow-hidden">
@@ -376,54 +424,18 @@ export default function ProfilePage() {
                         </div>
                         <p className="text-[13px] text-zinc-400 mt-3 font-medium">{profile.email}</p>
 
-                        <div className="w-full mt-6 flex gap-2.5 relative z-10 px-2 lg:px-4">
-                            <button onClick={() => setIsEditing(true)} className="flex-1 bg-gradient-to-r from-[#4DD4C4] to-[#34b6a5] hover:opacity-90 text-[#080c16] font-bold rounded-xl py-2.5 text-[13px] transition-all duration-300 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(77,212,196,0.2)] hover:shadow-[0_0_20px_rgba(77,212,196,0.3)] transform hover:-translate-y-0.5">
+                        <div className="w-full mt-6 relative z-10 px-2 lg:px-4">
+                            <button onClick={() => setIsEditing(true)} className="w-full bg-gradient-to-r from-[#4DD4C4] to-[#34b6a5] hover:opacity-90 text-[#080c16] font-bold rounded-xl py-2.5 text-[13px] transition-all duration-300 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(77,212,196,0.2)] hover:shadow-[0_0_20px_rgba(77,212,196,0.3)] transform hover:-translate-y-0.5">
                                 <Edit2 size={14} /> Edit Profile
                             </button>
-                            <button onClick={() => { navigator.clipboard.writeText(window.location.href); alert("Copied!"); }} className="w-[42px] h-[42px] bg-[#202736]/40 hover:bg-[#202736]/80 backdrop-blur-md text-zinc-300 rounded-xl flex items-center justify-center transition-all duration-300 border border-[#202736] hover:border-[#4DD4C4]/50 hover:text-[#4DD4C4] shadow-sm shrink-0">
-                                <Share2 size={16} />
-                            </button>
                         </div>
                     </div>
-
-                    {/* Quick Stats Overview */}
-                    <div className="bg-[#131924]/60 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-8 flex flex-col gap-6 shadow-lg hover:border-[#202736] transition-colors duration-300">
-                        <div className="space-y-5">
-                            <div className="group flex items-center justify-between p-3 rounded-2xl hover:bg-[#202736]/40 transition-colors cursor-pointer border border-transparent hover:border-[#202736]">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-[18px] bg-gradient-to-br from-orange-500/20 to-orange-500/5 text-orange-400 flex items-center justify-center border border-orange-500/20 group-hover:scale-110 transition-transform duration-300 shadow-[0_0_15px_rgba(249,115,22,0.1)] group-hover:shadow-[0_0_20px_rgba(249,115,22,0.2)]">
-                                        <Flame size={20} />
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[15px] font-bold text-white tracking-wide">24 Days</span>
-                                        <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider mt-0.5">Max Streak</span>
-                                    </div>
-                                </div>
-                                <ChevronRight className="text-zinc-600 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" size={16}/>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Pro Upgrade Card */}
-                    <Link href="/pricing" className="group bg-[#131924]/60 backdrop-blur-xl border border-[#202736]/80 hover:border-[#4DD4C4]/40 rounded-[32px] p-6 flex flex-col gap-4 shadow-lg transition-all duration-300 relative overflow-hidden block cursor-pointer">
-                        <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#4DD4C4]/5 rounded-full blur-[40px] pointer-events-none group-hover:bg-[#4DD4C4]/15 transition-colors duration-500"></div>
-                        <div className="flex items-center justify-between relative z-10 w-full pl-2">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-[18px] bg-[#4DD4C4]/10 text-[#4DD4C4] flex items-center justify-center border border-[#4DD4C4]/20 group-hover:scale-110 transition-transform duration-300 shadow-[0_0_15px_rgba(77,212,196,0.1)] group-hover:shadow-[0_0_20px_rgba(77,212,196,0.3)]">
-                                    <Sparkles size={20} />
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[15px] font-bold text-white tracking-wide group-hover:text-[#4DD4C4] transition-colors">DailySQL Pro</span>
-                                    <span className="text-[11px] text-zinc-500 font-semibold tracking-wider mt-0.5 uppercase">Unlock all features</span>
-                                </div>
-                            </div>
-                            <ChevronRight className="text-zinc-600 group-hover:text-[#4DD4C4] group-hover:translate-x-1 transition-all mr-2" size={18}/>
-                        </div>
-                    </Link>
                 </div>
 
-                {/* --- RIGHT COLUMN: Stats & Data --- */}
-                <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-5 gap-6">
+                {/* --- RIGHT COLUMN: Main Content --- */}
+                <div className="lg:col-span-9 flex flex-col gap-6">
+                    {/* Top Row: Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                     {/* Performance Donut */}
                     <div className="md:col-span-2 bg-[#131924]/60 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-6 flex flex-col shadow-lg relative min-h-[250px]">
                         <div className="w-full flex justify-start items-center mb-4 z-20">
@@ -546,106 +558,189 @@ export default function ProfilePage() {
                         </div>
                     </div>
                 </div>
-
-                {/* Heatmap Layout */}
-                <div className="lg:col-span-8 bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-8 flex flex-col shadow-lg relative overflow-hidden group">
-                    <div className="absolute -top-24 -right-24 w-64 h-64 bg-[#4DD4C4]/5 rounded-full blur-[60px] pointer-events-none group-hover:bg-[#4DD4C4]/10 transition-colors duration-700"></div>
                     
-                    <div className="flex justify-between items-center mb-8 relative z-10">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-[#4DD4C4]/10 flex items-center justify-center border border-[#4DD4C4]/20"><BarChart2 size={14} className="text-[#4DD4C4]"/></div>
-                            <h3 className="text-[15px] font-bold text-white tracking-wide">Activity Map</h3>
-                        </div>
-                        <div className="flex gap-2 text-[11px] font-semibold tracking-wider uppercase text-zinc-500 bg-[#0b101c] px-3 py-1.5 rounded-lg border border-[#202736]">
-                            <span>Mar 2025</span>
-                            <span className="text-zinc-700">•</span>
-                            <span>Mar 2026</span>
-                        </div>
-                    </div>
-                    
-                    <div className="w-full overflow-x-auto pb-6 custom-scrollbar lg:pr-4 relative z-10">
-                        <div className="min-w-[700px]">
-                            <div className="flex gap-[7px]">
-                                {heatmapMonths.map((month, mIdx) => (
-                                    <div key={mIdx} className="flex flex-col gap-2">
-                                        {mIdx % 2 === 0 ? <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">{month.name}</span> : <div className="h-[14px] mb-1"></div>}
-                                        <div className="flex gap-[7px]">
-                                            {month.weeks.map((week, wIdx) => (
-                                                <div key={wIdx} className="flex flex-col gap-[7px]">
-                                                    {week.map((dayCount, dIdx) => {
-                                                        if (dayCount === -1) return <div key={`${wIdx}-${dIdx}`} className="w-[13px] h-[13px]" />;
-                                                        let bgColor = "bg-[#202736]/60 border border-transparent";
-                                                        if (dayCount === 1) { bgColor = "bg-[#4DD4C4]/30 border border-[#4DD4C4]/40"; }
-                                                        else if (dayCount === 2) { bgColor = "bg-[#4DD4C4]/60 border border-[#4DD4C4]/70"; }
-                                                        else if (dayCount >= 3) { bgColor = "bg-[#4DD4C4] border border-[#34b6a5] shadow-[0_0_8px_rgba(77,212,196,0.6)]"; }
-                                                        
-                                                        return <div key={`${wIdx}-${dIdx}`} className={`w-[13px] h-[13px] rounded-[4px] ${bgColor} transition-all duration-300 cursor-pointer hover:scale-125 hover:z-10`} title={`${dayCount} submissions`} />;
-                                                    })}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
+                {/* Middle Row: Heatmap */}
+                <div className="bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-8 flex flex-col shadow-lg relative overflow-hidden group">
+                        <div className="absolute -top-24 -right-24 w-64 h-64 bg-[#4DD4C4]/5 rounded-full blur-[60px] pointer-events-none group-hover:bg-[#4DD4C4]/10 transition-colors duration-700"></div>
+                        
+                        <div className="flex justify-between items-center mb-8 relative z-10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-[#4DD4C4]/10 flex items-center justify-center border border-[#4DD4C4]/20"><BarChart2 size={14} className="text-[#4DD4C4]"/></div>
+                                <h3 className="text-[15px] font-bold text-white tracking-wide">Activity Map</h3>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* --- FULL WIDTH: Submissions --- */}
-                <div className="lg:col-span-12 bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-6 lg:p-8 flex flex-col shadow-lg mt-2 relative overflow-hidden">
-                    <div className="absolute bottom-[-20%] left-[10%] w-[50%] h-[50%] bg-[#0ea5e9]/5 rounded-full blur-[80px] pointer-events-none"></div>
-
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8 relative z-10">
-                        <div className="flex items-center gap-3 pl-2">
-                            <h3 className="text-[17px] font-bold text-white tracking-wide">Recent Submissions</h3>
-                            <div className="px-2 py-0.5 rounded-full bg-[#202736] text-[10px] font-bold text-zinc-400">{filteredSubmissions.length}</div>
-                        </div>
-                        <div className="flex gap-2 w-full sm:w-auto">
-                            <div className="relative w-full sm:w-72 group">
-                                <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" />
-                                <input type="text" placeholder="Search history..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-[#0b101c]/80 border border-[#202736] text-sm text-zinc-300 rounded-2xl py-3 pl-11 pr-4 outline-none focus:border-[#4DD4C4]/50 focus:shadow-[0_0_15px_rgba(77,212,196,0.1)] transition-all placeholder:text-zinc-600" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 relative z-10">
-                        {filteredSubmissions.map(p => {
-                            const diffLabels: Record<string, { t: string, b: string, bg: string, icon: string, shadow: string }> = {
-                                easy: { t: 'text-[#4DD4C4]', b: 'border-[#4DD4C4]/30', bg: 'bg-[#4DD4C4]/10', icon: 'bg-[#4DD4C4]', shadow: 'group-hover:shadow-[0_4px_20px_rgba(77,212,196,0.08)]' },
-                                medium: { t: 'text-[#eab308]', b: 'border-[#eab308]/30', bg: 'bg-[#eab308]/10', icon: 'bg-[#eab308]', shadow: 'group-hover:shadow-[0_4px_20px_rgba(234,179,8,0.08)]' },
-                                hard: { t: 'text-[#f87171]', b: 'border-[#f87171]/30', bg: 'bg-[#f87171]/10', icon: 'bg-[#f87171]', shadow: 'group-hover:shadow-[0_4px_20px_rgba(248,113,113,0.08)]' },
-                            };
-                            const st = diffLabels[p.difficulty.toLowerCase()] || { t: 'text-zinc-400', b: 'border-[#202736]', bg: 'bg-[#202736]/30', icon: 'bg-zinc-500', shadow: 'group-hover:shadow-[0_4px_20px_rgba(0,0,0,0.2)]' };
-
-                            return (
-                                <div key={p.id} className={`p-5 rounded-[24px] bg-[#0b101c]/60 hover:bg-[#131924] border border-[#202736] hover:border-[#202736] flex flex-col gap-4 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group ${st.shadow}`}>
-                                    <div className="flex justify-between items-start gap-4">
-                                        <div className="flex items-start gap-3">
-                                            <div className="mt-1">
-                                                <div className={`w-2 h-2 rounded-full ${st.icon} shadow-[0_0_8px_${st.icon.replace('bg-', '')}]`}></div>
-                                            </div>
-                                            <span className="text-[14px] font-semibold text-zinc-200 line-clamp-2 leading-snug group-hover:text-white transition-colors">{p.title}</span>
-                                        </div>
-                                        <span className={`text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-[8px] border ${st.b} ${st.t} ${st.bg} shrink-0`}>
-                                            {p.difficulty}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center mt-auto pt-2 border-t border-[#202736]/50">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                            <span className="text-[11px] font-medium text-zinc-500 hover:text-zinc-300 transition-colors">Success • Yesterday</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#202736]/50 group-hover:bg-[#202736] transition-colors">
-                                            <span className="text-[10px] font-mono font-medium text-zinc-400">42ms</span>
-                                        </div>
-                                    </div>
+                            <div className="flex items-center gap-3">
+                                <div className="hidden sm:flex gap-2 text-[11px] font-semibold tracking-wider uppercase text-zinc-500 bg-[#0b101c] px-3 py-1.5 rounded-lg border border-[#202736]">
+                                    {heatmapRangeLabel}
                                 </div>
-                            );
-                        })}
+                                <select 
+                                    className="bg-[#0b101c] border border-[#202736] text-zinc-300 text-[12px] font-semibold tracking-wider rounded-lg px-3 py-1.5 outline-none focus:border-[#4DD4C4]/50 cursor-pointer hover:bg-[#131924] transition-colors"
+                                    value={selectedYear}
+                                    onChange={(e) => setSelectedYear(e.target.value)}
+                                >
+                                    <option value="last_12">LAST YEAR</option>
+                                    <option value="2026">2026</option>
+                                    <option value="2025">2025</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div className="w-full overflow-x-auto pb-4 custom-scrollbar lg:pr-4 relative z-10 flex justify-center">
+                            <div className="min-w-fit flex flex-col gap-2">
+                                {/* Month Labels */}
+                                <div className="relative h-[14px] w-full mt-1">
+                                    {monthLabels.map((lbl, idx) => {
+                                        // 15px is the width of one column (11px + 4px gap)
+                                        if (idx > 0 && lbl.colIndex - monthLabels[idx - 1].colIndex < 3) return null;
+                                        return (
+                                            <span 
+                                                key={idx} 
+                                                className="absolute text-[10px] text-zinc-500 font-bold uppercase tracking-wider" 
+                                                style={{ left: `${lbl.colIndex * 15}px`, transform: 'translateX(-2px)' }}
+                                            >
+                                                {lbl.name}
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                                
+                                {/* Grid */}
+                                <div className="flex gap-[4px]">
+                                    {heatmapWeeks.map((week, wIdx) => (
+                                        <div key={wIdx} className="flex flex-col gap-[4px]">
+                                            {week.map((dayCount, dIdx) => {
+                                                if (dayCount === -1) return <div key={`${wIdx}-${dIdx}`} className="w-[11px] h-[11px]" />;
+                                                let bgColor = "bg-[#202736]/60 border border-[#202736]/30";
+                                                if (dayCount === 1) { bgColor = "bg-[#4DD4C4]/30 border border-[#4DD4C4]/40"; }
+                                                else if (dayCount === 2) { bgColor = "bg-[#4DD4C4]/60 border border-[#4DD4C4]/70"; }
+                                                else if (dayCount >= 3) { bgColor = "bg-[#4DD4C4] border border-[#34b6a5] shadow-[0_0_8px_rgba(77,212,196,0.5)]"; }
+                                                
+                                                return (
+                                                    <div 
+                                                        key={`${wIdx}-${dIdx}`} 
+                                                        className={`w-[11px] h-[11px] rounded-[3px] ${bgColor} transition-all duration-300 cursor-pointer hover:scale-125 hover:z-10`} 
+                                                        title={`${dayCount} submissions`} 
+                                                    />
+                                                );
+                                            })}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bottom Row: Submissions (Same Width) */}
+                    <div className="bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-6 lg:p-8 flex flex-col shadow-lg relative overflow-hidden">
+                        <div className="absolute bottom-[-20%] left-[10%] w-[50%] h-[50%] bg-[#0ea5e9]/5 rounded-full blur-[80px] pointer-events-none"></div>
+
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8 relative z-10">
+                            <div className="flex items-center gap-3 pl-2">
+                                <h3 className="text-[17px] font-bold text-white tracking-wide">Recent Submissions</h3>
+                                <div className="px-2 py-0.5 rounded-full bg-[#202736] text-[10px] font-bold text-zinc-400">{filteredSubmissions.length}</div>
+                            </div>
+                            <div className="flex gap-2 w-full sm:w-auto">
+                                <div className="relative w-full sm:w-72 group">
+                                    <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" />
+                                    <input type="text" placeholder="Search history..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-[#0b101c]/80 border border-[#202736] text-sm text-zinc-300 rounded-2xl py-3 pl-11 pr-4 outline-none focus:border-[#4DD4C4]/50 focus:shadow-[0_0_15px_rgba(77,212,196,0.1)] transition-all placeholder:text-zinc-600" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="relative z-10 overflow-y-auto max-h-[500px] custom-scrollbar pr-2 pb-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                                {filteredSubmissions.map(p => {
+                                    const diffLabels: Record<string, { t: string, b: string, bg: string, icon: string, shadow: string }> = {
+                                        easy: { t: 'text-[#4DD4C4]', b: 'border-[#4DD4C4]/30', bg: 'bg-[#4DD4C4]/10', icon: 'bg-[#4DD4C4]', shadow: 'group-hover:shadow-[0_4px_20px_rgba(77,212,196,0.08)]' },
+                                        medium: { t: 'text-[#eab308]', b: 'border-[#eab308]/30', bg: 'bg-[#eab308]/10', icon: 'bg-[#eab308]', shadow: 'group-hover:shadow-[0_4px_20px_rgba(234,179,8,0.08)]' },
+                                        hard: { t: 'text-[#f87171]', b: 'border-[#f87171]/30', bg: 'bg-[#f87171]/10', icon: 'bg-[#f87171]', shadow: 'group-hover:shadow-[0_4px_20px_rgba(248,113,113,0.08)]' },
+                                    };
+                                    const st = diffLabels[p.difficulty.toLowerCase()] || { t: 'text-zinc-400', b: 'border-[#202736]', bg: 'bg-[#202736]/30', icon: 'bg-zinc-500', shadow: 'group-hover:shadow-[0_4px_20px_rgba(0,0,0,0.2)]' };
+
+                                    return (
+                                        <div key={p.id} onClick={async () => {
+                                            setLoadingCode(true);
+                                            try {
+                                                const sol = await api.getSavedSolution(p.id);
+                                                if (sol.submitted_query) setViewingCode({ title: p.title, query: sol.submitted_query });
+                                            } catch { /* silent */ } finally { setLoadingCode(false); }
+                                        }} className={`p-5 rounded-[24px] bg-[#0b101c]/60 hover:bg-[#131924] border border-[#202736] hover:border-[#4DD4C4]/20 flex flex-col gap-4 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group ${st.shadow}`}>
+                                            <div className="flex justify-between items-start gap-4">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="mt-1">
+                                                        <div className={`w-2 h-2 rounded-full ${st.icon} shadow-[0_0_8px_${st.icon.replace('bg-', '')}]`}></div>
+                                                    </div>
+                                                    <span className="text-[14px] font-semibold text-zinc-200 line-clamp-2 leading-snug group-hover:text-white transition-colors">{p.title}</span>
+                                                </div>
+                                                <span className={`text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-[8px] border ${st.b} ${st.t} ${st.bg} shrink-0`}>
+                                                    {p.difficulty}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center mt-auto pt-2 border-t border-[#202736]/50">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                    <span className="text-[11px] font-medium text-zinc-500">
+                                                        {p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Solved'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 text-[10px] font-medium text-zinc-500 group-hover:text-[#4DD4C4] transition-colors">
+                                                    <Code size={11} /> View Code
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
             </div>
         </div>
+
+        {/* Code Viewer Modal */}
+        {viewingCode && (
+            <div
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                onClick={() => setViewingCode(null)}
+            >
+                <div
+                    className="bg-[#0d121c] border border-[#202736] rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-[#202736] bg-[#131924] shrink-0">
+                        <div className="flex items-center gap-3">
+                            <div className="w-7 h-7 rounded-lg bg-[#4DD4C4]/10 border border-[#4DD4C4]/20 flex items-center justify-center">
+                                <Code size={14} className="text-[#4DD4C4]" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider">Submitted Solution</p>
+                                <h3 className="text-sm font-bold text-white leading-tight line-clamp-1">{viewingCode?.title}</h3>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setViewingCode(null)}
+                            className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-[#202736]"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+                    <div className="flex-1 overflow-auto p-6 bg-[#0b101c]">
+                        <pre className="text-[13px] text-[#4DD4C4] font-mono leading-relaxed whitespace-pre-wrap break-words">
+                            {viewingCode?.query}
+                        </pre>
+                    </div>
+                    <div className="px-6 py-3 border-t border-[#202736] bg-[#0d121c] flex justify-between items-center shrink-0">
+                        <span className="text-[10px] text-zinc-600 font-mono">solution.sql</span>
+                        <button
+                            onClick={() => navigator.clipboard.writeText(viewingCode?.query ?? '')}
+                            className="text-[11px] font-medium text-zinc-400 hover:text-[#4DD4C4] transition-colors"
+                        >
+                            Copy to clipboard
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     );
 }
