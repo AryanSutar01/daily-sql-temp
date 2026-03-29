@@ -1,5 +1,4 @@
 "use client";
-
 import {
     Play,
     CheckCircle2,
@@ -28,7 +27,12 @@ import {
     Pause,
     RotateCcw,
     LogOut,
-    ArrowRight as ArrowRightIcon
+    Trash2,
+    ArrowRight as ArrowRightIcon,
+    X,
+    Send,
+    Reply,
+    MessageCircle
 } from "lucide-react";
 
 import { useState, useRef, useEffect } from "react";
@@ -80,6 +84,28 @@ export function DailySetClient() {
     const [timerExpanded, setTimerExpanded] = useState(false);
     const [timerRunning, setTimerRunning] = useState(false);
     const [timerSeconds, setTimerSeconds] = useState(0);
+
+    // ── Votes State ──────────────────────────────────────────────
+    const [problemVotes, setProblemVotes] = useState<{ likes: number; user_has_voted: boolean } | null>(null);
+    const [isVoting, setIsVoting] = useState(false);
+
+    // ── Discussion State ─────────────────────────────────────────
+    const [discussionOpen, setDiscussionOpen] = useState(false);
+    const [comments, setComments] = useState<any[]>([]);
+    const [commentCount, setCommentCount] = useState(0);
+    const [isLoadingComments, setIsLoadingComments] = useState(false);
+    const [newComment, setNewComment] = useState('');
+    const [replyingTo, setReplyingTo] = useState<{ id: string; userName: string } | null>(null);
+    const [replyText, setReplyText] = useState('');
+
+    // ── Feedback State ───────────────────────────────────────────
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
+    const [feedbackSource, setFeedbackSource] = useState<'fab' | 'dislike'>('fab');
+    const [feedbackProblemId, setFeedbackProblemId] = useState<string | null>(null);
+    const [feedbackRating, setFeedbackRating] = useState<number | null>(null);
+    const [feedbackMessage, setFeedbackMessage] = useState('');
+    const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+    const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
     // ── Refs ─────────────────────────────────────────────
     const containerRef = useRef<HTMLDivElement>(null);
@@ -280,6 +306,13 @@ export function DailySetClient() {
             api.getExpectedOutput(id)
                 .then(data => setExpectedOutput(data))
                 .catch(() => setExpectedOutput(null));
+            // Reset + lazy-load votes and comment count
+            setProblemVotes(null);
+            setCommentCount(0);
+            setDiscussionOpen(false);
+            setComments([]);
+            api.getProblemVotes(id).then(v => setProblemVotes(v)).catch(() => setProblemVotes({ likes: 0, user_has_voted: false }));
+            api.getCommentCount(id).then(({ count }) => setCommentCount(count)).catch(() => setCommentCount(0));
         } catch (err) {
             console.error("Failed to load datasets", err);
         }
@@ -328,6 +361,91 @@ export function DailySetClient() {
         document.cookie = "ds_token=; path=/; max-age=0; SameSite=Lax;";
         router.push("/login");
         router.refresh();
+    };
+
+    const openFeedbackModal = (source: 'fab' | 'dislike', problemId?: string) => {
+        setFeedbackSource(source);
+        setFeedbackProblemId(problemId || null);
+        setFeedbackRating(null);
+        setFeedbackMessage('');
+        setFeedbackSuccess(false);
+        setFeedbackOpen(true);
+    };
+
+    const handleVote = async () => {
+        if (authStatus === 'unauthenticated') { setError('LOGIN_REQUIRED'); setShowResult(true); return; }
+        if (!activeProblemId) return;
+        setIsVoting(true);
+        const prev = problemVotes;
+        setProblemVotes(v => v ? { likes: v.user_has_voted ? v.likes - 1 : v.likes + 1, user_has_voted: !v.user_has_voted } : null);
+        try {
+            const result = await api.voteProblem(activeProblemId);
+            setProblemVotes({ likes: result.likes, user_has_voted: result.user_has_voted });
+        } catch { setProblemVotes(prev); }
+        finally { setIsVoting(false); }
+    };
+
+    const handleOpenDiscussion = async () => {
+        if (authStatus === 'unauthenticated') { setError('LOGIN_REQUIRED'); setShowResult(true); return; }
+        setDiscussionOpen(true);
+        if (!activeProblemId || comments.length > 0) return;
+        setIsLoadingComments(true);
+        try {
+            const data = await api.getComments(activeProblemId);
+            setComments(data);
+        } catch (e) { console.error(e); }
+        finally { setIsLoadingComments(false); }
+    };
+
+    const handlePostComment = async () => {
+        if (!activeProblemId || !newComment.trim()) return;
+        try {
+            const c = await api.postComment(activeProblemId, newComment.trim());
+            setComments(prev => [...prev, c]);
+            setCommentCount(n => n + 1);
+            setNewComment('');
+        } catch (e) { console.error(e); }
+    };
+
+    const handlePostReply = async (parentId: string) => {
+        if (!activeProblemId || !replyText.trim()) return;
+        try {
+            const c = await api.postComment(activeProblemId, replyText.trim(), parentId);
+            setComments(prev => prev.map(com =>
+                com.id === parentId ? { ...com, replies: [...(com.replies || []), c], reply_count: (com.reply_count || 0) + 1 } : com
+            ));
+            setReplyingTo(null);
+            setReplyText('');
+        } catch (e) { console.error(e); }
+    };
+
+    const handleDeleteComment = async (commentId: string, parentId?: string) => {
+        try {
+            await api.deleteComment(commentId);
+            if (parentId) {
+                setComments(prev => prev.map(com =>
+                    com.id === parentId ? { ...com, replies: com.replies.filter((r: any) => r.id !== commentId), reply_count: Math.max(0, (com.reply_count || 1) - 1) } : com
+                ));
+            } else {
+                setComments(prev => prev.filter(c => c.id !== commentId));
+                setCommentCount(n => Math.max(0, n - 1));
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleSubmitFeedback = async () => {
+        setFeedbackSubmitting(true);
+        try {
+            await api.submitFeedback({
+                rating: feedbackRating || undefined,
+                message: feedbackMessage || undefined,
+                source: feedbackSource,
+                problem_id: feedbackProblemId || undefined,
+            });
+            setFeedbackSuccess(true);
+            setTimeout(() => { setFeedbackOpen(false); setFeedbackSuccess(false); }, 2000);
+        } catch (e) { console.error(e); }
+        finally { setFeedbackSubmitting(false); }
     };
 
     const getDiffStyle = (diff: string) => {
@@ -805,13 +923,37 @@ export function DailySetClient() {
                                 </div>
 
                                 <div className="border-t border-[#202736] bg-[#0b101c] p-4 flex justify-between items-center text-zinc-400 shrink-0">
-                                    <div className="flex gap-4">
-                                        <button className="flex items-center gap-1.5 hover:text-[#4DD4C4] transition-colors"><ThumbsUp size={16} /></button>
-                                        <button className="flex items-center gap-1.5 hover:text-red-400 transition-colors"><ThumbsDown size={16} /></button>
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative group">
+                                            <button
+                                                onClick={handleVote}
+                                                disabled={isVoting}
+                                                className={`flex items-center gap-1.5 text-xs transition-colors ${problemVotes?.user_has_voted ? 'text-[#4DD4C4]' : 'hover:text-[#4DD4C4]'}`}
+                                            >
+                                                <ThumbsUp size={15} fill={problemVotes?.user_has_voted ? 'currentColor' : 'none'} />
+                                                {problemVotes !== null && <span className="font-mono text-xs">{problemVotes.likes}</span>}
+                                            </button>
+                                            {authStatus === 'unauthenticated' && <LoginTooltip text="Sign in to like" />}
+                                        </div>
+                                        <button
+                                            onClick={() => openFeedbackModal('dislike', activeProblemId || undefined)}
+                                            title="Send feedback about this problem"
+                                            className="flex items-center gap-1.5 hover:text-amber-400 transition-colors"
+                                        >
+                                            <ThumbsDown size={15} />
+                                        </button>
                                     </div>
-                                    <button className="flex items-center gap-2 text-xs font-medium hover:text-white transition-colors">
-                                        Join Discussion <MessageSquare size={16} /> 30
-                                    </button>
+                                    <div className="relative group">
+                                        <button
+                                            onClick={handleOpenDiscussion}
+                                            className="flex items-center gap-1.5 text-xs font-medium hover:text-white transition-colors"
+                                        >
+                                            <MessageSquare size={14} />
+                                            Join Discussion
+                                            {commentCount > 0 && <span className="text-zinc-500 font-mono ml-1">({commentCount})</span>}
+                                        </button>
+                                        {authStatus === 'unauthenticated' && <LoginTooltip text="Sign in to join discussion" />}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -971,6 +1113,159 @@ export function DailySetClient() {
                     </Panel>
                 </Group>
             </div>
+
+            {/* ══ Discussion Drawer ══ */}
+            {discussionOpen && (
+                <div className="absolute inset-y-0 right-0 w-[380px] bg-[#0d121c] border-l border-[#202736] flex flex-col z-[200] shadow-2xl">
+                    <div className="h-11 border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0">
+                        <span className="text-sm font-bold text-white flex items-center gap-2">
+                            <MessageSquare size={14} className="text-[#4DD4C4]" /> Discussion
+                            {commentCount > 0 && <span className="text-xs text-zinc-500 font-normal">({commentCount})</span>}
+                        </span>
+                        <button onClick={() => setDiscussionOpen(false)} className="text-zinc-400 hover:text-white transition-colors"><X size={16} /></button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        {isLoadingComments && <div className="flex justify-center pt-8"><Loader2 size={20} className="animate-spin text-[#4DD4C4]" /></div>}
+                        {!isLoadingComments && comments.length === 0 && (
+                            <div className="text-center text-xs text-zinc-500 pt-10 space-y-2">
+                                <MessageCircle size={28} className="mx-auto text-zinc-700" />
+                                <p>No comments yet. Start the discussion!</p>
+                            </div>
+                        )}
+                        {comments.map(comment => (
+                            <div key={comment.id} className="space-y-2">
+                                <div className="bg-[#131924] rounded-lg p-3 border border-[#202736]">
+                                    <div className="flex items-start justify-between mb-1.5">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-6 h-6 rounded-full bg-[#4DD4C4]/20 flex items-center justify-center text-[10px] font-bold text-[#4DD4C4] shrink-0">{comment.user.initials}</div>
+                                            <div>
+                                                <span className="text-xs font-semibold text-zinc-300">{comment.user.full_name}</span>
+                                                <span className="text-[10px] text-zinc-600 ml-2">{new Date(comment.created_at).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                        {comment.is_own && (
+                                            <button onClick={() => handleDeleteComment(comment.id)} className="text-zinc-600 hover:text-red-400 transition-colors ml-2 shrink-0"><Trash2 size={12} /></button>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-zinc-300 leading-relaxed">{comment.body}</p>
+                                    {authStatus === 'authenticated' && (
+                                        <button
+                                            onClick={() => setReplyingTo(replyingTo?.id === comment.id ? null : { id: comment.id, userName: comment.user.full_name })}
+                                            className="mt-2 text-[10px] text-zinc-500 hover:text-[#4DD4C4] transition-colors flex items-center gap-1"
+                                        ><Reply size={10} /> Reply</button>
+                                    )}
+                                </div>
+                                {comment.replies?.map((reply: any) => (
+                                    <div key={reply.id} className="ml-5 bg-[#0b101c] rounded-lg p-3 border border-[#202736]/60">
+                                        <div className="flex items-start justify-between mb-1">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-5 h-5 rounded-full bg-[#4DD4C4]/10 flex items-center justify-center text-[9px] font-bold text-[#4DD4C4] shrink-0">{reply.user.initials}</div>
+                                                <span className="text-[11px] font-semibold text-zinc-400">{reply.user.full_name}</span>
+                                                <span className="text-[9px] text-zinc-600">{new Date(reply.created_at).toLocaleDateString()}</span>
+                                            </div>
+                                            {reply.is_own && (
+                                                <button onClick={() => handleDeleteComment(reply.id, comment.id)} className="text-zinc-600 hover:text-red-400 transition-colors shrink-0"><Trash2 size={11} /></button>
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] text-zinc-400 leading-relaxed">{reply.body}</p>
+                                    </div>
+                                ))}
+                                {replyingTo?.id === comment.id && (
+                                    <div className="ml-5 flex gap-2">
+                                        <input
+                                            value={replyText}
+                                            onChange={e => setReplyText(e.target.value)}
+                                            placeholder={`Reply to ${replyingTo?.userName ?? ''}...`}
+                                            className="flex-1 bg-[#0b101c] border border-[#202736] rounded-lg px-3 py-1.5 text-xs text-zinc-300 outline-none focus:border-[#4DD4C4]/50"
+                                            onKeyDown={e => e.key === 'Enter' && handlePostReply(comment.id)}
+                                        />
+                                        <button onClick={() => handlePostReply(comment.id)} className="text-[#4DD4C4] hover:text-white transition-colors px-2"><Send size={13} /></button>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="border-t border-[#202736] p-4 shrink-0 bg-[#0b101c]">
+                        {authStatus === 'authenticated' ? (
+                            <div className="flex gap-2">
+                                <input
+                                    value={newComment}
+                                    onChange={e => setNewComment(e.target.value)}
+                                    placeholder="Write a comment..."
+                                    className="flex-1 bg-[#131924] border border-[#202736] rounded-lg px-3 py-2 text-xs text-zinc-300 outline-none focus:border-[#4DD4C4]/50"
+                                    onKeyDown={e => e.key === 'Enter' && handlePostComment()}
+                                />
+                                <button onClick={handlePostComment} disabled={!newComment.trim()} className="text-[#4DD4C4] hover:text-white transition-colors disabled:text-zinc-600 px-2"><Send size={15} /></button>
+                            </div>
+                        ) : (
+                            <div className="text-center space-y-2">
+                                <p className="text-xs text-zinc-500">Sign in to join the discussion</p>
+                                <div className="flex gap-2 justify-center">
+                                    <Link href="/login" className="px-4 py-1.5 bg-[#4DD4C4] text-[#080c16] rounded text-xs font-bold hover:bg-[#3dbdb0] transition-colors">Log In</Link>
+                                    <Link href="/signup" className="px-4 py-1.5 bg-[#131924] border border-[#202736] text-white rounded text-xs font-bold hover:bg-[#202736] transition-colors">Sign Up</Link>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ══ Feedback FAB ══ */}
+            <button
+                onClick={() => openFeedbackModal('fab')}
+                title="Send Feedback"
+                className="absolute bottom-6 right-6 z-[150] w-10 h-10 rounded-full bg-[#131924] border border-[#202736] text-zinc-400 hover:text-[#4DD4C4] hover:border-[#4DD4C4]/50 transition-all shadow-lg flex items-center justify-center"
+            >
+                <MessageCircle size={16} />
+            </button>
+
+            {/* ══ Feedback Modal ══ */}
+            {feedbackOpen && (
+                <div className="absolute inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-[#0d121c] border border-[#202736] rounded-xl p-6 w-80 shadow-2xl space-y-4">
+                        {feedbackSuccess ? (
+                            <div className="text-center py-4 space-y-3">
+                                <CheckCircle2 size={36} className="text-[#4DD4C4] mx-auto" />
+                                <p className="text-white font-semibold">Thanks for your feedback!</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-bold text-white">Send Feedback</h3>
+                                    <button onClick={() => setFeedbackOpen(false)} className="text-zinc-500 hover:text-white transition-colors"><X size={16} /></button>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-zinc-500 mb-2">How's your experience?</p>
+                                    <div className="flex gap-2">
+                                        {[{ v: 1, label: 'Bad' }, { v: 2, label: 'Okay' }, { v: 3, label: 'Great' }].map(({ v, label }) => (
+                                            <button
+                                                key={v}
+                                                onClick={() => setFeedbackRating(feedbackRating === v ? null : v)}
+                                                className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${feedbackRating === v ? 'bg-[#4DD4C4]/20 border-[#4DD4C4] text-[#4DD4C4]' : 'bg-[#131924] border-[#202736] text-zinc-400 hover:border-zinc-500'}`}
+                                            >{label}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <textarea
+                                    value={feedbackMessage}
+                                    onChange={e => setFeedbackMessage(e.target.value)}
+                                    placeholder="Tell us more (optional)..."
+                                    rows={3}
+                                    className="w-full bg-[#0b101c] border border-[#202736] rounded-lg p-3 text-xs text-zinc-300 outline-none focus:border-[#4DD4C4]/50 resize-none"
+                                />
+                                <button
+                                    onClick={handleSubmitFeedback}
+                                    disabled={feedbackSubmitting || (!feedbackRating && !feedbackMessage.trim())}
+                                    className="w-full py-2 bg-[#4DD4C4] text-[#080c16] rounded-lg text-xs font-bold hover:bg-[#3dbdb0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {feedbackSubmitting && <Loader2 size={13} className="animate-spin" />}
+                                    Submit Feedback
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

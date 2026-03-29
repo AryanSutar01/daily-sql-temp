@@ -14,23 +14,16 @@ function getAuthHeaders(): HeadersInit {
     return headers;
 }
 
-
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const headers = getAuthHeaders();
-
     const res = await fetch(`${API_URL}${endpoint}`, {
         ...options,
-        headers: {
-            ...headers,
-            ...options.headers,
-        },
+        headers: { ...headers, ...options.headers },
     });
-
     if (!res.ok) {
         const errorBody = await res.json().catch(() => ({}));
         throw new Error(errorBody.detail || `API Error: ${res.status}`);
     }
-
     return res.json();
 }
 
@@ -69,4 +62,32 @@ export const api = {
     // Solutions
     getSavedSolution: (problemId: string) =>
         fetchApi<{ submitted_query: string | null }>(`/me/solutions/${problemId}`),
+
+    // Votes (likes)
+    getProblemVotes: (problemId: string) =>
+        fetchApi<{ likes: number; user_has_voted: boolean }>(`/problems/${problemId}/votes`),
+    voteProblem: (problemId: string) =>
+        fetchApi<{ action: string; likes: number; user_has_voted: boolean }>(`/problems/${problemId}/votes`, {
+            method: 'POST',
+        }),
+
+    // Comments / Discussion
+    getCommentCount: (problemId: string) =>
+        fetchApi<{ count: number }>(`/problems/${problemId}/comments?count_only=true`),
+    getComments: (problemId: string, offset = 0) =>
+        fetchApi<any[]>(`/problems/${problemId}/comments?limit=30&offset=${offset}`),
+    postComment: (problemId: string, body: string, parentId?: string) =>
+        fetchApi<any>(`/problems/${problemId}/comments`, {
+            method: 'POST',
+            body: JSON.stringify({ body, parent_id: parentId ?? null }),
+        }),
+    deleteComment: (commentId: string) =>
+        fetchApi<void>(`/comments/${commentId}`, { method: 'DELETE' }),
+
+    // Feedback
+    submitFeedback: (data: { rating?: number; message?: string; source: string; problem_id?: string; email?: string }) =>
+        fetchApi<{ id: string; created_at: string }>('/feedback', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
 };
