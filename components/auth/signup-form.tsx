@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { saveToken } from "@/lib/auth";
+import { api } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -12,13 +14,19 @@ export function SignupForm() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [step, setStep] = useState<"form" | "otp">("form");
+    const [stateId, setStateId] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         email: "",
         password: "",
         confirmPassword: "",
     });
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    // OTP state
+    const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+    const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+    const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
 
@@ -45,8 +53,9 @@ export function SignupForm() {
                 throw new Error(body.detail || "Signup failed");
             }
 
-            // Account created — redirect to login
-            router.push("/login?registered=true");
+            const data = await res.json();
+            setStateId(data.state_id);
+            setStep("otp");
         } catch (err: any) {
             setError(err.message || "Signup failed. Please try again.");
         } finally {
@@ -54,9 +63,144 @@ export function SignupForm() {
         }
     };
 
+    const handleOtpChange = (index: number, value: string) => {
+        if (!/^\d*$/.test(value)) return;
+        const newOtp = [...otp];
+        newOtp[index] = value.slice(-1);
+        setOtp(newOtp);
+
+        if (value && index < 5) {
+            inputRefs.current[index + 1]?.focus();
+        }
+    };
+
+    const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+        if (e.key === "Backspace" && !otp[index] && index > 0) {
+            inputRefs.current[index - 1]?.focus();
+        }
+    };
+
+    const handleOtpSubmit = async (e?: React.FormEvent) => {
+        e?.preventDefault();
+        const code = otp.join("");
+        if (code.length < 6) return;
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const res = await fetch(`${API_URL}/auth/register/verify`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email: formData.email,
+                    password: formData.password,
+                    state_id: stateId,
+                    otp: code
+                }),
+            });
+
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.detail || "Invalid code");
+            }
+
+            const { access_token } = await res.json();
+            saveToken(access_token);
+
+            // New users always go to profile completion first
+            router.push("/profile");
+            router.refresh();
+        } catch (err: any) {
+            setError(err.message || "Verification failed");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const resendCode = async () => {
+        setError(null);
+        try {
+            const res = await fetch(`${API_URL}/auth/otp/send`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: formData.email }),
+            });
+            const data = await res.json();
+            setStateId(data.state_id);
+            setOtp(["", "", "", "", "", ""]);
+            inputRefs.current[0]?.focus();
+        } catch (err) {
+            setError("Failed to resend code");
+        }
+    };
+
+    useEffect(() => {
+        if (step === "otp" && inputRefs.current[0]) {
+            inputRefs.current[0].focus();
+        }
+    }, [step]);
+
     const handleGoogleSignup = () => {
         window.location.href = `${API_URL}/auth/google`;
     };
+
+    if (step === "otp") {
+        return (
+            <div className="w-full">
+                <div className="text-center mb-8">
+                    <h2 className="text-2xl font-bold text-white mb-2">Verify your Email</h2>
+                    <p className="text-zinc-400 text-sm">
+                        Enter the 6-digit code sent to <br />
+                        <span className="text-white font-medium">{formData.email}</span>
+                    </p>
+                </div>
+
+                {error && (
+                    <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
+                        {error}
+                    </div>
+                )}
+
+                <div className="flex justify-between gap-2 mb-8">
+                    {otp.map((digit, idx) => (
+                        <input
+                            key={idx}
+                            ref={(el) => { inputRefs.current[idx] = el; }}
+                            type="text"
+                            inputMode="numeric"
+                            value={digit}
+                            onChange={(e) => handleOtpChange(idx, e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(idx, e)}
+                            className="w-12 h-14 bg-[#0b101c] border-2 border-[#202736] rounded-xl text-center text-xl font-bold text-white focus:border-[#4DD4C4] focus:ring-1 focus:ring-[#4DD4C4] outline-none transition-all"
+                        />
+                    ))}
+                </div>
+
+                <Button
+                    onClick={() => handleOtpSubmit()}
+                    disabled={isLoading || otp.join("").length < 6}
+                    className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-[#080c16] font-bold h-12 shadow-[0_0_20px_rgba(77,212,196,0.15)] transition-all mb-4"
+                >
+                    {isLoading ? "Verifying..." : "Create Account"}
+                </Button>
+
+                <button
+                    onClick={resendCode}
+                    className="w-full text-center text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                    Didn't receive code? Resend
+                </button>
+
+                <button
+                    onClick={() => setStep("form")}
+                    className="w-full text-center text-sm text-[#4DD4C4] hover:underline mt-6"
+                >
+                    ← Back to signup details
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full">
@@ -77,7 +221,7 @@ export function SignupForm() {
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleFormSubmit} className="space-y-4">
                 <div className="space-y-2">
                     <Label htmlFor="email" className="text-zinc-400">E-mail</Label>
                     <Input
@@ -120,7 +264,7 @@ export function SignupForm() {
                     disabled={isLoading}
                     className="w-full bg-[#4DD4C4] hover:bg-[#30B5A6] text-[#080c16] font-bold h-12 shadow-[0_0_20px_rgba(77,212,196,0.15)] transition-all mt-6"
                 >
-                    {isLoading ? "Signing up..." : "Sign Up"}
+                    {isLoading ? "Sending verification..." : "Sign Up"}
                 </Button>
             </form>
 

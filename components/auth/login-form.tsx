@@ -40,9 +40,9 @@ export function LoginForm() {
             const { access_token } = await res.json();
             saveToken(access_token);
 
-            // Check if profile exists to determine where to redirect
-            const profile = await api.getProfile().catch(() => ({ exists: false }));
-            router.push(profile.exists ? "/practice/daily" : "/profile");
+            // Check if profile is complete to determine where to redirect
+            const profile = await api.getProfile().catch(() => ({ onboarding_completed: false }));
+            router.push(profile.onboarding_completed ? "/practice/daily" : "/profile");
             router.refresh();
         } catch (err: any) {
             setError(err.message || "Login failed. Please try again.");
@@ -153,3 +153,5 @@ export function LoginForm() {
         </div>
     );
 }
+
+
