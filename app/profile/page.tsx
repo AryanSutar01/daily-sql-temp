@@ -140,6 +140,9 @@ export default function ProfilePage() {
             const updated = await api.getProfile();
             setProfile(updated);
             setIsEditing(false);
+            
+            // Redirect to practice page after successful onboarding/update
+            router.push("/practice/daily");
         } catch (err) {
             console.error("Failed to save profile", err);
         } finally {
@@ -283,7 +286,7 @@ export default function ProfilePage() {
         );
     }
 
-    if (profile && (!profile.exists || isEditing)) {
+    if (profile && (!profile.onboarding_completed || isEditing)) {
         return (
             <div className="min-h-[calc(100vh-64px)] bg-[#080c16] flex flex-col items-center justify-center p-6">
                 <div className="max-w-md w-full p-8 rounded-3xl border border-[#202736] bg-[#131924] shadow-2xl relative overflow-hidden">
@@ -292,11 +295,11 @@ export default function ProfilePage() {
                         <div className="w-16 h-16 rounded-2xl bg-[#4DD4C4]/10 flex items-center justify-center mb-4 border border-[#4DD4C4]/20">
                             <Sparkles className="text-[#4DD4C4]" size={32} />
                         </div>
-                        <h2 className="text-2xl font-bold text-white mb-2">{profile.exists && isEditing ? "Update Your Profile" : "Complete Your Profile"}</h2>
+                        <h2 className="text-2xl font-bold text-white mb-2">{profile.onboarding_completed ? "Update Your Profile" : "Complete Your Profile"}</h2>
                         <p className="text-zinc-400 text-sm">
-                            {profile.exists && isEditing
+                            {profile.onboarding_completed
                                 ? "Update your details below to keep your profile accurate and professional."
-                                : "Welcome back! Tell us a bit about yourself to unlock practice problems and track your progress."}
+                                : "Welcome! Tell us a bit about yourself to unlock practice problems and track your progress."}
                         </p>
                     </div>
 

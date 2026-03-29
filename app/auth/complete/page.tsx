@@ -15,10 +15,10 @@ export default function AuthCompletePage() {
     useEffect(() => {
         async function redirect() {
             try {
-                const profile = await api.getProfile().catch(() => ({ exists: false }));
-                router.replace(profile.exists ? "/practice/daily" : "/profile");
+                const profile = await api.getProfile().catch(() => ({ onboarding_completed: false }));
+                router.replace(profile.onboarding_completed ? "/practice/daily" : "/profile");
             } catch {
-                router.replace("/practice/daily");
+                router.replace("/profile");
             }
         }
         redirect();
