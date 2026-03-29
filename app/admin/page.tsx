@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
     Database, Plus, Calendar, Lock, Search, CheckCircle2,
     AlertCircle, Loader2, ChevronRight, Edit3, Eye,
-    Code, FileText, Clock, Trash2
+    Code, FileText, Clock, Trash2, MessageSquare, X, Save, ThumbsDown
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -27,7 +27,7 @@ interface ScheduleEntry {
     advanced: { id: string; title: string } | null;
 }
 
-type Tab = 'problems' | 'create' | 'schedule';
+type Tab = 'problems' | 'create' | 'schedule' | 'feedback';
 type CreateStep = 'problem' | 'datasets' | 'solution' | 'done';
 
 export default function AdminDashboard() {
@@ -39,6 +39,17 @@ export default function AdminDashboard() {
     const [problems, setProblems] = useState<Problem[]>([]);
     const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
     const [loading, setLoading] = useState(false);
+
+    // Drill-down & Feedback State
+    const [selectedProblem, setSelectedProblem] = useState<any>(null);
+    const [problemComments, setProblemComments] = useState<any[]>([]);
+    const [problemDatasets, setProblemDatasets] = useState<any[]>([]);
+    const [feedbacks, setFeedbacks] = useState<any[]>([]);
+    const [loadingDetails, setLoadingDetails] = useState(false);
+    
+    // Edit Form State for Drill-down
+    const [editForm, setEditForm] = useState<any>(null);
+    const [editingDatasets, setEditingDatasets] = useState<any[]>([]);
 
     // Create Wizard State
     const [createStep, setCreateStep] = useState<CreateStep>('problem');
@@ -101,6 +112,125 @@ export default function AdminDashboard() {
         } catch (e) { console.error(e); }
     };
 
+    const loadFeedbacks = async () => {
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/feedback`);
+            if (res.ok) {
+                setFeedbacks(await res.json());
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const loadProblemDetails = async (id: string) => {
+        setLoadingDetails(true);
+        setSelectedProblem(null);
+        setEditForm(null);
+        setProblemComments([]);
+        setProblemDatasets([]);
+        setEditingDatasets([]);
+        try {
+            const probRes = await fetch(`${API_URL}/problems/${id}`);
+            if (probRes.ok) {
+                const p = await probRes.json();
+                setSelectedProblem(p);
+                setEditForm({ ...p });
+            }
+            
+            const comRes = await fetchWithAuth(`${API_URL}/admin/problems/${id}/comments`);
+            if (comRes.ok) {
+                const allComments = await comRes.json();
+                // Group into top-level + replies
+                const topLevel = allComments.filter((c: any) => !c.parent_id);
+                const replies = allComments.filter((c: any) => c.parent_id);
+                const grouped = topLevel.map((c: any) => ({
+                    ...c,
+                    replies: replies.filter((r: any) => r.parent_id === c.id)
+                }));
+                setProblemComments(grouped);
+            }
+
+            // Load datasets
+            const dsRes = await fetch(`${API_URL}/problems/${id}/datasets`);
+            if (dsRes.ok) {
+                const ds = await dsRes.json();
+                setProblemDatasets(ds);
+                setEditingDatasets(ds.map((d: any) => ({ ...d })));
+            }
+        } catch (e) { console.error(e); }
+        setLoadingDetails(false);
+    };
+
+    const handleDeleteComment = async (commentId: string) => {
+        if (!confirm('Delete this comment completely?')) return;
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/comments/${commentId}`, { method: 'DELETE' });
+            if (res.ok) {
+                showToast('success', 'Comment deleted');
+                if (selectedProblem) loadProblemDetails(selectedProblem.id);
+            } else {
+                showToast('error', 'Failed to delete comment');
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleUpdateProblem = async () => {
+        if (!selectedProblem) return;
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/problems/${selectedProblem.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    title: editForm.title,
+                    difficulty: editForm.difficulty,
+                    description: editForm.description,
+                    estimated_time_minutes: editForm.estimated_time_minutes
+                })
+            });
+            if (res.ok) {
+                showToast('success', 'Problem updated!');
+                loadProblems();
+                loadProblemDetails(selectedProblem.id);
+            } else {
+                showToast('error', 'Failed to update problem');
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleUpdateDataset = async (ds: any) => {
+        if (!selectedProblem) return;
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/problems/${selectedProblem.id}/datasets/${ds.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    table_name: ds.table_name,
+                    schema_sql: ds.schema_sql,
+                    seed_sql: ds.seed_sql,
+                })
+            });
+            if (res.ok) {
+                showToast('success', `Table "${ds.table_name}" updated!`);
+                loadProblemDetails(selectedProblem.id);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showToast('error', err.detail || 'Failed to update dataset');
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleDeleteDataset = async (dsId: string) => {
+        if (!selectedProblem || !confirm('Delete this dataset?')) return;
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/problems/${selectedProblem.id}/datasets/${dsId}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                showToast('success', 'Dataset deleted!');
+                loadProblemDetails(selectedProblem.id);
+            } else {
+                showToast('error', 'Failed to delete dataset');
+            }
+        } catch (e) { console.error(e); }
+    };
+
     const verifySecret = async () => {
         try {
             const res = await fetch(`${API_URL}/admin/problems`, {
@@ -110,6 +240,7 @@ export default function AdminDashboard() {
                 setIsAuthenticated(true);
                 loadProblems();
                 loadSchedule();
+                loadFeedbacks();
             } else {
                 showToast('error', 'Invalid admin secret');
             }
@@ -320,6 +451,13 @@ export default function AdminDashboard() {
                         >
                             <Calendar size={16} className="mr-2" /> Schedule
                         </Button>
+                        <Button
+                            onClick={() => setActiveTab('feedback')}
+                            variant="ghost"
+                            className={`${activeTab === 'feedback' ? 'bg-[#4DD4C4]/10 text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}
+                        >
+                            <MessageSquare size={16} className="mr-2" /> Feedback
+                        </Button>
                     </div>
                 </div>
             </header>
@@ -329,48 +467,156 @@ export default function AdminDashboard() {
                 {/* ============ PROBLEMS TAB ============ */}
                 {activeTab === 'problems' && (
                     <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-2xl font-bold">All Problems</h2>
-                            <Button onClick={loadProblems} variant="outline" size="sm" className="border-[#202736] text-zinc-400">
-                                {loading ? <Loader2 size={14} className="animate-spin mr-2" /> : null} Refresh
-                            </Button>
-                        </div>
+                        {!selectedProblem && !loadingDetails ? (
+                            <>
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-2xl font-bold">All Problems</h2>
+                                    <Button onClick={loadProblems} variant="outline" size="sm" className="border-[#202736] text-zinc-400">
+                                        {loading ? <Loader2 size={14} className="animate-spin mr-2" /> : null} Refresh
+                                    </Button>
+                                </div>
 
-                        <div className="grid gap-4">
-                            {problems.map(p => (
-                                <div key={p.id} className="bg-[#121826] border border-[#202736] rounded-lg p-5 hover:border-[#4DD4C4]/30 transition-colors">
-                                    <div className="flex justify-between items-start">
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-3">
-                                                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${getDifficultyColor(p.difficulty)}`}>
-                                                    {p.difficulty}
-                                                </span>
-                                                <span className="text-xs text-zinc-500 flex items-center gap-1">
-                                                    <Clock size={12} /> {p.estimated_time_minutes} min
-                                                </span>
+                                <div className="grid gap-4">
+                                    {problems.map(p => (
+                                        <div key={p.id} onClick={() => loadProblemDetails(p.id)} className="bg-[#121826] border border-[#202736] rounded-lg p-5 hover:border-[#4DD4C4]/30 transition-colors cursor-pointer group">
+                                            <div className="flex justify-between items-start">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${getDifficultyColor(p.difficulty)}`}>
+                                                            {p.difficulty}
+                                                        </span>
+                                                        <span className="text-xs text-zinc-500 flex items-center gap-1">
+                                                            <Clock size={12} /> {p.estimated_time_minutes} min
+                                                        </span>
+                                                    </div>
+                                                    <h3 className="text-lg font-semibold text-white group-hover:text-[#4DD4C4] transition-colors">{p.title}</h3>
+                                                    <p className="text-sm text-zinc-500 max-w-2xl">{p.description}</p>
+                                                </div>
+                                                <div className="text-right flex flex-col items-end gap-3">
+                                                    <code className="text-[10px] text-zinc-600 font-mono">{p.id.slice(0, 8)}...</code>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteProblem(p.id); }}
+                                                        className="text-zinc-600 hover:text-red-400 transition-colors p-1"
+                                                        title="Delete Problem"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <h3 className="text-lg font-semibold text-white">{p.title}</h3>
-                                            <p className="text-sm text-zinc-500 max-w-2xl">{p.description}</p>
                                         </div>
-                                        <div className="text-right flex flex-col items-end gap-3">
-                                            <code className="text-[10px] text-zinc-600 font-mono">{p.id.slice(0, 8)}...</code>
-                                            <button
-                                                onClick={() => handleDeleteProblem(p.id)}
-                                                className="text-zinc-600 hover:text-red-400 transition-colors p-1"
-                                                title="Delete Problem"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
+                                    ))}
+                                    {problems.length === 0 && !loading && (
+                                        <div className="text-center py-12 text-zinc-500">
+                                            No problems yet. Create your first one!
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        ) : loadingDetails ? (
+                            <div className="flex justify-center py-20"><Loader2 size={32} className="animate-spin text-[#4DD4C4]" /></div>
+                        ) : selectedProblem && editForm && (
+                            <div className="space-y-6">
+                                <Button onClick={() => setSelectedProblem(null)} variant="ghost" className="text-zinc-400 hover:text-white p-0 h-auto flex items-center gap-2">
+                                    ← Back to Problems
+                                </Button>
+                                <div className="grid grid-cols-3 gap-8">
+                                    {/* Left: Problem Details + Datasets Form */}
+                                    <div className="col-span-2 space-y-6">
+                                        <div className="bg-[#121826] border border-[#202736] rounded-xl p-6 space-y-4">
+                                            <div className="flex items-center justify-between pb-4 border-b border-[#202736]">
+                                                <h3 className="text-lg font-bold flex items-center gap-2"><Edit3 size={18} className="text-[#4DD4C4]" /> Edit Details</h3>
+                                            </div>
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="block text-xs text-zinc-500 mb-1">Title</label>
+                                                    <input className="w-full bg-[#0b101c] border border-[#202736] p-2 rounded text-sm text-white focus:border-[#4DD4C4] focus:outline-none" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-xs text-zinc-500 mb-1">Difficulty</label>
+                                                        <select className="w-full bg-[#0b101c] border border-[#202736] p-2 rounded text-sm text-zinc-300 focus:border-[#4DD4C4] focus:outline-none" value={editForm.difficulty} onChange={e => setEditForm({ ...editForm, difficulty: e.target.value })}>
+                                                            <option value="easy">Easy</option><option value="medium">Medium</option><option value="advanced">Advanced</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs text-zinc-500 mb-1">Estimated Time (min)</label>
+                                                        <input type="number" className="w-full bg-[#0b101c] border border-[#202736] p-2 rounded text-sm text-white focus:border-[#4DD4C4]" value={editForm.estimated_time_minutes} onChange={e => setEditForm({ ...editForm, estimated_time_minutes: parseInt(e.target.value) || 0 })} />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-zinc-500 mb-1">Description (Markdown)</label>
+                                                    <textarea className="w-full bg-[#0b101c] border border-[#202736] p-2 rounded h-32 text-sm text-white focus:border-[#4DD4C4] focus:outline-none" value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} />
+                                                </div>
+                                                <Button onClick={handleUpdateProblem} className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold">
+                                                    <Save size={16} className="mr-2" /> Save Changes
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        {/* Datasets Editor */}
+                                        <div className="bg-[#121826] border border-[#202736] rounded-xl p-6 space-y-4">
+                                            <div className="flex items-center justify-between pb-4 border-b border-[#202736]">
+                                                <h3 className="text-lg font-bold flex items-center gap-2"><Database size={18} className="text-[#4DD4C4]" /> Datasets ({editingDatasets.length})</h3>
+                                            </div>
+                                            {editingDatasets.length === 0 && <p className="text-xs text-zinc-500 text-center py-4">No datasets for this problem.</p>}
+                                            {editingDatasets.map((ds: any, idx: number) => (
+                                                <div key={ds.id} className="bg-[#0b101c] border border-[#202736] rounded-lg p-4 space-y-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="text-xs text-zinc-500">Table Name</label>
+                                                        <button onClick={() => handleDeleteDataset(ds.id)} className="text-zinc-600 hover:text-red-400 transition-colors" title="Delete Dataset"><Trash2 size={14} /></button>
+                                                    </div>
+                                                    <input className="w-full bg-[#080c16] border border-[#202736] p-2 rounded text-sm text-white font-mono focus:border-[#4DD4C4] focus:outline-none" value={ds.table_name} onChange={e => { const copy = [...editingDatasets]; copy[idx] = { ...copy[idx], table_name: e.target.value }; setEditingDatasets(copy); }} />
+                                                    <div>
+                                                        <label className="block text-xs text-zinc-500 mb-1">Schema SQL (CREATE TABLE)</label>
+                                                        <textarea className="w-full bg-[#080c16] border border-[#202736] p-2 rounded h-24 font-mono text-xs text-white focus:border-[#4DD4C4] focus:outline-none" value={ds.schema_sql} onChange={e => { const copy = [...editingDatasets]; copy[idx] = { ...copy[idx], schema_sql: e.target.value }; setEditingDatasets(copy); }} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs text-zinc-500 mb-1">Seed SQL (INSERT INTO)</label>
+                                                        <textarea className="w-full bg-[#080c16] border border-[#202736] p-2 rounded h-24 font-mono text-xs text-white focus:border-[#4DD4C4] focus:outline-none" value={ds.seed_sql} onChange={e => { const copy = [...editingDatasets]; copy[idx] = { ...copy[idx], seed_sql: e.target.value }; setEditingDatasets(copy); }} />
+                                                    </div>
+                                                    <Button onClick={() => handleUpdateDataset(editingDatasets[idx])} className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold text-xs">
+                                                        <Save size={14} className="mr-2" /> Save Table "{ds.table_name}"
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Right: Comments Moderation */}
+                                    <div className="col-span-1 space-y-6">
+                                        <div className="bg-[#121826] border border-[#202736] rounded-xl p-6">
+                                            <div className="flex items-center justify-between pb-4 border-b border-[#202736] mb-4">
+                                                <h3 className="text-lg font-bold flex items-center gap-2"><MessageSquare size={18} className="text-[#4DD4C4]" /> Comments ({problemComments.length})</h3>
+                                            </div>
+                                            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                                                {problemComments.length === 0 && <p className="text-xs text-zinc-500 text-center py-4">No comments on this problem.</p>}
+                                                {problemComments.map((com: any) => (
+                                                    <div key={com.id} className="bg-[#0b101c] border border-[#202736] rounded-lg p-3 space-y-2">
+                                                        <div className="flex justify-between items-start">
+                                                            <div>
+                                                                <span className="text-xs font-semibold text-white">{com.user.full_name}</span>
+                                                                <span className="text-[10px] text-zinc-500 ml-2">{new Date(com.created_at).toLocaleDateString()}</span>
+                                                            </div>
+                                                            <button onClick={() => handleDeleteComment(com.id)} title="Delete Comment" className="text-zinc-600 hover:text-red-400"><Trash2 size={14} /></button>
+                                                        </div>
+                                                        <p className="text-xs text-zinc-400">{com.body}</p>
+                                                        {com.replies?.map((reply: any) => (
+                                                            <div key={reply.id} className="ml-4 mt-2 bg-[#131924] border border-[#202736]/50 rounded p-2">
+                                                                <div className="flex justify-between items-start">
+                                                                    <div className="text-[10px] font-semibold text-zinc-300">{reply.user.full_name}</div>
+                                                                    <button onClick={() => handleDeleteComment(reply.id)} title="Delete Reply" className="text-zinc-600 hover:text-red-400"><Trash2 size={12} /></button>
+                                                                </div>
+                                                                <p className="text-[10px] text-zinc-400">{reply.body}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            ))}
-                            {problems.length === 0 && !loading && (
-                                <div className="text-center py-12 text-zinc-500">
-                                    No problems yet. Create your first one!
-                                </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -539,6 +785,62 @@ export default function AdminDashboard() {
                                     <div className="text-center py-8 text-zinc-500">No schedules yet</div>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ============ FEEDBACK TAB ============ */}
+                {activeTab === 'feedback' && (
+                    <div className="space-y-6 max-w-5xl mx-auto">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-2xl font-bold flex items-center gap-2"><MessageSquare size={24} className="text-[#4DD4C4]" /> User Feedback</h2>
+                            <Button onClick={loadFeedbacks} variant="outline" size="sm" className="border-[#202736] text-zinc-400">
+                                <Loader2 size={14} className={`mr-2 ${loading ? 'animate-spin' : 'hidden'}`} /> Refresh
+                            </Button>
+                        </div>
+                        
+                        <div className="grid gap-4">
+                            {feedbacks.map((f: any) => (
+                                <div key={f.id} className="bg-[#121826] border border-[#202736] rounded-xl p-5 flex gap-4 items-start">
+                                    <div className={`p-3 rounded-lg shrink-0 ${f.rating === 1 ? 'bg-red-500/10 text-red-500' : f.rating === 3 ? 'bg-green-500/10 text-green-500' : f.rating === 2 ? 'bg-amber-500/10 text-amber-500' : 'bg-zinc-500/10 text-zinc-500'}`}>
+                                        {f.source === 'dislike' ? <ThumbsDown size={24} /> : <MessageSquare size={24} />}
+                                    </div>
+                                    <div className="flex-1 space-y-2">
+                                        <div className="flex items-center gap-3">
+                                            {f.rating && (
+                                                <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded border ${f.rating === 1 ? 'border-red-500/20 text-red-500 bg-red-500/10' : f.rating === 3 ? 'border-green-500/20 text-green-500 bg-green-500/10' : 'border-amber-500/20 text-amber-500 bg-amber-500/10'}`}>
+                                                    {f.rating === 1 ? 'Bad' : f.rating === 2 ? 'Okay' : 'Great'}
+                                                </span>
+                                            )}
+                                            <span className="text-xs text-zinc-500">Source: {f.source}</span>
+                                            <span className="text-xs text-zinc-500">•</span>
+                                            <span className="text-xs text-zinc-500">{new Date(f.created_at).toLocaleString()}</span>
+                                            {f.user_email && (
+                                                <>
+                                                    <span className="text-xs text-zinc-500">•</span>
+                                                    <span className="text-xs text-zinc-300">{f.user_email}</span>
+                                                </>
+                                            )}
+                                        </div>
+                                        {f.problem_title && (
+                                            <div className="text-xs text-zinc-400 font-mono bg-[#0b101c] py-1 px-2 rounded border border-[#202736]/50 inline-block">
+                                                Problem: {f.problem_title}
+                                            </div>
+                                        )}
+                                        {f.message && (
+                                            <p className="text-sm text-zinc-300 mt-2 bg-[#0b101c] p-3 rounded-lg border border-[#202736]/50">
+                                                "{f.message}"
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                            {feedbacks.length === 0 && (
+                                <div className="text-center py-20 bg-[#121826] border border-[#202736] rounded-xl text-zinc-500">
+                                    <MessageSquare size={48} className="mx-auto mb-4 opacity-20" />
+                                    No feedback received yet.
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
