@@ -733,7 +733,7 @@ export default function ProfilePage() {
                         </pre>
                     </div>
                     <div className="px-6 py-3 border-t border-[#202736] bg-[#0d121c] flex justify-between items-center shrink-0">
-                        <span className="text-[10px] text-zinc-600 font-mono">solution.sql</span>
+                        <span className="text-[10px] text-zinc-600 font-mono">PostgreSQL</span>
                         <button
                             onClick={() => navigator.clipboard.writeText(viewingCode?.query ?? '')}
                             className="text-[11px] font-medium text-zinc-400 hover:text-[#4DD4C4] transition-colors"
