@@ -1,5 +1,7 @@
 import { LoginForm } from "@/components/auth/login-form";
 import { StandaloneNavbar } from "@/components/auth/standalone-navbar";
+import { Suspense } from "react";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   return (
@@ -14,7 +16,9 @@ export default function LoginPage() {
 
         <div className="max-w-md w-full space-y-8 relative z-10">
           <div className="p-8 sm:p-10 rounded-2xl border border-[#202736] bg-[#131924] shadow-2xl backdrop-blur-sm">
-            <LoginForm />
+            <Suspense fallback={<div className="h-96 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-[#4DD4C4]" /></div>}>
+              <LoginForm />
+            </Suspense>
           </div>
         </div>
       </main>
