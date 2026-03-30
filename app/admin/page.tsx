@@ -27,7 +27,7 @@ interface ScheduleEntry {
     advanced: { id: string; title: string } | null;
 }
 
-type Tab = 'problems' | 'create' | 'schedule' | 'feedback';
+type Tab = 'problems' | 'create' | 'schedule' | 'feedback' | 'members';
 type CreateStep = 'problem' | 'datasets' | 'solution' | 'done';
 
 export default function AdminDashboard() {
@@ -45,6 +45,10 @@ export default function AdminDashboard() {
     const [problemComments, setProblemComments] = useState<any[]>([]);
     const [problemDatasets, setProblemDatasets] = useState<any[]>([]);
     const [feedbacks, setFeedbacks] = useState<any[]>([]);
+    const [whitelist, setWhitelist] = useState<any[]>([]);
+    const [newMemberEmail, setNewMemberEmail] = useState("");
+    const [isBulkMode, setIsBulkMode] = useState(false);
+    const [bulkEmailsText, setBulkEmailsText] = useState("");
     const [loadingDetails, setLoadingDetails] = useState(false);
     
     // Edit Form State for Drill-down
@@ -117,6 +121,15 @@ export default function AdminDashboard() {
             const res = await fetchWithAuth(`${API_URL}/admin/feedback`);
             if (res.ok) {
                 setFeedbacks(await res.json());
+            }
+        } catch (e) { console.error(e); }
+    };
+    
+    const loadWhitelist = async () => {
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/whitelist`);
+            if (res.ok) {
+                setWhitelist(await res.json());
             }
         } catch (e) { console.error(e); }
     };
@@ -241,6 +254,7 @@ export default function AdminDashboard() {
                 loadProblems();
                 loadSchedule();
                 loadFeedbacks();
+                loadWhitelist();
             } else {
                 showToast('error', 'Invalid admin secret');
             }
@@ -372,6 +386,72 @@ export default function AdminDashboard() {
         setSolutionForm({ reference_query: "", order_sensitive: false, notes: "" });
     };
 
+    const handleAddMember = async () => {
+        if (!newMemberEmail.trim()) return;
+        setLoading(true);
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/whitelist`, {
+                method: 'POST',
+                body: JSON.stringify({ email: newMemberEmail })
+            });
+            if (res.ok) {
+                showToast('success', 'Member added to whitelist!');
+                setNewMemberEmail("");
+                loadWhitelist();
+            } else {
+                const data = await res.json();
+                showToast('error', data.detail || 'Failed to add member');
+            }
+        } catch (e: any) { showToast('error', e.message); }
+        setLoading(false);
+    };
+
+    const handleDeleteMember = async (email: string) => {
+        if (!confirm(`Remove ${email} from whitelist?`)) return;
+        setLoading(true);
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/whitelist/${email}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                showToast('success', 'Member removed from whitelist');
+                loadWhitelist();
+            } else {
+                showToast('error', 'Failed to remove member');
+            }
+        } catch (e: any) { showToast('error', e.message); }
+        setLoading(false);
+    };
+
+    const handleBulkAddMember = async () => {
+        // Regex to extract emails from text (comma, newline, space separated)
+        const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+        const foundEmails = bulkEmailsText.match(emailRegex) || [];
+        
+        if (foundEmails.length === 0) {
+            showToast('error', 'No valid emails found in text');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/whitelist/bulk`, {
+                method: 'POST',
+                body: JSON.stringify({ emails: foundEmails })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                showToast('success', `Successfully authorized ${data.count} emails!`);
+                setBulkEmailsText("");
+                setIsBulkMode(false);
+                loadWhitelist();
+            } else {
+                showToast('error', 'Failed to bulk authorize emails');
+            }
+        } catch (e: any) { showToast('error', e.message); }
+        setLoading(false);
+    };
+
     const getDifficultyColor = (diff: string) => {
         switch (diff) {
             case 'easy': return 'text-green-400 bg-green-400/10 border-green-400/20';
@@ -457,6 +537,13 @@ export default function AdminDashboard() {
                             className={`${activeTab === 'feedback' ? 'bg-[#4DD4C4]/10 text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}
                         >
                             <MessageSquare size={16} className="mr-2" /> Feedback
+                        </Button>
+                        <Button
+                            onClick={() => setActiveTab('members')}
+                            variant="ghost"
+                            className={`${activeTab === 'members' ? 'bg-[#10b981]/10 text-[#10b981]' : 'text-zinc-400 hover:text-white'}`}
+                        >
+                            <Lock size={16} className="mr-2" /> Members
                         </Button>
                     </div>
                 </div>
@@ -783,6 +870,93 @@ export default function AdminDashboard() {
                                 ))}
                                 {schedule.length === 0 && (
                                     <div className="text-center py-8 text-zinc-500">No schedules yet</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ============ MEMBERS TAB ============ */}
+                {activeTab === 'members' && (
+                    <div className="space-y-6 max-w-4xl mx-auto">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-2xl font-bold flex items-center gap-2">
+                                <Lock size={24} className="text-[#10b981]" /> Authorized Members
+                            </h2>
+                            <Button onClick={loadWhitelist} variant="outline" size="sm" className="border-[#202736] text-zinc-400">
+                                {loading && <Loader2 size={14} className="animate-spin mr-2" />} Refresh
+                            </Button>
+                        </div>
+
+                        {/* Add Member Form */}
+                        <div className="bg-[#121826] border border-[#202736] rounded-xl p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-widest">Authorize Member</h3>
+                                <button 
+                                    onClick={() => setIsBulkMode(!isBulkMode)}
+                                    className="text-[10px] font-bold text-[#4DD4C4] uppercase bg-[#4DD4C4]/10 px-2 py-1 rounded hover:bg-[#4DD4C4]/20 transition-colors"
+                                >
+                                    {isBulkMode ? "Switch to Single" : "Switch to Bulk"}
+                                </button>
+                            </div>
+
+                            {!isBulkMode ? (
+                                <div className="flex gap-3">
+                                    <input 
+                                        className="flex-1 bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white focus:border-[#4DD4C4] focus:outline-none transition-colors"
+                                        placeholder="Enter email address..."
+                                        value={newMemberEmail}
+                                        onChange={e => setNewMemberEmail(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleAddMember()}
+                                    />
+                                    <Button onClick={handleAddMember} disabled={loading || !newMemberEmail.trim()} className="bg-[#10b981] hover:bg-[#059669] text-white font-bold px-8">
+                                        {loading ? <Loader2 size={16} className="animate-spin" /> : 'Authorize Email'}
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <textarea 
+                                        className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white focus:border-[#4DD4C4] focus:outline-none transition-colors h-32 font-mono text-sm"
+                                        placeholder="Paste multiple emails here... (separated by commas or newlines)"
+                                        value={bulkEmailsText}
+                                        onChange={e => setBulkEmailsText(e.target.value)}
+                                    />
+                                    <Button onClick={handleBulkAddMember} disabled={loading || !bulkEmailsText.trim()} className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold">
+                                        {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : <Lock size={16} className="mr-2" />}
+                                        Authorize All {bulkEmailsText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g)?.length || 0} Emails
+                                    </Button>
+                                </div>
+                            )}
+                            <p className="text-[10px] text-zinc-500 mt-2 italic">
+                                {isBulkMode 
+                                    ? "We'll automatically extract valid emails from the text above and skip duplicates." 
+                                    : "Only emails in this list will be allowed to sign up or log in."}
+                            </p>
+                        </div>
+
+                        {/* Member List */}
+                        <div className="bg-[#121826] border border-[#202736] rounded-xl overflow-hidden">
+                            <div className="p-4 border-b border-[#202736] bg-[#0b101c] flex justify-between items-center">
+                                <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Active Whitelist ({whitelist.length})</span>
+                            </div>
+                            <div className="divide-y divide-[#202736]">
+                                {whitelist.map((m: any) => (
+                                    <div key={m.email} className="p-4 flex justify-between items-center hover:bg-white/[0.02] transition-colors group">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-medium text-white">{m.email}</span>
+                                            <span className="text-[10px] text-zinc-500">Authorized on {new Date(m.created_at).toLocaleDateString()}</span>
+                                        </div>
+                                        <button 
+                                            onClick={() => handleDeleteMember(m.email)}
+                                            className="p-2 text-zinc-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                                            title="Revoke Access"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {whitelist.length === 0 && (
+                                    <div className="p-12 text-center text-zinc-500 italic">The whitelist is currently empty.</div>
                                 )}
                             </div>
                         </div>

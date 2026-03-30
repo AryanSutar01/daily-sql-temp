@@ -7,13 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveToken } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { useSearchParams } from "next/navigation";
+import { Lock, X } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export function SignupForm() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const [step, setStep] = useState<"form" | "otp">("form");
     const [stateId, setStateId] = useState<string | null>(null);
     const [formData, setFormData] = useState({
@@ -140,6 +144,17 @@ export function SignupForm() {
             inputRefs.current[0].focus();
         }
     }, [step]);
+
+    useEffect(() => {
+        const errorParam = searchParams.get('error');
+        if (errorParam === 'not_authorized') {
+            setToast({
+                type: 'error',
+                message: "Email not whitelisted. Please join our waitlist for early access!"
+            });
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    }, [searchParams]);
 
     const handleGoogleSignup = () => {
         window.location.href = `${API_URL}/auth/google`;
@@ -292,6 +307,24 @@ export function SignupForm() {
                 </svg>
                 Continue with Google
             </Button>
+
+            {/* ══ Auth Toast ══ */}
+            {toast && (
+                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[1000] animate-in slide-in-from-bottom-5 duration-300">
+                    <div className="bg-[#0d121c] border-2 border-red-500/50 rounded-2xl p-4 shadow-[0_0_40px_rgba(239,68,68,0.2)] flex items-center gap-4 min-w-[320px] backdrop-blur-md">
+                        <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                            <Lock className="text-red-500 animate-pulse" size={24} />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-white font-bold text-sm">Access Restricted</h3>
+                            <p className="text-red-400 text-xs mt-0.5">{toast.message}</p>
+                        </div>
+                        <button onClick={() => setToast(null)} className="text-zinc-500 hover:text-white transition-colors">
+                            <X size={16} />
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -58,6 +58,10 @@ export function DailySetClient() {
     const [isLoading, setIsLoading] = useState(true);
     const [authStatus, setAuthStatus] = useState<'loading' | 'unauthenticated' | 'authenticated'>('loading');
     const [userProfile, setUserProfile] = useState<any>(null);
+    const [stats, setStats] = useState<any>(null);
+    const [difficultyFilter, setDifficultyFilter] = useState<string>('all');
+    const [showDifficultyFilter, setShowDifficultyFilter] = useState(false);
+    const [toast, setToast] = useState<{ message: string; subMessage?: string; visible: boolean } | null>(null);
 
     // ── Drill-down State ─────────────────────────────────
     const [activeProblemId, setActiveProblemId] = useState<string | null>(null);
@@ -124,14 +128,16 @@ export function DailySetClient() {
                 } catch {
                     setAuthStatus('unauthenticated');
                 }
-                const [probs, daily, streakData] = await Promise.all([
+                const [probs, daily, streakData, userStats] = await Promise.all([
                     api.getProblems(),
                     api.getDailyPractice().catch(() => null),
                     api.getProfile().then(() => api.getStreak()).catch(() => ({ current_streak: 0 })),
+                    api.getStats().catch(() => null),
                 ]);
                 setProblems(probs);
                 setDailySet(daily);
                 setStreak(streakData?.current_streak || 0);
+                setStats(userStats);
             } catch (err) {
                 console.error("Failed to load initial data", err);
             } finally {
@@ -241,7 +247,11 @@ export function DailySetClient() {
     // ── Computed ─────────────────────────────────────────
     const todayStr = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date()).toUpperCase();
     const activeProblem = problems.find(p => p.id === activeProblemId);
-    const filteredProblems = problems.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredProblems = problems.filter(p => {
+        const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesDifficulty = difficultyFilter === 'all' || p.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
+        return matchesSearch && matchesDifficulty;
+    });
     const descriptionText = activeProblem?.description || '';
     const descParts = descriptionText.split('### Hint');
     const mainDesc = descParts[0];
@@ -340,12 +350,30 @@ export function DailySetClient() {
         }
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (authStatus === 'unauthenticated') { setError("LOGIN_REQUIRED"); return; }
         if (userProfile && !userProfile.exists) { setError("PROFILE_REQUIRED"); return; }
         if (executionResult?.status === 'correct') {
-            alert(`Solution Submitted for ${activeProblem?.title}! Streaks are updated automatically!`);
-            api.getStreak().then(s => setStreak(s.current_streak)).catch(console.error);
+            try {
+                const s = await api.getStreak();
+                const newStreak = s.current_streak;
+                const prevStreak = streak;
+                setStreak(newStreak);
+                
+                setToast({
+                    message: `Solution Submitted!`,
+                    subMessage: newStreak > prevStreak ? `Streak updated to ${newStreak} days! 🔥` : `Problem solved successfully!`,
+                    visible: true
+                });
+
+                // Update stats as well
+                const newStats = await api.getStats().catch(() => null);
+                if (newStats) setStats(newStats);
+
+                setTimeout(() => setToast(null), 5000);
+            } catch (err) {
+                console.error(err);
+            }
         }
     };
 
@@ -757,14 +785,40 @@ export function DailySetClient() {
                                 ) : (
                                     <div className="flex-1 flex flex-col p-6 space-y-6 overflow-hidden">
                                         <div className="flex flex-col items-center justify-center gap-3 shrink-0 mb-2">
-                                            <div className="w-16 h-16 rounded-full border-2 border-[#202736] flex items-center justify-center relative shadow-[0_0_15px_rgba(77,212,196,0.1)]">
-                                                <svg className="w-16 h-16 absolute -rotate-90" viewBox="0 0 36 36">
-                                                    <path className="text-[#202736]" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                    <path className="text-[#4DD4C4]" strokeDasharray="15, 100" strokeWidth="3" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                                </svg>
-                                                <span className="text-sm text-white font-bold">15%</span>
-                                            </div>
-                                            <span className="text-xs text-zinc-400 font-medium font-mono">15/100 Solved</span>
+                                            {(() => {
+                                                const sEasy = stats?.easy?.solved || 0;
+                                                const sMed = stats?.medium?.solved || 0;
+                                                const sAdv = stats?.advanced?.solved || 0;
+                                                const tEasy = stats?.easy?.total || 0;
+                                                const tMed = stats?.medium?.total || 0;
+                                                const tAdv = stats?.advanced?.total || 0;
+                                                
+                                                const totalSolved = sEasy + sMed + sAdv;
+                                                const totalQuestions = tEasy + tMed + tAdv || 1;
+                                                const percentage = Math.round((totalSolved / totalQuestions) * 100);
+                                                const strokeDash = Math.round((percentage / 100) * 100); // 100 is the circumference for 15.9155 radius
+
+                                                return (
+                                                    <>
+                                                        <div className="w-16 h-16 rounded-full border-2 border-[#202736] flex items-center justify-center relative shadow-[0_0_15px_rgba(77,212,196,0.1)]">
+                                                            <svg className="w-16 h-16 absolute -rotate-90" viewBox="0 0 36 36">
+                                                                <path className="text-[#202736]" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                                                <path 
+                                                                    className="text-[#4DD4C4] transition-all duration-1000 ease-out" 
+                                                                    strokeDasharray={`${strokeDash}, 100`} 
+                                                                    strokeWidth="3" 
+                                                                    strokeLinecap="round" 
+                                                                    stroke="currentColor" 
+                                                                    fill="none" 
+                                                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
+                                                                />
+                                                            </svg>
+                                                            <span className="text-sm text-white font-bold">{percentage}%</span>
+                                                        </div>
+                                                        <span className="text-xs text-zinc-400 font-medium font-mono">{totalSolved}/{totalQuestions} Solved</span>
+                                                    </>
+                                                );
+                                            })()}
                                         </div>
 
                                         <div className="flex gap-2 shrink-0">
@@ -778,7 +832,27 @@ export function DailySetClient() {
                                                     className="w-full bg-[#131924] border border-[#202736] rounded text-xs py-2 pl-9 pr-3 text-zinc-300 outline-none focus:border-[#4DD4C4]/50 transition-colors"
                                                 />
                                             </div>
-                                            <button className="p-2 bg-[#131924] border border-[#202736] rounded text-[#4DD4C4] hover:bg-[#1a2230] transition-colors"><Filter size={14} /></button>
+                                            <div className="relative">
+                                                <button 
+                                                    onClick={() => setShowDifficultyFilter(!showDifficultyFilter)}
+                                                    className={`p-2 border rounded transition-colors ${difficultyFilter !== 'all' ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/30 text-[#4DD4C4]' : 'bg-[#131924] border-[#202736] text-[#4DD4C4] hover:bg-[#1a2230]'}`}
+                                                >
+                                                    <Filter size={14} />
+                                                </button>
+                                                {showDifficultyFilter && (
+                                                    <div className="absolute top-full right-0 mt-1.5 w-32 bg-[#131924] border border-[#202736] rounded-lg overflow-hidden py-1 z-[300] shadow-xl">
+                                                        {['all', 'easy', 'medium', 'advanced'].map((lvl) => (
+                                                            <button
+                                                                key={lvl}
+                                                                onClick={() => { setDifficultyFilter(lvl); setShowDifficultyFilter(false); }}
+                                                                className={`w-full text-left px-4 py-2 text-xs font-bold uppercase transition-colors ${difficultyFilter === lvl ? 'text-[#4DD4C4] bg-[#4DD4C4]/5' : 'text-zinc-400 hover:text-white hover:bg-[#202736]'}`}
+                                                            >
+                                                                {lvl}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
 
                                         <div className="space-y-2 overflow-y-auto pr-1 pb-4 flex-1">
@@ -970,7 +1044,7 @@ export function DailySetClient() {
                         {/* Editor toolbar (simplified) */}
                         <div className="h-11 border-b border-[#202736] bg-[#131924] flex items-center justify-between px-4 shrink-0">
                             <span className="text-xs font-mono font-medium text-[#4DD4C4] flex items-center gap-2">
-                                <span className="text-zinc-500">&gt;_</span> solution.sql
+                                <span className="text-zinc-500">&gt;_</span> PostgreSQL
                             </span>
                             <div className="flex items-center gap-3 text-zinc-400">
                                 <button
@@ -1096,8 +1170,12 @@ export function DailySetClient() {
 
                                     <div className="p-4 border-t border-[#202736] bg-[#0b101c] flex justify-between items-center shrink-0">
                                         <div className="flex text-xs text-zinc-500 gap-4 font-mono">
-                                            <span className="cursor-pointer hover:text-zinc-300 transition-colors">Hint</span>
-                                            <span className="cursor-pointer hover:text-zinc-300 transition-colors border-l border-[#202736] pl-4">Solution</span>
+                                            <button 
+                                                onClick={() => setShowHint(!showHint)}
+                                                className="cursor-pointer hover:text-zinc-300 transition-colors"
+                                            >
+                                                Hint
+                                            </button>
                                         </div>
                                         <button
                                             onClick={handleSubmit}
@@ -1263,6 +1341,24 @@ export function DailySetClient() {
                                 </button>
                             </>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* ══ Submission Toast ══ */}
+            {toast && (
+                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[1000] animate-in slide-in-from-bottom-5 duration-300">
+                    <div className="bg-[#0d121c] border-2 border-[#4DD4C4]/50 rounded-2xl p-4 shadow-[0_0_40px_rgba(77,212,196,0.3)] flex items-center gap-4 min-w-[300px] backdrop-blur-md">
+                        <div className="w-12 h-12 rounded-xl bg-[#4DD4C4]/10 border border-[#4DD4C4]/20 flex items-center justify-center shrink-0">
+                            <Sparkles className="text-[#4DD4C4] animate-pulse" size={24} />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-white font-bold text-sm">{toast.message}</h3>
+                            {toast.subMessage && <p className="text-[#4DD4C4] text-xs font-mono mt-0.5">{toast.subMessage}</p>}
+                        </div>
+                        <button onClick={() => setToast(null)} className="text-zinc-500 hover:text-white transition-colors">
+                            <X size={16} />
+                        </button>
                     </div>
                 </div>
             )}
