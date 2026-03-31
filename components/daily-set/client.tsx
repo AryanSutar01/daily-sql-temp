@@ -1084,7 +1084,7 @@ export function DailySetClient() {
                                     formatOnPaste: true,
                                 }}
                             />
-                            <div className="absolute right-6 bottom-4 text-[10px] text-zinc-500 font-mono pointer-events-none px-2 py-1 rounded">
+                            <div className="absolute right-16 bottom-3 text-[10px] text-zinc-500 font-mono pointer-events-none px-2 py-1 rounded">
                                 Ln {cursorPos.lineNumber}, Col {cursorPos.column}
                             </div>
                         </div>
@@ -1292,9 +1292,9 @@ export function DailySetClient() {
             <button
                 onClick={() => openFeedbackModal('fab')}
                 title="Send Feedback"
-                className="absolute bottom-6 right-6 z-[150] w-10 h-10 rounded-full bg-[#131924] border border-[#202736] text-zinc-400 hover:text-[#4DD4C4] hover:border-[#4DD4C4]/50 transition-all shadow-lg flex items-center justify-center"
+                className="absolute bottom-3 right-6 z-[150] w-8 h-8 rounded-full bg-[#131924] border border-[#202736] text-zinc-400 hover:text-[#4DD4C4] hover:border-[#4DD4C4]/50 transition-all shadow-lg flex items-center justify-center"
             >
-                <MessageCircle size={16} />
+                <MessageCircle size={14} />
             </button>
 
             {/* ══ Feedback Modal ══ */}
