@@ -32,6 +32,11 @@ type CreateStep = 'problem' | 'datasets' | 'solution' | 'done';
 
 export default function AdminDashboard() {
     const [secret, setSecret] = useState("");
+    const [adminEmail, setAdminEmail] = useState("");
+    const [adminOtp, setAdminOtp] = useState("");
+    const [otpStep, setOtpStep] = useState<"email" | "otp">("email");
+    const [stateId, setStateId] = useState("");
+    const [adminToken, setAdminToken] = useState<string | null>(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [activeTab, setActiveTab] = useState<Tab>('problems');
 
@@ -88,6 +93,7 @@ export default function AdminDashboard() {
             headers: {
                 'Content-Type': 'application/json',
                 'X-Admin-Secret': secret,
+                'Authorization': adminToken ? `Bearer ${adminToken}` : '',
                 ...options.headers
             }
         });
@@ -244,6 +250,59 @@ export default function AdminDashboard() {
         } catch (e) { console.error(e); }
     };
 
+    const handleRequestAdminOtp = async () => {
+        if (!adminEmail.trim()) return;
+        setLoading(true);
+        try {
+            const res = await fetch(`${API_URL}/auth/admin/otp/send`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: adminEmail.trim() }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setStateId(data.state_id);
+                setOtpStep("otp");
+                showToast("success", "OTP sent to your admin email");
+            } else {
+                const data = await res.json();
+                showToast("error", data.detail || "Failed to send code");
+            }
+        } catch (e: any) { showToast("error", e.message); }
+        setLoading(false);
+    };
+
+    const handleVerifyAdminOtp = async () => {
+        if (!adminOtp.trim() || !stateId) return;
+        setLoading(true);
+        try {
+            const res = await fetch(`${API_URL}/auth/admin/otp/verify`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email: adminEmail.trim(),
+                    state_id: stateId,
+                    otp: adminOtp.trim()
+                }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setAdminToken(data.access_token);
+                setIsAuthenticated(true);
+                showToast("success", "Logged in as admin");
+                // Load relevant data now that we are authenticated
+                loadProblems();
+                loadSchedule();
+                loadFeedbacks();
+                loadWhitelist();
+            } else {
+                const data = await res.json();
+                showToast("error", data.detail || "Invalid code");
+            }
+        } catch (e: any) { showToast("error", e.message); }
+        setLoading(false);
+    };
+
     const verifySecret = async () => {
         try {
             const res = await fetch(`${API_URL}/admin/problems`, {
@@ -251,6 +310,7 @@ export default function AdminDashboard() {
             });
             if (res.ok) {
                 setIsAuthenticated(true);
+                showToast('success', 'Authenticated with secret');
                 loadProblems();
                 loadSchedule();
                 loadFeedbacks();
@@ -465,22 +525,75 @@ export default function AdminDashboard() {
     if (!isAuthenticated) {
         return (
             <div className="min-h-screen bg-[#080c16] flex items-center justify-center p-4">
-                <div className="bg-[#121826] p-8 rounded-xl border border-[#202736] max-w-sm w-full space-y-4 shadow-2xl">
+                <div className="bg-[#121826] p-8 rounded-xl border border-[#202736] max-w-sm w-full space-y-6 shadow-2xl">
                     <h1 className="text-white text-xl font-bold flex items-center gap-2">
                         <Lock size={20} className="text-[#4DD4C4]" /> Admin Access
                     </h1>
-                    <p className="text-zinc-500 text-sm">Enter your admin secret to continue</p>
-                    <input
-                        type="password"
-                        className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white focus:border-[#4DD4C4] focus:outline-none transition-colors"
-                        placeholder="Admin Secret"
-                        value={secret}
-                        onChange={e => setSecret(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && verifySecret()}
-                    />
-                    <Button onClick={verifySecret} className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold">
-                        Enter Dashboard
-                    </Button>
+                    
+                    {otpStep === 'email' ? (
+                        <div className="space-y-4">
+                            <p className="text-zinc-500 text-sm">Enter your registered admin email</p>
+                            <input
+                                type="email"
+                                className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white focus:border-[#4DD4C4] focus:outline-none transition-colors"
+                                placeholder="admin@dailysql.in"
+                                value={adminEmail}
+                                onChange={e => setAdminEmail(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleRequestAdminOtp()}
+                            />
+                            <Button 
+                                onClick={handleRequestAdminOtp} 
+                                disabled={loading}
+                                className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-extrabold"
+                            >
+                                {loading ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+                                Request Access Code
+                            </Button>
+                            
+                            <div className="relative py-2">
+                                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-white/5" /></div>
+                                <div className="relative flex justify-center text-[10px] font-bold uppercase"><span className="bg-[#121826] px-2 text-zinc-600">or use secret key</span></div>
+                            </div>
+                            
+                            <input
+                                type="password"
+                                className="w-full bg-[#0b101c]/50 border border-[#202736] p-2 rounded-lg text-white text-sm focus:border-[#4DD4C4] focus:outline-none transition-colors"
+                                placeholder="Static Secret Key"
+                                value={secret}
+                                onChange={e => setSecret(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && verifySecret()}
+                            />
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="bg-[#4DD4C4]/5 p-4 rounded-lg border border-[#4DD4C4]/10">
+                                <p className="text-zinc-400 text-xs">Code sent to:</p>
+                                <p className="text-[#4DD4C4] font-medium text-sm">{adminEmail}</p>
+                            </div>
+                            <input
+                                type="text"
+                                className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white text-center text-xl tracking-[0.5em] font-bold focus:border-[#4DD4C4] focus:outline-none transition-colors"
+                                placeholder="000000"
+                                value={adminOtp}
+                                onChange={e => setAdminOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                onKeyDown={e => e.key === 'Enter' && handleVerifyAdminOtp()}
+                            />
+                            <Button 
+                                onClick={handleVerifyAdminOtp} 
+                                disabled={loading}
+                                className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-extrabold"
+                            >
+                                {loading ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+                                Verify & Access
+                            </Button>
+                            <button 
+                                onClick={() => setOtpStep('email')} 
+                                className="w-full text-xs text-zinc-500 hover:text-white transition-colors"
+                            >
+                                Back to email
+                            </button>
+                        </div>
+                    )}
                 </div>
                 {toast && (
                     <div className={`fixed bottom-6 right-6 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 ${toast.type === 'success' ? 'bg-green-500/90' : 'bg-red-500/90'} text-white`}>
