@@ -164,6 +164,34 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #52525b; /* zinc-600 */
   }
+
+  @keyframes gradient-x {
+    0%, 100% { background-position: 0% 50% }
+    50% { background-position: 100% 50% }
+  }
+
+  .animate-gradient-x {
+    animation: gradient-x 8s ease-in-out infinite;
+    background-size: 200% 200%;
+  }
+
+  @keyframes slide-up-fade {
+    from { opacity: 0; transform: translateY(24px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .animate-premium-entry {
+    animation: slide-up-fade 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px) }
+    50% { transform: translateY(-8px) }
+  }
+
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
+  }
 }
 
 @layer utilities {
