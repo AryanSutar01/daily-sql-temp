@@ -87,23 +87,28 @@ export default function AdminDashboard() {
         setTimeout(() => setToast(null), 4000);
     };
 
-    const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+    const fetchWithAuth = async (url: string, options: RequestInit = {}, overrideToken?: string) => {
+        const authHeaders: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+        const token = overrideToken ?? adminToken;
+        if (secret) authHeaders['X-Admin-Secret'] = secret;
+        if (token) authHeaders['Authorization'] = `Bearer ${token}`;
+
         const res = await fetch(url, {
             ...options,
             headers: {
-                'Content-Type': 'application/json',
-                'X-Admin-Secret': secret,
-                'Authorization': adminToken ? `Bearer ${adminToken}` : '',
+                ...authHeaders,
                 ...options.headers
             }
         });
         return res;
     };
 
-    const loadProblems = async () => {
+    const loadProblems = async (token?: string) => {
         setLoading(true);
         try {
-            const res = await fetchWithAuth(`${API_URL}/admin/problems`);
+            const res = await fetchWithAuth(`${API_URL}/admin/problems`, {}, token);
             if (res.ok) {
                 const data = await res.json();
                 setProblems(data);
@@ -112,9 +117,9 @@ export default function AdminDashboard() {
         setLoading(false);
     };
 
-    const loadSchedule = async () => {
+    const loadSchedule = async (token?: string) => {
         try {
-            const res = await fetchWithAuth(`${API_URL}/admin/schedule`);
+            const res = await fetchWithAuth(`${API_URL}/admin/schedule`, {}, token);
             if (res.ok) {
                 const data = await res.json();
                 setSchedule(data);
@@ -122,18 +127,18 @@ export default function AdminDashboard() {
         } catch (e) { console.error(e); }
     };
 
-    const loadFeedbacks = async () => {
+    const loadFeedbacks = async (token?: string) => {
         try {
-            const res = await fetchWithAuth(`${API_URL}/admin/feedback`);
+            const res = await fetchWithAuth(`${API_URL}/admin/feedback`, {}, token);
             if (res.ok) {
                 setFeedbacks(await res.json());
             }
         } catch (e) { console.error(e); }
     };
     
-    const loadWhitelist = async () => {
+    const loadWhitelist = async (token?: string) => {
         try {
-            const res = await fetchWithAuth(`${API_URL}/admin/whitelist`);
+            const res = await fetchWithAuth(`${API_URL}/admin/whitelist`, {}, token);
             if (res.ok) {
                 setWhitelist(await res.json());
             }
@@ -290,11 +295,13 @@ export default function AdminDashboard() {
                 setAdminToken(data.access_token);
                 setIsAuthenticated(true);
                 showToast("success", "Logged in as admin");
-                // Load relevant data now that we are authenticated
-                loadProblems();
-                loadSchedule();
-                loadFeedbacks();
-                loadWhitelist();
+                
+                // Load relevant data now that we are authenticated, passing the token directly
+                // to avoid stale closure issues with the state variable
+                loadProblems(data.access_token);
+                loadSchedule(data.access_token);
+                loadFeedbacks(data.access_token);
+                loadWhitelist(data.access_token);
             } else {
                 const data = await res.json();
                 showToast("error", data.detail || "Invalid code");
@@ -671,7 +678,7 @@ export default function AdminDashboard() {
                             <>
                                 <div className="flex justify-between items-center">
                                     <h2 className="text-2xl font-bold">All Problems</h2>
-                                    <Button onClick={loadProblems} variant="outline" size="sm" className="border-[#202736] text-zinc-400">
+                                    <Button onClick={() => loadProblems()} variant="outline" size="sm" className="border-[#202736] text-zinc-400">
                                         {loading ? <Loader2 size={14} className="animate-spin mr-2" /> : null} Refresh
                                     </Button>
                                 </div>
@@ -996,7 +1003,7 @@ export default function AdminDashboard() {
                             <h2 className="text-2xl font-bold flex items-center gap-2">
                                 <Lock size={24} className="text-[#10b981]" /> Authorized Members
                             </h2>
-                            <Button onClick={loadWhitelist} variant="outline" size="sm" className="border-[#202736] text-zinc-400">
+                            <Button onClick={() => loadWhitelist()} variant="outline" size="sm" className="border-[#202736] text-zinc-400">
                                 {loading && <Loader2 size={14} className="animate-spin mr-2" />} Refresh
                             </Button>
                         </div>
@@ -1081,7 +1088,7 @@ export default function AdminDashboard() {
                     <div className="space-y-6 max-w-5xl mx-auto">
                         <div className="flex justify-between items-center">
                             <h2 className="text-2xl font-bold flex items-center gap-2"><MessageSquare size={24} className="text-[#4DD4C4]" /> User Feedback</h2>
-                            <Button onClick={loadFeedbacks} variant="outline" size="sm" className="border-[#202736] text-zinc-400">
+                            <Button onClick={() => loadFeedbacks()} variant="outline" size="sm" className="border-[#202736] text-zinc-400">
                                 <Loader2 size={14} className={`mr-2 ${loading ? 'animate-spin' : 'hidden'}`} /> Refresh
                             </Button>
                         </div>
