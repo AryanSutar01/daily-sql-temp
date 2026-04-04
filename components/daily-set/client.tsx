@@ -32,17 +32,44 @@ import {
     X,
     Send,
     Reply,
-    MessageCircle
+    MessageCircle,
+    Info
 } from "lucide-react";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Panel, Group, Separator } from "react-resizable-panels";
 import Editor from "@monaco-editor/react";
 import ReactMarkdown from 'react-markdown';
+import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
+import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { api } from "@/lib/api";
 import { Problem, DailyPractice, Dataset, ExecutionResponse } from "@/types/api";
+
+SyntaxHighlighter.registerLanguage('sql', sql);
+
+// Custom theme based on vscDarkPlus, matched to our editor background
+const sqlHighlightStyle = {
+    ...vscDarkPlus,
+    'pre[class*="language-"]': {
+        ...vscDarkPlus['pre[class*="language-"]'],
+        background: '#0b101c',
+        margin: 0,
+        padding: '10px 12px',
+        fontSize: '11px',
+        lineHeight: '1.6',
+        borderRadius: '6px',
+    },
+    'code[class*="language-"]': {
+        ...vscDarkPlus['code[class*="language-"]'],
+        background: 'none',
+        fontSize: '11px',
+        lineHeight: '1.6',
+        fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+    },
+};
 
 type Difficulty = 'easy' | 'medium' | 'hard' | 'advanced';
 
@@ -99,8 +126,10 @@ export function DailySetClient() {
     const [commentCount, setCommentCount] = useState(0);
     const [isLoadingComments, setIsLoadingComments] = useState(false);
     const [newComment, setNewComment] = useState('');
+    const [isCommentPreview, setIsCommentPreview] = useState(false);
     const [replyingTo, setReplyingTo] = useState<{ id: string; userName: string } | null>(null);
     const [replyText, setReplyText] = useState('');
+    const [isReplyPreview, setIsReplyPreview] = useState(false);
 
     // ── Feedback State ───────────────────────────────────────────
     const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -115,6 +144,53 @@ export function DailySetClient() {
     const containerRef = useRef<HTMLDivElement>(null);
     const sidebarDropdownRef = useRef<HTMLDivElement>(null);
     const profileDropdownRef = useRef<HTMLDivElement>(null);
+    const discussionRef = useRef<HTMLDivElement>(null);
+
+    // ── Discussion Drawer Resize ─────────────────────────
+    const [discussionWidth, setDiscussionWidth] = useState(380);
+    const handleDiscussionResizeStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        const startX = e.clientX;
+        const startWidth = discussionWidth;
+        const onMove = (moveEvent: MouseEvent) => {
+            const delta = startX - moveEvent.clientX;
+            const newWidth = Math.max(280, Math.min(700, startWidth + delta));
+            setDiscussionWidth(newWidth);
+        };
+        const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }, [discussionWidth]);
+
+    // ── Output Panel Resize ──────────────────────────────
+    const [outputHeight, setOutputHeight] = useState(280);
+    const handleOutputResizeStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        const startY = e.clientY;
+        const startHeight = outputHeight;
+        const onMove = (moveEvent: MouseEvent) => {
+            const delta = startY - moveEvent.clientY;
+            const newHeight = Math.max(100, Math.min(600, startHeight + delta));
+            setOutputHeight(newHeight);
+        };
+        const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }, [outputHeight]);
 
     // ── Effects ──────────────────────────────────────────
     useEffect(() => {
@@ -284,6 +360,35 @@ export function DailySetClient() {
         },
     };
 
+    // Compact markdown components for discussion drawer (smaller fonts/spacing)
+    const discussionMarkdownComponents = {
+        p: ({ node, ...props }: any) => <p className="mb-1 last:mb-0" {...props} />,
+        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-1 space-y-0.5 text-xs" {...props} />,
+        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-1 space-y-0.5 text-xs" {...props} />,
+        li: ({ node, ...props }: any) => <li className="text-xs" {...props} />,
+        pre: ({ node, children, ...props }: any) => <div className="my-2 first:mt-0 last:mb-0 rounded-md border border-[#202736] overflow-hidden" {...props}>{children}</div>,
+        code: ({ node, className, children, ...props }: any) => {
+            const match = /language-(\w+)/.exec(className || '');
+            const isInline = !match && !className;
+            if (isInline) {
+                return <code className="bg-[#202736] px-1 py-0.5 rounded text-[11px] text-[#4DD4C4] font-mono" {...props}>{children}</code>;
+            }
+            const lang = match?.[1] || 'sql';
+            const codeString = String(children).replace(/\n$/, '');
+            return (
+                <SyntaxHighlighter
+                    language={lang}
+                    style={sqlHighlightStyle}
+                    customStyle={{ margin: 0 }}
+                >
+                    {codeString}
+                </SyntaxHighlighter>
+            );
+        },
+        strong: ({ node, ...props }: any) => <strong className="font-semibold text-zinc-200" {...props} />,
+        em: ({ node, ...props }: any) => <em className="italic text-zinc-400" {...props} />,
+    };
+
     // ── Handlers ─────────────────────────────────────────
     const handleProblemSelect = async (id: string) => {
         setActiveProblemId(id);
@@ -337,6 +442,7 @@ export function DailySetClient() {
         setIsRunning(true);
         setError(null);
         setShowResult(true);
+        setOutputHeight(280); // Reset to default height to ensure visibility
         try {
             const res = await api.execute(activeProblemId, code);
             setExecutionResult(res);
@@ -1035,13 +1141,12 @@ export function DailySetClient() {
 
                     {/* Resize Handle */}
                     <Separator className="w-1.5 bg-[#080c16] hover:bg-[#4DD4C4]/20 transition-colors cursor-col-resize flex flex-col items-center justify-center relative">
-                        <div className="absolute inset-y-0 -left-2 -right-2 z-10" />
-                        <div className="h-8 w-0.5 bg-[#202736] rounded-full z-0" />
+                        <div className="h-8 w-0.5 bg-[#202736] rounded-full" />
                     </Separator>
 
                     {/* ── RIGHT PANE: Editor + Output ── */}
                     <Panel minSize="30" className="flex flex-col bg-[#0b101c]">
-                        {/* Editor toolbar (simplified) */}
+                        {/* Editor toolbar */}
                         <div className="h-11 border-b border-[#202736] bg-[#131924] flex items-center justify-between px-4 shrink-0">
                             <span className="text-xs font-mono font-medium text-[#4DD4C4] flex items-center gap-2">
                                 <span className="text-zinc-500">&gt;_</span> PostgreSQL
@@ -1087,12 +1192,29 @@ export function DailySetClient() {
                             <div className="absolute right-16 bottom-3 text-[10px] text-zinc-500 font-mono pointer-events-none px-2 py-1 rounded">
                                 Ln {cursorPos.lineNumber}, Col {cursorPos.column}
                             </div>
+                            
+                            {/* ══ Relocated Feedback FAB ══ */}
+                            <button
+                                onClick={() => openFeedbackModal('fab')}
+                                title="Send Feedback"
+                                className="absolute bottom-3 right-6 z-[30] w-8 h-8 rounded-full bg-[#131924] border border-[#202736] text-zinc-400 hover:text-[#4DD4C4] hover:border-[#4DD4C4]/50 transition-all shadow-lg flex items-center justify-center group"
+                            >
+                                <MessageCircle size={14} className="group-hover:scale-110 transition-transform" />
+                            </button>
                         </div>
 
-                        {/* Output panel */}
-                        <div className={`border-t border-[#202736] bg-[#0d121c] flex flex-col transition-all duration-300 shrink-0 ${showResult ? 'h-[280px]' : 'h-0 border-t-0'}`}>
-                            {showResult && (
-                                <>
+                        {/* Output panel with resizable drag handle */}
+                        {showResult && (
+                            <>
+                                {/* Drag handle for resizing output */}
+                                <div
+                                    className="h-1.5 bg-[#080c16] hover:bg-[#4DD4C4]/20 transition-colors cursor-row-resize flex items-center justify-center shrink-0 border-t border-[#202736]"
+                                    onMouseDown={handleOutputResizeStart}
+                                >
+                                    <div className="w-8 h-0.5 bg-[#202736] rounded-full" />
+                                </div>
+
+                                <div className="flex flex-col bg-[#0d121c] shrink-0 overflow-hidden" style={{ height: outputHeight }}>
                                     <div className="h-10 border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0">
                                         <span className="text-xs font-bold uppercase tracking-widest text-white font-mono flex items-center gap-2">
                                             <TerminalSquare size={14} /> Query Output
@@ -1185,16 +1307,27 @@ export function DailySetClient() {
                                             SUBMIT
                                         </button>
                                     </div>
-                                </>
-                            )}
-                        </div>
+                                </div>
+                            </>
+                        )}
                     </Panel>
                 </Group>
             </div>
 
             {/* ══ Discussion Drawer ══ */}
             {discussionOpen && (
-                <div className="absolute inset-y-0 right-0 w-[380px] bg-[#0d121c] border-l border-[#202736] flex flex-col z-[200] shadow-2xl">
+                <div
+                    className="absolute inset-y-0 right-0 bg-[#0d121c] border-l border-[#202736] flex flex-col z-[200] shadow-2xl"
+                    style={{ width: discussionWidth }}
+                    ref={discussionRef}
+                >
+                    {/* Drag handle for resizing discussion drawer */}
+                    <div
+                        className="absolute inset-y-0 left-0 w-1.5 cursor-col-resize hover:bg-[#4DD4C4]/20 transition-colors z-10 flex items-center justify-center"
+                        onMouseDown={handleDiscussionResizeStart}
+                    >
+                        <div className="h-8 w-0.5 bg-[#202736] rounded-full" />
+                    </div>
                     <div className="h-11 border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0">
                         <span className="text-sm font-bold text-white flex items-center gap-2">
                             <MessageSquare size={14} className="text-[#4DD4C4]" /> Discussion
@@ -1225,7 +1358,9 @@ export function DailySetClient() {
                                             <button onClick={() => handleDeleteComment(comment.id)} className="text-zinc-600 hover:text-red-400 transition-colors ml-2 shrink-0"><Trash2 size={12} /></button>
                                         )}
                                     </div>
-                                    <p className="text-xs text-zinc-300 leading-relaxed">{comment.body}</p>
+                                    <div className="text-xs text-zinc-300 leading-relaxed">
+                                        <ReactMarkdown components={discussionMarkdownComponents}>{comment.body}</ReactMarkdown>
+                                    </div>
                                     {authStatus === 'authenticated' && (
                                         <button
                                             onClick={() => setReplyingTo(replyingTo?.id === comment.id ? null : { id: comment.id, userName: comment.user.full_name })}
@@ -1245,19 +1380,57 @@ export function DailySetClient() {
                                                 <button onClick={() => handleDeleteComment(reply.id, comment.id)} className="text-zinc-600 hover:text-red-400 transition-colors shrink-0"><Trash2 size={11} /></button>
                                             )}
                                         </div>
-                                        <p className="text-[11px] text-zinc-400 leading-relaxed">{reply.body}</p>
+                                        <div className="text-[11px] text-zinc-400 leading-relaxed">
+                                            <ReactMarkdown components={discussionMarkdownComponents}>{reply.body}</ReactMarkdown>
+                                        </div>
                                     </div>
                                 ))}
                                 {replyingTo?.id === comment.id && (
-                                    <div className="ml-5 flex gap-2">
-                                        <input
-                                            value={replyText}
-                                            onChange={e => setReplyText(e.target.value)}
-                                            placeholder={`Reply to ${replyingTo?.userName ?? ''}...`}
-                                            className="flex-1 bg-[#0b101c] border border-[#202736] rounded-lg px-3 py-1.5 text-xs text-zinc-300 outline-none focus:border-[#4DD4C4]/50"
-                                            onKeyDown={e => e.key === 'Enter' && handlePostReply(comment.id)}
-                                        />
-                                        <button onClick={() => handlePostReply(comment.id)} className="text-[#4DD4C4] hover:text-white transition-colors px-2"><Send size={13} /></button>
+                                    <div className="ml-5 space-y-2">
+                                        <div className="flex items-center gap-4 px-1 border-b border-[#202736]/60">
+                                            <button 
+                                                onClick={() => setIsReplyPreview(false)}
+                                                className={`text-[10px] pb-1 border-b font-medium transition-colors ${!isReplyPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
+                                            >Write</button>
+                                            <button 
+                                                onClick={() => setIsReplyPreview(true)}
+                                                className={`text-[10px] pb-1 border-b font-medium transition-colors ${isReplyPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
+                                            >Preview</button>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {isReplyPreview ? (
+                                                <div className="flex-1 bg-[#0b101c] border border-[#202736] rounded-xl p-3 min-h-[60px] text-zinc-300 text-[11px] overflow-auto">
+                                                    {replyText.trim() ? (
+                                                        <ReactMarkdown components={discussionMarkdownComponents}>{replyText}</ReactMarkdown>
+                                                    ) : <span className="text-zinc-600 italic">Nothing to preview...</span>}
+                                                </div>
+                                            ) : (
+                                                <textarea
+                                                    value={replyText}
+                                                    onChange={e => setReplyText(e.target.value)}
+                                                    placeholder={`Reply to ${replyingTo?.userName ?? ''}...`}
+                                                    rows={2}
+                                                    className="flex-1 bg-[#0b101c] border border-[#202736] rounded-xl px-3 py-2 text-[11px] text-zinc-300 outline-none focus:border-[#4DD4C4]/50 resize-none"
+                                                    onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handlePostReply(comment.id); } }}
+                                                />
+                                            )}
+                                            <div className="flex flex-col justify-end">
+                                                <button onClick={() => handlePostReply(comment.id)} className="text-[#4DD4C4] hover:text-white transition-colors px-2 pb-2"><Send size={15} /></button>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 px-1 group relative">
+                                            <p className="text-[9px] text-zinc-600 italic">Supports markdown. <span className="text-zinc-500 font-medium font-sans">Ctrl+Enter</span></p>
+                                            <div className="relative group/tooltip">
+                                                <Info size={10} className="text-zinc-600 hover:text-[#4DD4C4] cursor-help transition-colors" />
+                                                <div className="absolute bottom-full right-0 mb-2 w-40 bg-[#1a212e] border border-[#202736] rounded-lg p-2 shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-[300] transform translate-y-1 group-hover/tooltip:translate-y-0">
+                                                    <div className="bg-[#0b101c] p-1.5 rounded font-mono text-[8px] text-[#4DD4C4] border border-[#202736]">
+                                                        ```sql<br/>
+                                                        SELECT...<br/>
+                                                        ```
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -1265,15 +1438,58 @@ export function DailySetClient() {
                     </div>
                     <div className="border-t border-[#202736] p-4 shrink-0 bg-[#0b101c]">
                         {authStatus === 'authenticated' ? (
-                            <div className="flex gap-2">
-                                <input
-                                    value={newComment}
-                                    onChange={e => setNewComment(e.target.value)}
-                                    placeholder="Write a comment..."
-                                    className="flex-1 bg-[#131924] border border-[#202736] rounded-lg px-3 py-2 text-xs text-zinc-300 outline-none focus:border-[#4DD4C4]/50"
-                                    onKeyDown={e => e.key === 'Enter' && handlePostComment()}
-                                />
-                                <button onClick={handlePostComment} disabled={!newComment.trim()} className="text-[#4DD4C4] hover:text-white transition-colors disabled:text-zinc-600 px-2"><Send size={15} /></button>
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-4 px-1 border-b border-[#202736]/60">
+                                    <button 
+                                        onClick={() => setIsCommentPreview(false)}
+                                        className={`text-[10px] pb-1 border-b font-medium uppercase tracking-wider transition-colors ${!isCommentPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
+                                    >Write</button>
+                                    <button 
+                                        onClick={() => setIsCommentPreview(true)}
+                                        className={`text-[10px] pb-1 border-b font-medium uppercase tracking-wider transition-colors ${isCommentPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
+                                    >Preview</button>
+                                </div>
+                                <div className="flex gap-2 items-end">
+                                    {isCommentPreview ? (
+                                        <div className="flex-1 bg-[#131924] border border-[#202736] rounded-xl px-3 py-3 min-h-[80px] text-zinc-300 text-xs overflow-auto">
+                                            {newComment.trim() ? (
+                                                <ReactMarkdown components={discussionMarkdownComponents}>{newComment}</ReactMarkdown>
+                                            ) : <span className="text-zinc-600 italic">Nothing to preview...</span>}
+                                        </div>
+                                    ) : (
+                                        <textarea
+                                            value={newComment}
+                                            onChange={e => setNewComment(e.target.value)}
+                                            placeholder="Write a comment... (use ```sql for code blocks)"
+                                            rows={3}
+                                            className="flex-1 bg-[#131924] border border-[#202736] rounded-xl px-3 py-2 text-xs text-zinc-300 outline-none focus:border-[#4DD4C4]/50 resize-none"
+                                            onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handlePostComment(); } }}
+                                        />
+                                    )}
+                                    <button 
+                                        onClick={handlePostComment} 
+                                        disabled={!newComment.trim()} 
+                                        className="text-[#4DD4C4] hover:text-white transition-colors disabled:text-zinc-800 px-2 pb-2"
+                                        title={isCommentPreview ? "Post Comment" : "Ctrl+Enter to post"}
+                                    >
+                                        <Send size={18} />
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-1.5 px-1 group relative">
+                                    <p className="text-[10px] text-zinc-600">Supports markdown. <span className="text-zinc-500 font-medium">Ctrl+Enter</span> to send.</p>
+                                    <div className="relative group/tooltip">
+                                        <Info size={11} className="text-zinc-600 hover:text-[#4DD4C4] cursor-help transition-colors" />
+                                        <div className="absolute bottom-full right-0 mb-2 w-48 bg-[#1a212e] border border-[#202736] rounded-lg p-2.5 shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-[300] transform translate-y-1 group-hover/tooltip:translate-y-0">
+                                            <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Code Block Sample</p>
+                                            <div className="bg-[#0b101c] p-2 rounded font-mono text-[9px] text-[#4DD4C4] leading-relaxed border border-[#202736]">
+                                                ```sql<br/>
+                                                SELECT * FROM users;<br/>
+                                                ```
+                                            </div>
+                                            <p className="text-[9px] text-zinc-500 mt-1.5 leading-tight italic">Triple backticks (```) to open & close.</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         ) : (
                             <div className="text-center space-y-2">
@@ -1288,14 +1504,7 @@ export function DailySetClient() {
                 </div>
             )}
 
-            {/* ══ Feedback FAB ══ */}
-            <button
-                onClick={() => openFeedbackModal('fab')}
-                title="Send Feedback"
-                className="absolute bottom-3 right-6 z-[150] w-8 h-8 rounded-full bg-[#131924] border border-[#202736] text-zinc-400 hover:text-[#4DD4C4] hover:border-[#4DD4C4]/50 transition-all shadow-lg flex items-center justify-center"
-            >
-                <MessageCircle size={14} />
-            </button>
+
 
             {/* ══ Feedback Modal ══ */}
             {feedbackOpen && (

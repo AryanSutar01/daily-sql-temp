@@ -7,8 +7,36 @@ import {
     AlertCircle, Loader2, ChevronRight, Edit3, Eye,
     Code, FileText, Clock, Trash2, MessageSquare, X, Save, ThumbsDown
 } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
+import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
+import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+
+SyntaxHighlighter.registerLanguage('sql', sql);
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+// Custom Markdown components for consistency with Practice Page
+const problemMarkdownComponents: any = {
+    h1: ({ node, ...props }: any) => <h1 className="text-xl font-bold text-white mt-4 mb-2" {...props} />,
+    h2: ({ node, ...props }: any) => <h2 className="text-lg font-bold text-white mt-4 mb-2" {...props} />,
+    h3: ({ node, ...props }: any) => <h3 className="text-md font-bold text-zinc-300 mt-3 mb-1" {...props} />,
+    p: ({ node, ...props }: any) => <p className="mb-2" {...props} />,
+    ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-2 space-y-1" {...props} />,
+    ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-2 space-y-1" {...props} />,
+    li: ({ node, ...props }: any) => <li className="" {...props} />,
+    code: ({ node, className, children, ...props }: any) => {
+        const match = /language-(\w+)/.exec(className || '');
+        const isInline = !match && !className;
+        return isInline ? (
+            <code className="bg-[#202736] px-1.5 py-0.5 rounded text-xs text-[#4DD4C4] font-mono" {...props}>{children}</code>
+        ) : (
+            <div className="bg-[#131924] p-3 rounded border border-[#202736] overflow-x-auto text-xs my-3 font-mono">
+                <code className="text-[#4DD4C4]" {...props}>{children}</code>
+            </div>
+        );
+    },
+};
 
 // Types
 interface Problem {
@@ -28,7 +56,7 @@ interface ScheduleEntry {
 }
 
 type Tab = 'problems' | 'create' | 'schedule' | 'feedback' | 'members';
-type CreateStep = 'problem' | 'datasets' | 'solution' | 'done';
+type CreateStep = 'problem' | 'datasets' | 'solution' | 'preview' | 'done';
 
 export default function AdminDashboard() {
     const [secret, setSecret] = useState("");
@@ -417,7 +445,7 @@ export default function AdminDashboard() {
             });
             if (res.ok) {
                 showToast('success', 'Solution saved!');
-                setCreateStep('done');
+                setCreateStep('preview');
             } else {
                 const data = await res.json();
                 showToast('error', data.detail || 'Failed to save solution');
@@ -832,23 +860,24 @@ export default function AdminDashboard() {
                     <div className="max-w-3xl mx-auto space-y-8">
                         {/* Stepper */}
                         <div className="flex items-center justify-center gap-2">
-                            {['problem', 'datasets', 'solution', 'done'].map((step, i) => (
+                            {['problem', 'datasets', 'solution', 'preview', 'done'].map((step, i) => (
                                 <div key={step} className="flex items-center">
                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${createStep === step ? 'bg-[#4DD4C4] text-black' :
-                                        ['problem', 'datasets', 'solution', 'done'].indexOf(createStep) > i ? 'bg-green-500 text-white' :
+                                        ['problem', 'datasets', 'solution', 'preview', 'done'].indexOf(createStep) > i ? 'bg-green-500 text-white' :
                                             'bg-[#202736] text-zinc-500'
                                         }`}>
-                                        {['problem', 'datasets', 'solution', 'done'].indexOf(createStep) > i ? <CheckCircle2 size={16} /> : i + 1}
+                                        {['problem', 'datasets', 'solution', 'preview', 'done'].indexOf(createStep) > i ? <CheckCircle2 size={16} /> : i + 1}
                                     </div>
-                                    {i < 3 && <ChevronRight size={16} className="mx-2 text-zinc-600" />}
+                                    {i < 4 && <ChevronRight size={16} className="mx-2 text-zinc-600" />}
                                 </div>
                             ))}
                         </div>
                         <div className="text-center text-sm text-zinc-500">
                             {createStep === 'problem' && 'Step 1: Define the problem'}
-                            {createStep === 'datasets' && 'Step 2: Add table schemas (can add multiple)'}
-                            {createStep === 'solution' && 'Step 3: Set the expected solution'}
-                            {createStep === 'done' && '✓ Problem setup complete!'}
+                            {createStep === 'datasets' && 'Step 2: Add table schemas'}
+                            {createStep === 'solution' && 'Step 3: Set reference query'}
+                            {createStep === 'preview' && 'Step 4: Preview & Verify'}
+                            {createStep === 'done' && '✓ Problem published!'}
                         </div>
 
                         {/* Step 1: Problem */}
@@ -900,38 +929,115 @@ export default function AdminDashboard() {
                                 <h2 className="text-xl font-bold flex items-center gap-2"><Code size={20} className="text-[#4DD4C4]" /> Expected Solution</h2>
                                 <p className="text-sm text-zinc-500">Enter the reference SQL query that produces the correct result.</p>
                                 <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-40 font-mono text-sm text-white" placeholder="SELECT ... FROM ... WHERE ..." value={solutionForm.reference_query} onChange={e => setSolutionForm({ ...solutionForm, reference_query: e.target.value })} />
-                                <label className="flex items-center gap-3 text-zinc-400">
+                                <label className="flex items-center gap-3 text-zinc-400 cursor-pointer">
                                     <input type="checkbox" checked={solutionForm.order_sensitive} onChange={e => setSolutionForm({ ...solutionForm, order_sensitive: e.target.checked })} className="w-4 h-4 rounded" />
                                     Order Sensitive (row order must match exactly)
                                 </label>
                                 <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-20 text-white" placeholder="Notes (optional hints, edge cases...)" value={solutionForm.notes} onChange={e => setSolutionForm({ ...solutionForm, notes: e.target.value })} />
                                 <div className="flex gap-3">
                                     <Button onClick={handleAddSolution} disabled={!solutionForm.reference_query || loading} className="flex-1 bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold">
-                                        {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : <CheckCircle2 size={16} className="mr-2" />}
-                                        Save Solution & Finish
+                                        {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : <ChevronRight size={16} className="mr-2" />}
+                                        Preview Problem
                                     </Button>
-                                    <Button onClick={() => setCreateStep('done')} variant="ghost" className="text-zinc-500">
-                                        Skip for now
+                                    <Button onClick={() => setCreateStep('preview')} variant="ghost" className="text-zinc-500">
+                                        Skip to Preview
                                     </Button>
                                 </div>
                             </div>
                         )}
 
-                        {/* Step 4: Done */}
-                        {createStep === 'done' && (
-                            <div className="bg-[#121826] p-8 rounded-xl border border-[#202736] text-center space-y-4">
-                                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
-                                    <CheckCircle2 size={32} className="text-green-500" />
-                                </div>
-                                <h2 className="text-2xl font-bold">Problem Created!</h2>
-                                <p className="text-zinc-500">Your problem is ready. You can now schedule it for a daily practice.</p>
-                                <code className="block text-xs text-zinc-600 font-mono bg-[#0b101c] p-2 rounded">ID: {createdProblemId}</code>
-                                <div className="flex gap-3 justify-center pt-4">
-                                    <Button onClick={() => { setActiveTab('schedule'); setScheduleForm({ ...scheduleForm, [problemForm.difficulty === 'easy' ? 'easy_problem_id' : problemForm.difficulty === 'medium' ? 'medium_problem_id' : 'advanced_problem_id']: createdProblemId || '' }); }} className="bg-[#4DD4C4] text-black font-bold">
-                                        <Calendar size={16} className="mr-2" /> Schedule This Problem
+                        {/* Step 4: Preview */}
+                        {createStep === 'preview' && (
+                            <div className="space-y-6">
+                                <div className="bg-[#121826] p-6 rounded-xl border border-[#202736] space-y-6">
+                                    <div className="flex items-center justify-between border-b border-[#202736] pb-4">
+                                        <h2 className="text-xl font-bold flex items-center gap-2"><Eye size={20} className="text-[#4DD4C4]" /> Review Problem</h2>
+                                        <div className="flex gap-2">
+                                            <Button onClick={() => setCreateStep('problem')} variant="outline" size="sm" className="border-[#202736] text-zinc-400 hover:text-white h-8"><Edit3 size={14} className="mr-2" /> Edit Details</Button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${getDifficultyColor(problemForm.difficulty)}`}>{problemForm.difficulty}</span>
+                                            <span className="text-xs text-zinc-500 flex items-center gap-1"><Clock size={12} /> {problemForm.estimated_time_minutes} min</span>
+                                        </div>
+                                        <h1 className="text-2xl font-bold text-white tracking-tight">{problemForm.title || "Untitled Problem"}</h1>
+                                        
+                                        {/* Harmonized Task Rendering */}
+                                        <div className="pt-2">
+                                            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2 font-sans">Task</h3>
+                                            <div className="h-px w-full bg-[#202736] mb-4" />
+                                            <div className="text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap font-sans">
+                                                {problemForm.description ? (
+                                                    <ReactMarkdown components={problemMarkdownComponents}>
+                                                        {problemForm.description.split('### Hint')[0]}
+                                                    </ReactMarkdown>
+                                                ) : <p className="text-zinc-600 italic">No description provided.</p>}
+                                            </div>
+                                        </div>
+
+                                        {/* Harmonized Hint Rendering */}
+                                        {problemForm.description?.includes('### Hint') && (
+                                            <div className="pt-2">
+                                                <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2 font-sans flex items-center gap-2">
+                                                    Hints <span className="text-[10px] normal-case font-normal text-zinc-500">(preview)</span>
+                                                </h3>
+                                                <div className="h-px w-full bg-[#202736] mb-4" />
+                                                <div className="p-4 bg-[#131924] rounded-lg border border-[#202736] text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap font-sans">
+                                                    <ReactMarkdown components={problemMarkdownComponents}>
+                                                        {problemForm.description.split('### Hint')[1].trim()}
+                                                    </ReactMarkdown>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between border-b border-[#202736] pb-2">
+                                            <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Reference Solution</h3>
+                                            <Button onClick={() => setCreateStep('solution')} variant="ghost" size="sm" className="text-zinc-500 hover:text-white h-7 text-[10px]"><Edit3 size={12} className="mr-2" /> EDIT</Button>
+                                        </div>
+                                        <div className="bg-[#0b101c] border border-[#202736] rounded-lg overflow-hidden">
+                                            <SyntaxHighlighter style={vscDarkPlus as any} language="sql" customStyle={{ margin: 0, padding: '1rem', fontSize: '12px' }}>
+                                                {solutionForm.reference_query || "-- No solution query provided"}
+                                            </SyntaxHighlighter>
+                                        </div>
+                                        {solutionForm.order_sensitive && <div className="text-[10px] text-zinc-500 flex items-center gap-1"><CheckCircle2 size={10} /> Results must match order exactly</div>}
+                                    </div>
+
+                                    <Button onClick={() => setCreateStep('done')} className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-extrabold py-6 text-lg shadow-[0_0_20px_rgba(77,212,196,0.2)]">
+                                        Confirm & Publish Problem
                                     </Button>
-                                    <Button onClick={resetCreateWizard} variant="outline" className="border-[#202736] text-zinc-400">
-                                        <Plus size={16} className="mr-2" /> Create Another
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Step 5: Done */}
+                        {createStep === 'done' && (
+                            <div className="bg-[#121826] p-10 rounded-2xl border border-[#202736] text-center space-y-6 shadow-2xl relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-[#4DD4C4]"></div>
+                                <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto border border-green-500/20">
+                                    <CheckCircle2 size={40} className="text-green-500" />
+                                </div>
+                                <div className="space-y-2">
+                                    <h2 className="text-3xl font-bold text-white tracking-tight">Problem Published</h2>
+                                    <p className="text-zinc-500 text-sm max-w-sm mx-auto">Your problem has been successfully added to the database and is ready to be scheduled.</p>
+                                </div>
+                                
+                                <div className="bg-[#0b101c] p-3 rounded-lg border border-[#202736] inline-block mx-auto">
+                                    <code className="text-[10px] text-[#4DD4C4] font-mono">PROBLEM_ID: {createdProblemId}</code>
+                                </div>
+
+                                <div className="flex flex-col gap-3 max-w-xs mx-auto pt-4">
+                                    <Button onClick={() => { setActiveTab('schedule'); setScheduleForm({ ...scheduleForm, [problemForm.difficulty === 'easy' ? 'easy_problem_id' : problemForm.difficulty === 'medium' ? 'medium_problem_id' : 'advanced_problem_id']: createdProblemId || '' }); }} className="bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold h-11">
+                                        <Calendar size={18} className="mr-2" /> Schedule for Practice
+                                    </Button>
+                                    <Button onClick={resetCreateWizard} variant="outline" className="border-[#202736] text-zinc-400 hover:text-white h-11 bg-white/5">
+                                        <Plus size={18} className="mr-2" /> Create Another Problem
+                                    </Button>
+                                    <Button onClick={() => setActiveTab('problems')} variant="ghost" className="text-zinc-600 hover:text-zinc-400 text-xs">
+                                        Return to Dashboard
                                     </Button>
                                 </div>
                             </div>
