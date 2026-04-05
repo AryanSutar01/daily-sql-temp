@@ -18,20 +18,20 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Custom Markdown components for consistency with Practice Page
 const problemMarkdownComponents: any = {
-    h1: ({ node, ...props }: any) => <h1 className="text-xl font-bold text-white mt-4 mb-2" {...props} />,
-    h2: ({ node, ...props }: any) => <h2 className="text-lg font-bold text-white mt-4 mb-2" {...props} />,
-    h3: ({ node, ...props }: any) => <h3 className="text-md font-bold text-zinc-300 mt-3 mb-1" {...props} />,
-    p: ({ node, ...props }: any) => <p className="mb-2" {...props} />,
-    ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-2 space-y-1" {...props} />,
-    ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-2 space-y-1" {...props} />,
-    li: ({ node, ...props }: any) => <li className="" {...props} />,
+    h1: ({ node, ...props }: any) => <h1 className="text-lg font-bold text-white mt-4 mb-2.5" {...props} />,
+    h2: ({ node, ...props }: any) => <h2 className="text-md font-bold text-white mt-4 mb-2" {...props} />,
+    h3: ({ node, ...props }: any) => <h3 className="text-sm font-bold text-zinc-300 mt-3 mb-1.5" {...props} />,
+    p: ({ node, ...props }: any) => <p className="mb-2.5 leading-relaxed" {...props} />,
+    ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-2.5" {...props} />,
+    ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-2.5" {...props} />,
+    li: ({ node, ...props }: any) => <li className="mb-1 last:mb-0" {...props} />,
     code: ({ node, className, children, ...props }: any) => {
         const match = /language-(\w+)/.exec(className || '');
         const isInline = !match && !className;
         return isInline ? (
-            <code className="bg-[#202736] px-1.5 py-0.5 rounded text-xs text-[#4DD4C4] font-mono" {...props}>{children}</code>
+            <code className="bg-[#202736] px-1.5 py-0.5 rounded text-[11px] text-[#4DD4C4] font-mono" {...props}>{children}</code>
         ) : (
-            <div className="bg-[#131924] p-3 rounded border border-[#202736] overflow-x-auto text-xs my-3 font-mono">
+            <div className="bg-[#131924] p-3 rounded border border-[#202736] overflow-x-auto text-[11px] my-3 font-mono">
                 <code className="text-[#4DD4C4]" {...props}>{children}</code>
             </div>
         );
@@ -102,6 +102,7 @@ export default function AdminDashboard() {
     const [solutionForm, setSolutionForm] = useState({
         reference_query: "", order_sensitive: false, notes: ""
     });
+    const [wizardDatasets, setWizardDatasets] = useState<any[]>([]);
     const [scheduleForm, setScheduleForm] = useState({
         date: new Date().toISOString().split('T')[0],
         easy_problem_id: "", medium_problem_id: "", advanced_problem_id: ""
@@ -247,6 +248,78 @@ export default function AdminDashboard() {
         } catch (e) { console.error(e); }
     };
 
+    const getColumnOrder = (schemaSql: string, fallbackRow?: Record<string, any>): string[] => {
+        try {
+            // Match the body between the first '(' and the matching last ')'
+            const bodyMatch = schemaSql.replace(/\n/g, ' ').match(/CREATE\s+TABLE\s+[\w"`.]+\s*\((.+)\)/i);
+            if (!bodyMatch) throw new Error('no match');
+            const body = bodyMatch[1];
+
+            const columns: string[] = [];
+            // Split by commas that are NOT inside parentheses (to handle CHECK(...), DEFAULT(...), etc.)
+            let depth = 0;
+            let current = '';
+            for (const ch of body) {
+                if (ch === '(') depth++;
+                else if (ch === ')') depth--;
+                else if (ch === ',' && depth === 0) {
+                    current = current.trim();
+                    if (current) {
+                        // Skip table-level constraints: PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK, INDEX
+                        const upper = current.toUpperCase();
+                        if (!upper.startsWith('PRIMARY') && !upper.startsWith('FOREIGN') &&
+                            !upper.startsWith('UNIQUE') && !upper.startsWith('CHECK') &&
+                            !upper.startsWith('INDEX') && !upper.startsWith('KEY')) {
+                            // First token is the column name (strip quotes/backticks)
+                            const nameMatch = current.match(/^[`"']?([\w]+)[`"']?/);
+                            if (nameMatch) columns.push(nameMatch[1]);
+                        }
+                    }
+                    current = '';
+                    continue;
+                }
+                current += ch;
+            }
+            // Handle the last column (no trailing comma)
+            current = current.trim();
+            if (current) {
+                const upper = current.toUpperCase();
+                if (!upper.startsWith('PRIMARY') && !upper.startsWith('FOREIGN') &&
+                    !upper.startsWith('UNIQUE') && !upper.startsWith('CHECK') &&
+                    !upper.startsWith('INDEX') && !upper.startsWith('KEY')) {
+                    const nameMatch = current.match(/^[`"']?([\w]+)[`"']?/);
+                    if (nameMatch) columns.push(nameMatch[1]);
+                }
+            }
+
+            // Validate: at least one column must exist in the fallback row (if provided)
+            if (columns.length === 0) throw new Error('no columns parsed');
+            return columns;
+        } catch {
+            // Fallback: use Object.keys of the first row (may be alphabetical due to JSONB)
+            return fallbackRow ? Object.keys(fallbackRow) : [];
+        }
+    };
+
+    useEffect(() => {
+        if (createStep === 'preview' && createdProblemId) {
+            const fetchWizardData = async () => {
+                try {
+                    const dsRes = await fetch(`${API_URL}/problems/${createdProblemId}/datasets`);
+                    if (dsRes.ok) {
+                        const ds = await dsRes.json();
+                        setWizardDatasets(ds.map((d: any) => ({
+                            ...d,
+                            sample_rows: typeof d.sample_rows === 'string' ? JSON.parse(d.sample_rows) : d.sample_rows,
+                            column_types: typeof d.column_types === 'string' ? JSON.parse(d.column_types) : d.column_types
+                        })));
+                    }
+                } catch (e) { console.error(e); }
+            };
+            fetchWizardData();
+        }
+    }, [createStep, createdProblemId]);
+
     const handleUpdateDataset = async (ds: any) => {
         if (!selectedProblem) return;
         try {
@@ -358,22 +431,24 @@ export default function AdminDashboard() {
         }
     };
 
-    // CREATE PROBLEM
+    // CREATE OR UPDATE PROBLEM DRAFT
     const handleCreateProblem = async () => {
         setLoading(true);
         try {
-            const res = await fetchWithAuth(`${API_URL}/admin/problems`, {
-                method: 'POST',
+            const isUpdate = !!createdProblemId;
+            const url = isUpdate ? `${API_URL}/admin/problems/${createdProblemId}` : `${API_URL}/admin/problems`;
+            const res = await fetchWithAuth(url, {
+                method: isUpdate ? 'PATCH' : 'POST',
                 body: JSON.stringify(problemForm)
             });
             const data = await res.json();
             if (res.ok) {
-                setCreatedProblemId(data.problem_id);
+                if (!isUpdate) setCreatedProblemId(data.problem_id);
                 setCreateStep('datasets');
-                showToast('success', `Problem created! ID: ${data.problem_id.slice(0, 8)}...`);
+                showToast('success', isUpdate ? 'Problem details updated!' : `Problem created! ID: ${data.problem_id.slice(0, 8)}...`);
                 loadProblems();
             } else {
-                showToast('error', data.detail || 'Failed to create problem');
+                showToast('error', data.detail || 'Failed to save problem');
             }
         } catch (e: any) { showToast('error', e.message); }
         setLoading(false);
@@ -547,13 +622,11 @@ export default function AdminDashboard() {
         setLoading(false);
     };
 
-    const getDifficultyColor = (diff: string) => {
-        switch (diff) {
-            case 'easy': return 'text-green-400 bg-green-400/10 border-green-400/20';
-            case 'medium': return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
-            case 'advanced': return 'text-red-400 bg-red-400/10 border-red-400/20';
-            default: return 'text-zinc-400 bg-zinc-400/10';
-        }
+    const getDiffStyle = (diff: string) => {
+        const d = diff?.toLowerCase();
+        if (d === 'easy') return { label: 'BASIC', color: 'text-[#4DD4C4]', bg: 'bg-[#4DD4C4]/10', border: 'border-[#4DD4C4]/30', hex: '#4DD4C4' };
+        if (d === 'medium') return { label: 'INTERMEDIATE', color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', hex: '#eab308' };
+        return { label: 'ADVANCED', color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/30', hex: '#f87171' };
     };
 
     // ================== AUTH GATE ==================
@@ -717,8 +790,8 @@ export default function AdminDashboard() {
                                             <div className="flex justify-between items-start">
                                                 <div className="space-y-2">
                                                     <div className="flex items-center gap-3">
-                                                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${getDifficultyColor(p.difficulty)}`}>
-                                                            {p.difficulty}
+                                                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${getDiffStyle(p.difficulty).color} ${getDiffStyle(p.difficulty).bg} ${getDiffStyle(p.difficulty).border}`}>
+                                                            {getDiffStyle(p.difficulty).label}
                                                         </span>
                                                         <span className="text-xs text-zinc-500 flex items-center gap-1">
                                                             <Clock size={12} /> {p.estimated_time_minutes} min
@@ -897,7 +970,7 @@ export default function AdminDashboard() {
                                 </div>
                                 <Button onClick={handleCreateProblem} disabled={!problemForm.title || loading} className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold disabled:opacity-50">
                                     {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
-                                    Create Problem & Continue
+                                    {createdProblemId ? 'Update Problem & Continue' : 'Create Problem & Continue'}
                                 </Button>
                             </div>
                         )}
@@ -957,18 +1030,24 @@ export default function AdminDashboard() {
                                         </div>
                                     </div>
                                     
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-3">
-                                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${getDifficultyColor(problemForm.difficulty)}`}>{problemForm.difficulty}</span>
-                                            <span className="text-xs text-zinc-500 flex items-center gap-1"><Clock size={12} /> {problemForm.estimated_time_minutes} min</span>
+                                    <div className="space-y-8">
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${getDiffStyle(problemForm.difficulty).color} ${getDiffStyle(problemForm.difficulty).bg} ${getDiffStyle(problemForm.difficulty).border}`}>
+                                                {getDiffStyle(problemForm.difficulty).label}
+                                            </span>
+                                            <div className="h-3 w-px bg-zinc-800" />
+                                            <span className="text-xs text-zinc-500 font-medium flex items-center gap-1.5"><Clock size={12} className="text-zinc-600" /> {problemForm.estimated_time_minutes} min</span>
+                                            <div className="h-3 w-px bg-zinc-800" />
+                                            <span className="text-xs text-zinc-500 font-medium">PostgreSQL</span>
                                         </div>
-                                        <h1 className="text-2xl font-bold text-white tracking-tight">{problemForm.title || "Untitled Problem"}</h1>
+
+                                        <h1 className="text-2xl font-bold text-white tracking-tight leading-tight">{problemForm.title || "Untitled Problem"}</h1>
                                         
-                                        {/* Harmonized Task Rendering */}
-                                        <div className="pt-2">
-                                            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2 font-sans">Task</h3>
-                                            <div className="h-px w-full bg-[#202736] mb-4" />
-                                            <div className="text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap font-sans">
+                                        {/* Task Section */}
+                                        <div>
+                                            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 font-sans">Task</h3>
+                                            <div className="h-px w-full bg-[#181f2b]" />
+                                            <div className="pt-4 text-zinc-400 text-sm leading-relaxed font-sans">
                                                 {problemForm.description ? (
                                                     <ReactMarkdown components={problemMarkdownComponents}>
                                                         {problemForm.description.split('### Hint')[0]}
@@ -977,18 +1056,86 @@ export default function AdminDashboard() {
                                             </div>
                                         </div>
 
-                                        {/* Harmonized Hint Rendering */}
+                                        {/* Hint Section */}
                                         {problemForm.description?.includes('### Hint') && (
-                                            <div className="pt-2">
-                                                <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2 font-sans flex items-center gap-2">
-                                                    Hints <span className="text-[10px] normal-case font-normal text-zinc-500">(preview)</span>
+                                            <div>
+                                                <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 font-sans flex items-center gap-2">
+                                                    Hints <span className="text-[10px] normal-case font-normal text-zinc-600">(toggle in practice)</span>
                                                 </h3>
-                                                <div className="h-px w-full bg-[#202736] mb-4" />
-                                                <div className="p-4 bg-[#131924] rounded-lg border border-[#202736] text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap font-sans">
+                                                <div className="h-px w-full bg-[#181f2b] mb-4" />
+                                                <div className="p-4 bg-[#131924] rounded-lg border border-[#202736]/50 text-zinc-400 text-sm leading-relaxed font-sans">
                                                     <ReactMarkdown components={problemMarkdownComponents}>
                                                         {problemForm.description.split('### Hint')[1].trim()}
                                                     </ReactMarkdown>
                                                 </div>
+                                            </div>
+                                        )}
+
+                                        {/* Sample Data Section */}
+                                        {wizardDatasets.length > 0 && (
+                                            <div className="space-y-4 pt-2">
+                                                <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 font-sans flex items-center gap-1.5">
+                                                    <Database size={11} /> Datasets
+                                                </h3>
+                                                <div className="h-px w-full bg-[#181f2b]" />
+                                                {wizardDatasets.map((ds, idx) => {
+                                                    const colOrder = getColumnOrder(ds.schema_sql, ds.sample_rows[0]);
+                                                    return (
+                                                        <div key={idx} className="mb-6 last:mb-0 space-y-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="h-4 w-1 bg-[#4DD4C4] rounded-full" />
+                                                                <span className="text-xs font-bold text-zinc-300 font-mono uppercase tracking-wider">{ds.table_name}</span>
+                                                            </div>
+
+                                                            {/* Schema Table */}
+                                                            <div className="border border-[#202736] rounded-lg overflow-hidden max-w-sm bg-[#0d121c]">
+                                                                <table className="w-full text-[11px] text-left">
+                                                                    <thead className="bg-[#131924] text-zinc-400">
+                                                                        <tr>
+                                                                            <th className="px-3 py-1.5 border-b border-[#202736] font-semibold uppercase tracking-wider">Column Name</th>
+                                                                            <th className="px-3 py-1.5 border-b border-[#202736] font-semibold uppercase tracking-wider">Type</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="bg-[#0b101c]">
+                                                                        {colOrder.map(col => (
+                                                                            <tr key={col} className="border-b border-[#202736]/50 last:border-0 text-zinc-400 font-mono hover:bg-white/[0.02]">
+                                                                                <td className="px-3 py-1.5 font-medium">{col}</td>
+                                                                                <td className="px-3 py-1.5 text-[#4DD4C4]/80">{ds.column_types?.[col] || 'string'}</td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+
+                                                            {/* Sample Data Table */}
+                                                            <div className="border border-[#202736] rounded-lg overflow-hidden shadow-xl bg-[#0d121c]">
+                                                                <div className="bg-[#131924]/50 px-3 py-1 text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-[#202736]">
+                                                                    Sample Rows
+                                                                </div>
+                                                                <div className="overflow-x-auto">
+                                                                    <table className="w-full text-[11px] text-left">
+                                                                        <thead className="bg-[#0b101c] text-zinc-500">
+                                                                            <tr>
+                                                                                {colOrder.map(h => (
+                                                                                    <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">{h}</th>
+                                                                                ))}
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="bg-[#0b101c]">
+                                                                            {ds.sample_rows.map((row: any, i: number) => (
+                                                                                <tr key={i} className="border-b border-[#202736]/50 last:border-0 text-zinc-300 font-mono hover:bg-white/[0.02]">
+                                                                                    {colOrder.map((col) => (
+                                                                                        <td key={col} className="px-3 py-1.5">{row[col]?.toString() ?? ''}</td>
+                                                                                    ))}
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>
