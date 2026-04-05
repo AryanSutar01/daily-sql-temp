@@ -84,9 +84,22 @@ export function LoginForm() {
             </div>
 
             {error && (
-                <div className="animate-in fade-in zoom-in-95 duration-300 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
-                    <AlertCircle className="text-red-500 shrink-0" size={18} />
-                    <p className="text-red-400 text-sm font-medium">{error}</p>
+                <div className="animate-in fade-in zoom-in-95 duration-300 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex flex-col gap-3">
+                    <div className="flex items-start gap-3">
+                        <AlertCircle className="text-red-500 shrink-0 mt-0.5" size={18} />
+                        <div className="flex-1">
+                            <p className="text-red-400 text-sm font-medium leading-relaxed">{error}</p>
+                            {(error.toLowerCase().includes("authorized") || error.toLowerCase().includes("whitelist")) && (
+                                <div className="mt-3">
+                                    <Link href="/waitlist" className="block w-full">
+                                        <Button type="button" className="w-full bg-[#4DD4C4]/10 hover:bg-[#4DD4C4]/20 text-[#4DD4C4] border border-[#4DD4C4]/30 font-bold h-10 rounded-xl transition-all text-sm">
+                                            Join the Waitlist
+                                        </Button>
+                                    </Link>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -170,17 +183,28 @@ export function LoginForm() {
             {/* ══ Auth Toast ══ */}
             {toast && (
                 <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[1000] animate-in slide-in-from-bottom-5 duration-300">
-                    <div className="bg-[#0d121c] border-2 border-red-500/50 rounded-2xl p-4 shadow-[0_0_40px_rgba(239,68,68,0.2)] flex items-center gap-4 min-w-[320px] backdrop-blur-md">
-                        <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
-                            <Lock className="text-red-500 animate-pulse" size={24} />
+                    <div className="bg-[#0d121c] border-2 border-red-500/50 rounded-2xl p-4 shadow-[0_0_40px_rgba(239,68,68,0.2)] flex flex-col gap-3 min-w-[380px] backdrop-blur-md">
+                        <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                                <Lock className="text-red-500 animate-pulse" size={24} />
+                            </div>
+                            <div className="flex-1 pt-1">
+                                <h3 className="text-white font-bold text-sm text-left">Access Restricted</h3>
+                                <p className="text-red-400 text-xs mt-1 text-left leading-relaxed">{toast.message}</p>
+                            </div>
+                            <button onClick={() => setToast(null)} className="text-zinc-500 hover:text-white transition-colors pt-1">
+                                <X size={16} />
+                            </button>
                         </div>
-                        <div className="flex-1">
-                            <h3 className="text-white font-bold text-sm text-left">Access Restricted</h3>
-                            <p className="text-red-400 text-xs mt-0.5 text-left">{toast.message}</p>
-                        </div>
-                        <button onClick={() => setToast(null)} className="text-zinc-500 hover:text-white transition-colors">
-                            <X size={16} />
-                        </button>
+                        {toast.type === 'error' && toast.message.toLowerCase().includes("waitlist") && (
+                            <div className="pt-2 border-t border-red-500/20 mt-1">
+                                <Link href="/waitlist" className="block w-full">
+                                    <Button type="button" className="w-full bg-[#4DD4C4]/10 hover:bg-[#4DD4C4]/20 text-[#4DD4C4] border border-[#4DD4C4]/30 font-bold h-10 rounded-xl transition-all text-sm">
+                                        Join the Waitlist
+                                    </Button>
+                                </Link>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
