@@ -987,9 +987,6 @@ export function DailySetClient() {
                                     <button onClick={handleBackToList} className="flex items-center gap-2 text-xs font-mono text-zinc-400 hover:text-white transition-colors">
                                         <ArrowLeft size={14} /> Back
                                     </button>
-                                    <div className="text-[10px] font-mono text-zinc-500 flex items-center gap-1.5 break-all line-clamp-1 max-w-[200px]">
-                                        {activeSidebarTab === 'today' ? "Today's Set" : "Problem List"} <ChevronRight size={10} /> <span className="text-[#4DD4C4]">{activeProblem?.title}</span>
-                                    </div>
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
