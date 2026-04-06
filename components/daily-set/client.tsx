@@ -97,6 +97,8 @@ export function DailySetClient() {
     const [showHint, setShowHint] = useState<boolean>(false);
     const [expectedOutput, setExpectedOutput] = useState<{ columns: string[]; rows: any[][] } | null>(null);
 
+    const SQL_TEMPLATE = "\n\n```sql\nSELECT * FROM users;\n```";
+
     // ── Editor & Results State ───────────────────────────
     const [code, setCode] = useState("-- Select a problem to begin\n");
     const [isRunning, setIsRunning] = useState(false);
@@ -121,14 +123,14 @@ export function DailySetClient() {
     const [isVoting, setIsVoting] = useState(false);
 
     // ── Discussion State ─────────────────────────────────────────
-    const [discussionOpen, setDiscussionOpen] = useState(false);
+    const [activeDetailTab, setActiveDetailTab] = useState<'question' | 'discussion'>('question');
     const [comments, setComments] = useState<any[]>([]);
     const [commentCount, setCommentCount] = useState(0);
     const [isLoadingComments, setIsLoadingComments] = useState(false);
-    const [newComment, setNewComment] = useState('');
+    const [newComment, setNewComment] = useState(SQL_TEMPLATE);
     const [isCommentPreview, setIsCommentPreview] = useState(false);
     const [replyingTo, setReplyingTo] = useState<{ id: string; userName: string } | null>(null);
-    const [replyText, setReplyText] = useState('');
+    const [replyText, setReplyText] = useState(SQL_TEMPLATE);
     const [isReplyPreview, setIsReplyPreview] = useState(false);
 
     // ── Feedback State ───────────────────────────────────────────
@@ -144,30 +146,7 @@ export function DailySetClient() {
     const containerRef = useRef<HTMLDivElement>(null);
     const sidebarDropdownRef = useRef<HTMLDivElement>(null);
     const profileDropdownRef = useRef<HTMLDivElement>(null);
-    const discussionRef = useRef<HTMLDivElement>(null);
 
-    // ── Discussion Drawer Resize ─────────────────────────
-    const [discussionWidth, setDiscussionWidth] = useState(380);
-    const handleDiscussionResizeStart = useCallback((e: React.MouseEvent) => {
-        e.preventDefault();
-        const startX = e.clientX;
-        const startWidth = discussionWidth;
-        const onMove = (moveEvent: MouseEvent) => {
-            const delta = startX - moveEvent.clientX;
-            const newWidth = Math.max(280, Math.min(700, startWidth + delta));
-            setDiscussionWidth(newWidth);
-        };
-        const onUp = () => {
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-        };
-        document.body.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-    }, [discussionWidth]);
 
     // ── Output Panel Resize ──────────────────────────────
     const [outputHeight, setOutputHeight] = useState(280);
@@ -340,20 +319,20 @@ export function DailySetClient() {
     };
 
     const markdownComponents = {
-        h1: ({ node, ...props }: any) => <h1 className="text-xl font-bold text-white mt-4 mb-2" {...props} />,
-        h2: ({ node, ...props }: any) => <h2 className="text-lg font-bold text-white mt-4 mb-2" {...props} />,
-        h3: ({ node, ...props }: any) => <h3 className="text-md font-bold text-zinc-300 mt-3 mb-1" {...props} />,
-        p: ({ node, ...props }: any) => <p className="mb-2" {...props} />,
-        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-2 space-y-1" {...props} />,
-        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-2 space-y-1" {...props} />,
-        li: ({ node, ...props }: any) => <li className="" {...props} />,
+        h1: ({ node, ...props }: any) => <h1 className="text-lg font-bold text-white mt-4 mb-2.5" {...props} />,
+        h2: ({ node, ...props }: any) => <h2 className="text-md font-bold text-white mt-4 mb-2" {...props} />,
+        h3: ({ node, ...props }: any) => <h3 className="text-sm font-bold text-zinc-300 mt-3 mb-1.5" {...props} />,
+        p: ({ node, ...props }: any) => <p className="mb-2.5 leading-relaxed" {...props} />,
+        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-2.5" {...props} />,
+        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-2.5" {...props} />,
+        li: ({ node, ...props }: any) => <li className="mb-1 last:mb-0" {...props} />,
         code: ({ node, className, children, ...props }: any) => {
             const match = /language-(\w+)/.exec(className || '');
             const isInline = !match && !className;
             return isInline ? (
-                <code className="bg-[#202736] px-1.5 py-0.5 rounded text-xs text-[#4DD4C4] font-mono" {...props}>{children}</code>
+                <code className="bg-[#202736] px-1.5 py-0.5 rounded text-[11px] text-[#4DD4C4] font-mono" {...props}>{children}</code>
             ) : (
-                <div className="bg-[#131924] p-3 rounded border border-[#202736] overflow-x-auto text-xs my-3 font-mono">
+                <div className="bg-[#131924] p-3 rounded border border-[#202736] overflow-x-auto text-[11px] my-3 font-mono">
                     <code className="text-[#4DD4C4]" {...props}>{children}</code>
                 </div>
             );
@@ -362,10 +341,10 @@ export function DailySetClient() {
 
     // Compact markdown components for discussion drawer (smaller fonts/spacing)
     const discussionMarkdownComponents = {
-        p: ({ node, ...props }: any) => <p className="mb-1 last:mb-0" {...props} />,
-        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-1 space-y-0.5 text-xs" {...props} />,
-        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-1 space-y-0.5 text-xs" {...props} />,
-        li: ({ node, ...props }: any) => <li className="text-xs" {...props} />,
+        p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0" {...props} />,
+        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-1.5 space-y-1 text-xs" {...props} />,
+        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-1.5 space-y-1 text-xs" {...props} />,
+        li: ({ node, ...props }: any) => <li className="text-xs mb-0.5 last:mb-0" {...props} />,
         pre: ({ node, children, ...props }: any) => <div className="my-2 first:mt-0 last:mb-0 rounded-md border border-[#202736] overflow-hidden" {...props}>{children}</div>,
         code: ({ node, className, children, ...props }: any) => {
             const match = /language-(\w+)/.exec(className || '');
@@ -423,8 +402,9 @@ export function DailySetClient() {
                 .catch(() => setExpectedOutput(null));
             // Reset + lazy-load votes and comment count
             setProblemVotes(null);
+            setProblemVotes(null);
             setCommentCount(0);
-            setDiscussionOpen(false);
+            setActiveDetailTab('question');
             setComments([]);
             api.getProblemVotes(id).then(v => setProblemVotes(v)).catch(() => setProblemVotes({ likes: 0, user_has_voted: false }));
             api.getCommentCount(id).then(({ count }) => setCommentCount(count)).catch(() => setCommentCount(0));
@@ -521,7 +501,7 @@ export function DailySetClient() {
 
     const handleOpenDiscussion = async () => {
         if (authStatus === 'unauthenticated') { setError('LOGIN_REQUIRED'); setShowResult(true); return; }
-        setDiscussionOpen(true);
+        setActiveDetailTab('discussion');
         if (!activeProblemId || comments.length > 0) return;
         setIsLoadingComments(true);
         try {
@@ -532,24 +512,24 @@ export function DailySetClient() {
     };
 
     const handlePostComment = async () => {
-        if (!activeProblemId || !newComment.trim()) return;
+        if (!activeProblemId || !newComment.trim() || newComment === SQL_TEMPLATE) return;
         try {
             const c = await api.postComment(activeProblemId, newComment.trim());
             setComments(prev => [...prev, c]);
             setCommentCount(n => n + 1);
-            setNewComment('');
+            setNewComment(SQL_TEMPLATE);
         } catch (e) { console.error(e); }
     };
 
     const handlePostReply = async (parentId: string) => {
-        if (!activeProblemId || !replyText.trim()) return;
+        if (!activeProblemId || !replyText.trim() || replyText === SQL_TEMPLATE) return;
         try {
             const c = await api.postComment(activeProblemId, replyText.trim(), parentId);
             setComments(prev => prev.map(com =>
                 com.id === parentId ? { ...com, replies: [...(com.replies || []), c], reply_count: (com.reply_count || 0) + 1 } : com
             ));
             setReplyingTo(null);
-            setReplyText('');
+            setReplyText(SQL_TEMPLATE);
         } catch (e) { console.error(e); }
     };
 
@@ -983,155 +963,297 @@ export function DailySetClient() {
                         ) : (
                             // STATE 2: Problem Details
                             <div className="flex-1 flex flex-col h-full bg-[#0d121c] overflow-hidden">
-                                <div className="h-11 border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0">
-                                    <button onClick={handleBackToList} className="flex items-center gap-2 text-xs font-mono text-zinc-400 hover:text-white transition-colors">
+                                {/* ── Tab Bar ── */}
+                                <div className="h-11 border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0 relative">
+                                    <button onClick={handleBackToList} className="flex items-center gap-2 text-xs font-mono text-zinc-400 hover:text-white transition-colors shrink-0">
                                         <ArrowLeft size={14} /> Back
                                     </button>
+                                    
+                                    {/* Center tabs */}
+                                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center h-full">
+                                        <button 
+                                            onClick={() => setActiveDetailTab('question')}
+                                            className={`flex items-center gap-1.5 h-full px-4 text-xs font-medium border-b-2 transition-colors ${activeDetailTab === 'question' ? 'text-white border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
+                                        >
+                                            Question
+                                        </button>
+                                        <button 
+                                            onClick={handleOpenDiscussion}
+                                            className={`flex items-center gap-1.5 h-full px-4 text-xs font-medium border-b-2 transition-colors ${activeDetailTab === 'discussion' ? 'text-white border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
+                                        >
+                                            <MessageSquare size={12} />
+                                            Discussion
+                                            {commentCount > 0 && <span className="ml-1 text-[10px] bg-[#4DD4C4]/15 text-[#4DD4C4] rounded-full px-1.5 font-mono leading-tight">{commentCount}</span>}
+                                        </button>
+                                    </div>
+
+                                    {/* Right: vote buttons */}
+                                    <div className="flex items-center gap-2.5 shrink-0">
+                                        <div className="relative group">
+                                            <button 
+                                                onClick={handleVote}
+                                                disabled={isVoting}
+                                                className={`flex items-center gap-1 text-xs transition-colors ${problemVotes?.user_has_voted ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-[#4DD4C4]'}`}
+                                            >
+                                                <ThumbsUp size={13} fill={problemVotes?.user_has_voted ? 'currentColor' : 'none'} />
+                                                {problemVotes !== null && <span className="font-mono text-[11px]">{problemVotes.likes}</span>}
+                                            </button>
+                                            {authStatus === 'unauthenticated' && <LoginTooltip text="Sign in to like" />}
+                                        </div>
+                                        <button 
+                                            onClick={() => openFeedbackModal('dislike', activeProblemId || undefined)}
+                                            title="Send feedback"
+                                            className="text-zinc-500 hover:text-amber-400 transition-colors"
+                                        >
+                                            <ThumbsDown size={13} />
+                                        </button>
+                                    </div>
                                 </div>
 
-                                <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                                    <div>
-                                        {activeProblem && (
-                                            <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border mb-3 ${getDiffStyle(activeProblem.difficulty).color} ${getDiffStyle(activeProblem.difficulty).bg} ${getDiffStyle(activeProblem.difficulty).border}`}>
-                                                {getDiffStyle(activeProblem.difficulty).label}
-                                            </span>
-                                        )}
-                                        <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">{activeProblem?.title}</h1>
-                                        <div className="flex gap-4 text-xs text-zinc-500 mb-6 font-mono font-medium">
-                                            <span className="flex items-center gap-1.5"><Timer size={12} /> {activeProblem?.estimated_time_minutes}m Avg</span>
-                                        </div>
-                                        <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2">Task</h3>
-                                        <div className="h-px w-full bg-[#202736] mb-4" />
-                                        <div className="text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap">
-                                            <ReactMarkdown components={markdownComponents}>{mainDesc}</ReactMarkdown>
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-2">
-                                        <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                            <Database size={12} /> Sample Data
-                                        </h3>
-                                        <div className="h-px w-full bg-[#202736] mb-4" />
-                                        {activeDatasets.length === 0 && <span className="text-xs text-zinc-600 font-mono italic">No datasets available</span>}
-                                        {activeDatasets.map((ds, idx) => {
-                                            // Derive column order from schema_sql (TEXT, order-preserving)
-                                            // to avoid JSONB alphabetical ordering of sample_rows keys
-                                            const colOrder = getColumnOrder(
-                                                ds.schema_sql,
-                                                ds.sample_rows[0]
-                                            );
-                                            return (
-                                            <div key={idx} className="border border-[#202736] rounded-lg overflow-hidden mb-4">
-                                                <div className="bg-[#131924] px-4 py-2 border-b border-[#202736]">
-                                                    <span className="text-xs font-bold text-zinc-400 font-mono">{ds.table_name}</span>
-                                                </div>
-                                                <div className="overflow-x-auto">
-                                                    <table className="w-full text-[11px] text-left">
-                                                        <thead className="bg-[#0b101c] text-zinc-500">
-                                                            <tr>
-                                                                {colOrder.map(h => (
-                                                                    <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">
-                                                                        <span>{h}</span>
-                                                                        {ds.column_types?.[h] && <span className="ml-2 text-[10px] text-[#4DD4C4]/70">({ds.column_types[h]})</span>}
-                                                                    </th>
-                                                                ))}
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {ds.sample_rows.map((row: any, i: number) => (
-                                                                <tr key={i} className="border-b border-[#202736]/50 last:border-0 text-zinc-400 font-mono hover:bg-white/[0.02]">
-                                                                    {colOrder.map((col: string) => (
-                                                                        <td key={col} className="px-3 py-1.5">{row[col]?.toString() ?? ''}</td>
-                                                                    ))}
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
+                                {/* ── Tab Content ── */}
+                                {activeDetailTab === 'question' ? (
+                                    <div className="flex-1 overflow-y-auto p-5 space-y-8">
+                                        <div>
+                                            {activeProblem && (
+                                                <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border mb-2 ${getDiffStyle(activeProblem.difficulty).color} ${getDiffStyle(activeProblem.difficulty).bg} ${getDiffStyle(activeProblem.difficulty).border}`}>
+                                                    {getDiffStyle(activeProblem.difficulty).label}
+                                                </span>
+                                            )}
+                                            <h1 className="text-xl font-bold text-white mb-1 tracking-tight">{activeProblem?.title}</h1>
+                                            <div className="flex gap-3 text-xs text-zinc-500 mb-3 font-mono font-medium">
+                                                <span className="flex items-center gap-1.5"><Timer size={11} /> {activeProblem?.estimated_time_minutes}m Avg</span>
                                             </div>
-                                            );
-                                        })}
-                                    </div>
+                                            <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Task</h3>
+                                            <div className="h-px w-full bg-[#202736] mb-3" />
+                                            <div className="text-zinc-400 text-sm leading-relaxed">
+                                                <ReactMarkdown components={markdownComponents}>{mainDesc}</ReactMarkdown>
+                                            </div>
+                                        </div>
 
-                                    <div className="pt-2">
-                                        <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2">Expected Output</h3>
-                                        <div className="h-px w-full bg-[#202736] mb-4" />
-                                        {(() => {
-                                            const output = executionResult?.expected || expectedOutput;
-                                            if (output && output.columns.length > 0) {
+                                        <div>
+                                            <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                                                <Database size={11} /> Datasets
+                                            </h3>
+                                            <div className="h-px w-full bg-[#202736] mb-3" />
+                                            {activeDatasets.length === 0 && <span className="text-xs text-zinc-600 font-mono italic">No datasets available</span>}
+                                            {activeDatasets.map((ds, idx) => {
+                                                const colOrder = getColumnOrder(ds.schema_sql, ds.sample_rows[0]);
                                                 return (
-                                                    <div className="border border-[#202736] rounded-lg overflow-hidden mb-4">
+                                                <div key={idx} className="mb-6 last:mb-0 space-y-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="h-4 w-1 bg-[#4DD4C4] rounded-full" />
+                                                        <span className="text-xs font-bold text-zinc-300 font-mono uppercase tracking-wider">{ds.table_name}</span>
+                                                    </div>
+
+                                                    {/* Schema Table */}
+                                                    <div className="border border-[#202736] rounded-lg overflow-hidden max-w-sm">
                                                         <table className="w-full text-[11px] text-left">
                                                             <thead className="bg-[#131924] text-zinc-400">
-                                                                <tr>{output.columns.map(h => <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">{h}</th>)}</tr>
+                                                                <tr>
+                                                                    <th className="px-3 py-1.5 border-b border-[#202736] font-semibold uppercase tracking-wider">Column Name</th>
+                                                                    <th className="px-3 py-1.5 border-b border-[#202736] font-semibold uppercase tracking-wider">Type</th>
+                                                                </tr>
                                                             </thead>
                                                             <tbody className="bg-[#0b101c]">
-                                                                {output.rows.map((row: any, i: number) => (
-                                                                    <tr key={i} className="border-b border-[#202736]/50 last:border-0 text-green-400/80 font-mono hover:bg-white/[0.02]">
-                                                                        {row.map((cell: any, j: number) => <td key={j} className="px-3 py-1.5">{cell?.toString()}</td>)}
+                                                                {colOrder.map(col => (
+                                                                    <tr key={col} className="border-b border-[#202736]/50 last:border-0 text-zinc-400 font-mono hover:bg-white/[0.02]">
+                                                                        <td className="px-3 py-1.5 font-medium">{col}</td>
+                                                                        <td className="px-3 py-1.5 text-[#4DD4C4]/80">{ds.column_types?.[col] || 'string'}</td>
                                                                     </tr>
                                                                 ))}
                                                             </tbody>
                                                         </table>
                                                     </div>
-                                                );
-                                            }
-                                            return <div className="p-4 bg-[#131924] rounded-lg border border-[#202736] text-xs text-zinc-500 font-mono italic">Loading expected output...</div>;
-                                        })()}
-                                    </div>
 
-                                    {hintText && (
-                                        <div className="pt-2">
-                                            <h3
-                                                className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2 cursor-pointer hover:text-white transition-colors flex justify-between items-center"
-                                                onClick={() => setShowHint(!showHint)}
-                                            >
-                                                <span>Hints</span>
-                                                <span className={`text-[10px] transform transition-transform ${showHint ? 'rotate-180' : ''}`}>&darr;</span>
-                                            </h3>
-                                            <div className="h-px w-full bg-[#202736] mb-4" />
-                                            {showHint && (
-                                                <div className="p-4 bg-[#131924] rounded-lg border border-[#202736] text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap mb-4">
-                                                    <ReactMarkdown components={markdownComponents}>{hintText}</ReactMarkdown>
+                                                    {/* Sample Data Table */}
+                                                    <div className="border border-[#202736] rounded-lg overflow-hidden shadow-xl">
+                                                        <div className="bg-[#131924]/50 px-3 py-1 text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-[#202736]">
+                                                            Sample Rows
+                                                        </div>
+                                                        <div className="overflow-x-auto">
+                                                            <table className="w-full text-[11px] text-left">
+                                                                <thead className="bg-[#0b101c] text-zinc-500">
+                                                                    <tr>
+                                                                        {colOrder.map(h => (
+                                                                            <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">{h}</th>
+                                                                        ))}
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="bg-[#0b101c]">
+                                                                    {ds.sample_rows.map((row: any, i: number) => (
+                                                                        <tr key={i} className="border-b border-[#202736]/50 last:border-0 text-zinc-400 font-mono hover:bg-white/[0.02]">
+                                                                            {colOrder.map((col: string) => (
+                                                                                <td key={col} className="px-3 py-1.5">{row[col]?.toString() ?? ''}</td>
+                                                                            ))}
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div>
+                                            <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Expected Output</h3>
+                                            <div className="h-px w-full bg-[#202736] mb-3" />
+                                            {(() => {
+                                                const output = executionResult?.expected || expectedOutput;
+                                                if (output && output.columns.length > 0) {
+                                                    return (
+                                                        <div className="border border-[#202736] rounded-lg overflow-hidden mb-3">
+                                                            <table className="w-full text-[11px] text-left">
+                                                                <thead className="bg-[#131924] text-zinc-400">
+                                                                    <tr>{output.columns.map(h => <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">{h}</th>)}</tr>
+                                                                </thead>
+                                                                <tbody className="bg-[#0b101c]">
+                                                                    {output.rows.map((row: any, i: number) => (
+                                                                        <tr key={i} className="border-b border-[#202736]/50 last:border-0 text-green-400/80 font-mono hover:bg-white/[0.02]">
+                                                                            {row.map((cell: any, j: number) => <td key={j} className="px-3 py-1.5">{cell?.toString()}</td>)}
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    );
+                                                }
+                                                return <div className="p-3 bg-[#131924] rounded-lg border border-[#202736] text-xs text-zinc-500 font-mono italic">Loading expected output...</div>;
+                                            })()}
+                                        </div>
+
+                                        {hintText && (
+                                            <div>
+                                                <h3 
+                                                    className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5 cursor-pointer hover:text-white transition-colors flex justify-between items-center"
+                                                    onClick={() => setShowHint(!showHint)}
+                                                >
+                                                    <span>Hints</span>
+                                                    <span className={`text-[10px] transform transition-transform ${showHint ? 'rotate-180' : ''}`}>&darr;</span>
+                                                </h3>
+                                                <div className="h-px w-full bg-[#202736] mb-3" />
+                                                {showHint && (
+                                                    <div className="p-3 bg-[#131924] rounded-lg border border-[#202736] text-zinc-400 text-sm leading-relaxed mb-3">
+                                                        <ReactMarkdown components={markdownComponents}>{hintText}</ReactMarkdown>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    /* ── Discussion List View ── */
+                                    <div className="flex-1 flex flex-col overflow-hidden">
+                                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                            {isLoadingComments && <div className="flex justify-center pt-8"><Loader2 size={20} className="animate-spin text-[#4DD4C4]" /></div>}
+                                            {!isLoadingComments && comments.length === 0 && (
+                                                <div className="text-center text-xs text-zinc-500 pt-10 space-y-2">
+                                                    <MessageCircle size={28} className="mx-auto text-zinc-700" />
+                                                    <p>No comments yet. Start the discussion!</p>
+                                                </div>
+                                            )}
+                                            {comments.map(comment => (
+                                                <div key={comment.id} className="space-y-2">
+                                                    <div className="bg-[#131924] rounded-lg p-3 border border-[#202736]">
+                                                        <div className="flex items-start justify-between mb-1.5">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-6 h-6 rounded-full bg-[#4DD4C4]/20 flex items-center justify-center text-[10px] font-bold text-[#4DD4C4] shrink-0">{comment.user.initials}</div>
+                                                                <div>
+                                                                    <span className="text-xs font-semibold text-zinc-300">{comment.user.full_name}</span>
+                                                                    <span className="text-[10px] text-zinc-600 ml-2">{new Date(comment.created_at).toLocaleDateString()}</span>
+                                                                </div>
+                                                            </div>
+                                                            {comment.is_own && (
+                                                                <button onClick={() => handleDeleteComment(comment.id)} className="text-zinc-600 hover:text-red-400 transition-colors ml-2 shrink-0"><Trash2 size={12} /></button>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-zinc-300 leading-relaxed">
+                                                            <ReactMarkdown components={discussionMarkdownComponents}>{comment.body}</ReactMarkdown>
+                                                        </div>
+                                                        {authStatus === 'authenticated' && (
+                                                            <button 
+                                                                onClick={() => setReplyingTo(replyingTo?.id === comment.id ? null : { id: comment.id, userName: comment.user.full_name })}
+                                                                className="mt-2 text-[10px] text-zinc-500 hover:text-[#4DD4C4] transition-colors flex items-center gap-1"
+                                                            ><Reply size={10} /> Reply</button>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    {comment.replies?.map((reply: any) => (
+                                                        <div key={reply.id} className="ml-5 bg-[#0b101c] rounded-lg p-3 border border-[#202736]/60">
+                                                            <div className="flex items-start justify-between mb-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-5 h-5 rounded-full bg-[#4DD4C4]/10 flex items-center justify-center text-[9px] font-bold text-[#4DD4C4] shrink-0">{reply.user.initials}</div>
+                                                                    <span className="text-[11px] font-semibold text-zinc-400">{reply.user.full_name}</span>
+                                                                    <span className="text-[9px] text-zinc-600">{new Date(reply.created_at).toLocaleDateString()}</span>
+                                                                </div>
+                                                                {reply.is_own && (
+                                                                    <button onClick={() => handleDeleteComment(reply.id, comment.id)} className="text-zinc-600 hover:text-red-400 transition-colors shrink-0"><Trash2 size={11} /></button>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-[11px] text-zinc-400 leading-relaxed">
+                                                                <ReactMarkdown components={discussionMarkdownComponents}>{reply.body}</ReactMarkdown>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+
+                                                    {replyingTo?.id === comment.id && (
+                                                        <div className="ml-5 space-y-2">
+                                                            <div className="flex items-center gap-4 px-1 border-b border-[#202736]/60">
+                                                                <button onClick={() => setIsReplyPreview(false)} className={`text-[10px] pb-1 border-b font-medium transition-colors ${!isReplyPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>Write</button>
+                                                                <button onClick={() => setIsReplyPreview(true)} className={`text-[10px] pb-1 border-b font-medium transition-colors ${isReplyPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>Preview</button>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                {isReplyPreview ? (
+                                                                    <div className="flex-1 bg-[#0b101c] border border-[#202736] rounded-xl p-3 min-h-[60px] text-zinc-300 text-[11px] overflow-auto">
+                                                                        {replyText.trim() ? <ReactMarkdown components={discussionMarkdownComponents}>{replyText}</ReactMarkdown> : <span className="text-zinc-600 italic">Nothing to preview...</span>}
+                                                                    </div>
+                                                                ) : (
+                                                                    <textarea value={replyText} onChange={e => setReplyText(e.target.value)} placeholder={`Reply to ${replyingTo?.userName ?? ''}...`} rows={5} className="flex-1 bg-[#0b101c] border border-[#202736] rounded-xl px-3 py-2 text-[11px] text-zinc-300 outline-none focus:border-[#4DD4C4]/50 resize-none" onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handlePostReply(comment.id); } }} />
+                                                                )}
+                                                                <div className="flex flex-col justify-end">
+                                                                    <button onClick={() => handlePostReply(comment.id)} className="text-[#4DD4C4] hover:text-white transition-colors px-2 pb-2"><Send size={15} /></button>
+                                                                </div>
+                                                            </div>
+                                                            <p className="text-[9px] text-zinc-600 italic px-1">Supports markdown. <span className="text-zinc-500 font-medium font-sans">Ctrl+Enter</span></p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="border-t border-[#202736] p-3 shrink-0 bg-[#0b101c]">
+                                            {authStatus === 'authenticated' ? (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-4 px-1 border-b border-[#202736]/60">
+                                                        <button onClick={() => setIsCommentPreview(false)} className={`text-[10px] pb-1 border-b font-medium uppercase tracking-wider transition-colors ${!isCommentPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>Write</button>
+                                                        <button onClick={() => setIsCommentPreview(true)} className={`text-[10px] pb-1 border-b font-medium uppercase tracking-wider transition-colors ${isCommentPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>Preview</button>
+                                                    </div>
+                                                    <div className="flex gap-2 items-end">
+                                                        {isCommentPreview ? (
+                                                            <div className="flex-1 bg-[#131924] border border-[#202736] rounded-xl px-3 py-3 min-h-[72px] text-zinc-300 text-xs overflow-auto">
+                                                                {newComment.trim() ? <ReactMarkdown components={discussionMarkdownComponents}>{newComment}</ReactMarkdown> : <span className="text-zinc-600 italic">Nothing to preview...</span>}
+                                                            </div>
+                                                        ) : (
+                                                            <textarea value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Write a comment... (use ```sql for code blocks)" rows={6} className="flex-1 bg-[#131924] border border-[#202736] rounded-xl px-3 py-2 text-xs text-zinc-300 outline-none focus:border-[#4DD4C4]/50 resize-none" onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handlePostComment(); } }} />
+                                                        )}
+                                                        <button onClick={handlePostComment} disabled={!newComment.trim() || newComment === SQL_TEMPLATE} className="text-[#4DD4C4] hover:text-white transition-colors disabled:text-zinc-800 px-2 pb-2" title={isCommentPreview ? "Post Comment" : "Ctrl+Enter to post"}>
+                                                            <Send size={18} />
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-[10px] text-zinc-600 px-1">Supports markdown. <span className="text-zinc-500 font-medium">Ctrl+Enter</span> to send.</p>
+                                                </div>
+                                            ) : (
+                                                <div className="text-center space-y-2">
+                                                    <p className="text-xs text-zinc-500">Sign in to join the discussion</p>
+                                                    <div className="flex gap-2 justify-center">
+                                                        <Link href="/login" className="px-4 py-1.5 bg-[#4DD4C4] text-[#080c16] rounded text-xs font-bold hover:bg-[#3dbdb0] transition-colors">Log In</Link>
+                                                        <Link href="/signup" className="px-4 py-1.5 bg-[#131924] border border-[#202736] text-white rounded text-xs font-bold hover:bg-[#202736] transition-colors">Sign Up</Link>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
-                                    )}
-                                </div>
-
-                                <div className="border-t border-[#202736] bg-[#0b101c] p-4 flex justify-between items-center text-zinc-400 shrink-0">
-                                    <div className="flex items-center gap-3">
-                                        <div className="relative group">
-                                            <button
-                                                onClick={handleVote}
-                                                disabled={isVoting}
-                                                className={`flex items-center gap-1.5 text-xs transition-colors ${problemVotes?.user_has_voted ? 'text-[#4DD4C4]' : 'hover:text-[#4DD4C4]'}`}
-                                            >
-                                                <ThumbsUp size={15} fill={problemVotes?.user_has_voted ? 'currentColor' : 'none'} />
-                                                {problemVotes !== null && <span className="font-mono text-xs">{problemVotes.likes}</span>}
-                                            </button>
-                                            {authStatus === 'unauthenticated' && <LoginTooltip text="Sign in to like" />}
-                                        </div>
-                                        <button
-                                            onClick={() => openFeedbackModal('dislike', activeProblemId || undefined)}
-                                            title="Send feedback about this problem"
-                                            className="flex items-center gap-1.5 hover:text-amber-400 transition-colors"
-                                        >
-                                            <ThumbsDown size={15} />
-                                        </button>
                                     </div>
-                                    <div className="relative group">
-                                        <button
-                                            onClick={handleOpenDiscussion}
-                                            className="flex items-center gap-1.5 text-xs font-medium hover:text-white transition-colors"
-                                        >
-                                            <MessageSquare size={14} />
-                                            Join Discussion
-                                            {commentCount > 0 && <span className="text-zinc-500 font-mono ml-1">({commentCount})</span>}
-                                        </button>
-                                        {authStatus === 'unauthenticated' && <LoginTooltip text="Sign in to join discussion" />}
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         )}
                     </Panel>
@@ -1311,195 +1433,6 @@ export function DailySetClient() {
                 </Group>
             </div>
 
-            {/* ══ Discussion Drawer ══ */}
-            {discussionOpen && (
-                <div
-                    className="absolute inset-y-0 right-0 bg-[#0d121c] border-l border-[#202736] flex flex-col z-[200] shadow-2xl"
-                    style={{ width: discussionWidth }}
-                    ref={discussionRef}
-                >
-                    {/* Drag handle for resizing discussion drawer */}
-                    <div
-                        className="absolute inset-y-0 left-0 w-1.5 cursor-col-resize hover:bg-[#4DD4C4]/20 transition-colors z-10 flex items-center justify-center"
-                        onMouseDown={handleDiscussionResizeStart}
-                    >
-                        <div className="h-8 w-0.5 bg-[#202736] rounded-full" />
-                    </div>
-                    <div className="h-11 border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0">
-                        <span className="text-sm font-bold text-white flex items-center gap-2">
-                            <MessageSquare size={14} className="text-[#4DD4C4]" /> Discussion
-                            {commentCount > 0 && <span className="text-xs text-zinc-500 font-normal">({commentCount})</span>}
-                        </span>
-                        <button onClick={() => setDiscussionOpen(false)} className="text-zinc-400 hover:text-white transition-colors"><X size={16} /></button>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {isLoadingComments && <div className="flex justify-center pt-8"><Loader2 size={20} className="animate-spin text-[#4DD4C4]" /></div>}
-                        {!isLoadingComments && comments.length === 0 && (
-                            <div className="text-center text-xs text-zinc-500 pt-10 space-y-2">
-                                <MessageCircle size={28} className="mx-auto text-zinc-700" />
-                                <p>No comments yet. Start the discussion!</p>
-                            </div>
-                        )}
-                        {comments.map(comment => (
-                            <div key={comment.id} className="space-y-2">
-                                <div className="bg-[#131924] rounded-lg p-3 border border-[#202736]">
-                                    <div className="flex items-start justify-between mb-1.5">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-full bg-[#4DD4C4]/20 flex items-center justify-center text-[10px] font-bold text-[#4DD4C4] shrink-0">{comment.user.initials}</div>
-                                            <div>
-                                                <span className="text-xs font-semibold text-zinc-300">{comment.user.full_name}</span>
-                                                <span className="text-[10px] text-zinc-600 ml-2">{new Date(comment.created_at).toLocaleDateString()}</span>
-                                            </div>
-                                        </div>
-                                        {comment.is_own && (
-                                            <button onClick={() => handleDeleteComment(comment.id)} className="text-zinc-600 hover:text-red-400 transition-colors ml-2 shrink-0"><Trash2 size={12} /></button>
-                                        )}
-                                    </div>
-                                    <div className="text-xs text-zinc-300 leading-relaxed">
-                                        <ReactMarkdown components={discussionMarkdownComponents}>{comment.body}</ReactMarkdown>
-                                    </div>
-                                    {authStatus === 'authenticated' && (
-                                        <button
-                                            onClick={() => setReplyingTo(replyingTo?.id === comment.id ? null : { id: comment.id, userName: comment.user.full_name })}
-                                            className="mt-2 text-[10px] text-zinc-500 hover:text-[#4DD4C4] transition-colors flex items-center gap-1"
-                                        ><Reply size={10} /> Reply</button>
-                                    )}
-                                </div>
-                                {comment.replies?.map((reply: any) => (
-                                    <div key={reply.id} className="ml-5 bg-[#0b101c] rounded-lg p-3 border border-[#202736]/60">
-                                        <div className="flex items-start justify-between mb-1">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-5 h-5 rounded-full bg-[#4DD4C4]/10 flex items-center justify-center text-[9px] font-bold text-[#4DD4C4] shrink-0">{reply.user.initials}</div>
-                                                <span className="text-[11px] font-semibold text-zinc-400">{reply.user.full_name}</span>
-                                                <span className="text-[9px] text-zinc-600">{new Date(reply.created_at).toLocaleDateString()}</span>
-                                            </div>
-                                            {reply.is_own && (
-                                                <button onClick={() => handleDeleteComment(reply.id, comment.id)} className="text-zinc-600 hover:text-red-400 transition-colors shrink-0"><Trash2 size={11} /></button>
-                                            )}
-                                        </div>
-                                        <div className="text-[11px] text-zinc-400 leading-relaxed">
-                                            <ReactMarkdown components={discussionMarkdownComponents}>{reply.body}</ReactMarkdown>
-                                        </div>
-                                    </div>
-                                ))}
-                                {replyingTo?.id === comment.id && (
-                                    <div className="ml-5 space-y-2">
-                                        <div className="flex items-center gap-4 px-1 border-b border-[#202736]/60">
-                                            <button 
-                                                onClick={() => setIsReplyPreview(false)}
-                                                className={`text-[10px] pb-1 border-b font-medium transition-colors ${!isReplyPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
-                                            >Write</button>
-                                            <button 
-                                                onClick={() => setIsReplyPreview(true)}
-                                                className={`text-[10px] pb-1 border-b font-medium transition-colors ${isReplyPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
-                                            >Preview</button>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            {isReplyPreview ? (
-                                                <div className="flex-1 bg-[#0b101c] border border-[#202736] rounded-xl p-3 min-h-[60px] text-zinc-300 text-[11px] overflow-auto">
-                                                    {replyText.trim() ? (
-                                                        <ReactMarkdown components={discussionMarkdownComponents}>{replyText}</ReactMarkdown>
-                                                    ) : <span className="text-zinc-600 italic">Nothing to preview...</span>}
-                                                </div>
-                                            ) : (
-                                                <textarea
-                                                    value={replyText}
-                                                    onChange={e => setReplyText(e.target.value)}
-                                                    placeholder={`Reply to ${replyingTo?.userName ?? ''}...`}
-                                                    rows={2}
-                                                    className="flex-1 bg-[#0b101c] border border-[#202736] rounded-xl px-3 py-2 text-[11px] text-zinc-300 outline-none focus:border-[#4DD4C4]/50 resize-none"
-                                                    onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handlePostReply(comment.id); } }}
-                                                />
-                                            )}
-                                            <div className="flex flex-col justify-end">
-                                                <button onClick={() => handlePostReply(comment.id)} className="text-[#4DD4C4] hover:text-white transition-colors px-2 pb-2"><Send size={15} /></button>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 px-1 group relative">
-                                            <p className="text-[9px] text-zinc-600 italic">Supports markdown. <span className="text-zinc-500 font-medium font-sans">Ctrl+Enter</span></p>
-                                            <div className="relative group/tooltip">
-                                                <Info size={10} className="text-zinc-600 hover:text-[#4DD4C4] cursor-help transition-colors" />
-                                                <div className="absolute bottom-full right-0 mb-2 w-40 bg-[#1a212e] border border-[#202736] rounded-lg p-2 shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-[300] transform translate-y-1 group-hover/tooltip:translate-y-0">
-                                                    <div className="bg-[#0b101c] p-1.5 rounded font-mono text-[8px] text-[#4DD4C4] border border-[#202736]">
-                                                        ```sql<br/>
-                                                        SELECT...<br/>
-                                                        ```
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                    <div className="border-t border-[#202736] p-4 shrink-0 bg-[#0b101c]">
-                        {authStatus === 'authenticated' ? (
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-4 px-1 border-b border-[#202736]/60">
-                                    <button 
-                                        onClick={() => setIsCommentPreview(false)}
-                                        className={`text-[10px] pb-1 border-b font-medium uppercase tracking-wider transition-colors ${!isCommentPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
-                                    >Write</button>
-                                    <button 
-                                        onClick={() => setIsCommentPreview(true)}
-                                        className={`text-[10px] pb-1 border-b font-medium uppercase tracking-wider transition-colors ${isCommentPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
-                                    >Preview</button>
-                                </div>
-                                <div className="flex gap-2 items-end">
-                                    {isCommentPreview ? (
-                                        <div className="flex-1 bg-[#131924] border border-[#202736] rounded-xl px-3 py-3 min-h-[80px] text-zinc-300 text-xs overflow-auto">
-                                            {newComment.trim() ? (
-                                                <ReactMarkdown components={discussionMarkdownComponents}>{newComment}</ReactMarkdown>
-                                            ) : <span className="text-zinc-600 italic">Nothing to preview...</span>}
-                                        </div>
-                                    ) : (
-                                        <textarea
-                                            value={newComment}
-                                            onChange={e => setNewComment(e.target.value)}
-                                            placeholder="Write a comment... (use ```sql for code blocks)"
-                                            rows={3}
-                                            className="flex-1 bg-[#131924] border border-[#202736] rounded-xl px-3 py-2 text-xs text-zinc-300 outline-none focus:border-[#4DD4C4]/50 resize-none"
-                                            onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handlePostComment(); } }}
-                                        />
-                                    )}
-                                    <button 
-                                        onClick={handlePostComment} 
-                                        disabled={!newComment.trim()} 
-                                        className="text-[#4DD4C4] hover:text-white transition-colors disabled:text-zinc-800 px-2 pb-2"
-                                        title={isCommentPreview ? "Post Comment" : "Ctrl+Enter to post"}
-                                    >
-                                        <Send size={18} />
-                                    </button>
-                                </div>
-                                <div className="flex items-center gap-1.5 px-1 group relative">
-                                    <p className="text-[10px] text-zinc-600">Supports markdown. <span className="text-zinc-500 font-medium">Ctrl+Enter</span> to send.</p>
-                                    <div className="relative group/tooltip">
-                                        <Info size={11} className="text-zinc-600 hover:text-[#4DD4C4] cursor-help transition-colors" />
-                                        <div className="absolute bottom-full right-0 mb-2 w-48 bg-[#1a212e] border border-[#202736] rounded-lg p-2.5 shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-[300] transform translate-y-1 group-hover/tooltip:translate-y-0">
-                                            <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Code Block Sample</p>
-                                            <div className="bg-[#0b101c] p-2 rounded font-mono text-[9px] text-[#4DD4C4] leading-relaxed border border-[#202736]">
-                                                ```sql<br/>
-                                                SELECT * FROM users;<br/>
-                                                ```
-                                            </div>
-                                            <p className="text-[9px] text-zinc-500 mt-1.5 leading-tight italic">Triple backticks (```) to open & close.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="text-center space-y-2">
-                                <p className="text-xs text-zinc-500">Sign in to join the discussion</p>
-                                <div className="flex gap-2 justify-center">
-                                    <Link href="/login" className="px-4 py-1.5 bg-[#4DD4C4] text-[#080c16] rounded text-xs font-bold hover:bg-[#3dbdb0] transition-colors">Log In</Link>
-                                    <Link href="/signup" className="px-4 py-1.5 bg-[#131924] border border-[#202736] text-white rounded text-xs font-bold hover:bg-[#202736] transition-colors">Sign Up</Link>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
 
 
 
