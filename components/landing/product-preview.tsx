@@ -169,6 +169,14 @@ export function ProductPreview() {
     }
   }, [activeQuestion]);
 
+  const handleRun = () => {
+    setIsRunning(true);
+    setTimeout(() => {
+      setIsRunning(false);
+      setShowResult(true);
+    }, 400); // Reduced delay to 400ms for responsiveness
+  };
+
   // Typing effect
   useEffect(() => {
     if (!isTyping || !activeQuestion) return;
@@ -189,14 +197,6 @@ export function ProductPreview() {
 
     return () => clearInterval(interval);
   }, [isTyping, activeQuestion]);
-
-  const handleRun = () => {
-    setIsRunning(true);
-    setTimeout(() => {
-      setIsRunning(false);
-      setShowResult(true);
-    }, 400); // Reduced delay to 400ms for responsiveness
-  };
 
 
   return (

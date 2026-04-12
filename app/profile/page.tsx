@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Edit2, Search, Loader2, Sparkles, User, Briefcase, GraduationCap, History, BarChart2, Flame, X, Code, Camera, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Edit2, Search, Loader2, Sparkles, User, Briefcase, GraduationCap, History, BarChart2, Flame, X, Code, Camera, CheckCircle2, AlertCircle } from "lucide-react";
 import { useRef } from "react";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
@@ -109,7 +109,8 @@ export default function ProfilePage() {
                     full_name: mockProfile.full_name,
                     occupation: mockProfile.occupation,
                     job_role: mockProfile.job_role,
-                    experience_years: mockProfile.experience_years
+                    experience_years: mockProfile.experience_years,
+                    avatar_url: mockProfile.avatar_url || ""
                 });
                 setIsLoading(false);
                 return;
