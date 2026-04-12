@@ -1,6 +1,9 @@
+"use client";
+
 import { Check, Shield, Star, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { PracticeLink } from "@/components/landing/practice-link";
 
 export function PricingTeaser() {
   return (
@@ -48,9 +51,10 @@ export function PricingTeaser() {
             </div>
 
             <div className="mt-8 pt-8 border-t border-white/5">
-              <Button asChild variant="outline" className="w-full border-white/10 hover:bg-white/5 text-zinc-300 hover:text-white">
-                <Link href="/waitlist">Start for Free</Link>
-              </Button>
+              <PracticeLink
+                label="Start for Free"
+                className="w-full inline-flex items-center justify-center rounded-md border border-white/10 hover:bg-white/5 text-zinc-300 hover:text-white text-sm font-medium h-10 px-4 py-2 transition-colors"
+              />
             </div>
           </div>
 

@@ -59,6 +59,14 @@ export const api = {
     getStats: () => fetchApi<any>('/me/stats'),
     getRecentSubmissions: () => fetchApi<any[]>('/me/submissions'),
     getHeatmap: () => fetchApi<Record<string, number>>('/me/heatmap'),
+    getCloudinarySignature: () => fetchApi<{
+        signature: string;
+        timestamp: number;
+        api_key: string;
+        cloud_name: string;
+        public_id: string;
+        folder: string;
+    }>('/me/cloudinary-signature'),
 
     // Solutions
     getSavedSolution: (problemId: string) =>

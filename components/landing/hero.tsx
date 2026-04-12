@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { PracticeLink } from "@/components/landing/practice-link";
 
 export function Hero() {
   return (
@@ -51,13 +52,11 @@ export function Hero() {
 
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-2">
-          <Link
-            href="/waitlist"
+          <PracticeLink
+            label="Start your daily practice"
+            showArrow
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#30B5A6] hover:bg-[#2A9D90] text-[#0a0f1c] font-medium transition-all duration-200 shadow-lg shadow-[#30B5A6]/20 hover:shadow-[#30B5A6]/30"
-          >
-            Start your daily practice
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+          />
           <Link
             href="#how-it-works"
             className="inline-flex items-center px-6 py-3 rounded-lg border border-zinc-700 hover:border-zinc-600 text-zinc-300 hover:text-white font-medium transition-all duration-200"

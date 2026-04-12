@@ -45,6 +45,7 @@ interface Problem {
     difficulty: string;
     description: string;
     estimated_time_minutes: number;
+    is_active: boolean;
     created_at?: string;
 }
 
@@ -182,11 +183,12 @@ export default function AdminDashboard() {
         setProblemDatasets([]);
         setEditingDatasets([]);
         try {
-            const probRes = await fetch(`${API_URL}/problems/${id}`);
+            // Use admin endpoint to get full details including is_active
+            const probRes = await fetchWithAuth(`${API_URL}/admin/problems/${id}`);
             if (probRes.ok) {
                 const p = await probRes.json();
                 setSelectedProblem(p);
-                setEditForm({ ...p });
+                setEditForm({ ...p, solution: p.solution || { reference_query: '', order_sensitive: false, notes: '' } });
             }
             
             const comRes = await fetchWithAuth(`${API_URL}/admin/problems/${id}/comments`);
@@ -202,7 +204,7 @@ export default function AdminDashboard() {
                 setProblemComments(grouped);
             }
 
-            // Load datasets
+            // Load datasets from datasets endpoint (still needed for editingDatasets)
             const dsRes = await fetch(`${API_URL}/problems/${id}/datasets`);
             if (dsRes.ok) {
                 const ds = await dsRes.json();
@@ -244,6 +246,44 @@ export default function AdminDashboard() {
                 loadProblemDetails(selectedProblem.id);
             } else {
                 showToast('error', 'Failed to update problem');
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleTogglePublish = async () => {
+        if (!selectedProblem || !editForm) return;
+        const newStatus = !editForm.is_active;
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/problems/${selectedProblem.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ is_active: newStatus })
+            });
+            if (res.ok) {
+                showToast('success', newStatus ? '✓ Problem Published!' : 'Problem set to Draft');
+                setEditForm({ ...editForm, is_active: newStatus });
+                loadProblems();
+            } else {
+                showToast('error', 'Failed to update status');
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleUpdateSolution = async () => {
+        if (!selectedProblem || !editForm?.solution) return;
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/problems/${selectedProblem.id}/solution`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    reference_query: editForm.solution.reference_query,
+                    order_sensitive: editForm.solution.order_sensitive,
+                    notes: editForm.solution.notes,
+                })
+            });
+            if (res.ok) {
+                showToast('success', 'Solution updated!');
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showToast('error', err.detail || 'Failed to update solution');
             }
         } catch (e) { console.error(e); }
     };
@@ -793,6 +833,11 @@ export default function AdminDashboard() {
                                                         <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${getDiffStyle(p.difficulty).color} ${getDiffStyle(p.difficulty).bg} ${getDiffStyle(p.difficulty).border}`}>
                                                             {getDiffStyle(p.difficulty).label}
                                                         </span>
+                                                        {!p.is_active && (
+                                                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border border-zinc-600 text-zinc-400 bg-zinc-800/50">
+                                                                DRAFT
+                                                            </span>
+                                                        )}
                                                         <span className="text-xs text-zinc-500 flex items-center gap-1">
                                                             <Clock size={12} /> {p.estimated_time_minutes} min
                                                         </span>
@@ -833,6 +878,19 @@ export default function AdminDashboard() {
                                         <div className="bg-[#121826] border border-[#202736] rounded-xl p-6 space-y-4">
                                             <div className="flex items-center justify-between pb-4 border-b border-[#202736]">
                                                 <h3 className="text-lg font-bold flex items-center gap-2"><Edit3 size={18} className="text-[#4DD4C4]" /> Edit Details</h3>
+                                                {/* Publish/Draft toggle */}
+                                                <button
+                                                    onClick={handleTogglePublish}
+                                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                                                        editForm.is_active
+                                                            ? 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400'
+                                                            : 'bg-zinc-800 border-zinc-600 text-zinc-400 hover:bg-green-500/10 hover:border-green-500/30 hover:text-green-400'
+                                                    }`}
+                                                    title={editForm.is_active ? 'Click to set to Draft' : 'Click to Publish'}
+                                                >
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${editForm.is_active ? 'bg-green-400' : 'bg-zinc-500'}`} />
+                                                    {editForm.is_active ? 'Published' : 'Draft — Click to Publish'}
+                                                </button>
                                             </div>
                                             <div className="space-y-4">
                                                 <div>
@@ -887,6 +945,52 @@ export default function AdminDashboard() {
                                                     </Button>
                                                 </div>
                                             ))}
+                                        </div>
+
+                                        {/* Solution Editor */}
+                                        <div className="bg-[#121826] border border-[#202736] rounded-xl p-6 space-y-4">
+                                            <div className="flex items-center justify-between pb-4 border-b border-[#202736]">
+                                                <h3 className="text-lg font-bold flex items-center gap-2"><Code size={18} className="text-[#4DD4C4]" /> Reference Solution</h3>
+                                                {!editForm?.solution?.reference_query && (
+                                                    <span className="text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded font-bold">NO SOLUTION YET</span>
+                                                )}
+                                            </div>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-xs text-zinc-500 mb-1">Reference Query (SQL)</label>
+                                                    <textarea
+                                                        className="w-full bg-[#080c16] border border-[#202736] p-2 rounded h-32 font-mono text-xs text-white focus:border-[#4DD4C4] focus:outline-none"
+                                                        placeholder="SELECT ... FROM ..."
+                                                        value={editForm?.solution?.reference_query || ''}
+                                                        onChange={e => setEditForm({ ...editForm, solution: { ...editForm.solution, reference_query: e.target.value } })}
+                                                    />
+                                                </div>
+                                                <label className="flex items-center gap-3 text-xs text-zinc-400 cursor-pointer select-none">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={editForm?.solution?.order_sensitive || false}
+                                                        onChange={e => setEditForm({ ...editForm, solution: { ...editForm.solution, order_sensitive: e.target.checked } })}
+                                                        className="w-3.5 h-3.5 rounded accent-[#4DD4C4]"
+                                                    />
+                                                    Order Sensitive (row order must match exactly)
+                                                </label>
+                                                <div>
+                                                    <label className="block text-xs text-zinc-500 mb-1">Notes (optional)</label>
+                                                    <textarea
+                                                        className="w-full bg-[#080c16] border border-[#202736] p-2 rounded h-16 text-xs text-white focus:border-[#4DD4C4] focus:outline-none"
+                                                        placeholder="Edge cases, hints..."
+                                                        value={editForm?.solution?.notes || ''}
+                                                        onChange={e => setEditForm({ ...editForm, solution: { ...editForm.solution, notes: e.target.value } })}
+                                                    />
+                                                </div>
+                                                <Button
+                                                    onClick={handleUpdateSolution}
+                                                    disabled={!editForm?.solution?.reference_query}
+                                                    className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold text-xs disabled:opacity-50"
+                                                >
+                                                    <Save size={14} className="mr-2" /> Save Solution
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                     
@@ -1204,7 +1308,7 @@ export default function AdminDashboard() {
                                 <input type="date" className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white" value={scheduleForm.date} onChange={e => setScheduleForm({ ...scheduleForm, date: e.target.value })} />
                             </div>
 
-                            {/* Problem Selectors */}
+                            {/* Problem Selectors — only show published problems */}
                             {(['easy', 'medium', 'advanced'] as const).map(diff => (
                                 <div key={diff}>
                                     <label className="block text-sm text-zinc-500 mb-1 capitalize">{diff} Problem</label>
@@ -1214,10 +1318,15 @@ export default function AdminDashboard() {
                                         onChange={e => setScheduleForm({ ...scheduleForm, [`${diff}_problem_id`]: e.target.value })}
                                     >
                                         <option value="">Select a {diff} problem...</option>
-                                        {problems.filter(p => p.difficulty === diff).map(p => (
+                                        {problems.filter(p => p.difficulty === diff && p.is_active).map(p => (
                                             <option key={p.id} value={p.id}>{p.title}</option>
                                         ))}
                                     </select>
+                                    {problems.filter(p => p.difficulty === diff && !p.is_active).length > 0 && (
+                                        <p className="text-[10px] text-zinc-600 mt-1 italic">
+                                            {problems.filter(p => p.difficulty === diff && !p.is_active).length} draft(s) hidden — publish them first
+                                        </p>
+                                    )}
                                 </div>
                             ))}
 
