@@ -2,6 +2,7 @@
 
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { PracticeLink } from "@/components/landing/practice-link";
 
 export function CTASection() {
     return (
@@ -44,10 +45,11 @@ export function CTASection() {
                                 ))}
                             </ul>
 
-                            <Link href="/waitlist" className="inline-flex items-center justify-center gap-2 whitespace-nowrap bg-[#4DD4C4] text-[#080c16] font-bold hover:bg-[#3dbdb0] shadow-[0_0_60px_rgba(77,212,196,0.15)] hover:shadow-[0_0_80px_rgba(77,212,196,0.25)] transition-all duration-300 h-14 rounded-lg px-10 text-base w-full">
-                                Join early access
-                                <ArrowRight className="w-5 h-5" />
-                            </Link>
+                            <PracticeLink
+                                label="Join early access"
+                                showArrow
+                                className="inline-flex items-center justify-center gap-2 whitespace-nowrap bg-[#4DD4C4] text-[#080c16] font-bold hover:bg-[#3dbdb0] shadow-[0_0_60px_rgba(77,212,196,0.15)] hover:shadow-[0_0_80px_rgba(77,212,196,0.25)] transition-all duration-300 h-14 rounded-lg px-10 text-base w-full"
+                            />
                         </div>
 
                     </div>

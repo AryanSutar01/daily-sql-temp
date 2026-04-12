@@ -18,8 +18,10 @@ export function Navbar() {
   const pathname = usePathname();
   const isAdmin = pathname.startsWith("/admin");
 
+  const practiceHref = user ? "/practice/daily" : "/login";
+
   const navItems = [
-    { name: "Practice", href: "/waitlist" },
+    { name: "Practice", href: practiceHref },
     { name: "Pricing", href: "/#pricing" },
     { name: "FAQ", href: "/#faq" },
     { name: "Contact", href: "/contact" },
@@ -136,13 +138,21 @@ export function Navbar() {
                   </div>
                 </>
               ) : (
-                <Link
-                  href="/waitlist"
-                  className="text-sm text-[#4DD4C4] hover:text-[#30B5A6] transition-colors flex items-center gap-1 group"
-                >
-                  Join early access
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                </Link>
+                <>
+                  <Link
+                    href="/login"
+                    className="text-sm text-zinc-400 hover:text-white transition-colors"
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    href="/waitlist"
+                    className="text-sm text-[#4DD4C4] hover:text-[#30B5A6] transition-colors flex items-center gap-1 group"
+                  >
+                    Join early access
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                </>
               )}
             </div>
           )}
@@ -186,6 +196,13 @@ export function Navbar() {
             ))}
             {user ? (
               <>
+                <Link
+                  href="/practice/daily"
+                  className="block text-sm text-[#4DD4C4] hover:text-white transition-colors font-medium"
+                  onClick={() => setIsOpen(false)}
+                >
+                  Open Practice
+                </Link>
                 <Link
                   href="/profile"
                   className="block text-sm text-zinc-300 hover:text-white transition-colors"

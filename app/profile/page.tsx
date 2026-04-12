@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Edit2, Search, Loader2, Sparkles, User, Briefcase, GraduationCap, History, BarChart2, Flame, X, Code } from "lucide-react";
+import { ArrowLeft, Edit2, Search, Loader2, Sparkles, User, Briefcase, GraduationCap, History, BarChart2, Flame, X, Code, Camera, CheckCircle2 } from "lucide-react";
+import { useRef } from "react";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -49,9 +50,21 @@ export default function ProfilePage() {
         full_name: "",
         occupation: "",
         job_role: "",
-        experience_years: 0
+        experience_years: 0,
+        avatar_url: ""
     });
     const [isSaving, setIsSaving] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Auto-clear toast
+    useEffect(() => {
+        if (toast) {
+            const timer = setTimeout(() => setToast(null), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [toast]);
 
     useEffect(() => {
         async function loadProfile() {
@@ -120,7 +133,8 @@ export default function ProfilePage() {
                         full_name: data.full_name || "",
                         occupation: data.occupation || "",
                         job_role: data.job_role || "",
-                        experience_years: data.experience_years || 0
+                        experience_years: data.experience_years || 0,
+                        avatar_url: data.avatar_url || ""
                     });
                 }
             } catch (err) {
@@ -147,6 +161,66 @@ export default function ProfilePage() {
             console.error("Failed to save profile", err);
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handlePhotoClick = () => {
+        if (fileInputRef.current) fileInputRef.current.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Basic validation
+        if (!file.type.startsWith('image/')) {
+            setToast({ type: 'error', message: "Please select a valid image file (PNG, JPG, etc)." });
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            setToast({ type: 'error', message: "Image is too large. Please select a photo under 2MB." });
+            return;
+        }
+
+        setIsUploading(true);
+        setToast(null);
+        try {
+            // 1. Get signature from backend
+            const sigData = await api.getCloudinarySignature();
+
+            // 2. Upload to Cloudinary
+            const fd = new FormData();
+            fd.append("file", file);
+            fd.append("api_key", sigData.api_key);
+            fd.append("timestamp", String(sigData.timestamp));
+            fd.append("signature", sigData.signature);
+            fd.append("public_id", sigData.public_id);
+            fd.append("folder", sigData.folder);
+
+            const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${sigData.cloud_name}/image/upload`, {
+                method: "POST",
+                body: fd
+            });
+
+            if (!uploadRes.ok) throw new Error("Cloudinary upload failed");
+
+            const result = await uploadRes.json();
+            const newAvatarUrl = result.secure_url;
+
+            // 3. Update local state and backend
+            const updatedFormData = { ...formData, avatar_url: newAvatarUrl };
+            setFormData(updatedFormData);
+            await api.updateProfile(updatedFormData);
+            
+            // Update profile state to reflect change immediately
+            setProfile((prev: any) => ({ ...prev, avatar_url: newAvatarUrl }));
+            setToast({ type: 'success', message: "Profile photo updated successfully!" });
+            
+        } catch (err) {
+            console.error("Upload failed", err);
+            setToast({ type: 'error', message: "Failed to upload photo. Please try again." });
+        } finally {
+            setIsUploading(false);
         }
     };
 
@@ -411,13 +485,32 @@ export default function ProfilePage() {
                     <div className="group relative bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-8 flex flex-col items-center text-center shadow-xl hover:border-[#4DD4C4]/30 transition-all duration-500 overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-br from-[#4DD4C4]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                         
-                        <div className="relative w-[110px] h-[110px] rounded-[32px] mb-6 p-1 border border-[#4DD4C4]/30 bg-[#4DD4C4]/5 group-hover:border-[#4DD4C4]/60 group-hover:bg-[#4DD4C4]/10 transition-all duration-500 shadow-[0_0_15px_rgba(77,212,196,0.1)] group-hover:shadow-[0_0_20px_rgba(77,212,196,0.3)]">
-                            <div className="w-full h-full rounded-[28px] overflow-hidden bg-[#080c16] flex justify-center items-center border border-[#202736]/50">
+                        <div 
+                            onClick={handlePhotoClick}
+                            className="relative w-[110px] h-[110px] rounded-[32px] mb-6 p-1 border border-[#4DD4C4]/30 bg-[#4DD4C4]/5 group-hover:border-[#4DD4C4]/60 group-hover:bg-[#4DD4C4]/10 transition-all duration-500 shadow-[0_0_15px_rgba(77,212,196,0.1)] group-hover:shadow-[0_0_20px_rgba(77,212,196,0.3)] cursor-pointer overflow-hidden"
+                        >
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={handleFileChange} 
+                                className="hidden" 
+                                accept="image/*"
+                            />
+                            <div className="w-full h-full rounded-[28px] overflow-hidden bg-[#080c16] flex justify-center items-center border border-[#202736]/50 relative group/avatar">
                                 {profile.avatar_url ? (
                                     <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" />
                                 ) : (
                                     <User size={40} className="text-zinc-600" />
                                 )}
+                                
+                                {/* Hover Overlay */}
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300">
+                                    {isUploading ? (
+                                        <Loader2 size={24} className="text-[#4DD4C4] animate-spin" />
+                                    ) : (
+                                        <Camera size={24} className="text-white" />
+                                    )}
+                                </div>
                             </div>
                         </div>
                         
@@ -744,7 +837,32 @@ export default function ProfilePage() {
                 </div>
             </div>
         )}
+
+        {/* ══ Auth Toast ══ */}
+        {toast && (
+            <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[1000] animate-in slide-in-from-bottom-5 duration-300">
+                <div className={`bg-[#0d121c] border-2 ${toast.type === 'error' ? 'border-red-500/50 shadow-[0_0_40px_rgba(239,68,68,0.2)]' : 'border-[#4DD4C4]/50 shadow-[0_0_40px_rgba(77,212,196,0.2)]'} rounded-2xl p-4 flex flex-col gap-3 min-w-[320px] backdrop-blur-md`}>
+                    <div className="flex items-start gap-4">
+                        <div className={`w-12 h-12 rounded-xl ${toast.type === 'error' ? 'bg-red-500/10 border border-red-500/20' : 'bg-[#4DD4C4]/10 border border-[#4DD4C4]/20'} flex items-center justify-center shrink-0`}>
+                            {toast.type === 'error' ? (
+                                <AlertCircle className="text-red-500" size={24} />
+                            ) : (
+                                <CheckCircle2 className="text-[#4DD4C4]" size={24} />
+                            )}
+                        </div>
+                        <div className="flex-1 pt-1">
+                            <h3 className="text-white font-bold text-sm text-left">{toast.type === 'error' ? 'Upload Failed' : 'Success'}</h3>
+                            <p className={`${toast.type === 'error' ? 'text-red-400' : 'text-zinc-400'} text-xs mt-1 text-left leading-relaxed`}>{toast.message}</p>
+                        </div>
+                        <button onClick={() => setToast(null)} className="text-zinc-500 hover:text-white transition-colors pt-1">
+                            <X size={16} />
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
         </>
     );
 }
+
 //redep

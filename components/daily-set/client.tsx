@@ -17,6 +17,7 @@ import {
     MessageSquare,
     TerminalSquare,
     ChevronRight,
+    ChevronLeft,
     ChevronDown,
     ArrowLeft,
     User,
@@ -414,6 +415,22 @@ export function DailySetClient() {
     };
 
     const handleBackToList = () => setViewingDetails(false);
+
+    // ── Today's Set ordered list for navigation ──────────────
+    const todaysProblemIds = (['easy', 'medium', 'advanced'] as const)
+        .map(level => dailySet?.[level as keyof DailyPractice] as string | undefined)
+        .filter((id): id is string => !!id && problems.some(p => p.id === id));
+
+    const navigationList = activeSidebarTab === 'today' ? todaysProblemIds : filteredProblems.map(p => p.id);
+    const currentNavIndex = activeProblemId ? navigationList.indexOf(activeProblemId) : -1;
+
+    const handlePrevProblem = () => {
+        if (currentNavIndex > 0) handleProblemSelect(navigationList[currentNavIndex - 1]);
+    };
+
+    const handleNextProblem = () => {
+        if (currentNavIndex < navigationList.length - 1) handleProblemSelect(navigationList[currentNavIndex + 1]);
+    };
 
     const handleRun = async () => {
         if (!activeProblemId) return;
@@ -965,9 +982,33 @@ export function DailySetClient() {
                             <div className="flex-1 flex flex-col h-full bg-[#0d121c] overflow-hidden">
                                 {/* ── Tab Bar ── */}
                                 <div className="h-11 border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0 relative">
-                                    <button onClick={handleBackToList} className="flex items-center gap-2 text-xs font-mono text-zinc-400 hover:text-white transition-colors shrink-0">
-                                        <ArrowLeft size={14} /> Back
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={handleBackToList} className="flex items-center gap-2 text-xs font-mono text-zinc-400 hover:text-white transition-colors shrink-0">
+                                            <ArrowLeft size={14} /> Back
+                                        </button>
+                                        {/* Prev / Next navigation */}
+                                        <div className="flex items-center border-l border-[#202736] ml-1 pl-2 gap-0.5">
+                                            <button
+                                                onClick={handlePrevProblem}
+                                                disabled={currentNavIndex <= 0}
+                                                title="Previous problem"
+                                                className="p-1 rounded text-zinc-500 hover:text-white hover:bg-[#202736] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                                            >
+                                                <ChevronLeft size={15} />
+                                            </button>
+                                            <span className="text-[10px] font-mono text-zinc-600 tabular-nums px-1">
+                                                {currentNavIndex >= 0 ? `${currentNavIndex + 1}/${navigationList.length}` : ''}
+                                            </span>
+                                            <button
+                                                onClick={handleNextProblem}
+                                                disabled={currentNavIndex >= navigationList.length - 1}
+                                                title="Next problem"
+                                                className="p-1 rounded text-zinc-500 hover:text-white hover:bg-[#202736] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                                            >
+                                                <ChevronRight size={15} />
+                                            </button>
+                                        </div>
+                                    </div>
                                     
                                     {/* Center tabs */}
                                     <div className="absolute left-1/2 -translate-x-1/2 flex items-center h-full">
