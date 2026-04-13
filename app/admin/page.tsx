@@ -838,6 +838,11 @@ export default function AdminDashboard() {
                                                                 DRAFT
                                                             </span>
                                                         )}
+                                                        {schedule.some(s => s.easy?.id === p.id || s.medium?.id === p.id || s.advanced?.id === p.id) && (
+                                                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border border-[#4DD4C4]/40 text-[#4DD4C4] bg-[#4DD4C4]/10">
+                                                                SCHEDULED
+                                                            </span>
+                                                        )}
                                                         <span className="text-xs text-zinc-500 flex items-center gap-1">
                                                             <Clock size={12} /> {p.estimated_time_minutes} min
                                                         </span>
@@ -1318,15 +1323,10 @@ export default function AdminDashboard() {
                                         onChange={e => setScheduleForm({ ...scheduleForm, [`${diff}_problem_id`]: e.target.value })}
                                     >
                                         <option value="">Select a {diff} problem...</option>
-                                        {problems.filter(p => p.difficulty === diff && p.is_active).map(p => (
-                                            <option key={p.id} value={p.id}>{p.title}</option>
+                                        {problems.filter(p => p.difficulty === diff).map(p => (
+                                            <option key={p.id} value={p.id}>{p.title} {!p.is_active ? '(DRAFT)' : ''}</option>
                                         ))}
                                     </select>
-                                    {problems.filter(p => p.difficulty === diff && !p.is_active).length > 0 && (
-                                        <p className="text-[10px] text-zinc-600 mt-1 italic">
-                                            {problems.filter(p => p.difficulty === diff && !p.is_active).length} draft(s) hidden — publish them first
-                                        </p>
-                                    )}
                                 </div>
                             ))}
 
