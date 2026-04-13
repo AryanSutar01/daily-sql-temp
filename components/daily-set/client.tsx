@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { Panel, Group, Separator } from "react-resizable-panels";
 import Editor from "@monaco-editor/react";
@@ -76,6 +76,8 @@ type Difficulty = 'easy' | 'medium' | 'hard' | 'advanced';
 
 export function DailySetClient() {
     const router = useRouter();
+    const params = useParams();
+    const urlProblemId = params.problemId as string | undefined;
 
     // ── Data State ──────────────────────────────────────
     const [streak, setStreak] = useState<number>(0);
@@ -171,6 +173,65 @@ export function DailySetClient() {
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
     }, [outputHeight]);
+ 
+    // ── Handlers ─────────────────────────────────────────
+    const handleProblemSelect = async (id: string) => {
+        router.push(`/practice/daily/${id}`);
+    };
+
+    const handleBackToList = () => {
+        router.push('/practice/daily');
+    };
+
+    // Internal helper to load problem data (called by useEffect when URL changes)
+    const loadProblemData = useCallback(async (id: string) => {
+        setActiveProblemId(id);
+        setViewingDetails(true);
+        setShowResult(false);
+        setError(null);
+        setExecutionResult(null);
+        setActiveDatasets([]);
+        setShowHint(false);
+        setExpectedOutput(null);
+        try {
+            const [datasets, savedSol] = await Promise.all([
+                api.getDatasets(id),
+                api.getSavedSolution(id).catch(() => ({ submitted_query: null }))
+            ]);
+            const normalizedDatasets = datasets.map(ds => ({
+                ...ds,
+                sample_rows: typeof ds.sample_rows === 'string'
+                    ? JSON.parse(ds.sample_rows)
+                    : (Array.isArray(ds.sample_rows) ? ds.sample_rows : []),
+            }));
+            setActiveDatasets(normalizedDatasets);
+            if (savedSol?.submitted_query) {
+                setCode(savedSol.submitted_query);
+            } else {
+                const p = problems.find(x => x.id === id);
+                const dsName = datasets[0]?.table_name || 'table_name';
+                setCode(`-- Write your query for: ${p?.title}\nSELECT * FROM ${dsName};\n`);
+            }
+            api.getExpectedOutput(id)
+                .then(data => setExpectedOutput(data))
+                .catch(() => setExpectedOutput(null));
+            setProblemVotes(null);
+            setCommentCount(0);
+            setActiveDetailTab('question');
+            setComments([]);
+            api.getProblemVotes(id).then(v => setProblemVotes(v)).catch(() => setProblemVotes({ likes: 0, user_has_voted: false }));
+            api.getCommentCount(id).then(({ count }) => setCommentCount(count)).catch(() => setCommentCount(0));
+            
+            // Persist "Today's Set" sidebar tab if the problem is in it, else show "Problem List"
+            if (dailySet) {
+                const isDaily = [dailySet.easy, dailySet.medium, dailySet.advanced].includes(id);
+                if (isDaily) setActiveSidebarTab('today');
+                else setActiveSidebarTab('list');
+            }
+        } catch (err) {
+            console.error("Failed to load datasets", err);
+        }
+    }, [problems, dailySet]);
 
     // ── Effects ──────────────────────────────────────────
     useEffect(() => {
@@ -202,6 +263,17 @@ export function DailySetClient() {
         }
         loadData();
     }, []);
+
+    // Sync state with URL problemId
+    useEffect(() => {
+        if (isLoading) return;
+        if (urlProblemId) {
+            loadProblemData(urlProblemId);
+        } else {
+            setActiveProblemId(null);
+            setViewingDetails(false);
+        }
+    }, [urlProblemId, isLoading, loadProblemData]);
 
     // Timer tick
     useEffect(() => {
@@ -369,52 +441,7 @@ export function DailySetClient() {
         em: ({ node, ...props }: any) => <em className="italic text-zinc-400" {...props} />,
     };
 
-    // ── Handlers ─────────────────────────────────────────
-    const handleProblemSelect = async (id: string) => {
-        setActiveProblemId(id);
-        setViewingDetails(true);
-        setShowResult(false);
-        setError(null);
-        setExecutionResult(null);
-        setActiveDatasets([]);
-        setShowHint(false);
-        setExpectedOutput(null);
-        try {
-            const [datasets, savedSol] = await Promise.all([
-                api.getDatasets(id),
-                api.getSavedSolution(id).catch(() => ({ submitted_query: null }))
-            ]);
-            const normalizedDatasets = datasets.map(ds => ({
-                ...ds,
-                sample_rows: typeof ds.sample_rows === 'string'
-                    ? JSON.parse(ds.sample_rows)
-                    : (Array.isArray(ds.sample_rows) ? ds.sample_rows : []),
-            }));
-            setActiveDatasets(normalizedDatasets);
-            if (savedSol?.submitted_query) {
-                setCode(savedSol.submitted_query);
-            } else {
-                const p = problems.find(x => x.id === id);
-                const dsName = datasets[0]?.table_name || 'table_name';
-                setCode(`-- Write your query for: ${p?.title}\nSELECT * FROM ${dsName};\n`);
-            }
-            api.getExpectedOutput(id)
-                .then(data => setExpectedOutput(data))
-                .catch(() => setExpectedOutput(null));
-            // Reset + lazy-load votes and comment count
-            setProblemVotes(null);
-            setProblemVotes(null);
-            setCommentCount(0);
-            setActiveDetailTab('question');
-            setComments([]);
-            api.getProblemVotes(id).then(v => setProblemVotes(v)).catch(() => setProblemVotes({ likes: 0, user_has_voted: false }));
-            api.getCommentCount(id).then(({ count }) => setCommentCount(count)).catch(() => setCommentCount(0));
-        } catch (err) {
-            console.error("Failed to load datasets", err);
-        }
-    };
 
-    const handleBackToList = () => setViewingDetails(false);
 
     // ── Today's Set ordered list for navigation ──────────────
     const todaysProblemIds = (['easy', 'medium', 'advanced'] as const)
