@@ -34,7 +34,11 @@ import {
     Send,
     Reply,
     MessageCircle,
-    Info
+    Info,
+    Share2,
+    Twitter,
+    Linkedin,
+    Copy
 } from "lucide-react";
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -113,6 +117,7 @@ export function DailySetClient() {
     // ── UI / Overlay State ───────────────────────────────
     const [sidebarDropdownOpen, setSidebarDropdownOpen] = useState(false);
     const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+    const [shareDropdownOpen, setShareDropdownOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     // ── Timer / Stopwatch State ──────────────────────────
@@ -149,6 +154,7 @@ export function DailySetClient() {
     const containerRef = useRef<HTMLDivElement>(null);
     const sidebarDropdownRef = useRef<HTMLDivElement>(null);
     const profileDropdownRef = useRef<HTMLDivElement>(null);
+    const shareDropdownRef = useRef<HTMLDivElement>(null);
 
 
     // ── Output Panel Resize ──────────────────────────────
@@ -302,6 +308,16 @@ export function DailySetClient() {
         const h = (e: MouseEvent) => {
             if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target as Node))
                 setProfileDropdownOpen(false);
+        };
+        document.addEventListener('mousedown', h);
+        return () => document.removeEventListener('mousedown', h);
+    }, []);
+
+    // Outside-click: share dropdown
+    useEffect(() => {
+        const h = (e: MouseEvent) => {
+            if (shareDropdownRef.current && !shareDropdownRef.current.contains(e.target as Node))
+                setShareDropdownOpen(false);
         };
         document.addEventListener('mousedown', h);
         return () => document.removeEventListener('mousedown', h);
@@ -604,6 +620,23 @@ export function DailySetClient() {
             setTimeout(() => { setFeedbackOpen(false); setFeedbackSuccess(false); }, 2000);
         } catch (e) { console.error(e); }
         finally { setFeedbackSubmitting(false); }
+    };
+
+    const handleShare = (platform: 'twitter' | 'linkedin' | 'copy') => {
+        if (!activeProblemId) return;
+        const url = `${window.location.origin}/practice/daily/${activeProblemId}`;
+        const text = `Check out this SQL question: ${activeProblem?.title} on DailySQL!`;
+        
+        if (platform === 'twitter') {
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
+        } else if (platform === 'linkedin') {
+            window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, '_blank');
+        } else {
+            navigator.clipboard.writeText(url);
+            setToast({ message: "Link copied to clipboard!", visible: true });
+            setTimeout(() => setToast(null), 3000);
+        }
+        setShareDropdownOpen(false);
     };
 
     const getDiffStyle = (diff: string) => {
@@ -1057,6 +1090,28 @@ export function DailySetClient() {
 
                                     {/* Right: vote buttons */}
                                     <div className="flex items-center gap-2.5 shrink-0">
+                                        <div className="relative group" ref={shareDropdownRef}>
+                                            <button 
+                                                onClick={() => setShareDropdownOpen(!shareDropdownOpen)}
+                                                title="Share Question"
+                                                className="flex items-center gap-1 text-xs text-zinc-500 hover:text-[#4DD4C4] transition-colors"
+                                            >
+                                                <Share2 size={13} />
+                                            </button>
+                                            {shareDropdownOpen && (
+                                                <div className="absolute top-full right-0 mt-2 w-40 bg-[#131924] border border-[#202736] rounded-lg overflow-hidden py-1 z-[300] shadow-xl">
+                                                    <button onClick={() => handleShare('twitter')} className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:text-white hover:bg-[#202736] flex items-center gap-3 transition-colors">
+                                                        <Twitter size={14} className="text-[#1DA1F2]" /> Twitter
+                                                    </button>
+                                                    <button onClick={() => handleShare('linkedin')} className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:text-white hover:bg-[#202736] flex items-center gap-3 transition-colors">
+                                                        <Linkedin size={14} className="text-[#0A66C2]" /> LinkedIn
+                                                    </button>
+                                                    <button onClick={() => handleShare('copy')} className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:text-white hover:bg-[#202736] flex items-center gap-3 transition-colors border-t border-[#202736]/50">
+                                                        <Copy size={14} className="text-zinc-400" /> Copy Link
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                         <div className="relative group">
                                             <button 
                                                 onClick={handleVote}
