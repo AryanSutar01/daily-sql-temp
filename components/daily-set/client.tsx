@@ -93,6 +93,7 @@ export function DailySetClient() {
     const [authStatus, setAuthStatus] = useState<'loading' | 'unauthenticated' | 'authenticated'>('loading');
     const [userProfile, setUserProfile] = useState<any>(null);
     const [stats, setStats] = useState<any>(null);
+    const [solvedIds, setSolvedIds] = useState<Set<string>>(new Set());
     const [difficultyFilter, setDifficultyFilter] = useState<string>('all');
     const [showDifficultyFilter, setShowDifficultyFilter] = useState(false);
     const [toast, setToast] = useState<{ message: string; subMessage?: string; visible: boolean } | null>(null);
@@ -244,10 +245,12 @@ export function DailySetClient() {
         async function loadData() {
             try {
                 let profileData = null;
+                let isAuthed = false;
                 try {
                     profileData = await api.getProfile();
                     setAuthStatus('authenticated');
                     setUserProfile(profileData);
+                    isAuthed = true;
                 } catch {
                     setAuthStatus('unauthenticated');
                 }
@@ -261,6 +264,12 @@ export function DailySetClient() {
                 setDailySet(daily);
                 setStreak(streakData?.current_streak || 0);
                 setStats(userStats);
+                // Fetch solved IDs only when authenticated
+                if (isAuthed) {
+                    api.getSolvedIds()
+                        .then(({ solved_ids }) => setSolvedIds(new Set(solved_ids)))
+                        .catch(() => {});
+                }
             } catch (err) {
                 console.error("Failed to load initial data", err);
             } finally {
@@ -505,7 +514,12 @@ export function DailySetClient() {
                 const newStreak = s.current_streak;
                 const prevStreak = streak;
                 setStreak(newStreak);
-                
+
+                // Mark this problem as solved immediately in local state
+                if (activeProblemId) {
+                    setSolvedIds(prev => new Set(prev).add(activeProblemId));
+                }
+
                 setToast({
                     message: `Solution Submitted!`,
                     subMessage: newStreak > prevStreak ? `Streak updated to ${newStreak} days! 🔥` : `Problem solved successfully!`,
@@ -926,6 +940,7 @@ export function DailySetClient() {
                                                 const pInfo = problems.find(p => p.id === pId);
                                                 if (!pInfo) return null;
                                                 const dStyle = getDiffStyle(pInfo.difficulty);
+                                                const isSolved = solvedIds.has(pId);
                                                 return (
                                                     <div key={dLevel}
                                                         onClick={() => handleProblemSelect(pId)}
@@ -936,7 +951,7 @@ export function DailySetClient() {
                                                             <div className="w-[100px] flex justify-center shrink-0">
                                                                 <span className={`text-[10px] font-bold px-2 py-1 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>{dStyle.label}</span>
                                                             </div>
-                                                            <CheckCircle2 size={16} className="text-zinc-600" />
+                                                            <CheckCircle2 size={16} className={isSolved ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
                                                         </div>
                                                     </div>
                                                 );
@@ -1025,10 +1040,13 @@ export function DailySetClient() {
                                                         <span className="text-[10px] font-mono text-zinc-500 shrink-0 w-[40px] truncate">{index + 1}.</span>
                                                         <span className="text-sm font-medium text-zinc-300 group-hover:text-white truncate">{p.title}</span>
                                                     </div>
-                                                    <div className="w-[100px] flex justify-center shrink-0">
-                                                        <span className={`text-[10px] font-bold px-2 py-1 rounded border ${getDiffStyle(p.difficulty).color} ${getDiffStyle(p.difficulty).bg} ${getDiffStyle(p.difficulty).border}`}>
-                                                            {getDiffStyle(p.difficulty).label}
-                                                        </span>
+                                                    <div className="flex items-center gap-3 shrink-0">
+                                                        <div className="w-[100px] flex justify-center">
+                                                            <span className={`text-[10px] font-bold px-2 py-1 rounded border ${getDiffStyle(p.difficulty).color} ${getDiffStyle(p.difficulty).bg} ${getDiffStyle(p.difficulty).border}`}>
+                                                                {getDiffStyle(p.difficulty).label}
+                                                            </span>
+                                                        </div>
+                                                        <CheckCircle2 size={16} className={solvedIds.has(p.id) ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
                                                     </div>
                                                 </div>
                                             ))}
