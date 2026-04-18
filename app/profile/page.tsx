@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Edit2, Search, Loader2, Sparkles, User, Briefcase, GraduationCap, History, BarChart2, Flame, X, Code, Camera, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Edit2, Search, Loader2, Sparkles, User, Briefcase, GraduationCap, History, BarChart2, Flame, X, Code, Camera, CheckCircle2, AlertCircle, Trophy } from "lucide-react";
 import { useRef } from "react";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
@@ -44,6 +44,7 @@ export default function ProfilePage() {
     const [viewingCode, setViewingCode] = useState<{ title: string; query: string } | null>(null);
     const [loadingCode, setLoadingCode] = useState(false);
     const [selectedYear, setSelectedYear] = useState<string>('last_12');
+    const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -117,17 +118,19 @@ export default function ProfilePage() {
             }
 
             try {
-                const [data, s, sub, h] = await Promise.all([
+                const [data, s, sub, h, lb] = await Promise.all([
                     api.getProfile(),
                     api.getStats(),
                     api.getRecentSubmissions(),
-                    api.getHeatmap()
+                    api.getHeatmap(),
+                    api.getLeaderboard().catch(() => [])
                 ]);
 
                 setProfile(data);
                 setRealStats(s);
                 setSubmissions(sub || []);
                 setHeatmapData(h || {});
+                setLeaderboard(lb || []);
 
                 if (data && data.exists) {
                     setFormData({
@@ -525,6 +528,98 @@ export default function ProfilePage() {
                             <button onClick={() => setIsEditing(true)} className="w-full bg-gradient-to-r from-[#4DD4C4] to-[#34b6a5] hover:opacity-90 text-[#080c16] font-bold rounded-xl py-2.5 text-[13px] transition-all duration-300 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(77,212,196,0.2)] hover:shadow-[0_0_20px_rgba(77,212,196,0.3)] transform hover:-translate-y-0.5">
                                 <Edit2 size={14} /> Edit Profile
                             </button>
+                        </div>
+                    </div>
+
+                    {/* Leaderboard Card */}
+                    <div className="relative flex-1 bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-6 flex flex-col shadow-xl overflow-hidden group hover:border-[#4DD4C4]/20 transition-all duration-500">
+                        <div className="absolute -bottom-20 -right-20 w-48 h-48 bg-[#f59e0b]/5 rounded-full blur-[60px] pointer-events-none group-hover:bg-[#f59e0b]/10 transition-colors duration-700"></div>
+                        
+                        {/* Header */}
+                        <div className="flex items-center gap-3 mb-5 relative z-10">
+                            <div className="w-8 h-8 rounded-xl bg-[#f59e0b]/10 flex items-center justify-center border border-[#f59e0b]/20 shrink-0">
+                                <Trophy size={14} className="text-[#f59e0b]" />
+                            </div>
+                            <h3 className="text-[14px] font-bold text-white tracking-wide">Leaderboard</h3>
+                        </div>
+
+                        {/* List */}
+                        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar relative z-10">
+                            {leaderboard.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full gap-3 py-8">
+                                    <Trophy size={28} className="text-zinc-700" />
+                                    <p className="text-xs text-zinc-500">No data yet</p>
+                                </div>
+                            ) : leaderboard.map((entry, idx) => {
+                                const isCurrentUser = profile && entry.user_id === profile.user_id;
+                                const rankColors = [
+                                    'text-[#f59e0b]',   // Gold - 1st
+                                    'text-[#94a3b8]',   // Silver - 2nd
+                                    'text-[#b45309]',   // Bronze - 3rd
+                                ];
+                                const rankBg = [
+                                    'bg-[#f59e0b]/10 border-[#f59e0b]/30',
+                                    'bg-[#94a3b8]/10 border-[#94a3b8]/30',
+                                    'bg-[#b45309]/10 border-[#b45309]/30',
+                                ];
+                                return (
+                                    <div
+                                        key={entry.user_id}
+                                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all duration-200 ${
+                                            isCurrentUser
+                                                ? 'bg-[#4DD4C4]/8 border-[#4DD4C4]/30 shadow-[0_0_10px_rgba(77,212,196,0.08)]'
+                                                : 'bg-[#0b101c]/40 border-[#202736] hover:border-[#202736]/80 hover:bg-[#131924]/60'
+                                        }`}
+                                    >
+                                        {/* Rank */}
+                                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black border shrink-0 ${
+                                            idx < 3 ? rankBg[idx] + ' ' + rankColors[idx] : 'bg-[#202736]/60 border-[#202736] text-zinc-500'
+                                        }`}>
+                                            {idx + 1}
+                                        </div>
+
+                                        {/* Avatar */}
+                                        <div className="w-7 h-7 rounded-lg bg-[#0b101c] border border-[#202736] flex items-center justify-center overflow-hidden shrink-0">
+                                            {entry.avatar_url ? (
+                                                <img src={entry.avatar_url} alt={entry.full_name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <User size={14} className="text-zinc-600" />
+                                            )}
+                                        </div>
+
+                                        {/* Name + Role */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={`text-[12px] font-semibold truncate ${
+                                                    isCurrentUser ? 'text-[#4DD4C4]' : 'text-zinc-200'
+                                                }`}>
+                                                    {entry.full_name}
+                                                </span>
+                                                {isCurrentUser && (
+                                                    <span className="text-[9px] font-bold text-[#4DD4C4]/70 bg-[#4DD4C4]/10 px-1.5 py-0.5 rounded-full border border-[#4DD4C4]/20 shrink-0">YOU</span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Stats */}
+                                        <div className="flex items-center gap-0 shrink-0">
+                                            {entry.current_streak > 0 && (
+                                                <>
+                                                    <div className="flex items-center gap-1 px-2">
+                                                        <Flame size={10} className="text-[#4DD4C4] fill-[#4DD4C4]" />
+                                                        <span className="text-[11px] font-bold text-zinc-300 tabular-nums">{entry.current_streak}</span>
+                                                    </div>
+                                                    <div className="w-px h-3 bg-[#202736]" />
+                                                </>
+                                            )}
+                                            <div className="flex items-baseline gap-0.5 pl-2">
+                                                <span className="text-[13px] font-extrabold text-white tabular-nums">{entry.total_solved}</span>
+                                                <span className="text-[9px] text-zinc-600 font-medium">sol</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
