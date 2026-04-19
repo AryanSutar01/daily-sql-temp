@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
     Database, Plus, Calendar, Lock, Search, CheckCircle2,
     AlertCircle, Loader2, ChevronRight, Edit3, Eye,
-    Code, FileText, Clock, Trash2, MessageSquare, X, Save, ThumbsDown
+    Code, FileText, Clock, Trash2, MessageSquare, X, Save, ThumbsDown, Phone
 } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -1492,27 +1492,27 @@ export default function AdminDashboard() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-[#202736]">
-                                        {waitlist.map((w: any) => (
-                                            <tr key={w.id} className="hover:bg-white/[0.02] transition-colors group">
-                                                <td className="p-4 font-medium text-white">{w.full_name}</td>
-                                                <td className="p-4 text-zinc-400">{w.email}</td>
+                                        {waitlist.map((entry: any) => (
+                                            <tr key={(entry as any).id} className="hover:bg-white/[0.02] transition-colors group">
+                                                <td className="p-4 font-medium text-white">{entry.full_name}</td>
+                                                <td className="p-4 text-zinc-400">{entry.email}</td>
                                                 <td className="p-4">
-                                                    <a href={`https://wa.me/${w.whatsapp_number.replace(/\+/g, '')}`} target="_blank" className="text-[#4DD4C4] hover:underline flex items-center gap-1">
-                                                        <Phone size={12} /> {w.whatsapp_number}
+                                                    <a href={`https://wa.me/${entry.whatsapp_number.replace(/\+/g, '')}`} target="_blank" className="text-[#4DD4C4] hover:underline flex items-center gap-1">
+                                                        <Phone size={12} /> {entry.whatsapp_number}
                                                     </a>
                                                 </td>
-                                                <td className="p-4 text-zinc-400">{w.job_role || w.occupation}</td>
-                                                <td className="p-4 text-zinc-400">{w.experience_years}y</td>
+                                                <td className="p-4 text-zinc-400">{entry.job_role || entry.occupation}</td>
+                                                <td className="p-4 text-zinc-400">{entry.experience_years}y</td>
                                                 <td className="p-4">
-                                                    <span className="px-2 py-0.5 rounded bg-zinc-500/10 text-zinc-500 text-[10px] font-bold uppercase">{w.source}</span>
+                                                    <span className="px-2 py-0.5 rounded bg-zinc-500/10 text-zinc-500 text-[10px] font-bold uppercase">{entry.source}</span>
                                                 </td>
                                                 <td className="p-4 text-center">
                                                     <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <button 
                                                             onClick={async () => {
-                                                                setNewMemberEmail(w.email);
+                                                                setNewMemberEmail(entry.email);
                                                                 await handleAddMember();
-                                                                handleDeleteWaitlist(w.id);
+                                                                handleDeleteWaitlist((entry as any).id);
                                                             }}
                                                             className="p-1.5 text-green-500 hover:bg-green-500/10 rounded transition-colors"
                                                             title="Approve (Add to Whitelist)"
@@ -1520,7 +1520,7 @@ export default function AdminDashboard() {
                                                             <CheckCircle2 size={16} />
                                                         </button>
                                                         <button 
-                                                            onClick={() => handleDeleteWaitlist(w.id)}
+                                                            onClick={() => handleDeleteWaitlist((entry as any).id)}
                                                             className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
                                                             title="Reject"
                                                         >
