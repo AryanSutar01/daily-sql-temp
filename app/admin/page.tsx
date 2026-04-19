@@ -721,9 +721,9 @@ export default function AdminDashboard() {
                             <input
                                 type="text"
                                 className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white text-center text-xl tracking-[0.5em] font-bold focus:border-[#4DD4C4] focus:outline-none transition-colors"
-                                placeholder="000000"
+                                placeholder="0000"
                                 value={adminOtp}
-                                onChange={e => setAdminOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                onChange={e => setAdminOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
                                 onKeyDown={e => e.key === 'Enter' && handleVerifyAdminOtp()}
                             />
                             <Button 
