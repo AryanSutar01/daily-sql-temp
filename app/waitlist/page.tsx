@@ -28,7 +28,7 @@ export default function WaitlistPage() {
            occupation: data.occupation,
            job_role: data.job_role,
            experience_years: data.years_of_experience,
-           source: data.source
+           source: (data as any).source
         }),
       });
 
