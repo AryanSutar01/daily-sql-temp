@@ -80,6 +80,7 @@ export default function AdminDashboard() {
     const [problemDatasets, setProblemDatasets] = useState<any[]>([]);
     const [feedbacks, setFeedbacks] = useState<any[]>([]);
     const [whitelist, setWhitelist] = useState<any[]>([]);
+    const [waitlist, setWaitlist] = useState<any[]>([]);
     const [newMemberEmail, setNewMemberEmail] = useState("");
     const [isBulkMode, setIsBulkMode] = useState(false);
     const [bulkEmailsText, setBulkEmailsText] = useState("");
@@ -171,6 +172,15 @@ export default function AdminDashboard() {
             const res = await fetchWithAuth(`${API_URL}/admin/whitelist`, {}, token);
             if (res.ok) {
                 setWhitelist(await res.json());
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const loadWaitlist = async (token?: string) => {
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/waitlist`, {}, token);
+            if (res.ok) {
+                setWaitlist(await res.json());
             }
         } catch (e) { console.error(e); }
     };
@@ -628,6 +638,23 @@ export default function AdminDashboard() {
                 loadWhitelist();
             } else {
                 showToast('error', 'Failed to remove member');
+            }
+        } catch (e: any) { showToast('error', e.message); }
+        setLoading(false);
+    };
+
+    const handleDeleteWaitlist = async (id: string) => {
+        if (!confirm('Remove this entry from waitlist?')) return;
+        setLoading(true);
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/waitlist/${id}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                showToast('success', 'Waitlist entry removed');
+                loadWaitlist();
+            } else {
+                showToast('error', 'Failed to remove entry');
             }
         } catch (e: any) { showToast('error', e.message); }
         setLoading(false);
@@ -1439,6 +1466,74 @@ export default function AdminDashboard() {
                                 ))}
                                 {whitelist.length === 0 && (
                                     <div className="p-12 text-center text-zinc-500 italic">The whitelist is currently empty.</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Waitlist List */}
+                        <div className="bg-[#121826] border border-[#202736] rounded-xl overflow-hidden mt-8">
+                            <div className="p-4 border-b border-[#202736] bg-[#0b101c] flex justify-between items-center">
+                                <h3 className="text-xs font-bold text-[#4DD4C4] uppercase tracking-widest flex items-center gap-2">
+                                    <Clock size={14} /> Pending Waitlist ({waitlist.length})
+                                </h3>
+                                <Button onClick={() => loadWaitlist()} variant="ghost" size="sm" className="text-zinc-500 h-6">Refresh</Button>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm border-collapse">
+                                    <thead>
+                                        <tr className="bg-black/20 text-[10px] uppercase text-zinc-500 border-b border-[#202736]">
+                                            <th className="p-4 font-black">Full Name</th>
+                                            <th className="p-4 font-black">Email</th>
+                                            <th className="p-4 font-black">WhatsApp</th>
+                                            <th className="p-4 font-black">Role</th>
+                                            <th className="p-4 font-black">Exp</th>
+                                            <th className="p-4 font-black">Source</th>
+                                            <th className="p-4 font-black text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[#202736]">
+                                        {waitlist.map((w: any) => (
+                                            <tr key={w.id} className="hover:bg-white/[0.02] transition-colors group">
+                                                <td className="p-4 font-medium text-white">{w.full_name}</td>
+                                                <td className="p-4 text-zinc-400">{w.email}</td>
+                                                <td className="p-4">
+                                                    <a href={`https://wa.me/${w.whatsapp_number.replace(/\+/g, '')}`} target="_blank" className="text-[#4DD4C4] hover:underline flex items-center gap-1">
+                                                        <Phone size={12} /> {w.whatsapp_number}
+                                                    </a>
+                                                </td>
+                                                <td className="p-4 text-zinc-400">{w.job_role || w.occupation}</td>
+                                                <td className="p-4 text-zinc-400">{w.experience_years}y</td>
+                                                <td className="p-4">
+                                                    <span className="px-2 py-0.5 rounded bg-zinc-500/10 text-zinc-500 text-[10px] font-bold uppercase">{w.source}</span>
+                                                </td>
+                                                <td className="p-4 text-center">
+                                                    <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button 
+                                                            onClick={async () => {
+                                                                setNewMemberEmail(w.email);
+                                                                await handleAddMember();
+                                                                handleDeleteWaitlist(w.id);
+                                                            }}
+                                                            className="p-1.5 text-green-500 hover:bg-green-500/10 rounded transition-colors"
+                                                            title="Approve (Add to Whitelist)"
+                                                        >
+                                                            <CheckCircle2 size={16} />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDeleteWaitlist(w.id)}
+                                                            className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
+                                                            title="Reject"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {waitlist.length === 0 && (
+                                    <div className="p-12 text-center text-zinc-500 italic">No pending requests in the waitlist.</div>
                                 )}
                             </div>
                         </div>

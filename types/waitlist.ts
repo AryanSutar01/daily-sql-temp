@@ -10,8 +10,12 @@ export type WaitlistEntry = {
 }
 
 export type WaitlistFormData = {
+  email: string
+  full_name: string
+  whatsapp_number: string
   occupation: string
   job_role: string
   years_of_experience: number
+  source: string
 }
 
