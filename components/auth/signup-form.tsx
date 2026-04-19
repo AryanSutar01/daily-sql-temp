@@ -27,7 +27,7 @@ export function SignupForm() {
         confirmPassword: "",
     });
 
-    const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+    const [otp, setOtp] = useState(["", "", "", ""]);
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
     const handleFormSubmit = async (e: React.FormEvent) => {
@@ -73,7 +73,7 @@ export function SignupForm() {
         newOtp[index] = value.slice(-1);
         setOtp(newOtp);
 
-        if (value && index < 5) {
+        if (value && index < 3) {
             inputRefs.current[index + 1]?.focus();
         }
     };
@@ -87,7 +87,7 @@ export function SignupForm() {
     const handleOtpSubmit = async (e?: React.FormEvent) => {
         e?.preventDefault();
         const code = otp.join("");
-        if (code.length < 6) return;
+        if (code.length < 4) return;
 
         setIsLoading(true);
         setError(null);
@@ -131,7 +131,7 @@ export function SignupForm() {
             });
             const data = await res.json();
             setStateId(data.state_id);
-            setOtp(["", "", "", "", "", ""]);
+            setOtp(["", "", "", ""]);
             inputRefs.current[0]?.focus();
         } catch (err) {
             setError("Failed to resend code");
@@ -165,7 +165,7 @@ export function SignupForm() {
                 <div className="space-y-4">
                     <h2 className="text-3xl font-bold tracking-tight text-white">Verify your mail</h2>
                     <p className="text-zinc-400 text-sm leading-relaxed">
-                        We've sent a 6-digit verification code to <br />
+                        We've sent a 4-digit verification code to <br />
                         <span className="text-[#4DD4C4] font-semibold">{formData.email}</span>
                     </p>
                 </div>
@@ -208,7 +208,7 @@ export function SignupForm() {
                 <div className="space-y-4">
                     <Button
                         onClick={() => handleOtpSubmit()}
-                        disabled={isLoading || otp.join("").length < 6}
+                        disabled={isLoading || otp.join("").length < 4}
                         className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-[#080c16] font-extrabold h-14 rounded-xl shadow-[0_0_30px_rgba(77,212,196,0.1)] transition-all transform active:scale-[0.98] text-base"
                     >
                         {isLoading ? "Verifying..." : "Create Account"}
