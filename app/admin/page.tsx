@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
     Database, Plus, Calendar, Lock, Search, CheckCircle2,
     AlertCircle, Loader2, ChevronRight, Edit3, Eye,
-    Code, FileText, Clock, Trash2, MessageSquare, X, Save, ThumbsDown, Phone
+    Code, FileText, Clock, Trash2, MessageSquare, X, Save, ThumbsDown, Phone, Download
 } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -68,6 +68,7 @@ export default function AdminDashboard() {
     const [adminToken, setAdminToken] = useState<string | null>(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [activeTab, setActiveTab] = useState<Tab>('problems');
+    const [membersSubTab, setMembersSubTab] = useState<'whitelist' | 'waitlist'>('whitelist');
 
     // Data
     const [problems, setProblems] = useState<Problem[]>([]);
@@ -687,6 +688,32 @@ export default function AdminDashboard() {
             }
         } catch (e: any) { showToast('error', e.message); }
         setLoading(false);
+    };
+
+    const downloadCSV = (data: any[], filename: string) => {
+        if (!data || data.length === 0) {
+            showToast('error', 'No data to export');
+            return;
+        }
+        
+        // Ensure consistent headers across all rows
+        const allKeys = new Set<string>();
+        data.forEach(item => Object.keys(item).forEach(key => allKeys.add(key)));
+        const headers = Array.from(allKeys);
+        
+        const rows = data.map(obj => headers.map(header => {
+             const val = obj[header];
+             return `"${val !== null && val !== undefined ? String(val).replace(/"/g, '""') : ''}"`;
+        }).join(',')).join('\n');
+        
+        const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows;
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const getDiffStyle = (diff: string) => {
@@ -1387,15 +1414,36 @@ export default function AdminDashboard() {
 
                 {/* ============ MEMBERS TAB ============ */}
                 {activeTab === 'members' && (
-                    <div className="space-y-6 max-w-4xl mx-auto">
+                    <div className="space-y-6 max-w-5xl mx-auto">
                         <div className="flex justify-between items-center">
                             <h2 className="text-2xl font-bold flex items-center gap-2">
-                                <Lock size={24} className="text-[#10b981]" /> Authorized Members
+                                <Lock size={24} className="text-[#10b981]" /> Members & Waitlist
                             </h2>
-                            <Button onClick={() => loadWhitelist()} variant="outline" size="sm" className="border-[#202736] text-zinc-400">
-                                {loading && <Loader2 size={14} className="animate-spin mr-2" />} Refresh
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button 
+                                    onClick={() => setMembersSubTab('whitelist')} 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className={`${membersSubTab === 'whitelist' ? 'border-[#10b981] text-[#10b981] bg-[#10b981]/10' : 'border-[#202736] text-zinc-400'}`}
+                                >
+                                    Whitelist
+                                </Button>
+                                <Button 
+                                    onClick={() => setMembersSubTab('waitlist')} 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className={`${membersSubTab === 'waitlist' ? 'border-[#4DD4C4] text-[#4DD4C4] bg-[#4DD4C4]/10' : 'border-[#202736] text-zinc-400'}`}
+                                >
+                                    Waitlist
+                                </Button>
+                                <Button onClick={() => { loadWhitelist(); loadWaitlist(); }} variant="outline" size="sm" className="border-[#202736] text-zinc-400 ml-4">
+                                    {loading && <Loader2 size={14} className="animate-spin mr-2" />} Refresh
+                                </Button>
+                            </div>
                         </div>
+                        
+                        {membersSubTab === 'whitelist' && (
+                            <>
 
                         {/* Add Member Form */}
                         <div className="bg-[#121826] border border-[#202736] rounded-xl p-6">
@@ -1444,11 +1492,14 @@ export default function AdminDashboard() {
                         </div>
 
                         {/* Member List */}
-                        <div className="bg-[#121826] border border-[#202736] rounded-xl overflow-hidden">
-                            <div className="p-4 border-b border-[#202736] bg-[#0b101c] flex justify-between items-center">
+                        <div className="bg-[#121826] border border-[#202736] rounded-xl overflow-hidden flex flex-col h-[500px]">
+                            <div className="p-4 border-b border-[#202736] bg-[#0b101c] flex justify-between items-center shrink-0">
                                 <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Active Whitelist ({whitelist.length})</span>
+                                <Button onClick={() => downloadCSV(whitelist, 'whitelist.csv')} variant="ghost" size="sm" className="text-[#4DD4C4] hover:text-[#3dbdb0] hover:bg-[#4DD4C4]/10 h-6">
+                                    <Download size={12} className="mr-1" /> Export CSV
+                                </Button>
                             </div>
-                            <div className="divide-y divide-[#202736]">
+                            <div className="divide-y divide-[#202736] overflow-y-auto flex-1">
                                 {whitelist.map((m: any) => (
                                     <div key={m.email} className="p-4 flex justify-between items-center hover:bg-white/[0.02] transition-colors group">
                                         <div className="flex flex-col">
@@ -1469,18 +1520,25 @@ export default function AdminDashboard() {
                                 )}
                             </div>
                         </div>
+                        </>
+                        )}
 
-                        {/* Waitlist List */}
-                        <div className="bg-[#121826] border border-[#202736] rounded-xl overflow-hidden mt-8">
-                            <div className="p-4 border-b border-[#202736] bg-[#0b101c] flex justify-between items-center">
+                        {membersSubTab === 'waitlist' && (
+                        <div className="bg-[#121826] border border-[#202736] rounded-xl overflow-hidden flex flex-col h-[600px]">
+                            <div className="p-4 border-b border-[#202736] bg-[#0b101c] flex justify-between items-center shrink-0">
                                 <h3 className="text-xs font-bold text-[#4DD4C4] uppercase tracking-widest flex items-center gap-2">
                                     <Clock size={14} /> Pending Waitlist ({waitlist.length})
                                 </h3>
-                                <Button onClick={() => loadWaitlist()} variant="ghost" size="sm" className="text-zinc-500 h-6">Refresh</Button>
+                                <div className="flex gap-2">
+                                    <Button onClick={() => downloadCSV(waitlist, 'waitlist.csv')} variant="ghost" size="sm" className="text-[#4DD4C4] hover:text-[#3dbdb0] hover:bg-[#4DD4C4]/10 h-6">
+                                        <Download size={12} className="mr-1" /> Export CSV
+                                    </Button>
+                                    <Button onClick={() => loadWaitlist()} variant="ghost" size="sm" className="text-zinc-500 h-6">Refresh</Button>
+                                </div>
                             </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm border-collapse">
-                                    <thead>
+                            <div className="overflow-x-auto overflow-y-auto flex-1">
+                                <table className="w-full text-left text-sm border-collapse relative">
+                                    <thead className="sticky top-0 bg-[#0b101c] shadow-md z-10">
                                         <tr className="bg-black/20 text-[10px] uppercase text-zinc-500 border-b border-[#202736]">
                                             <th className="p-4 font-black">Full Name</th>
                                             <th className="p-4 font-black">Email</th>
@@ -1537,6 +1595,7 @@ export default function AdminDashboard() {
                                 )}
                             </div>
                         </div>
+                        )}
                     </div>
                 )}
 

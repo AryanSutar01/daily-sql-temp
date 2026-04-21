@@ -259,78 +259,82 @@ export function SignupForm() {
                 </div>
             )}
 
-            <form onSubmit={handleFormSubmit} className="space-y-5">
-                <div className="space-y-3">
-                    <Label htmlFor="email" className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase ml-1">
-                        EMAIL ADDRESS
-                    </Label>
-                    <div className="relative group">
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={18} />
-                        <Input
-                            id="email"
-                            type="email"
-                            required
-                            placeholder="master@sql-engine.com"
-                            value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                            className="bg-[#0b101c]/50 border-white/5 text-zinc-200 focus:border-[#4DD4C4]/50 h-14 pl-12 rounded-xl transition-all"
-                        />
+            {false && (
+                <>
+                    <form onSubmit={handleFormSubmit} className="space-y-5">
+                        <div className="space-y-3">
+                            <Label htmlFor="email" className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase ml-1">
+                                EMAIL ADDRESS
+                            </Label>
+                            <div className="relative group">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={18} />
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    required
+                                    placeholder="master@sql-engine.com"
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    className="bg-[#0b101c]/50 border-white/5 text-zinc-200 focus:border-[#4DD4C4]/50 h-14 pl-12 rounded-xl transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <Label htmlFor="password" className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase ml-1">
+                                CHOOSE PASSWORD
+                            </Label>
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={18} />
+                                <Input
+                                    id="password"
+                                    type="password"
+                                    required
+                                    placeholder="••••••••"
+                                    value={formData.password}
+                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                    className="bg-[#0b101c]/50 border-white/5 text-zinc-200 focus:border-[#4DD4C4]/50 h-14 pl-12 rounded-xl transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <Label htmlFor="confirmPassword" className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase ml-1">
+                                CONFIRM PASSWORD
+                            </Label>
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={18} />
+                                <Input
+                                    id="confirmPassword"
+                                    type="password"
+                                    required
+                                    placeholder="••••••••"
+                                    value={formData.confirmPassword}
+                                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                                    className="bg-[#0b101c]/50 border-white/5 text-zinc-200 focus:border-[#4DD4C4]/50 h-14 pl-12 rounded-xl transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        <Button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-[#080c16] font-extrabold h-14 rounded-xl shadow-[0_0_30px_rgba(77,212,196,0.1)] transition-all transform active:scale-[0.98] mt-2 text-base"
+                        >
+                            {isLoading ? "Preparing..." : "Sign Up"}
+                        </Button>
+                    </form>
+
+                    <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t border-white/5" />
+                        </div>
+                        <div className="relative flex justify-center text-[10px] font-black uppercase tracking-[0.2em]">
+                            <span className="bg-[#0b101c] px-4 text-zinc-500">or continue with</span>
+                        </div>
                     </div>
-                </div>
-
-                <div className="space-y-3">
-                    <Label htmlFor="password" className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase ml-1">
-                        CHOOSE PASSWORD
-                    </Label>
-                    <div className="relative group">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={18} />
-                        <Input
-                            id="password"
-                            type="password"
-                            required
-                            placeholder="••••••••"
-                            value={formData.password}
-                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                            className="bg-[#0b101c]/50 border-white/5 text-zinc-200 focus:border-[#4DD4C4]/50 h-14 pl-12 rounded-xl transition-all"
-                        />
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    <Label htmlFor="confirmPassword" className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase ml-1">
-                        CONFIRM PASSWORD
-                    </Label>
-                    <div className="relative group">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={18} />
-                        <Input
-                            id="confirmPassword"
-                            type="password"
-                            required
-                            placeholder="••••••••"
-                            value={formData.confirmPassword}
-                            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                            className="bg-[#0b101c]/50 border-white/5 text-zinc-200 focus:border-[#4DD4C4]/50 h-14 pl-12 rounded-xl transition-all"
-                        />
-                    </div>
-                </div>
-
-                <Button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-[#080c16] font-extrabold h-14 rounded-xl shadow-[0_0_30px_rgba(77,212,196,0.1)] transition-all transform active:scale-[0.98] mt-2 text-base"
-                >
-                    {isLoading ? "Preparing..." : "Sign Up"}
-                </Button>
-            </form>
-
-            <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-white/5" />
-                </div>
-                <div className="relative flex justify-center text-[10px] font-black uppercase tracking-[0.2em]">
-                    <span className="bg-[#0b101c] px-4 text-zinc-500">or continue with</span>
-                </div>
-            </div>
+                </>
+            )}
 
             <Button
                 type="button"

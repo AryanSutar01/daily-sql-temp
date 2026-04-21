@@ -67,11 +67,11 @@ export function Navbar() {
       <div className="container mx-auto px-12 sm:px-20 lg:px-40">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center space-x-2">
+          <Link href="/" className="flex items-center space-x-2">
             <span className="text-xl font-bold text-white">
               DailySQL
             </span>
-          </div>
+          </Link>
 
           {/* Desktop Navigation - Centered */}
           {!isAdmin && (
