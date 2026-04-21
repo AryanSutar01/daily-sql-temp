@@ -711,9 +711,9 @@ export function DailySetClient() {
 
                 {/* ── LEFT: Logo + Set selector ── */}
                 <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-base font-bold text-white">
+                    <Link href="/" className="text-base font-bold text-white hover:opacity-80 transition-opacity">
                         DailySQL
-                    </span>
+                    </Link>
                     <div className="w-px h-5 bg-[#202736]" />
                     <div className="relative" ref={sidebarDropdownRef}>
                         <button

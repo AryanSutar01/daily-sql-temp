@@ -20,6 +20,7 @@ export function LoginForm() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const [showLegacy, setShowLegacy] = useState(false);
     const [formData, setFormData] = useState({
         email: "",
         password: "",
@@ -103,61 +104,6 @@ export function LoginForm() {
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-3">
-                    <Label htmlFor="email" className="text-[10px] uppercase tracking-[0.1em] font-bold text-zinc-500 ml-1">
-                        Email Address
-                    </Label>
-                    <div className="relative group">
-                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={18} />
-                        <Input
-                            id="email"
-                            type="email"
-                            required
-                            placeholder="master@sql-engine.com"
-                            value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                            className="bg-[#0b101c]/50 border-white/5 text-zinc-200 focus:border-[#4DD4C4]/50 h-14 pl-12 rounded-xl transition-all"
-                        />
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <Label className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase">PASSWORD</Label>
-                    </div>
-                    <div className="relative group">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={18} />
-                        <Input
-                            id="password"
-                            type="password"
-                            required
-                            placeholder="••••••••"
-                            value={formData.password}
-                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                            className="bg-[#0b101c]/50 border-white/5 text-zinc-200 focus:border-[#4DD4C4]/50 h-14 pl-12 rounded-xl transition-all"
-                        />
-                    </div>
-                </div>
-
-                <Button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-[#080c16] font-extrabold h-14 rounded-xl shadow-[0_0_30px_rgba(77,212,196,0.1)] transition-all transform active:scale-[0.98] mt-2 text-base"
-                >
-                    {isLoading ? "Validating..." : "Log In"}
-                </Button>
-            </form>
-
-            <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-white/5" />
-                </div>
-                <div className="relative flex justify-center text-[10px] font-bold uppercase tracking-[0.2em]">
-                    <span className="bg-[#0a0f1c] px-4 text-zinc-500">or continue with</span>
-                </div>
-            </div>
-
             <Button
                 type="button"
                 variant="outline"
@@ -171,8 +117,76 @@ export function LoginForm() {
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
-                Google
+                Sign in with Google
             </Button>
+
+            {!showLegacy ? (
+                <div className="text-center pt-2">
+                    <button 
+                        type="button" 
+                        onClick={() => setShowLegacy(true)} 
+                        className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                    >
+                        Using an old account? Sign in with Email
+                    </button>
+                </div>
+            ) : (
+                <div className="space-y-6 pt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t border-white/5" />
+                        </div>
+                        <div className="relative flex justify-center text-[10px] font-bold uppercase tracking-[0.2em]">
+                            <span className="bg-[#0a0f1c] px-4 text-zinc-500">or</span>
+                        </div>
+                    </div>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="space-y-3">
+                            <Label htmlFor="email" className="text-[10px] uppercase tracking-[0.1em] font-bold text-zinc-500 ml-1">
+                                Email Address (Legacy)
+                            </Label>
+                            <div className="relative group">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={18} />
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    required
+                                    placeholder="master@sql-engine.com"
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    className="bg-[#0b101c]/50 border-white/5 text-zinc-200 focus:border-[#4DD4C4]/50 h-14 pl-12 rounded-xl transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase">PASSWORD</Label>
+                            </div>
+                            <div className="relative group">
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={18} />
+                                <Input
+                                    id="password"
+                                    type="password"
+                                    required
+                                    placeholder="••••••••"
+                                    value={formData.password}
+                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                    className="bg-[#0b101c]/50 border-white/5 text-zinc-200 focus:border-[#4DD4C4]/50 h-14 pl-12 rounded-xl transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        <Button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-14 rounded-xl transition-all transform active:scale-[0.98] mt-2 text-base border border-white/10"
+                        >
+                            {isLoading ? "Validating..." : "Log In via Email"}
+                        </Button>
+                    </form>
+                </div>
+            )}
 
             <div className="text-center pt-4">
                 <p className="text-sm font-medium text-zinc-500">
