@@ -1420,11 +1420,13 @@ export default function AdminDashboard() {
                         </div>
 
                         {/* Schedule Calendar */}
-                        <div className="bg-[#121826] p-6 rounded-xl border border-[#202736]">
-                            <h3 className="text-lg font-bold mb-4">Recent Schedule</h3>
-                            <div className="space-y-3">
+                        <div className="bg-[#121826] border border-[#202736] rounded-xl overflow-hidden flex flex-col h-[500px]">
+                            <div className="p-4 border-b border-[#202736] bg-[#0b101c] flex justify-between items-center shrink-0">
+                                <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Recent Schedule</span>
+                            </div>
+                            <div className="p-4 space-y-3 overflow-y-auto flex-1">
                                 {schedule.map(s => (
-                                    <div key={s.date} className="bg-[#0b101c] p-4 rounded-lg border border-[#202736]">
+                                    <div key={s.date} className="bg-[#0b101c] p-4 rounded-lg border border-[#202736] shrink-0">
                                         <div className="font-mono text-sm text-[#4DD4C4] mb-2">{s.date}</div>
                                         <div className="grid grid-cols-3 gap-2 text-xs">
                                             <div className="text-green-400">Easy: <span className="text-zinc-400">{s.easy?.title || '—'}</span></div>
