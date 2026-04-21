@@ -628,14 +628,15 @@ export default function AdminDashboard() {
     };
 
     const handleDeleteMember = async (email: string) => {
-        if (!confirm(`Remove ${email} from whitelist?`)) return;
+        if (!confirm(`Are you sure you want to remove ${email} from the whitelist?`)) return;
+        if (!confirm(`Before deletion, please confirm again: Are you absolutely sure you want to delete ${email}?`)) return;
         setLoading(true);
         try {
             const res = await fetchWithAuth(`${API_URL}/admin/whitelist/${email}`, {
                 method: 'DELETE'
             });
             if (res.ok) {
-                showToast('success', 'Member removed from whitelist');
+                showToast('success', `Member ${email} removed from whitelist successfully`);
                 loadWhitelist();
             } else {
                 showToast('error', 'Failed to remove member');
@@ -644,15 +645,43 @@ export default function AdminDashboard() {
         setLoading(false);
     };
 
-    const handleDeleteWaitlist = async (id: string) => {
-        if (!confirm('Remove this entry from waitlist?')) return;
+    const handleApproveWaitlist = async (id: string, email: string) => {
+        if (!confirm(`Approve ${email} and move to whitelist?`)) return;
+        setLoading(true);
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/whitelist`, {
+                method: 'POST',
+                body: JSON.stringify({ email })
+            });
+            if (res.ok) {
+                const delRes = await fetchWithAuth(`${API_URL}/admin/waitlist/${id}`, {
+                    method: 'DELETE'
+                });
+                if (delRes.ok) {
+                    showToast('success', `Member ${email} approved and transferred to whitelist successfully!`);
+                    loadWhitelist();
+                    loadWaitlist();
+                } else {
+                    showToast('error', 'Added to whitelist, but failed to remove from waitlist.');
+                }
+            } else {
+                const data = await res.json();
+                showToast('error', data.detail || 'Failed to add member to whitelist');
+            }
+        } catch (e: any) { showToast('error', e.message); }
+        setLoading(false);
+    };
+
+    const handleDeleteWaitlist = async (id: string, email: string) => {
+        if (!confirm(`Are you sure you want to reject and delete ${email} from the waitlist?`)) return;
+        if (!confirm(`Before deletion, please confirm again: Delete ${email}?`)) return;
         setLoading(true);
         try {
             const res = await fetchWithAuth(`${API_URL}/admin/waitlist/${id}`, {
                 method: 'DELETE'
             });
             if (res.ok) {
-                showToast('success', 'Waitlist entry removed');
+                showToast('success', `Member ${email} has been rejected and deleted successfully.`);
                 loadWaitlist();
             } else {
                 showToast('error', 'Failed to remove entry');
@@ -1567,18 +1596,14 @@ export default function AdminDashboard() {
                                                 <td className="p-4 text-center">
                                                     <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <button 
-                                                            onClick={async () => {
-                                                                setNewMemberEmail(entry.email);
-                                                                await handleAddMember();
-                                                                handleDeleteWaitlist((entry as any).id);
-                                                            }}
+                                                            onClick={() => handleApproveWaitlist((entry as any).id, entry.email)}
                                                             className="p-1.5 text-green-500 hover:bg-green-500/10 rounded transition-colors"
                                                             title="Approve (Add to Whitelist)"
                                                         >
                                                             <CheckCircle2 size={16} />
                                                         </button>
                                                         <button 
-                                                            onClick={() => handleDeleteWaitlist((entry as any).id)}
+                                                            onClick={() => handleDeleteWaitlist((entry as any).id, entry.email)}
                                                             className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
                                                             title="Reject"
                                                         >
