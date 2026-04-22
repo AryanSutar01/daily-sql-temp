@@ -483,7 +483,7 @@ export default function ProfilePage() {
             <div className="max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8 relative z-10 w-full grid grid-cols-1 lg:grid-cols-12 gap-6 pt-8 lg:pt-12">
                 
                 {/* --- LEFT COLUMN: Profile & Quick Info --- */}
-                <div className="lg:col-span-3 flex flex-col gap-6">
+                <div className="lg:col-span-4 flex flex-col gap-6">
                     
                     {/* Main Profile Card */}
                     <div className="group relative bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-8 flex flex-col items-center text-center shadow-xl hover:border-[#4DD4C4]/30 transition-all duration-500 overflow-hidden">
@@ -625,7 +625,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* --- RIGHT COLUMN: Main Content --- */}
-                <div className="lg:col-span-9 flex flex-col gap-6">
+                <div className="lg:col-span-8 flex flex-col gap-6">
                     {/* Top Row: Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                     {/* Performance Donut */}

@@ -180,6 +180,52 @@ export function DailySetClient() {
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
     }, [outputHeight]);
+
+    // ── Discussion Panels Resize ─────────────────────────
+    const [commentEditorHeight, setCommentEditorHeight] = useState(180);
+    const [replyEditorHeight, setReplyEditorHeight] = useState(150);
+
+    const handleCommentResizeStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        const startY = e.clientY;
+        const startHeight = commentEditorHeight;
+        const onMove = (moveEvent: MouseEvent) => {
+            const delta = startY - moveEvent.clientY;
+            const newHeight = Math.max(120, Math.min(500, startHeight + delta));
+            setCommentEditorHeight(newHeight);
+        };
+        const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }, [commentEditorHeight]);
+
+    const handleReplyResizeStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        const startY = e.clientY;
+        const startHeight = replyEditorHeight;
+        const onMove = (moveEvent: MouseEvent) => {
+            const delta = startY - moveEvent.clientY;
+            const newHeight = Math.max(100, Math.min(400, startHeight + delta));
+            setReplyEditorHeight(newHeight);
+        };
+        const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }, [replyEditorHeight]);
  
     // ── Handlers ─────────────────────────────────────────
     const handleProblemSelect = async (id: string) => {
@@ -1343,16 +1389,23 @@ export function DailySetClient() {
                                                                 <button onClick={() => setIsReplyPreview(false)} className={`text-[10px] pb-1 border-b font-medium transition-colors ${!isReplyPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>Write</button>
                                                                 <button onClick={() => setIsReplyPreview(true)} className={`text-[10px] pb-1 border-b font-medium transition-colors ${isReplyPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>Preview</button>
                                                             </div>
-                                                            <div className="flex gap-2">
-                                                                {isReplyPreview ? (
-                                                                    <div className="flex-1 bg-[#0b101c] border border-[#202736] rounded-xl p-3 min-h-[60px] text-zinc-300 text-[11px] overflow-auto">
-                                                                        {replyText.trim() ? <ReactMarkdown components={discussionMarkdownComponents}>{replyText}</ReactMarkdown> : <span className="text-zinc-600 italic">Nothing to preview...</span>}
+                                                            <div className="relative group/reply-panel">
+                                                                {/* Resize Handle */}
+                                                                <div 
+                                                                    onMouseDown={handleReplyResizeStart}
+                                                                    className="absolute -top-1 left-0 right-0 h-1.5 cursor-row-resize z-20 group-hover/reply-panel:bg-[#4DD4C4]/20 transition-colors"
+                                                                />
+                                                                <div className="flex gap-2" style={{ height: replyEditorHeight }}>
+                                                                    {isReplyPreview ? (
+                                                                        <div className="flex-1 bg-[#0b101c] border border-[#202736] rounded-xl p-3 h-full text-zinc-300 text-[11px] overflow-y-auto">
+                                                                            {replyText.trim() ? <ReactMarkdown components={discussionMarkdownComponents}>{replyText}</ReactMarkdown> : <span className="text-zinc-600 italic">Nothing to preview...</span>}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <textarea value={replyText} onChange={e => setReplyText(e.target.value)} placeholder={`Reply to ${replyingTo?.userName ?? ''}...`} className="flex-1 bg-[#0b101c] border border-[#202736] rounded-xl px-3 py-2 text-[11px] text-zinc-300 outline-none focus:border-[#4DD4C4]/50 resize-none h-full overflow-y-auto" onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handlePostReply(comment.id); } }} />
+                                                                    )}
+                                                                    <div className="flex flex-col justify-end">
+                                                                        <button onClick={() => handlePostReply(comment.id)} className="text-[#4DD4C4] hover:text-white transition-colors px-2 pb-2"><Send size={15} /></button>
                                                                     </div>
-                                                                ) : (
-                                                                    <textarea value={replyText} onChange={e => setReplyText(e.target.value)} placeholder={`Reply to ${replyingTo?.userName ?? ''}...`} rows={5} className="flex-1 bg-[#0b101c] border border-[#202736] rounded-xl px-3 py-2 text-[11px] text-zinc-300 outline-none focus:border-[#4DD4C4]/50 resize-none" onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handlePostReply(comment.id); } }} />
-                                                                )}
-                                                                <div className="flex flex-col justify-end">
-                                                                    <button onClick={() => handlePostReply(comment.id)} className="text-[#4DD4C4] hover:text-white transition-colors px-2 pb-2"><Send size={15} /></button>
                                                                 </div>
                                                             </div>
                                                             <p className="text-[9px] text-zinc-600 italic px-1">Supports markdown. <span className="text-zinc-500 font-medium font-sans">Ctrl+Enter</span></p>
@@ -1362,29 +1415,34 @@ export function DailySetClient() {
                                             ))}
                                         </div>
 
-                                        <div className="border-t border-[#202736] p-3 shrink-0 bg-[#0b101c]">
+                                        <div className="border-t border-[#202736] p-3 shrink-0 bg-[#0b101c] relative group/comment-panel" style={{ height: commentEditorHeight }}>
+                                            {/* Resize Handle */}
+                                            <div 
+                                                onMouseDown={handleCommentResizeStart}
+                                                className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize z-20 group-hover/comment-panel:bg-[#4DD4C4]/20 transition-colors"
+                                            />
                                             {authStatus === 'authenticated' ? (
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center gap-4 px-1 border-b border-[#202736]/60">
+                                                <div className="flex flex-col h-full space-y-2">
+                                                    <div className="flex items-center gap-4 px-1 border-b border-[#202736]/60 shrink-0">
                                                         <button onClick={() => setIsCommentPreview(false)} className={`text-[10px] pb-1 border-b font-medium uppercase tracking-wider transition-colors ${!isCommentPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>Write</button>
                                                         <button onClick={() => setIsCommentPreview(true)} className={`text-[10px] pb-1 border-b font-medium uppercase tracking-wider transition-colors ${isCommentPreview ? 'text-[#4DD4C4] border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>Preview</button>
                                                     </div>
-                                                    <div className="flex gap-2 items-end">
+                                                    <div className="flex gap-2 items-end flex-1 min-h-0">
                                                         {isCommentPreview ? (
-                                                            <div className="flex-1 bg-[#131924] border border-[#202736] rounded-xl px-3 py-3 min-h-[72px] text-zinc-300 text-xs overflow-auto">
+                                                            <div className="flex-1 bg-[#131924] border border-[#202736] rounded-xl px-3 py-3 h-full text-zinc-300 text-xs overflow-y-auto">
                                                                 {newComment.trim() ? <ReactMarkdown components={discussionMarkdownComponents}>{newComment}</ReactMarkdown> : <span className="text-zinc-600 italic">Nothing to preview...</span>}
                                                             </div>
                                                         ) : (
-                                                            <textarea value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Write a comment... (use ```sql for code blocks)" rows={6} className="flex-1 bg-[#131924] border border-[#202736] rounded-xl px-3 py-2 text-xs text-zinc-300 outline-none focus:border-[#4DD4C4]/50 resize-none" onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handlePostComment(); } }} />
+                                                            <textarea value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Write a comment... (use ```sql for code blocks)" className="flex-1 bg-[#131924] border border-[#202736] rounded-xl px-3 py-2 text-xs text-zinc-300 outline-none focus:border-[#4DD4C4]/50 resize-none h-full overflow-y-auto" onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handlePostComment(); } }} />
                                                         )}
-                                                        <button onClick={handlePostComment} disabled={!newComment.trim() || newComment === SQL_TEMPLATE} className="text-[#4DD4C4] hover:text-white transition-colors disabled:text-zinc-800 px-2 pb-2" title={isCommentPreview ? "Post Comment" : "Ctrl+Enter to post"}>
+                                                        <button onClick={handlePostComment} disabled={!newComment.trim() || newComment === SQL_TEMPLATE} className="text-[#4DD4C4] hover:text-white transition-colors disabled:text-zinc-800 px-2 pb-2 shrink-0" title={isCommentPreview ? "Post Comment" : "Ctrl+Enter to post"}>
                                                             <Send size={18} />
                                                         </button>
                                                     </div>
-                                                    <p className="text-[10px] text-zinc-600 px-1">Supports markdown. <span className="text-zinc-500 font-medium">Ctrl+Enter</span> to send.</p>
+                                                    <p className="text-[10px] text-zinc-600 px-1 shrink-0">Supports markdown. <span className="text-zinc-500 font-medium">Ctrl+Enter</span> to send.</p>
                                                 </div>
                                             ) : (
-                                                <div className="text-center space-y-2">
+                                                <div className="text-center space-y-2 flex flex-col justify-center h-full">
                                                     <p className="text-xs text-zinc-500">Sign in to join the discussion</p>
                                                     <div className="flex gap-2 justify-center">
                                                         <Link href="/login" className="px-4 py-1.5 bg-[#4DD4C4] text-[#080c16] rounded text-xs font-bold hover:bg-[#3dbdb0] transition-colors">Log In</Link>
