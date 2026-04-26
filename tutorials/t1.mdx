@@ -1,0 +1,110 @@
+## What is SQL?
+
+SQL (Structured Query Language) is a standard programming language used to manage and manipulate relational databases. It allows you to create, read, update, and delete data stored in tables.
+
+SQL is used by nearly every major application that stores structured data — from banking systems and e-commerce platforms to analytics dashboards and mobile apps.
+
+## Why Was SQL Created?
+
+In the early 1970s, IBM researchers Donald Chamberlin and Raymond Boyce developed SQL (originally called SEQUEL) to interact with IBM's relational database system. It was designed to give non-programmers a simple, English-like way to query data.
+
+Key milestones:
+- **1970** — Edgar F. Codd published the relational model for databases
+- **1974** — SQL was developed at IBM
+- **1986** — SQL became an ANSI standard
+- **1987** — SQL became an ISO standard
+- **Today** — SQL is used in MySQL, PostgreSQL, SQLite, SQL Server, BigQuery, and more
+
+## How Does SQL Work?
+
+SQL communicates with a **Relational Database Management System (RDBMS)**. Data is stored in **tables** (similar to spreadsheets), and SQL lets you ask questions about that data.
+
+```
+Your SQL Query
+     ↓
+RDBMS Engine (MySQL / PostgreSQL / SQLite)
+     ↓
+Returns Result Set
+```
+
+## Core Concepts
+
+### Tables
+A table is a collection of related data organized into rows and columns.
+
+```
+users table:
++----+----------+---------------------+-----+
+| id | name     | email               | age |
++----+----------+---------------------+-----+
+| 1  | Alice    | alice@email.com     | 28  |
+| 2  | Bob      | bob@email.com       | 34  |
+| 3  | Charlie  | charlie@email.com   | 22  |
++----+----------+---------------------+-----+
+```
+
+### Rows and Columns
+- **Row (Record)** — A single entry in the table (e.g., one user)
+- **Column (Field)** — A specific attribute (e.g., name, email, age)
+
+### Primary Key
+A unique identifier for each row. No two rows can have the same primary key.
+
+```sql
+CREATE TABLE users (
+  id    INT PRIMARY KEY,
+  name  VARCHAR(100),
+  email VARCHAR(100),
+  age   INT
+);
+```
+
+## SQL Command Categories
+
+SQL commands are grouped into five categories:
+
+| Category | Full Name | Purpose | Examples |
+|----------|-----------|---------|---------|
+| DDL | Data Definition Language | Define structure | CREATE, ALTER, DROP |
+| DML | Data Manipulation Language | Modify data | INSERT, UPDATE, DELETE |
+| DQL | Data Query Language | Read data | SELECT |
+| DCL | Data Control Language | Manage permissions | GRANT, REVOKE |
+| TCL | Transaction Control Language | Manage transactions | COMMIT, ROLLBACK |
+
+## Your First SQL Query
+
+```sql
+-- Select all columns from the users table
+SELECT * FROM users;
+
+-- Select specific columns
+SELECT name, email FROM users;
+
+-- Select with a condition
+SELECT name FROM users WHERE age > 25;
+```
+
+## SQL vs NoSQL
+
+| Feature | SQL | NoSQL |
+|---------|-----|-------|
+| Structure | Tables (rows/columns) | Documents, Key-Value, Graph |
+| Schema | Fixed schema | Flexible schema |
+| Query Language | SQL | Varies (MongoDB, Cassandra, etc.) |
+| Best For | Structured data, relations | Unstructured, large-scale data |
+| Examples | PostgreSQL, MySQL | MongoDB, Redis, DynamoDB |
+
+## Popular SQL Databases
+
+- **PostgreSQL** — Open source, powerful, great for production
+- **MySQL** — Most widely used, great for web apps
+- **SQLite** — Lightweight, file-based, great for local development
+- **SQL Server** — Microsoft's enterprise database
+- **BigQuery** — Google's cloud-based analytical SQL engine
+
+## Summary
+
+- SQL is the standard language for relational databases
+- Data is stored in tables with rows and columns
+- SQL commands are categorized into DDL, DML, DQL, DCL, and TCL
+- SQL is used across almost every industry and application type

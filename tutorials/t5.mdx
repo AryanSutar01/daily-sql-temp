@@ -1,0 +1,230 @@
+## What is a JOIN?
+
+A JOIN combines rows from two or more tables based on a related column. This is the heart of relational databases — data is split across tables and JOINs bring it back together.
+
+### Sample Tables
+
+```sql
+-- users table
++----+----------+
+| id | name     |
++----+----------+
+| 1  | Alice    |
+| 2  | Bob      |
+| 3  | Charlie  |
+| 4  | Diana    |
++----+----------+
+
+-- orders table
++----+-------------+---------+
+| id | customer_id | amount  |
++----+-------------+---------+
+| 1  | 1           | 500     |
+| 2  | 1           | 300     |
+| 3  | 2           | 750     |
+| 4  | 5           | 200     |  ← customer_id 5 doesn't exist in users
++----+-------------+---------+
+```
+
+## INNER JOIN
+
+Returns only rows that have a match in **both** tables. Non-matching rows are excluded.
+
+```sql
+SELECT users.name, orders.amount
+FROM users
+INNER JOIN orders ON users.id = orders.customer_id;
+```
+
+Result:
+```
++-------+--------+
+| name  | amount |
++-------+--------+
+| Alice | 500    |
+| Alice | 300    |
+| Bob   | 750    |
++-------+--------+
+```
+
+Charlie and Diana have no orders → excluded.
+Order with customer_id=5 → excluded (no matching user).
+
+```sql
+-- Shorthand: JOIN = INNER JOIN
+SELECT u.name, o.amount
+FROM users u
+JOIN orders o ON u.id = o.customer_id;
+```
+
+## LEFT JOIN
+
+Returns **all rows from the left table** and matching rows from the right table. Non-matching right rows become NULL.
+
+```sql
+SELECT users.name, orders.amount
+FROM users
+LEFT JOIN orders ON users.id = orders.customer_id;
+```
+
+Result:
+```
++---------+--------+
+| name    | amount |
++---------+--------+
+| Alice   | 500    |
+| Alice   | 300    |
+| Bob     | 750    |
+| Charlie | NULL   |  ← no orders, but Charlie is included
+| Diana   | NULL   |  ← no orders, but Diana is included
++---------+--------+
+```
+
+### Common Use Case: Find users with NO orders
+
+```sql
+SELECT users.name
+FROM users
+LEFT JOIN orders ON users.id = orders.customer_id
+WHERE orders.id IS NULL;
+```
+
+Result:
+```
++---------+
+| name    |
++---------+
+| Charlie |
+| Diana   |
++---------+
+```
+
+## RIGHT JOIN
+
+Returns **all rows from the right table** and matching rows from the left. Opposite of LEFT JOIN.
+
+```sql
+SELECT users.name, orders.amount
+FROM users
+RIGHT JOIN orders ON users.id = orders.customer_id;
+```
+
+Result:
+```
++-------+--------+
+| name  | amount |
++-------+--------+
+| Alice | 500    |
+| Alice | 300    |
+| Bob   | 750    |
+| NULL  | 200    |  ← order with unknown customer_id=5
++-------+--------+
+```
+
+> **Tip:** RIGHT JOIN is rarely used. You can always rewrite it as a LEFT JOIN by swapping the table order.
+
+## FULL OUTER JOIN
+
+Returns **all rows from both tables**. Non-matching rows from either side become NULL.
+
+```sql
+SELECT users.name, orders.amount
+FROM users
+FULL OUTER JOIN orders ON users.id = orders.customer_id;
+```
+
+Result:
+```
++---------+--------+
+| name    | amount |
++---------+--------+
+| Alice   | 500    |
+| Alice   | 300    |
+| Bob     | 750    |
+| Charlie | NULL   |
+| Diana   | NULL   |
+| NULL    | 200    |
++---------+--------+
+```
+
+> **Note:** MySQL does not support FULL OUTER JOIN. Simulate it with UNION of LEFT and RIGHT JOIN.
+
+```sql
+-- MySQL workaround for FULL OUTER JOIN
+SELECT users.name, orders.amount
+FROM users
+LEFT JOIN orders ON users.id = orders.customer_id
+
+UNION
+
+SELECT users.name, orders.amount
+FROM users
+RIGHT JOIN orders ON users.id = orders.customer_id;
+```
+
+## CROSS JOIN
+
+Returns every combination of rows from both tables (cartesian product). Use with caution — can produce huge result sets.
+
+```sql
+SELECT colors.name, sizes.name
+FROM colors
+CROSS JOIN sizes;
+```
+
+If colors has 3 rows and sizes has 4 rows → 12 rows returned.
+
+## SELF JOIN
+
+A table joined with itself. Useful for hierarchical data like employee-manager relationships.
+
+```sql
+-- employees table has a manager_id column pointing to another employee
+SELECT
+  e.name AS employee,
+  m.name AS manager
+FROM employees e
+JOIN employees m ON e.manager_id = m.id;
+```
+
+## JOIN with Multiple Tables
+
+```sql
+SELECT
+  u.name        AS customer,
+  p.name        AS product,
+  o.amount,
+  o.order_date
+FROM orders o
+JOIN users    u ON o.customer_id = u.id
+JOIN products p ON o.product_id  = p.id
+WHERE o.order_date >= '2024-01-01'
+ORDER BY o.order_date DESC;
+```
+
+## JOIN Cheat Sheet
+
+```
+Table A    Table B
+  1          1   ← INNER JOIN returns this
+  2          2   ← INNER JOIN returns this
+  3              ← LEFT JOIN includes this (NULL for B)
+               4 ← RIGHT JOIN includes this (NULL for A)
+```
+
+| JOIN Type | Returns |
+|-----------|---------|
+| INNER JOIN | Only matching rows from both tables |
+| LEFT JOIN | All left rows + matching right rows |
+| RIGHT JOIN | All right rows + matching left rows |
+| FULL OUTER JOIN | All rows from both tables |
+| CROSS JOIN | Every combination of rows |
+
+## Summary
+
+- `INNER JOIN` — only rows with matches in both tables
+- `LEFT JOIN` — all left rows, NULL for unmatched right rows
+- `RIGHT JOIN` — all right rows, NULL for unmatched left rows
+- `FULL OUTER JOIN` — all rows from both tables
+- Always use table aliases (`u`, `o`) for cleaner queries
+- Use `LEFT JOIN ... WHERE right.id IS NULL` to find unmatched rows

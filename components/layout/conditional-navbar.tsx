@@ -8,7 +8,7 @@ export function ConditionalNavbar() {
     const pathname = usePathname();
 
     // Practice page has its own integrated top bar
-    if (pathname.startsWith("/practice")) return null;
+    if (pathname.startsWith("/practice/daily")) return null;
 
     if (pathname.startsWith("/login") || pathname.startsWith("/signup") || pathname.startsWith("/admin")) return null;
 
