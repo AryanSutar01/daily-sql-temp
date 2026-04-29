@@ -1,0 +1,213 @@
+## What Are Aggregate Functions?
+
+Aggregate functions perform a calculation on a set of rows and return a single value. They collapse multiple rows into one summary result.
+
+| Function | Description |
+|----------|-------------|
+| `COUNT()` | Number of rows |
+| `SUM()` | Total of a numeric column |
+| `AVG()` | Average of a numeric column |
+| `MIN()` | Smallest value |
+| `MAX()` | Largest value |
+
+## COUNT
+
+```sql
+-- Total number of users
+SELECT COUNT(*) FROM users;
+
+-- Count users with an email (ignores NULLs)
+SELECT COUNT(email) FROM users;
+
+-- Count unique cities
+SELECT COUNT(DISTINCT city) FROM users;
+```
+
+## SUM
+
+```sql
+-- Total revenue
+SELECT SUM(amount) FROM orders;
+
+-- Total salary expense
+SELECT SUM(salary) FROM employees;
+```
+
+## AVG
+
+```sql
+-- Average order value
+SELECT AVG(amount) FROM orders;
+
+-- Average age of users
+SELECT AVG(age) FROM users;
+```
+
+## MIN and MAX
+
+```sql
+-- Youngest and oldest user
+SELECT MIN(age), MAX(age) FROM users;
+
+-- Cheapest and most expensive product
+SELECT MIN(price) AS cheapest, MAX(price) AS most_expensive
+FROM products;
+
+-- First and last order date
+SELECT MIN(order_date) AS first_order, MAX(order_date) AS last_order
+FROM orders;
+```
+
+## GROUP BY
+
+`GROUP BY` groups rows that have the same value in a column, then applies aggregate functions to each group.
+
+```sql
+-- Count users per city
+SELECT city, COUNT(*) AS user_count
+FROM users
+GROUP BY city;
+```
+
+Result:
+```
++-----------+------------+
+| city      | user_count |
++-----------+------------+
+| Mumbai    | 142        |
+| Delhi     | 98         |
+| Pune      | 67         |
+| Bangalore | 203        |
++-----------+------------+
+```
+
+```sql
+-- Total revenue per product
+SELECT product_id, SUM(amount) AS total_revenue
+FROM orders
+GROUP BY product_id;
+
+-- Average salary per department
+SELECT department, AVG(salary) AS avg_salary
+FROM employees
+GROUP BY department;
+
+-- Orders count and total per customer
+SELECT customer_id, COUNT(*) AS order_count, SUM(amount) AS total_spent
+FROM orders
+GROUP BY customer_id;
+```
+
+## GROUP BY Multiple Columns
+
+```sql
+-- Revenue per product per month
+SELECT
+  product_id,
+  EXTRACT(MONTH FROM order_date) AS month,
+  SUM(amount) AS monthly_revenue
+FROM orders
+GROUP BY product_id, EXTRACT(MONTH FROM order_date)
+ORDER BY product_id, month;
+```
+
+## HAVING
+
+`HAVING` filters groups after aggregation — like `WHERE` but for groups.
+
+```sql
+-- Cities with more than 100 users
+SELECT city, COUNT(*) AS user_count
+FROM users
+GROUP BY city
+HAVING COUNT(*) > 100;
+
+-- Departments with average salary above 50000
+SELECT department, AVG(salary) AS avg_salary
+FROM employees
+GROUP BY department
+HAVING AVG(salary) > 50000;
+
+-- Products with total revenue above 1 million
+SELECT product_id, SUM(amount) AS total_revenue
+FROM orders
+GROUP BY product_id
+HAVING SUM(amount) > 1000000;
+```
+
+## WHERE vs HAVING
+
+This is a very common interview question!
+
+| | WHERE | HAVING |
+|-|-------|--------|
+| Filters | Individual rows | Groups |
+| When applied | Before grouping | After grouping |
+| Can use aggregates | ❌ No | ✅ Yes |
+
+```sql
+-- WHERE filters rows BEFORE grouping
+-- HAVING filters groups AFTER grouping
+
+SELECT city, COUNT(*) AS user_count
+FROM users
+WHERE status = 'active'        -- filters rows first
+GROUP BY city
+HAVING COUNT(*) > 50;          -- then filters groups
+```
+
+## Full Aggregation Query Order
+
+```sql
+SELECT   city, COUNT(*) AS user_count   -- 5. Select columns
+FROM     users                           -- 1. From table
+WHERE    status = 'active'              -- 2. Filter rows
+GROUP BY city                           -- 3. Group
+HAVING   COUNT(*) > 50                  -- 4. Filter groups
+ORDER BY user_count DESC                -- 6. Sort
+LIMIT    10;                            -- 7. Limit
+```
+
+## Real World Examples
+
+```sql
+-- Monthly sales report
+SELECT
+  EXTRACT(YEAR FROM order_date)  AS year,
+  EXTRACT(MONTH FROM order_date) AS month,
+  COUNT(*)                       AS total_orders,
+  SUM(amount)                    AS total_revenue,
+  AVG(amount)                    AS avg_order_value
+FROM orders
+WHERE status = 'completed'
+GROUP BY
+  EXTRACT(YEAR FROM order_date),
+  EXTRACT(MONTH FROM order_date)
+ORDER BY year DESC, month DESC;
+
+-- Top 5 customers by spending
+SELECT
+  customer_id,
+  COUNT(*)    AS order_count,
+  SUM(amount) AS total_spent
+FROM orders
+GROUP BY customer_id
+ORDER BY total_spent DESC
+LIMIT 5;
+
+-- Categories with more than 10 products under $50
+SELECT category, COUNT(*) AS affordable_products
+FROM products
+WHERE price < 50
+GROUP BY category
+HAVING COUNT(*) > 10
+ORDER BY affordable_products DESC;
+```
+
+## Summary
+
+- Aggregate functions — `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`
+- `GROUP BY` — groups rows, then applies aggregate per group
+- `HAVING` — filters groups (like WHERE but after grouping)
+- `WHERE` filters rows before grouping; `HAVING` filters after
+- Execution order: FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT

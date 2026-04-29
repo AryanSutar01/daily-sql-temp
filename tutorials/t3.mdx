@@ -1,0 +1,201 @@
+## ORDER BY
+
+`ORDER BY` sorts the result set by one or more columns.
+
+```sql
+-- Sort users by age ascending (default)
+SELECT * FROM users ORDER BY age;
+
+-- Sort users by age descending
+SELECT * FROM users ORDER BY age DESC;
+
+-- Sort users by name ascending
+SELECT * FROM users ORDER BY name ASC;
+```
+
+## ASC vs DESC
+
+| Keyword | Meaning | Default? |
+|---------|---------|---------|
+| `ASC` | Ascending (A→Z, 0→9, oldest→newest) | Yes |
+| `DESC` | Descending (Z→A, 9→0, newest→oldest) | No |
+
+```sql
+-- Most recent orders first
+SELECT * FROM orders ORDER BY order_date DESC;
+
+-- Highest salary first
+SELECT * FROM employees ORDER BY salary DESC;
+```
+
+## Sorting by Multiple Columns
+
+You can sort by multiple columns. The second column is used as a tiebreaker when the first column has equal values.
+
+```sql
+-- Sort by city ASC, then by age DESC within each city
+SELECT name, city, age
+FROM users
+ORDER BY city ASC, age DESC;
+```
+
+Result:
+```
++----------+-----------+-----+
+| name     | city      | age |
++----------+-----------+-----+
+| Rahul    | Delhi     | 35  |
+| Priya    | Delhi     | 28  |
+| Amit     | Mumbai    | 42  |
+| Sneha    | Mumbai    | 31  |
+| Kiran    | Pune      | 25  |
++----------+-----------+-----+
+```
+
+## Sorting by Column Position
+
+You can reference columns by their position number in the SELECT list.
+
+```sql
+-- Same as ORDER BY name ASC, age DESC
+SELECT name, age, city FROM users ORDER BY 1 ASC, 2 DESC;
+```
+
+> **Tip:** Avoid this in production code — it's fragile if column order changes.
+
+## Sorting with NULL Values
+
+By default:
+- In **PostgreSQL** — NULLs appear last in ASC, first in DESC
+- In **MySQL** — NULLs appear first in ASC, last in DESC
+
+You can control this in PostgreSQL:
+
+```sql
+-- NULLs last in descending order
+SELECT * FROM users ORDER BY age DESC NULLS LAST;
+
+-- NULLs first in ascending order
+SELECT * FROM users ORDER BY age ASC NULLS FIRST;
+```
+
+## LIMIT
+
+`LIMIT` restricts how many rows are returned. Essential for performance and pagination.
+
+```sql
+-- Return only the first 5 users
+SELECT * FROM users LIMIT 5;
+
+-- Top 10 highest-paid employees
+SELECT name, salary FROM employees
+ORDER BY salary DESC
+LIMIT 10;
+```
+
+## OFFSET
+
+`OFFSET` skips a number of rows before starting to return results. Used together with `LIMIT` for pagination.
+
+```sql
+-- Skip first 10 rows, return next 10 (page 2)
+SELECT * FROM users
+ORDER BY id
+LIMIT 10 OFFSET 10;
+
+-- Page 3 (rows 21-30)
+SELECT * FROM users
+ORDER BY id
+LIMIT 10 OFFSET 20;
+```
+
+## Pagination Formula
+
+```
+OFFSET = (page_number - 1) * page_size
+```
+
+```sql
+-- Page 1: LIMIT 10 OFFSET 0
+-- Page 2: LIMIT 10 OFFSET 10
+-- Page 3: LIMIT 10 OFFSET 20
+-- Page N: LIMIT 10 OFFSET (N-1)*10
+```
+
+## FETCH (SQL Standard Alternative to LIMIT)
+
+Some databases (PostgreSQL, SQL Server) support the SQL standard syntax:
+
+```sql
+-- PostgreSQL / SQL Server
+SELECT * FROM users
+ORDER BY id
+FETCH FIRST 10 ROWS ONLY;
+
+-- With offset
+SELECT * FROM users
+ORDER BY id
+OFFSET 10 ROWS
+FETCH NEXT 10 ROWS ONLY;
+```
+
+## TOP (SQL Server / MS Access)
+
+```sql
+-- SQL Server syntax
+SELECT TOP 10 * FROM users ORDER BY salary DESC;
+```
+
+## Real World Examples
+
+```sql
+-- Latest 5 orders for a specific customer
+SELECT order_id, product, amount, order_date
+FROM orders
+WHERE customer_id = 101
+ORDER BY order_date DESC
+LIMIT 5;
+
+-- Leaderboard: Top 3 users by score
+SELECT name, score
+FROM game_scores
+ORDER BY score DESC
+LIMIT 3;
+
+-- Products page 3 (10 per page), sorted by price
+SELECT product_name, price
+FROM products
+ORDER BY price ASC
+LIMIT 10 OFFSET 20;
+```
+
+## ORDER BY with WHERE
+
+The full query clause order is:
+
+```sql
+SELECT columns
+FROM table
+WHERE conditions
+ORDER BY column ASC/DESC
+LIMIT n
+OFFSET n;
+```
+
+```sql
+-- Active users from Mumbai, sorted by name, first 20
+SELECT name, email
+FROM users
+WHERE status = 'active' AND city = 'Mumbai'
+ORDER BY name ASC
+LIMIT 20;
+```
+
+## Summary
+
+- `ORDER BY col ASC` — sort ascending (default)
+- `ORDER BY col DESC` — sort descending
+- Multiple columns — secondary sort as tiebreaker
+- `LIMIT n` — return only n rows
+- `OFFSET n` — skip n rows (for pagination)
+- Pagination formula: `OFFSET = (page - 1) * page_size`

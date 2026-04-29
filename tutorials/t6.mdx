@@ -1,0 +1,238 @@
+## What is a Subquery?
+
+A subquery (also called an inner query or nested query) is a query written inside another query. The inner query runs first, and its result is used by the outer query.
+
+```sql
+-- Find users who have placed orders
+SELECT name FROM users
+WHERE id IN (
+  SELECT DISTINCT customer_id FROM orders   -- subquery runs first
+);
+```
+
+## Types of Subqueries
+
+### 1. Subquery in WHERE
+
+```sql
+-- Find products priced above the average price
+SELECT name, price FROM products
+WHERE price > (SELECT AVG(price) FROM products);
+
+-- Find the customer who spent the most
+SELECT name FROM users
+WHERE id = (
+  SELECT customer_id
+  FROM orders
+  GROUP BY customer_id
+  ORDER BY SUM(amount) DESC
+  LIMIT 1
+);
+```
+
+### 2. Subquery in FROM (Derived Table)
+
+The subquery acts as a temporary table.
+
+```sql
+-- Average of per-customer totals
+SELECT AVG(customer_total) AS avg_customer_spending
+FROM (
+  SELECT customer_id, SUM(amount) AS customer_total
+  FROM orders
+  GROUP BY customer_id
+) AS customer_summary;
+```
+
+### 3. Subquery in SELECT (Scalar Subquery)
+
+Returns a single value per row.
+
+```sql
+SELECT
+  name,
+  (SELECT COUNT(*) FROM orders WHERE orders.customer_id = users.id) AS order_count
+FROM users;
+```
+
+## Correlated vs Non-Correlated Subqueries
+
+### Non-Correlated
+Runs once, independently of the outer query.
+
+```sql
+-- Runs once, same result for all rows
+SELECT name FROM users
+WHERE age > (SELECT AVG(age) FROM users);
+```
+
+### Correlated
+Runs once per row of the outer query — references the outer query.
+
+```sql
+-- Runs for every row in users
+SELECT name FROM users u
+WHERE EXISTS (
+  SELECT 1 FROM orders o WHERE o.customer_id = u.id
+);
+```
+
+## EXISTS and NOT EXISTS
+
+`EXISTS` returns true if the subquery returns at least one row.
+
+```sql
+-- Users who have placed at least one order
+SELECT name FROM users u
+WHERE EXISTS (
+  SELECT 1 FROM orders o WHERE o.customer_id = u.id
+);
+
+-- Users who have NEVER placed an order
+SELECT name FROM users u
+WHERE NOT EXISTS (
+  SELECT 1 FROM orders o WHERE o.customer_id = u.id
+);
+```
+
+> **Tip:** `EXISTS` is often faster than `IN` for large datasets because it short-circuits on the first match.
+
+## Common Table Expressions (CTEs)
+
+A CTE is a named temporary result set defined using `WITH`. It makes complex queries much more readable.
+
+```sql
+WITH cte_name AS (
+  SELECT ...  -- your subquery here
+)
+SELECT * FROM cte_name;
+```
+
+### Basic CTE Example
+
+```sql
+-- Without CTE (hard to read)
+SELECT AVG(customer_total)
+FROM (
+  SELECT customer_id, SUM(amount) AS customer_total
+  FROM orders
+  GROUP BY customer_id
+) AS t;
+
+-- With CTE (clean and readable)
+WITH customer_totals AS (
+  SELECT customer_id, SUM(amount) AS customer_total
+  FROM orders
+  GROUP BY customer_id
+)
+SELECT AVG(customer_total) AS avg_spending
+FROM customer_totals;
+```
+
+### Multiple CTEs
+
+```sql
+WITH
+active_users AS (
+  SELECT id, name FROM users WHERE status = 'active'
+),
+user_orders AS (
+  SELECT customer_id, COUNT(*) AS order_count, SUM(amount) AS total_spent
+  FROM orders
+  GROUP BY customer_id
+)
+SELECT
+  u.name,
+  COALESCE(o.order_count, 0)  AS order_count,
+  COALESCE(o.total_spent, 0)  AS total_spent
+FROM active_users u
+LEFT JOIN user_orders o ON u.id = o.customer_id
+ORDER BY total_spent DESC;
+```
+
+## Recursive CTEs
+
+Used for hierarchical or tree-structured data (e.g., org charts, categories).
+
+```sql
+-- Get all employees and their management chain
+WITH RECURSIVE org_chart AS (
+  -- Base case: top-level employees (no manager)
+  SELECT id, name, manager_id, 0 AS level
+  FROM employees
+  WHERE manager_id IS NULL
+
+  UNION ALL
+
+  -- Recursive case: employees with a manager
+  SELECT e.id, e.name, e.manager_id, oc.level + 1
+  FROM employees e
+  JOIN org_chart oc ON e.manager_id = oc.id
+)
+SELECT * FROM org_chart ORDER BY level, name;
+```
+
+## Subquery vs CTE vs JOIN — When to Use What?
+
+| Approach | Best For |
+|----------|----------|
+| Subquery | Simple one-off filters, scalar values |
+| CTE | Complex multi-step logic, readability, reuse within a query |
+| JOIN | Combining columns from multiple tables |
+| Recursive CTE | Tree/hierarchical data |
+
+```sql
+-- Same query written 3 ways:
+
+-- 1. Subquery
+SELECT name FROM users
+WHERE id IN (SELECT customer_id FROM orders WHERE amount > 1000);
+
+-- 2. CTE
+WITH big_orders AS (
+  SELECT customer_id FROM orders WHERE amount > 1000
+)
+SELECT name FROM users
+WHERE id IN (SELECT customer_id FROM big_orders);
+
+-- 3. JOIN
+SELECT DISTINCT u.name
+FROM users u
+JOIN orders o ON u.id = o.customer_id
+WHERE o.amount > 1000;
+```
+
+## Real World Example
+
+```sql
+-- Find the top 3 products by revenue in the last 30 days,
+-- along with each product's share of total revenue
+
+WITH recent_orders AS (
+  SELECT product_id, SUM(amount) AS product_revenue
+  FROM orders
+  WHERE order_date >= CURRENT_DATE - INTERVAL '30 days'
+  GROUP BY product_id
+),
+total AS (
+  SELECT SUM(product_revenue) AS total_revenue FROM recent_orders
+)
+SELECT
+  p.name,
+  ro.product_revenue,
+  ROUND(ro.product_revenue * 100.0 / t.total_revenue, 2) AS revenue_share_pct
+FROM recent_orders ro
+JOIN products p ON ro.product_id = p.id
+CROSS JOIN total t
+ORDER BY ro.product_revenue DESC
+LIMIT 3;
+```
+
+## Summary
+
+- Subqueries are queries nested inside other queries
+- Can appear in WHERE, FROM, or SELECT clauses
+- `EXISTS` / `NOT EXISTS` — check for row presence efficiently
+- CTEs (`WITH`) make complex queries readable and reusable
+- Multiple CTEs can be chained together
+- Recursive CTEs handle hierarchical/tree data

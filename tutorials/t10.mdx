@@ -1,0 +1,290 @@
+## What is Normalization?
+
+Normalization is the process of organizing a database to reduce **data redundancy** and improve **data integrity**. It involves structuring tables so that data is stored in one place and relationships are clean.
+
+### The Problem: Unnormalized Table
+
+```
+orders_flat table (BAD):
++----------+-----------+---------------------+------------+----------+---------+----------+
+| order_id | cust_name | cust_email          | cust_city  | product  | price   | quantity |
++----------+-----------+---------------------+------------+----------+---------+----------+
+| 1        | Alice     | alice@email.com     | Mumbai     | Laptop   | 50000   | 1        |
+| 2        | Alice     | alice@email.com     | Mumbai     | Mouse    | 500     | 2        |
+| 3        | Bob       | bob@email.com       | Delhi      | Keyboard | 1500    | 1        |
+| 4        | Alice     | alice@email.com     | Mumbai     | Laptop   | 50000   | 1        |
++----------+-----------+---------------------+------------+----------+---------+----------+
+```
+
+Problems:
+- Alice's email is stored 3 times → **update anomaly** (change it in one row, others are wrong)
+- Laptop price stored twice → **redundancy**
+- Delete Bob's order → Bob's data is lost → **deletion anomaly**
+
+## Normal Forms
+
+### 1NF — First Normal Form
+
+Rules:
+- Each column contains atomic (indivisible) values
+- No repeating groups or arrays
+- Each row is unique
+
+```sql
+-- ❌ Violates 1NF: multiple values in one column
++----------+---------------------------+
+| order_id | products                  |
++----------+---------------------------+
+| 1        | Laptop, Mouse, Keyboard   |  ← not atomic!
++----------+---------------------------+
+
+-- ✅ 1NF compliant: one value per cell
++----------+----------+
+| order_id | product  |
++----------+----------+
+| 1        | Laptop   |
+| 1        | Mouse    |
+| 1        | Keyboard |
++----------+----------+
+```
+
+### 2NF — Second Normal Form
+
+Rules:
+- Must be in 1NF
+- Every non-key column must depend on the **entire** primary key (no partial dependencies)
+- Applies to tables with composite primary keys
+
+```sql
+-- ❌ Violates 2NF: product_name depends only on product_id, not the full key
+order_items:
++----------+------------+--------------+----------+
+| order_id | product_id | product_name | quantity |  ← composite PK: (order_id, product_id)
++----------+------------+--------------+----------+
+| 1        | 5          | Laptop       | 1        |  product_name depends only on product_id
+| 2        | 5          | Laptop       | 2        |  ← redundant!
++----------+------------+--------------+----------+
+
+-- ✅ 2NF: split product_name into its own table
+order_items:                          products:
++----------+------------+----------+  +------------+--------------+--------+
+| order_id | product_id | quantity |  | product_id | product_name | price  |
++----------+------------+----------+  +------------+--------------+--------+
+| 1        | 5          | 1        |  | 5          | Laptop       | 50000  |
+| 2        | 5          | 2        |  +------------+--------------+--------+
++----------+------------+----------+
+```
+
+### 3NF — Third Normal Form
+
+Rules:
+- Must be in 2NF
+- No transitive dependencies (non-key column depending on another non-key column)
+
+```sql
+-- ❌ Violates 3NF: zip_code → city (city depends on zip, not on customer_id)
+customers:
++-------------+-------+----------+-----------+
+| customer_id | name  | zip_code | city      |
++-------------+-------+----------+-----------+
+| 1           | Alice | 400001   | Mumbai    |
+| 2           | Bob   | 400001   | Mumbai    |  ← city repeated for same zip
++-------------+-------+----------+-----------+
+
+-- ✅ 3NF: separate zip_code → city into its own table
+customers:                          zip_codes:
++-------------+-------+----------+  +----------+-----------+
+| customer_id | name  | zip_code |  | zip_code | city      |
++-------------+-------+----------+  +----------+-----------+
+| 1           | Alice | 400001   |  | 400001   | Mumbai    |
+| 2           | Bob   | 400001   |  +----------+-----------+
++-------------+-------+----------+
+```
+
+## Relationships
+
+### One-to-Many (most common)
+
+One user can have many orders.
+
+```sql
+CREATE TABLE users (
+  id   SERIAL PRIMARY KEY,
+  name VARCHAR(100)
+);
+
+CREATE TABLE orders (
+  id          SERIAL PRIMARY KEY,
+  customer_id INT REFERENCES users(id),  -- foreign key
+  amount      DECIMAL(10, 2),
+  order_date  DATE
+);
+```
+
+### Many-to-Many
+
+A student can enroll in many courses; a course can have many students.
+
+```sql
+-- Requires a junction/bridge table
+CREATE TABLE students (id SERIAL PRIMARY KEY, name VARCHAR(100));
+CREATE TABLE courses  (id SERIAL PRIMARY KEY, name VARCHAR(100));
+
+CREATE TABLE enrollments (
+  student_id INT REFERENCES students(id),
+  course_id  INT REFERENCES courses(id),
+  enrolled_at DATE,
+  PRIMARY KEY (student_id, course_id)  -- composite PK
+);
+```
+
+### One-to-One
+
+A user has exactly one profile.
+
+```sql
+CREATE TABLE users   (id SERIAL PRIMARY KEY, email VARCHAR(100));
+CREATE TABLE profiles (
+  user_id   INT PRIMARY KEY REFERENCES users(id),  -- also FK
+  bio       TEXT,
+  avatar_url VARCHAR(255)
+);
+```
+
+## Primary Keys and Foreign Keys
+
+```sql
+CREATE TABLE orders (
+  id          SERIAL PRIMARY KEY,
+  customer_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_id  INT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  amount      DECIMAL(10, 2) NOT NULL CHECK (amount > 0),
+  status      VARCHAR(20) DEFAULT 'pending',
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+```
+
+### ON DELETE behaviors:
+| Option | Behavior |
+|--------|----------|
+| `CASCADE` | Delete child rows when parent is deleted |
+| `RESTRICT` | Prevent deletion if child rows exist |
+| `SET NULL` | Set FK to NULL when parent is deleted |
+| `SET DEFAULT` | Set FK to default value |
+
+## Data Types (PostgreSQL)
+
+```sql
+-- Common data types
+id          SERIAL / BIGSERIAL     -- auto-incrementing integer
+name        VARCHAR(100)           -- variable-length string
+bio         TEXT                   -- unlimited string
+price       DECIMAL(10, 2)         -- exact decimal (10 digits, 2 after point)
+is_active   BOOLEAN                -- true/false
+created_at  TIMESTAMP              -- date and time
+birth_date  DATE                   -- date only
+metadata    JSONB                  -- JSON (binary, indexed)
+tags        TEXT[]                 -- array of text
+user_id     UUID                   -- universally unique identifier
+```
+
+## Constraints
+
+```sql
+CREATE TABLE products (
+  id          SERIAL PRIMARY KEY,
+  name        VARCHAR(200) NOT NULL,
+  sku         VARCHAR(50)  UNIQUE NOT NULL,
+  price       DECIMAL(10, 2) CHECK (price >= 0),
+  category_id INT NOT NULL REFERENCES categories(id),
+  stock       INT DEFAULT 0 CHECK (stock >= 0),
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+```
+
+| Constraint | Purpose |
+|-----------|---------|
+| `PRIMARY KEY` | Unique identifier, not null |
+| `FOREIGN KEY` | Link to another table |
+| `UNIQUE` | No duplicate values |
+| `NOT NULL` | Value is required |
+| `CHECK` | Custom validation rule |
+| `DEFAULT` | Default value if not provided |
+
+## Denormalization
+
+Sometimes you intentionally break normalization rules for performance.
+
+```sql
+-- Normalized: requires JOIN to get category name
+SELECT p.name, c.name AS category
+FROM products p JOIN categories c ON p.category_id = c.id;
+
+-- Denormalized: store category_name directly on product
+-- Faster reads, but category_name can become stale
+SELECT name, category_name FROM products;
+```
+
+Denormalization is appropriate for:
+- Read-heavy tables where joins are too expensive
+- Analytics / reporting tables (data warehouses)
+- Caching frequently needed data
+
+## Full Schema Example
+
+```sql
+-- E-commerce schema
+CREATE TABLE users (
+  id         BIGSERIAL PRIMARY KEY,
+  email      VARCHAR(255) UNIQUE NOT NULL,
+  name       VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE categories (
+  id   SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  slug VARCHAR(100) UNIQUE NOT NULL
+);
+
+CREATE TABLE products (
+  id          BIGSERIAL PRIMARY KEY,
+  name        VARCHAR(200) NOT NULL,
+  description TEXT,
+  price       DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
+  stock       INT NOT NULL DEFAULT 0,
+  category_id INT REFERENCES categories(id),
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE orders (
+  id          BIGSERIAL PRIMARY KEY,
+  customer_id BIGINT NOT NULL REFERENCES users(id),
+  total       DECIMAL(10, 2) NOT NULL,
+  status      VARCHAR(20) DEFAULT 'pending',
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE order_items (
+  id         BIGSERIAL PRIMARY KEY,
+  order_id   BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  product_id BIGINT NOT NULL REFERENCES products(id),
+  quantity   INT NOT NULL CHECK (quantity > 0),
+  unit_price DECIMAL(10, 2) NOT NULL
+);
+
+-- Indexes for common queries
+CREATE INDEX idx_orders_customer ON orders(customer_id);
+CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX idx_products_category ON products(category_id);
+```
+
+## Summary
+
+- Normalization reduces redundancy and prevents data anomalies
+- **1NF** — atomic values, no repeating groups
+- **2NF** — no partial dependencies on composite keys
+- **3NF** — no transitive dependencies
+- Relationships: one-to-many, many-to-many (junction table), one-to-one
+- Use foreign keys and constraints to enforce data integrity
+- Denormalize intentionally for performance when needed

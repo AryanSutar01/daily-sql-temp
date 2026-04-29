@@ -1,0 +1,202 @@
+## Creating Indexes
+
+```sql
+-- Single column index
+CREATE INDEX idx_users_email ON users(email);
+
+-- Multi-column (composite) index
+CREATE INDEX idx_orders_customer_date ON orders(customer_id, order_date);
+
+-- Unique index (also enforces uniqueness)
+CREATE UNIQUE INDEX idx_users_email_unique ON users(email);
+
+-- Drop an index
+DROP INDEX idx_users_email;
+```
+
+## How Indexes Work (B-Tree)
+
+```
+Without index — full table scan:
+Scan row 1 → Scan row 2 → ... → Scan row 1,000,000
+
+With B-Tree index on email:
+Root node
+├── emails A-M
+│   ├── A-F → [row pointers]
+│   └── G-M → [row pointers]
+└── emails N-Z
+    └── ...
+→ Find "alice@email.com" in ~20 comparisons instead of 1,000,000
+```
+
+## When to Add an Index
+
+**Good candidates:**
+- Columns used frequently in `WHERE` clauses
+- Columns used in `JOIN` conditions (`ON u.id = o.customer_id`)
+- Columns used in `ORDER BY` when combined with filtering
+- Foreign key columns
+
+```sql
+-- These queries benefit from an index on (customer_id)
+SELECT * FROM orders WHERE customer_id = 101;
+SELECT * FROM orders WHERE customer_id = 101 ORDER BY order_date DESC;
+```
+
+**Bad candidates:**
+- Columns with very few unique values (e.g., `status` with only 'active'/'inactive')
+- Tables with very few rows
+- Columns that are rarely queried
+
+## Composite Index — Column Order Matters
+
+```sql
+CREATE INDEX idx_orders_customer_date ON orders(customer_id, order_date);
+```
+
+This index efficiently supports:
+```sql
+WHERE customer_id = 101                          -- ✅ uses index
+WHERE customer_id = 101 AND order_date > '2024'  -- ✅ uses index
+WHERE order_date > '2024'                        -- ❌ cannot use index (leading column missing)
+```
+
+> **Rule:** A composite index can only be used when the query includes the **leftmost** columns of the index.
+
+## EXPLAIN / EXPLAIN ANALYZE
+
+Always use `EXPLAIN` to understand what the database is doing.
+
+```sql
+-- PostgreSQL
+EXPLAIN SELECT * FROM users WHERE email = 'alice@email.com';
+
+-- PostgreSQL with actual execution stats
+EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'alice@email.com';
+
+-- MySQL
+EXPLAIN SELECT * FROM users WHERE email = 'alice@email.com';
+```
+
+Key things to look for in the output:
+
+| Term | Meaning | Good or Bad |
+|------|---------|-------------|
+| Seq Scan | Full table scan | Bad on large tables |
+| Index Scan | Uses an index | Good |
+| Index Only Scan | All data from index, no table lookup | Best |
+| Nested Loop | Row-by-row join | OK for small tables |
+| Hash Join | Hash table-based join | Good for large tables |
+
+## Common Query Anti-Patterns
+
+### 1. Function on indexed column
+```sql
+-- ❌ Bad: index on email cannot be used
+SELECT * FROM users WHERE UPPER(email) = 'ALICE@EMAIL.COM';
+
+-- ✅ Good: store emails lowercase, or use a functional index
+SELECT * FROM users WHERE email = 'alice@email.com';
+```
+
+### 2. Leading wildcard in LIKE
+```sql
+-- ❌ Bad: cannot use index (starts with %)
+SELECT * FROM users WHERE name LIKE '%kumar';
+
+-- ✅ Good: trailing wildcard can use index
+SELECT * FROM users WHERE name LIKE 'kumar%';
+```
+
+### 3. SELECT *
+```sql
+-- ❌ Bad: fetches all columns, prevents index-only scans
+SELECT * FROM orders WHERE customer_id = 101;
+
+-- ✅ Good: fetch only what you need
+SELECT order_id, amount, order_date FROM orders WHERE customer_id = 101;
+```
+
+### 4. Implicit type conversion
+```sql
+-- ❌ Bad: customer_id is INT, but compared to string
+SELECT * FROM orders WHERE customer_id = '101';
+
+-- ✅ Good: match the column type
+SELECT * FROM orders WHERE customer_id = 101;
+```
+
+### 5. OR on different columns
+```sql
+-- ❌ Bad: cannot efficiently use a single index
+SELECT * FROM orders WHERE customer_id = 1 OR product_id = 5;
+
+-- ✅ Good: use UNION
+SELECT * FROM orders WHERE customer_id = 1
+UNION
+SELECT * FROM orders WHERE product_id = 5;
+```
+
+## Query Optimization Tips
+
+### Use EXISTS instead of COUNT
+```sql
+-- ❌ Slower: counts all matching rows
+SELECT * FROM users WHERE (SELECT COUNT(*) FROM orders WHERE customer_id = users.id) > 0;
+
+-- ✅ Faster: stops at first match
+SELECT * FROM users u WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = u.id);
+```
+
+### Avoid N+1 queries
+```sql
+-- ❌ Bad: 1 query to get users + N queries to get each user's orders
+-- (this is an application-level problem, but use JOINs to solve it)
+
+-- ✅ Good: single JOIN
+SELECT u.name, COUNT(o.id) AS order_count
+FROM users u
+LEFT JOIN orders o ON u.id = o.customer_id
+GROUP BY u.name;
+```
+
+### Limit early
+```sql
+-- ❌ Slower: sorts all rows then takes 10
+SELECT * FROM orders ORDER BY amount DESC LIMIT 10;
+
+-- ✅ Better: filter first, then sort
+SELECT * FROM orders
+WHERE order_date >= '2024-01-01'
+ORDER BY amount DESC
+LIMIT 10;
+```
+
+## Types of Indexes
+
+| Type | Use Case |
+|------|----------|
+| B-Tree (default) | Equality and range queries |
+| Hash | Equality only (=) |
+| GIN | Full-text search, arrays (PostgreSQL) |
+| GiST | Geometric data, full-text (PostgreSQL) |
+| Partial Index | Index only a subset of rows |
+| Covering Index | Include extra columns for index-only scans |
+
+```sql
+-- Partial index: only index active users
+CREATE INDEX idx_active_users ON users(email) WHERE status = 'active';
+
+-- Covering index: include extra columns
+CREATE INDEX idx_orders_covering ON orders(customer_id) INCLUDE (amount, order_date);
+```
+
+## Summary
+
+- Indexes allow the database to find rows without full table scans
+- Add indexes on columns used in WHERE, JOIN, and ORDER BY
+- Composite index column order matters — leftmost columns first
+- Use `EXPLAIN ANALYZE` to see how your query actually runs
+- Avoid functions on indexed columns, leading wildcards, and SELECT *
+- Too many indexes slow down INSERT/UPDATE/DELETE — index wisely

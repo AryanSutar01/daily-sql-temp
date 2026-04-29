@@ -3,17 +3,20 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
-import { ArrowRight, Flame, User, LogOut, Loader2 } from "lucide-react";
+import { ArrowRight, Flame, User, LogOut, Loader2, ChevronDown, Code2, BookOpen } from "lucide-react";
 import { api } from "@/lib/api";
 import { usePathname, useRouter } from "next/navigation";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isPracticeOpen, setIsPracticeOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [streak, setStreak] = useState(0);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const practiceRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
   const isAdmin = pathname.startsWith("/admin");
@@ -21,10 +24,28 @@ export function Navbar() {
   const practiceHref = user ? "/practice/daily" : "/login";
 
   const navItems = [
-    { name: "Practice", href: practiceHref },
     { name: "Pricing", href: "/#pricing" },
     { name: "FAQ", href: "/#faq" },
     { name: "Contact", href: "/contact" },
+  ];
+
+  const practiceOptions = [
+    {
+      title: "Coding Questions",
+      description: "Practice coding problems in SQL.",
+      href: practiceHref,
+      icon: Code2,
+      iconBg: "bg-[#4DD4C4]/10",
+      iconColor: "text-[#4DD4C4]",
+    },
+    {
+      title: "learn SQL",
+      description: "Essential SQL theory.",
+      href: "/practice/learn",
+      icon: BookOpen,
+      iconBg: "bg-amber-400/10",
+      iconColor: "text-amber-400",
+    },
   ];
 
   useEffect(() => {
@@ -43,11 +64,14 @@ export function Navbar() {
     fetchUser();
   }, []);
 
-  // Close dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsDropdownOpen(false);
+      }
+      if (practiceRef.current && !practiceRef.current.contains(e.target as Node)) {
+        setIsPracticeOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -76,6 +100,46 @@ export function Navbar() {
           {/* Desktop Navigation - Centered */}
           {!isAdmin && (
             <div className="hidden md:flex items-center justify-center flex-1 space-x-8">
+
+              {/* Practice Interview Question Dropdown */}
+              <div className="relative" ref={practiceRef}>
+                <button
+                  onClick={() => setIsPracticeOpen((prev) => !prev)}
+                  className="flex items-center gap-1 text-sm text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  Practice Interview Question
+                  <ChevronDown
+                    size={14}
+                    className={`mt-1 transition-transform duration-200 ${isPracticeOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {isPracticeOpen && (
+                  <div className="absolute top-8 left-0 w-[420px] bg-[#0f1623] border border-[#202736] rounded-2xl shadow-2xl p-3 z-[200] grid grid-cols-2 gap-2">
+                    {practiceOptions.map((option) => (
+                      <Link
+                        key={option.href}
+                        href={option.href}
+                        onClick={() => setIsPracticeOpen(false)}
+                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-[#1a2235] transition-colors group"
+                      >
+                        <div className={`flex-shrink-0 w-9 h-9 rounded-lg ${option.iconBg} flex items-center justify-center mt-0.5`}>
+                          <option.icon size={16} className={option.iconColor} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-white group-hover:text-[#4DD4C4] transition-colors leading-tight">
+                            {option.title}
+                          </p>
+                          <p className="text-xs text-zinc-500 mt-0.5 leading-snug">
+                            {option.description}
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {navItems.map((item) => (
                 <Link
                   key={item.name}
@@ -95,7 +159,6 @@ export function Navbar() {
                 <Loader2 size={18} className="animate-spin text-zinc-500" />
               ) : user ? (
                 <>
-                  {/* ... existing user code ... */}
                   <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4DD4C4]/10 border border-[#4DD4C4]/20 rounded-lg">
                     <span className="text-sm font-bold text-[#4DD4C4]">{streak}</span>
                     <Flame size={14} className="text-[#4DD4C4] fill-[#4DD4C4]" />
@@ -184,6 +247,22 @@ export function Navbar() {
         {/* Mobile Navigation */}
         {isOpen && (
           <div className="md:hidden py-4 space-y-4 border-t border-white/5">
+            {/* Mobile Practice Section */}
+            <div className="space-y-2">
+              <p className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Practice Interview Question</p>
+              {practiceOptions.map((option) => (
+                <Link
+                  key={option.href}
+                  href={option.href}
+                  className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors pl-2"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <option.icon size={14} className={option.iconColor} />
+                  {option.title}
+                </Link>
+              ))}
+            </div>
+
             {navItems.map((item) => (
               <Link
                 key={item.name}
@@ -194,6 +273,7 @@ export function Navbar() {
                 {item.name}
               </Link>
             ))}
+
             {user ? (
               <>
                 <Link

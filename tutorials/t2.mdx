@@ -1,0 +1,188 @@
+## The SELECT Statement
+
+`SELECT` is the most fundamental SQL command. It retrieves data from one or more tables.
+
+```sql
+-- Select all columns
+SELECT * FROM users;
+
+-- Select specific columns
+SELECT name, email FROM users;
+
+-- Select with an alias
+SELECT name AS full_name, email AS contact FROM users;
+```
+
+## The WHERE Clause
+
+`WHERE` filters rows based on a condition. Only rows that satisfy the condition are returned.
+
+```sql
+SELECT * FROM users WHERE age > 25;
+
+SELECT * FROM users WHERE city = 'New York';
+
+SELECT * FROM users WHERE age > 18 AND city = 'London';
+```
+
+## Comparison Operators
+
+| Operator | Meaning | Example |
+|----------|---------|---------|
+| `=` | Equal | `age = 25` |
+| `!=` or `<>` | Not equal | `age != 25` |
+| `>` | Greater than | `age > 25` |
+| `<` | Less than | `age < 25` |
+| `>=` | Greater than or equal | `age >= 25` |
+| `<=` | Less than or equal | `age <= 25` |
+
+## Logical Operators
+
+### AND
+All conditions must be true.
+
+```sql
+SELECT * FROM users
+WHERE age > 18 AND city = 'Mumbai';
+```
+
+### OR
+At least one condition must be true.
+
+```sql
+SELECT * FROM users
+WHERE city = 'Mumbai' OR city = 'Delhi';
+```
+
+### NOT
+Negates a condition.
+
+```sql
+SELECT * FROM users
+WHERE NOT city = 'Mumbai';
+```
+
+## BETWEEN
+
+Filters rows within a range (inclusive).
+
+```sql
+-- Users aged between 20 and 30
+SELECT * FROM users WHERE age BETWEEN 20 AND 30;
+
+-- Orders placed in January 2024
+SELECT * FROM orders
+WHERE order_date BETWEEN '2024-01-01' AND '2024-01-31';
+```
+
+## IN
+
+Filters rows where a column matches any value in a list. Much cleaner than multiple OR conditions.
+
+```sql
+-- Instead of this:
+SELECT * FROM users
+WHERE city = 'Mumbai' OR city = 'Delhi' OR city = 'Pune';
+
+-- Use this:
+SELECT * FROM users
+WHERE city IN ('Mumbai', 'Delhi', 'Pune');
+
+-- NOT IN
+SELECT * FROM users
+WHERE city NOT IN ('Mumbai', 'Delhi');
+```
+
+## LIKE
+
+Filters rows based on a pattern match. Used for text/string searches.
+
+### Wildcards
+- `%` — matches zero or more characters
+- `_` — matches exactly one character
+
+```sql
+-- Names starting with 'A'
+SELECT * FROM users WHERE name LIKE 'A%';
+
+-- Names ending with 'Kumar'
+SELECT * FROM users WHERE name LIKE '%Kumar';
+
+-- Names containing 'raj'
+SELECT * FROM users WHERE name LIKE '%raj%';
+
+-- Names with exactly 5 characters
+SELECT * FROM users WHERE name LIKE '_____';
+
+-- Names starting with 'A' and ending with 'a'
+SELECT * FROM users WHERE name LIKE 'A%a';
+```
+
+### Case Sensitivity
+- In **MySQL** — LIKE is case-insensitive by default
+- In **PostgreSQL** — use `ILIKE` for case-insensitive matching
+
+```sql
+-- PostgreSQL case-insensitive search
+SELECT * FROM users WHERE name ILIKE 'alice%';
+```
+
+## IS NULL / IS NOT NULL
+
+NULL means missing or unknown value. You cannot use `=` to check for NULL.
+
+```sql
+-- Find users with no email
+SELECT * FROM users WHERE email IS NULL;
+
+-- Find users who have an email
+SELECT * FROM users WHERE email IS NOT NULL;
+```
+
+## Combining Filters — Real Example
+
+```sql
+-- Find active users from Mumbai or Delhi aged between 25 and 40
+-- whose name starts with 'A' and have an email address
+
+SELECT id, name, email, age, city
+FROM users
+WHERE
+  status = 'active'
+  AND city IN ('Mumbai', 'Delhi')
+  AND age BETWEEN 25 AND 40
+  AND name LIKE 'A%'
+  AND email IS NOT NULL;
+```
+
+## DISTINCT
+
+Removes duplicate values from results.
+
+```sql
+-- Get unique cities from users table
+SELECT DISTINCT city FROM users;
+
+-- Get unique combinations
+SELECT DISTINCT city, status FROM users;
+```
+
+## LIMIT
+
+Restricts the number of rows returned (covered more in the next tutorial).
+
+```sql
+-- Return only the first 10 users
+SELECT * FROM users LIMIT 10;
+```
+
+## Summary
+
+- `SELECT` retrieves data from tables
+- `WHERE` filters rows using conditions
+- `AND`, `OR`, `NOT` combine multiple conditions
+- `BETWEEN` filters within a range
+- `IN` matches any value from a list
+- `LIKE` matches string patterns using `%` and `_`
+- `IS NULL` checks for missing values
+- `DISTINCT` removes duplicate rows

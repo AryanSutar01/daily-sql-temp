@@ -1,0 +1,233 @@
+## What Are Window Functions?
+
+Window functions perform calculations across a set of rows **related to the current row** — without collapsing the result into a single row like `GROUP BY` does.
+
+```sql
+-- GROUP BY collapses rows
+SELECT department, AVG(salary) FROM employees GROUP BY department;
+-- Returns 1 row per department
+
+-- Window function keeps all rows
+SELECT name, department, salary,
+  AVG(salary) OVER (PARTITION BY department) AS dept_avg
+FROM employees;
+-- Returns ALL rows, each with dept avg alongside
+```
+
+## Syntax
+
+```sql
+function_name() OVER (
+  PARTITION BY column   -- optional: divide rows into groups
+  ORDER BY column       -- optional: order within partition
+  ROWS/RANGE frame      -- optional: define the window frame
+)
+```
+
+## ROW_NUMBER
+
+Assigns a unique sequential number to each row within a partition.
+
+```sql
+-- Rank employees by salary within each department
+SELECT
+  name,
+  department,
+  salary,
+  ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC) AS row_num
+FROM employees;
+```
+
+Result:
+```
++----------+-------------+--------+---------+
+| name     | department  | salary | row_num |
++----------+-------------+--------+---------+
+| Alice    | Engineering | 95000  | 1       |
+| Bob      | Engineering | 82000  | 2       |
+| Charlie  | Engineering | 76000  | 3       |
+| Diana    | Marketing   | 71000  | 1       |
+| Eve      | Marketing   | 65000  | 2       |
++----------+-------------+--------+---------+
+```
+
+### Common Use Case: Get the highest-paid employee per department
+
+```sql
+WITH ranked AS (
+  SELECT *,
+    ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC) AS rn
+  FROM employees
+)
+SELECT name, department, salary
+FROM ranked
+WHERE rn = 1;
+```
+
+## RANK and DENSE_RANK
+
+Both assign rankings, but handle ties differently.
+
+```sql
+SELECT
+  name,
+  score,
+  RANK()       OVER (ORDER BY score DESC) AS rank,
+  DENSE_RANK() OVER (ORDER BY score DESC) AS dense_rank,
+  ROW_NUMBER() OVER (ORDER BY score DESC) AS row_num
+FROM scores;
+```
+
+Result:
+```
++-------+-------+------+------------+---------+
+| name  | score | rank | dense_rank | row_num |
++-------+-------+------+------------+---------+
+| Alice | 95    | 1    | 1          | 1       |
+| Bob   | 90    | 2    | 2          | 2       |
+| Carol | 90    | 2    | 2          | 3       |  ← tie
+| Dave  | 85    | 4    | 3          | 4       |  ← RANK skips 3, DENSE_RANK doesn't
++-------+-------+------+------------+---------+
+```
+
+| Function | Tie Behavior | Gap After Tie |
+|----------|-------------|---------------|
+| `ROW_NUMBER()` | Arbitrary order | No ties |
+| `RANK()` | Same rank | Yes (skips numbers) |
+| `DENSE_RANK()` | Same rank | No (continuous) |
+
+## LAG and LEAD
+
+Access values from previous or next rows.
+
+```sql
+-- Compare each month's revenue to the previous month
+SELECT
+  month,
+  revenue,
+  LAG(revenue)  OVER (ORDER BY month) AS prev_month_revenue,
+  LEAD(revenue) OVER (ORDER BY month) AS next_month_revenue,
+  revenue - LAG(revenue) OVER (ORDER BY month) AS month_over_month_change
+FROM monthly_revenue;
+```
+
+```sql
+-- LAG with offset and default
+LAG(revenue, 1, 0) OVER (ORDER BY month)
+-- 1 = look back 1 row, 0 = default if no previous row
+```
+
+## SUM, AVG, COUNT as Window Functions
+
+```sql
+-- Running total of revenue
+SELECT
+  order_date,
+  amount,
+  SUM(amount) OVER (ORDER BY order_date) AS running_total
+FROM orders;
+
+-- Running total per customer
+SELECT
+  customer_id,
+  order_date,
+  amount,
+  SUM(amount) OVER (PARTITION BY customer_id ORDER BY order_date) AS customer_running_total
+FROM orders;
+
+-- Each employee's salary vs department average
+SELECT
+  name,
+  department,
+  salary,
+  AVG(salary) OVER (PARTITION BY department) AS dept_avg,
+  salary - AVG(salary) OVER (PARTITION BY department) AS diff_from_avg
+FROM employees;
+```
+
+## NTILE
+
+Divides rows into N equal buckets.
+
+```sql
+-- Divide customers into 4 quartiles by total spending
+SELECT
+  customer_id,
+  total_spent,
+  NTILE(4) OVER (ORDER BY total_spent DESC) AS spending_quartile
+FROM customer_summary;
+-- 1 = top 25%, 4 = bottom 25%
+```
+
+## FIRST_VALUE and LAST_VALUE
+
+```sql
+-- Highest salary in the department alongside each employee
+SELECT
+  name,
+  department,
+  salary,
+  FIRST_VALUE(salary) OVER (
+    PARTITION BY department ORDER BY salary DESC
+  ) AS dept_max_salary
+FROM employees;
+```
+
+## Window Frame
+
+Controls which rows are included in the window calculation.
+
+```sql
+-- 7-day moving average
+SELECT
+  order_date,
+  revenue,
+  AVG(revenue) OVER (
+    ORDER BY order_date
+    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+  ) AS moving_avg_7d
+FROM daily_revenue;
+```
+
+Common frame options:
+```sql
+ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW  -- from start to current row
+ROWS BETWEEN 6 PRECEDING AND CURRENT ROW          -- last 7 rows
+ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING          -- 3-row centered window
+ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING  -- current to end
+```
+
+## Real World Example
+
+```sql
+-- Sales dashboard: rank products, show running total, compare to prev month
+
+WITH monthly_product_sales AS (
+  SELECT
+    product_id,
+    DATE_TRUNC('month', order_date) AS month,
+    SUM(amount) AS revenue
+  FROM orders
+  GROUP BY product_id, DATE_TRUNC('month', order_date)
+)
+SELECT
+  product_id,
+  month,
+  revenue,
+  RANK()      OVER (PARTITION BY month ORDER BY revenue DESC)   AS monthly_rank,
+  LAG(revenue) OVER (PARTITION BY product_id ORDER BY month)    AS prev_month_revenue,
+  SUM(revenue) OVER (PARTITION BY product_id ORDER BY month)    AS cumulative_revenue
+FROM monthly_product_sales
+ORDER BY month DESC, monthly_rank;
+```
+
+## Summary
+
+- Window functions calculate across related rows without collapsing them
+- `ROW_NUMBER()` — unique sequential number
+- `RANK()` — ranking with gaps on ties
+- `DENSE_RANK()` — ranking without gaps on ties
+- `LAG()` / `LEAD()` — access previous / next row values
+- `SUM()`, `AVG()` over a window — running totals, moving averages
+- `PARTITION BY` — divides rows into independent groups
+- `ORDER BY` inside OVER — defines row order within the window
