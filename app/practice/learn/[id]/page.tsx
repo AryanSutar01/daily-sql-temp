@@ -2,6 +2,7 @@ import { compileMDX } from "next-mdx-remote/rsc"
 import { tutorials } from "@/tutorials/manifest"
 import { getTutorial } from "@/tutorials"
 import { notFound } from "next/navigation"
+import remarkGfm from "remark-gfm"
 import { BadgeCheck, Zap, Search, ArrowUpDown, BarChart3, GitMerge, Puzzle, AppWindow, Gauge, Lock, Building2 } from "lucide-react"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
@@ -30,7 +31,7 @@ const mdxComponents = {
   pre: ({ children, ...props }: any) => {
     const code = children?.props?.children?.trim() || ""
     return (
-      <div className="relative group">
+      <div className="relative group my-6">
         <pre {...props} className="bg-[#1a1f2e] rounded-xl p-4 overflow-x-auto text-sm border border-[#202736]">
           {children}
         </pre>
@@ -100,19 +101,34 @@ const mdxComponents = {
     </li>
   ),
   table: ({ children, ...props }: any) => (
-    <div className="overflow-x-auto mb-4">
+    <div className="overflow-x-auto mb-4 rounded-lg border border-[#202736]">
       <table {...props} className="w-full border-collapse text-sm">
         {children}
       </table>
     </div>
   ),
+  thead: ({ children, ...props }: any) => (
+    <thead {...props} className="bg-[#0f1623]">
+      {children}
+    </thead>
+  ),
+  tbody: ({ children, ...props }: any) => (
+    <tbody {...props} className="divide-y divide-[#202736]">
+      {children}
+    </tbody>
+  ),
+  tr: ({ children, ...props }: any) => (
+    <tr {...props} className="hover:bg-[#0f1623]/50 transition-colors">
+      {children}
+    </tr>
+  ),
   th: ({ children, ...props }: any) => (
-    <th {...props} className="border border-[#202736] bg-[#0f1623] px-4 py-2 text-left text-zinc-400 font-medium">
+    <th {...props} className="border-b border-[#202736] px-4 py-3 text-left text-zinc-400 font-medium text-sm">
       {children}
     </th>
   ),
   td: ({ children, ...props }: any) => (
-    <td {...props} className="border border-[#202736] px-4 py-2 text-zinc-300">
+    <td {...props} className="border-b border-[#202736] px-4 py-3 text-zinc-300 text-sm">
       {children}
     </td>
   ),
@@ -153,6 +169,11 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
   const { content } = await compileMDX({
     source: tutorial.source,
     components: mdxComponents,
+    options: {
+      mdxOptions: {
+        remarkPlugins: [remarkGfm],
+      },
+    },
   })
 
   const currentIndex = tutorials.findIndex((t) => t.id === id)
