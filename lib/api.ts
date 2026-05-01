@@ -51,6 +51,7 @@ export const api = {
 
     // Profiles & Onboarding
     getProfile: () => fetchApi<any>('/me/profile'),
+    getPublicProfile: (username: string) => fetchApi<any>(`/u/${username}`),
     updateProfile: (data: any) =>
         fetchApi<any>('/me/profile', {
             method: 'POST',

@@ -46,13 +46,17 @@ export default function ProfilePage() {
     const [selectedYear, setSelectedYear] = useState<string>('last_12');
     const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
-    // Form State
     const [formData, setFormData] = useState({
         full_name: "",
         occupation: "",
         job_role: "",
         experience_years: 0,
-        avatar_url: ""
+        avatar_url: "",
+        username: "",
+        is_public_profile: true,
+        bio: "",
+        linkedin_url: "",
+        github_url: ""
     });
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -111,7 +115,12 @@ export default function ProfilePage() {
                     occupation: mockProfile.occupation,
                     job_role: mockProfile.job_role,
                     experience_years: mockProfile.experience_years,
-                    avatar_url: mockProfile.avatar_url || ""
+                    avatar_url: mockProfile.avatar_url || "",
+                    username: "johndoe",
+                    is_public_profile: true,
+                    bio: "Mock bio",
+                    linkedin_url: "",
+                    github_url: ""
                 });
                 setIsLoading(false);
                 return;
@@ -138,7 +147,12 @@ export default function ProfilePage() {
                         occupation: data.occupation || "",
                         job_role: data.job_role || "",
                         experience_years: data.experience_years || 0,
-                        avatar_url: data.avatar_url || ""
+                        avatar_url: data.avatar_url || "",
+                        username: data.username || "",
+                        is_public_profile: data.is_public_profile ?? true,
+                        bio: data.bio || "",
+                        linkedin_url: data.linkedin_url || "",
+                        github_url: data.github_url || ""
                     });
                 }
             } catch (err) {
@@ -159,10 +173,13 @@ export default function ProfilePage() {
             setProfile(updated);
             setIsEditing(false);
             
-            // Redirect to practice page after successful onboarding/update
-            router.push("/practice/daily");
-        } catch (err) {
+            // If just finished onboarding, redirect to practice
+            if (!profile.onboarding_completed) {
+                router.push("/practice/daily");
+            }
+        } catch (err: any) {
             console.error("Failed to save profile", err);
+            setToast({ type: 'error', message: err.message || "Failed to update profile." });
         } finally {
             setIsSaving(false);
         }
@@ -367,11 +384,47 @@ export default function ProfilePage() {
     if (profile && (!profile.onboarding_completed || isEditing)) {
         return (
             <div className="min-h-[calc(100vh-64px)] bg-[#080c16] flex flex-col items-center justify-center p-6">
-                <div className="max-w-md w-full p-8 rounded-3xl border border-[#202736] bg-[#131924] shadow-2xl relative overflow-hidden">
+                <div className="max-w-2xl w-full p-8 rounded-3xl border border-[#202736] bg-[#131924] shadow-2xl relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#4DD4C4] to-transparent opacity-50"></div>
+                    
+                    {toast && (
+                        <div className={`mb-6 p-4 rounded-xl border flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-[#4DD4C4]/10 border-[#4DD4C4]/30 text-[#4DD4C4]'}`}>
+                            {toast.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
+                            <span className="text-sm font-medium">{toast.message}</span>
+                        </div>
+                    )}
+
                     <div className="flex flex-col items-center mb-8 text-center">
-                        <div className="w-16 h-16 rounded-2xl bg-[#4DD4C4]/10 flex items-center justify-center mb-4 border border-[#4DD4C4]/20">
-                            <Sparkles className="text-[#4DD4C4]" size={32} />
+                        <div 
+                            onClick={handlePhotoClick}
+                            className="relative w-24 h-24 rounded-3xl mb-4 p-1 border border-[#4DD4C4]/30 bg-[#4DD4C4]/5 hover:border-[#4DD4C4]/60 hover:bg-[#4DD4C4]/10 transition-all duration-300 shadow-lg shadow-[#4DD4C4]/10 cursor-pointer overflow-hidden group/avatar"
+                        >
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={handleFileChange} 
+                                className="hidden" 
+                                accept="image/*"
+                            />
+                            <div className="w-full h-full rounded-[20px] overflow-hidden bg-[#080c16] flex justify-center items-center border border-[#202736]/50 relative">
+                                {formData.avatar_url || profile.avatar_url ? (
+                                    <img src={formData.avatar_url || profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                                ) : (
+                                    <User size={32} className="text-zinc-600" />
+                                )}
+                                
+                                {/* Hover Overlay */}
+                                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300">
+                                    {isUploading ? (
+                                        <Loader2 size={20} className="text-[#4DD4C4] animate-spin" />
+                                    ) : (
+                                        <>
+                                            <Camera size={20} className="text-white mb-1" />
+                                            <span className="text-[10px] font-bold text-white">Change</span>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                         <h2 className="text-2xl font-bold text-white mb-2">{profile.onboarding_completed ? "Update Your Profile" : "Complete Your Profile"}</h2>
                         <p className="text-zinc-400 text-sm">
@@ -382,18 +435,36 @@ export default function ProfilePage() {
                     </div>
 
                     <form onSubmit={handleOnboard} className="space-y-5">
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Full Name</label>
-                            <div className="relative">
-                                <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-                                <input
-                                    required
-                                    type="text"
-                                    placeholder="Vedant Sharma"
-                                    className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
-                                    value={formData.full_name}
-                                    onChange={e => setFormData({ ...formData, full_name: e.target.value })}
-                                />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Full Name</label>
+                                <div className="relative">
+                                    <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="Vedant Sharma"
+                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                        value={formData.full_name}
+                                        onChange={e => setFormData({ ...formData, full_name: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Username (URL slug)</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 text-sm">@</span>
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="vedant-sharma"
+                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-8 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                        value={formData.username}
+                                        onChange={e => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                                    />
+                                </div>
+                                {isEditing && <p className="text-[10px] text-zinc-500 px-1 mt-1">Warning: Changing this breaks links to your old profile.</p>}
                             </div>
                         </div>
 
@@ -429,19 +500,71 @@ export default function ProfilePage() {
                             </div>
                         </div>
 
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Job Role / Interest</label>
-                            <div className="relative">
-                                <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Job Role / Interest</label>
+                                <div className="relative">
+                                    <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="Data Analyst, Student, etc."
+                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                        value={formData.job_role}
+                                        onChange={e => setFormData({ ...formData, job_role: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5 pt-2">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Short Bio</label>
+                            <textarea
+                                placeholder="I love solving SQL puzzles and drinking coffee..."
+                                rows={2}
+                                className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 px-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all resize-none"
+                                value={formData.bio}
+                                onChange={e => setFormData({ ...formData, bio: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">LinkedIn URL</label>
                                 <input
-                                    required
-                                    type="text"
-                                    placeholder="Data Analyst, Student, etc."
-                                    className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
-                                    value={formData.job_role}
-                                    onChange={e => setFormData({ ...formData, job_role: e.target.value })}
+                                    type="url"
+                                    placeholder="https://www.linkedin.com/in/username"
+                                    className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 px-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                    value={formData.linkedin_url}
+                                    onChange={e => setFormData({ ...formData, linkedin_url: e.target.value })}
                                 />
                             </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">GitHub URL</label>
+                                <input
+                                    type="url"
+                                    placeholder="https://github.com/username"
+                                    className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 px-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                    value={formData.github_url}
+                                    onChange={e => setFormData({ ...formData, github_url: e.target.value })}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-[#202736] mt-4 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-bold text-white">Public Profile</h3>
+                                <p className="text-xs text-zinc-400">Make your profile visible to others and on the leaderboard.</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    className="sr-only peer"
+                                    checked={formData.is_public_profile}
+                                    onChange={(e) => setFormData({ ...formData, is_public_profile: e.target.checked })}
+                                />
+                                <div className="w-11 h-6 bg-[#202736] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#4DD4C4]"></div>
+                            </label>
                         </div>
 
                         <button
@@ -489,40 +612,44 @@ export default function ProfilePage() {
                     <div className="group relative bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-8 flex flex-col items-center text-center shadow-xl hover:border-[#4DD4C4]/30 transition-all duration-500 overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-br from-[#4DD4C4]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                         
-                        <div 
-                            onClick={handlePhotoClick}
-                            className="relative w-[110px] h-[110px] rounded-[32px] mb-6 p-1 border border-[#4DD4C4]/30 bg-[#4DD4C4]/5 group-hover:border-[#4DD4C4]/60 group-hover:bg-[#4DD4C4]/10 transition-all duration-500 shadow-[0_0_15px_rgba(77,212,196,0.1)] group-hover:shadow-[0_0_20px_rgba(77,212,196,0.3)] cursor-pointer overflow-hidden"
-                        >
-                            <input 
-                                type="file" 
-                                ref={fileInputRef} 
-                                onChange={handleFileChange} 
-                                className="hidden" 
-                                accept="image/*"
-                            />
-                            <div className="w-full h-full rounded-[28px] overflow-hidden bg-[#080c16] flex justify-center items-center border border-[#202736]/50 relative group/avatar">
+                        <div className="relative w-[110px] h-[110px] rounded-[32px] mb-6 p-1 border border-[#4DD4C4]/20 bg-[#4DD4C4]/5 shadow-[0_0_15px_rgba(77,212,196,0.05)] overflow-hidden">
+                            <div className="w-full h-full rounded-[28px] overflow-hidden bg-[#080c16] flex justify-center items-center border border-[#202736]/50">
                                 {profile.avatar_url ? (
                                     <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" />
                                 ) : (
                                     <User size={40} className="text-zinc-600" />
                                 )}
-                                
-                                {/* Hover Overlay */}
-                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300">
-                                    {isUploading ? (
-                                        <Loader2 size={24} className="text-[#4DD4C4] animate-spin" />
-                                    ) : (
-                                        <Camera size={24} className="text-white" />
-                                    )}
-                                </div>
                             </div>
                         </div>
                         
                         <h1 className="text-[28px] font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400 tracking-tight">{profile.full_name || 'Member'}</h1>
+                        {profile.username && (
+                            <div className="flex items-center gap-1.5 mt-1 text-zinc-400 font-medium">
+                                <span className="text-sm">@{profile.username}</span>
+                                {profile.is_public_profile && (
+                                    <Link href={`/u/${profile.username}`} target="_blank" rel="noopener noreferrer" className="text-[#4DD4C4] hover:underline text-xs flex items-center gap-1">
+                                        View Public Page
+                                    </Link>
+                                )}
+                            </div>
+                        )}
                         <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-2 rounded-full bg-[#4DD4C4]/10 border border-[#4DD4C4]/20 text-[#4DD4C4] text-[12px] font-bold tracking-wide">
                             <Flame size={12} /> {profile.job_role || profile.occupation || 'Learner'}
                         </div>
                         <p className="text-[13px] text-zinc-400 mt-3 font-medium">{profile.email}</p>
+
+                        <div className="flex gap-3 mt-4">
+                            {profile.github_url && (
+                                <a href={profile.github_url} target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-xl bg-[#202736]/50 flex items-center justify-center hover:bg-[#202736] transition-colors border border-[#202736]">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+                                </a>
+                            )}
+                            {profile.linkedin_url && (
+                                <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-xl bg-[#202736]/50 flex items-center justify-center hover:bg-[#202736] transition-colors border border-[#202736]">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-[#0a66c2]"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+                                </a>
+                            )}
+                        </div>
 
                         <div className="w-full mt-6 relative z-10 px-2 lg:px-4">
                             <button onClick={() => setIsEditing(true)} className="w-full bg-gradient-to-r from-[#4DD4C4] to-[#34b6a5] hover:opacity-90 text-[#080c16] font-bold rounded-xl py-2.5 text-[13px] transition-all duration-300 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(77,212,196,0.2)] hover:shadow-[0_0_20px_rgba(77,212,196,0.3)] transform hover:-translate-y-0.5">
@@ -590,11 +717,19 @@ export default function ProfilePage() {
                                         {/* Name + Role */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-1.5">
-                                                <span className={`text-[12px] font-semibold truncate ${
-                                                    isCurrentUser ? 'text-[#4DD4C4]' : 'text-zinc-200'
-                                                }`}>
-                                                    {entry.full_name}
-                                                </span>
+                                                {entry.username ? (
+                                                    <Link href={`/u/${entry.username}`} className={`text-[12px] font-semibold truncate hover:underline ${
+                                                        isCurrentUser ? 'text-[#4DD4C4]' : 'text-zinc-200 hover:text-white'
+                                                    }`}>
+                                                        {entry.full_name}
+                                                    </Link>
+                                                ) : (
+                                                    <span className={`text-[12px] font-semibold truncate ${
+                                                        isCurrentUser ? 'text-[#4DD4C4]' : 'text-zinc-200'
+                                                    }`}>
+                                                        {entry.full_name}
+                                                    </span>
+                                                )}
                                                 {isCurrentUser && (
                                                     <span className="text-[9px] font-bold text-[#4DD4C4]/70 bg-[#4DD4C4]/10 px-1.5 py-0.5 rounded-full border border-[#4DD4C4]/20 shrink-0">YOU</span>
                                                 )}
