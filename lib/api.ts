@@ -97,6 +97,11 @@ export const api = {
         }),
     deleteComment: (commentId: string) =>
         fetchApi<void>(`/comments/${commentId}`, { method: 'DELETE' }),
+    voteComment: (commentId: string, voteType: number) =>
+        fetchApi<any>(`/comments/${commentId}/vote`, {
+            method: 'POST',
+            body: JSON.stringify({ vote_type: voteType }),
+        }),
 
     // Feedback
     submitFeedback: (data: { rating?: number; message?: string; source: string; problem_id?: string; email?: string }) =>

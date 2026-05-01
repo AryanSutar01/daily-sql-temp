@@ -5,12 +5,31 @@ import { Button } from "@/components/ui/button";
 import {
     Database, Plus, Calendar, Lock, Search, CheckCircle2,
     AlertCircle, Loader2, ChevronRight, Edit3, Eye,
-    Code, FileText, Clock, Trash2, MessageSquare, X, Save, ThumbsDown, Phone, Download
+    Code, FileText, Clock, Trash2, MessageSquare, X, Save, ThumbsDown, Phone, Download, BarChart3, TrendingUp, Users, Activity, Target, Zap
 } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { 
+    Card, 
+    Text, 
+    Metric, 
+    AreaChart, 
+    BarChart, 
+    DonutChart,
+    Table as TremorTable, 
+    TableHead, 
+    TableRow, 
+    TableHeaderCell, 
+    TableBody, 
+    TableCell, 
+    Title, 
+    Flex, 
+    Grid,
+    Badge,
+    CategoryBar
+} from "@tremor/react";
 
 SyntaxHighlighter.registerLanguage('sql', sql);
 
@@ -56,7 +75,7 @@ interface ScheduleEntry {
     advanced: { id: string; title: string } | null;
 }
 
-type Tab = 'problems' | 'create' | 'schedule' | 'feedback' | 'members';
+type Tab = 'problems' | 'create' | 'schedule' | 'feedback' | 'members' | 'analytics';
 type CreateStep = 'problem' | 'datasets' | 'solution' | 'preview' | 'done';
 
 export default function AdminDashboard() {
@@ -86,6 +105,14 @@ export default function AdminDashboard() {
     const [isBulkMode, setIsBulkMode] = useState(false);
     const [bulkEmailsText, setBulkEmailsText] = useState("");
     const [loadingDetails, setLoadingDetails] = useState(false);
+
+    // Analytics State
+    const [analyticsSummary, setAnalyticsSummary] = useState<any>(null);
+    const [problemStats, setProblemStats] = useState<any[]>([]);
+    const [retentionData, setRetentionData] = useState<any>(null);
+    const [demographics, setDemographics] = useState<any>(null);
+    const [sentimentData, setSentimentData] = useState<any[]>([]);
+    const [analyticsSearch, setAnalyticsSearch] = useState("");
 
     // Edit Form State for Drill-down
     const [editForm, setEditForm] = useState<any>(null);
@@ -184,6 +211,34 @@ export default function AdminDashboard() {
                 setWaitlist(await res.json());
             }
         } catch (e) { console.error(e); }
+    };
+
+    const loadAnalytics = async (token?: string) => {
+        setLoading(true);
+        try {
+            const endpoints = [
+                { url: '/summary', setter: setAnalyticsSummary },
+                { url: '/problems', setter: setProblemStats },
+                { url: '/retention', setter: setRetentionData },
+                { url: '/demographics', setter: setDemographics },
+                { url: '/sentiment', setter: setSentimentData }
+            ];
+
+            await Promise.all(endpoints.map(async ({ url, setter }) => {
+                try {
+                    const res = await fetchWithAuth(`${API_URL}/admin/analytics${url}`, {}, token);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setter(data);
+                    }
+                } catch (e) {
+                    console.error(`Failed to load ${url}:`, e);
+                }
+            }));
+        } catch (e) {
+            console.error("General analytics loading error:", e);
+        }
+        setLoading(false);
     };
 
     const loadProblemDetails = async (id: string) => {
@@ -367,6 +422,12 @@ export default function AdminDashboard() {
         }
     }, [createStep, createdProblemId]);
 
+    useEffect(() => {
+        if (activeTab === 'analytics' && isAuthenticated) {
+            loadAnalytics();
+        }
+    }, [activeTab]);
+
     const handleUpdateDataset = async (ds: any) => {
         if (!selectedProblem) return;
         try {
@@ -450,6 +511,7 @@ export default function AdminDashboard() {
                 loadSchedule(data.access_token);
                 loadFeedbacks(data.access_token);
                 loadWhitelist(data.access_token);
+                loadAnalytics(data.access_token);
             } else {
                 const data = await res.json();
                 showToast("error", data.detail || "Invalid code");
@@ -884,6 +946,13 @@ export default function AdminDashboard() {
                             className={`${activeTab === 'members' ? 'bg-[#10b981]/10 text-[#10b981]' : 'text-zinc-400 hover:text-white'}`}
                         >
                             <Lock size={16} className="mr-2" /> Members
+                        </Button>
+                        <Button
+                            onClick={() => setActiveTab('analytics')}
+                            variant="ghost"
+                            className={`${activeTab === 'analytics' ? 'bg-[#4DD4C4]/10 text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}
+                        >
+                            <BarChart3 size={16} className="mr-2" /> Analytics
                         </Button>
                     </div>
                 </div>
@@ -1661,7 +1730,7 @@ export default function AdminDashboard() {
                                         )}
                                         {f.message && (
                                             <p className="text-sm text-zinc-300 mt-2 bg-[#0b101c] p-3 rounded-lg border border-[#202736]/50">
-                                                "{f.message}"
+                                                &quot;{f.message}&quot;
                                             </p>
                                         )}
                                     </div>
@@ -1676,7 +1745,195 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                 )}
+                {/* ============ ANALYTICS TAB ============ */}
+                {activeTab === 'analytics' && (
+                    <div className="space-y-8 animate-premium-entry pb-12">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-2xl font-bold flex items-center gap-3">
+                                <TrendingUp size={28} className="text-[#4DD4C4]" /> 
+                                Platform Analytics
+                            </h2>
+                            <Button onClick={() => loadAnalytics()} variant="outline" size="sm" className="border-[#202736] text-zinc-400 bg-white/5">
+                                {loading ? <Loader2 size={14} className="animate-spin mr-2" /> : null} Refresh Data
+                            </Button>
+                        </div>
+
+                        {/* 1. Summary KPI Cards */}
+                        <Grid numItemsSm={2} numItemsLg={4} className="gap-6">
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-8">
+                                <Flex alignItems="start">
+                                    <div className="truncate">
+                                        <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em]">Daily Active Users</Text>
+                                        <Metric className="text-white font-light text-4xl mt-2">{analyticsSummary?.dau || 0}</Metric>
+                                    </div>
+                                </Flex>
+                            </Card>
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-8">
+                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em]">Monthly Active</Text>
+                                <Metric className="text-white font-light text-4xl mt-2">{analyticsSummary?.mau || 0}</Metric>
+                            </Card>
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-8">
+                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em]">Total Registered</Text>
+                                <Metric className="text-white font-light text-4xl mt-2">{analyticsSummary?.total_users || 0}</Metric>
+                            </Card>
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-8">
+                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em]">Waitlist Size</Text>
+                                <Metric className="text-white font-light text-4xl mt-2">{analyticsSummary?.total_waitlist || 0}</Metric>
+                            </Card>
+                        </Grid>
+
+                        {/* 2. Engagement & Retention Overviews */}
+                        <Grid numItemsLg={2} className="gap-8">
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-8">
+                                <Title className="text-white text-sm font-bold uppercase tracking-[0.2em] mb-8 border-l-2 border-[#4DD4C4] pl-4">
+                                    User Acquisition
+                                </Title>
+                                <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {(analyticsSummary?.signups_trend || []).slice(-30).reverse().map((s: any) => (
+                                        <Flex key={s.date} className="border-b border-[#202736]/50 pb-4 last:border-0">
+                                            <Text className="text-zinc-400 text-sm">{new Date(s.date).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</Text>
+                                            <Text className="text-[#4DD4C4] font-mono font-bold text-lg">+{s.count}</Text>
+                                        </Flex>
+                                    ))}
+                                </div>
+                            </Card>
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-8">
+                                <Title className="text-white text-sm font-bold uppercase tracking-[0.2em] mb-8 border-l-2 border-[#4DD4C4] pl-4">
+                                    Streak Retention
+                                </Title>
+                                <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {(retentionData?.streaks || []).map((s: any) => (
+                                        <div key={s.range} className="space-y-2">
+                                            <Flex>
+                                                <Text className="text-zinc-400 text-xs font-bold uppercase tracking-[0.1em]">{s.range} Day Progression</Text>
+                                                <Text className="text-white text-sm font-mono">{s.count} users</Text>
+                                            </Flex>
+                                            <CategoryBar
+                                                values={[s.count]}
+                                                colors={["teal"]}
+                                                showLabels={false}
+                                                className="h-2"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </Card>
+                        </Grid>
+
+                        {/* 3. Problem Performance Table */}
+                        <Card className="bg-[#121826] border-[#202736] ring-0 p-8">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+                                <Title className="text-white text-sm font-bold uppercase tracking-[0.2em] border-l-2 border-[#4DD4C4] pl-4">
+                                    Detailed Problem Performance
+                                </Title>
+                                <div className="relative max-w-xs w-full">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={14} />
+                                    <input 
+                                        type="text"
+                                        placeholder="Search problems..."
+                                        className="w-full bg-[#0b101c] border border-[#202736] pl-9 pr-4 py-2 rounded-lg text-xs text-white focus:border-[#4DD4C4] focus:outline-none transition-colors"
+                                        value={analyticsSearch}
+                                        onChange={e => setAnalyticsSearch(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div className="overflow-y-auto max-h-[500px] pr-2 custom-scrollbar">
+                                <TremorTable>
+                                    <TableHead className="sticky top-0 bg-[#121826] z-10">
+                                        <TableRow className="border-[#202736]">
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Problem</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase text-center bg-[#121826]">Total Runs</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase text-center bg-[#121826]">Success Rate</TableHeaderCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {problemStats
+                                            .filter(item => item.title.toLowerCase().includes(analyticsSearch.toLowerCase()))
+                                            .map((item) => (
+                                            <TableRow key={item.id} className="border-[#202736] hover:bg-white/[0.02]">
+                                                <TableCell>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-white font-medium text-sm">{item.title}</span>
+                                                        <span className="text-[10px] text-zinc-500 uppercase font-bold">{item.difficulty}</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-center text-zinc-300 font-mono">{item.total_attempts}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="text-zinc-300 text-xs mb-1 font-mono">{item.success_rate}%</span>
+                                                        <CategoryBar
+                                                            values={[item.success_rate, 100 - item.success_rate]}
+                                                            colors={["emerald", "red"]}
+                                                            className="w-24"
+                                                            showLabels={false}
+                                                        />
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </TremorTable>
+                                {problemStats.filter(item => item.title.toLowerCase().includes(analyticsSearch.toLowerCase())).length === 0 && (
+                                    <div className="text-center py-10 text-zinc-500 italic text-sm">No problems match your search.</div>
+                                )}
+                            </div>
+                        </Card>
+
+                        {/* 4. Audience Breakdown */}
+                        <Grid numItemsSm={1} numItemsLg={3} className="gap-8">
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-8">
+                                <Title className="text-white text-sm font-bold uppercase tracking-[0.2em] mb-8 border-l-2 border-[#4DD4C4] pl-4">Audience Roles</Title>
+                                <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {(demographics?.roles || []).map((r: any) => (
+                                        <Flex key={r.name} className="border-b border-[#202736]/30 pb-3 last:border-0">
+                                            <Text className="text-zinc-300 text-sm">{r.name}</Text>
+                                            <Text className="text-[#4DD4C4] font-bold">{r.value}</Text>
+                                        </Flex>
+                                    ))}
+                                    {(demographics?.roles || []).length === 0 && <Text className="text-zinc-600 italic text-xs">No user demographic data available.</Text>}
+                                </div>
+                            </Card>
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-8">
+                                <Title className="text-white text-sm font-bold uppercase tracking-[0.2em] mb-8 border-l-2 border-[#4DD4C4] pl-4">Engagement Leaders</Title>
+                                <div className="space-y-6 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {(sentimentData || []).slice(0, 10).map((s: any) => (
+                                        <div key={s.id} className="space-y-2">
+                                            <Text className="text-white text-xs font-bold uppercase tracking-tight truncate">{s.title}</Text>
+                                            <Flex justifyContent="start" className="gap-6">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Likes</span>
+                                                    <span className="text-sm text-[#4DD4C4] font-mono">{s.likes}</span>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Comments</span>
+                                                    <span className="text-sm text-blue-400 font-mono">{s.comments}</span>
+                                                </div>
+                                            </Flex>
+                                        </div>
+                                    ))}
+                                </div>
+                            </Card>
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-8">
+                                <Title className="text-white text-sm font-bold uppercase tracking-[0.2em] mb-8 border-l-2 border-[#4DD4C4] pl-4">Seniority Spread</Title>
+                                <div className="space-y-5 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {(demographics?.experience || []).map((e: any) => (
+                                        <div key={e.years} className="space-y-2">
+                                            <Flex>
+                                                <Text className="text-zinc-400 text-xs font-bold uppercase">{e.years} Year Exp</Text>
+                                                <Text className="text-white text-xs font-mono">{e.count} users</Text>
+                                            </Flex>
+                                            <CategoryBar values={[e.count]} colors={["teal"]} className="h-1.5" showLabels={false} />
+                                        </div>
+                                    ))}
+                                    {(demographics?.experience || []).length === 0 && <Text className="text-zinc-600 italic text-xs">No experience data available.</Text>}
+                                </div>
+                            </Card>
+                        </Grid>
+                    </div>
+                )}
             </main>
+
         </div>
     );
 }
