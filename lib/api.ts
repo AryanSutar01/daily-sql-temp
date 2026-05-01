@@ -74,6 +74,8 @@ export const api = {
     // Solutions
     getSavedSolution: (problemId: string) =>
         fetchApi<{ submitted_query: string | null }>(`/me/solutions/${problemId}`),
+    getPublicSavedSolution: (username: string, problemId: string) =>
+        fetchApi<{ submitted_query: string | null }>(`/u/${username}/solutions/${problemId}`),
 
     // Votes (likes)
     getProblemVotes: (problemId: string) =>
