@@ -86,7 +86,7 @@ export default function AdminDashboard() {
     const [isBulkMode, setIsBulkMode] = useState(false);
     const [bulkEmailsText, setBulkEmailsText] = useState("");
     const [loadingDetails, setLoadingDetails] = useState(false);
-    
+
     // Edit Form State for Drill-down
     const [editForm, setEditForm] = useState<any>(null);
     const [editingDatasets, setEditingDatasets] = useState<any[]>([]);
@@ -167,7 +167,7 @@ export default function AdminDashboard() {
             }
         } catch (e) { console.error(e); }
     };
-    
+
     const loadWhitelist = async (token?: string) => {
         try {
             const res = await fetchWithAuth(`${API_URL}/admin/whitelist`, {}, token);
@@ -201,7 +201,7 @@ export default function AdminDashboard() {
                 setSelectedProblem(p);
                 setEditForm({ ...p, solution: p.solution || { reference_query: '', order_sensitive: false, notes: '' } });
             }
-            
+
             const comRes = await fetchWithAuth(`${API_URL}/admin/problems/${id}/comments`);
             if (comRes.ok) {
                 const allComments = await comRes.json();
@@ -317,10 +317,8 @@ export default function AdminDashboard() {
                     current = current.trim();
                     if (current) {
                         // Skip table-level constraints: PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK, INDEX
-                        const upper = current.toUpperCase();
-                        if (!upper.startsWith('PRIMARY') && !upper.startsWith('FOREIGN') &&
-                            !upper.startsWith('UNIQUE') && !upper.startsWith('CHECK') &&
-                            !upper.startsWith('INDEX') && !upper.startsWith('KEY')) {
+                        const isConstraint = /^(PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE[\s(]|CHECK\s*\(|INDEX\s|KEY\s|CONSTRAINT\s)/i.test(current);
+                        if (!isConstraint) {
                             // First token is the column name (strip quotes/backticks)
                             const nameMatch = current.match(/^[`"']?([\w]+)[`"']?/);
                             if (nameMatch) columns.push(nameMatch[1]);
@@ -334,10 +332,8 @@ export default function AdminDashboard() {
             // Handle the last column (no trailing comma)
             current = current.trim();
             if (current) {
-                const upper = current.toUpperCase();
-                if (!upper.startsWith('PRIMARY') && !upper.startsWith('FOREIGN') &&
-                    !upper.startsWith('UNIQUE') && !upper.startsWith('CHECK') &&
-                    !upper.startsWith('INDEX') && !upper.startsWith('KEY')) {
+                const isConstraint = /^(PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE[\s(]|CHECK\s*\(|INDEX\s|KEY\s|CONSTRAINT\s)/i.test(current);
+                if (!isConstraint) {
                     const nameMatch = current.match(/^[`"']?([\w]+)[`"']?/);
                     if (nameMatch) columns.push(nameMatch[1]);
                 }
@@ -447,7 +443,7 @@ export default function AdminDashboard() {
                 setAdminToken(data.access_token);
                 setIsAuthenticated(true);
                 showToast("success", "Logged in as admin");
-                
+
                 // Load relevant data now that we are authenticated, passing the token directly
                 // to avoid stale closure issues with the state variable
                 loadProblems(data.access_token);
@@ -694,7 +690,7 @@ export default function AdminDashboard() {
         // Regex to extract emails from text (comma, newline, space separated)
         const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
         const foundEmails = bulkEmailsText.match(emailRegex) || [];
-        
+
         if (foundEmails.length === 0) {
             showToast('error', 'No valid emails found in text');
             return;
@@ -724,17 +720,17 @@ export default function AdminDashboard() {
             showToast('error', 'No data to export');
             return;
         }
-        
+
         // Ensure consistent headers across all rows
         const allKeys = new Set<string>();
         data.forEach(item => Object.keys(item).forEach(key => allKeys.add(key)));
         const headers = Array.from(allKeys);
-        
+
         const rows = data.map(obj => headers.map(header => {
-             const val = obj[header];
-             return `"${val !== null && val !== undefined ? String(val).replace(/"/g, '""') : ''}"`;
+            const val = obj[header];
+            return `"${val !== null && val !== undefined ? String(val).replace(/"/g, '""') : ''}"`;
         }).join(',')).join('\n');
-        
+
         const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows;
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
@@ -760,7 +756,7 @@ export default function AdminDashboard() {
                     <h1 className="text-white text-xl font-bold flex items-center gap-2">
                         <Lock size={20} className="text-[#4DD4C4]" /> Admin Access
                     </h1>
-                    
+
                     {otpStep === 'email' ? (
                         <div className="space-y-4">
                             <p className="text-zinc-500 text-sm">Enter your registered admin email</p>
@@ -772,20 +768,20 @@ export default function AdminDashboard() {
                                 onChange={e => setAdminEmail(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && handleRequestAdminOtp()}
                             />
-                            <Button 
-                                onClick={handleRequestAdminOtp} 
+                            <Button
+                                onClick={handleRequestAdminOtp}
                                 disabled={loading}
                                 className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-extrabold"
                             >
                                 {loading ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
                                 Request Access Code
                             </Button>
-                            
+
                             <div className="relative py-2">
                                 <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-white/5" /></div>
                                 <div className="relative flex justify-center text-[10px] font-bold uppercase"><span className="bg-[#121826] px-2 text-zinc-600">or use secret key</span></div>
                             </div>
-                            
+
                             <input
                                 type="password"
                                 className="w-full bg-[#0b101c]/50 border border-[#202736] p-2 rounded-lg text-white text-sm focus:border-[#4DD4C4] focus:outline-none transition-colors"
@@ -809,16 +805,16 @@ export default function AdminDashboard() {
                                 onChange={e => setAdminOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
                                 onKeyDown={e => e.key === 'Enter' && handleVerifyAdminOtp()}
                             />
-                            <Button 
-                                onClick={handleVerifyAdminOtp} 
+                            <Button
+                                onClick={handleVerifyAdminOtp}
                                 disabled={loading}
                                 className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-extrabold"
                             >
                                 {loading ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
                                 Verify & Access
                             </Button>
-                            <button 
-                                onClick={() => setOtpStep('email')} 
+                            <button
+                                onClick={() => setOtpStep('email')}
                                 className="w-full text-xs text-zinc-500 hover:text-white transition-colors"
                             >
                                 Back to email
@@ -969,11 +965,10 @@ export default function AdminDashboard() {
                                                 {/* Publish/Draft toggle */}
                                                 <button
                                                     onClick={handleTogglePublish}
-                                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                                                        editForm.is_active
+                                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${editForm.is_active
                                                             ? 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400'
                                                             : 'bg-zinc-800 border-zinc-600 text-zinc-400 hover:bg-green-500/10 hover:border-green-500/30 hover:text-green-400'
-                                                    }`}
+                                                        }`}
                                                     title={editForm.is_active ? 'Click to set to Draft' : 'Click to Publish'}
                                                 >
                                                     <span className={`w-1.5 h-1.5 rounded-full ${editForm.is_active ? 'bg-green-400' : 'bg-zinc-500'}`} />
@@ -1081,7 +1076,7 @@ export default function AdminDashboard() {
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     {/* Right: Comments Moderation */}
                                     <div className="col-span-1 space-y-6">
                                         <div className="bg-[#121826] border border-[#202736] rounded-xl p-6">
@@ -1221,7 +1216,7 @@ export default function AdminDashboard() {
                                             <Button onClick={() => setCreateStep('problem')} variant="outline" size="sm" className="border-[#202736] text-zinc-400 hover:text-white h-8"><Edit3 size={14} className="mr-2" /> Edit Details</Button>
                                         </div>
                                     </div>
-                                    
+
                                     <div className="space-y-8">
                                         <div className="flex flex-wrap items-center gap-3">
                                             <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${getDiffStyle(problemForm.difficulty).color} ${getDiffStyle(problemForm.difficulty).bg} ${getDiffStyle(problemForm.difficulty).border}`}>
@@ -1234,7 +1229,7 @@ export default function AdminDashboard() {
                                         </div>
 
                                         <h1 className="text-2xl font-bold text-white tracking-tight leading-tight">{problemForm.title || "Untitled Problem"}</h1>
-                                        
+
                                         {/* Task Section */}
                                         <div>
                                             <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3 font-sans">Task</h3>
@@ -1363,7 +1358,7 @@ export default function AdminDashboard() {
                                     <h2 className="text-3xl font-bold text-white tracking-tight">Problem Published</h2>
                                     <p className="text-zinc-500 text-sm max-w-sm mx-auto">Your problem has been successfully added to the database and is ready to be scheduled.</p>
                                 </div>
-                                
+
                                 <div className="bg-[#0b101c] p-3 rounded-lg border border-[#202736] inline-block mx-auto">
                                     <code className="text-[10px] text-[#4DD4C4] font-mono">PROBLEM_ID: {createdProblemId}</code>
                                 </div>
@@ -1451,18 +1446,18 @@ export default function AdminDashboard() {
                                 <Lock size={24} className="text-[#10b981]" /> Members & Waitlist
                             </h2>
                             <div className="flex gap-2">
-                                <Button 
-                                    onClick={() => setMembersSubTab('whitelist')} 
-                                    variant="outline" 
-                                    size="sm" 
+                                <Button
+                                    onClick={() => setMembersSubTab('whitelist')}
+                                    variant="outline"
+                                    size="sm"
                                     className={`${membersSubTab === 'whitelist' ? 'border-[#10b981] text-[#10b981] bg-[#10b981]/10' : 'border-[#202736] text-zinc-400'}`}
                                 >
                                     Whitelist
                                 </Button>
-                                <Button 
-                                    onClick={() => setMembersSubTab('waitlist')} 
-                                    variant="outline" 
-                                    size="sm" 
+                                <Button
+                                    onClick={() => setMembersSubTab('waitlist')}
+                                    variant="outline"
+                                    size="sm"
                                     className={`${membersSubTab === 'waitlist' ? 'border-[#4DD4C4] text-[#4DD4C4] bg-[#4DD4C4]/10' : 'border-[#202736] text-zinc-400'}`}
                                 >
                                     Waitlist
@@ -1472,156 +1467,156 @@ export default function AdminDashboard() {
                                 </Button>
                             </div>
                         </div>
-                        
+
                         {membersSubTab === 'whitelist' && (
                             <>
 
-                        {/* Add Member Form */}
-                        <div className="bg-[#121826] border border-[#202736] rounded-xl p-6">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-widest">Authorize Member</h3>
-                                <button 
-                                    onClick={() => setIsBulkMode(!isBulkMode)}
-                                    className="text-[10px] font-bold text-[#4DD4C4] uppercase bg-[#4DD4C4]/10 px-2 py-1 rounded hover:bg-[#4DD4C4]/20 transition-colors"
-                                >
-                                    {isBulkMode ? "Switch to Single" : "Switch to Bulk"}
-                                </button>
-                            </div>
-
-                            {!isBulkMode ? (
-                                <div className="flex gap-3">
-                                    <input 
-                                        className="flex-1 bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white focus:border-[#4DD4C4] focus:outline-none transition-colors"
-                                        placeholder="Enter email address..."
-                                        value={newMemberEmail}
-                                        onChange={e => setNewMemberEmail(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && handleAddMember()}
-                                    />
-                                    <Button onClick={handleAddMember} disabled={loading || !newMemberEmail.trim()} className="bg-[#10b981] hover:bg-[#059669] text-white font-bold px-8">
-                                        {loading ? <Loader2 size={16} className="animate-spin" /> : 'Authorize Email'}
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    <textarea 
-                                        className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white focus:border-[#4DD4C4] focus:outline-none transition-colors h-32 font-mono text-sm"
-                                        placeholder="Paste multiple emails here... (separated by commas or newlines)"
-                                        value={bulkEmailsText}
-                                        onChange={e => setBulkEmailsText(e.target.value)}
-                                    />
-                                    <Button onClick={handleBulkAddMember} disabled={loading || !bulkEmailsText.trim()} className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold">
-                                        {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : <Lock size={16} className="mr-2" />}
-                                        Authorize All {bulkEmailsText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g)?.length || 0} Emails
-                                    </Button>
-                                </div>
-                            )}
-                            <p className="text-[10px] text-zinc-500 mt-2 italic">
-                                {isBulkMode 
-                                    ? "We'll automatically extract valid emails from the text above and skip duplicates." 
-                                    : "Only emails in this list will be allowed to sign up or log in."}
-                            </p>
-                        </div>
-
-                        {/* Member List */}
-                        <div className="bg-[#121826] border border-[#202736] rounded-xl overflow-hidden flex flex-col h-[500px]">
-                            <div className="p-4 border-b border-[#202736] bg-[#0b101c] flex justify-between items-center shrink-0">
-                                <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Active Whitelist ({whitelist.length})</span>
-                                <Button onClick={() => downloadCSV(whitelist, 'whitelist.csv')} variant="ghost" size="sm" className="text-[#4DD4C4] hover:text-[#3dbdb0] hover:bg-[#4DD4C4]/10 h-6">
-                                    <Download size={12} className="mr-1" /> Export CSV
-                                </Button>
-                            </div>
-                            <div className="divide-y divide-[#202736] overflow-y-auto flex-1">
-                                {whitelist.map((m: any) => (
-                                    <div key={m.email} className="p-4 flex justify-between items-center hover:bg-white/[0.02] transition-colors group">
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-medium text-white">{m.email}</span>
-                                            <span className="text-[10px] text-zinc-500">Authorized on {new Date(m.created_at).toLocaleDateString()}</span>
-                                        </div>
-                                        <button 
-                                            onClick={() => handleDeleteMember(m.email)}
-                                            className="p-2 text-zinc-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                                            title="Revoke Access"
+                                {/* Add Member Form */}
+                                <div className="bg-[#121826] border border-[#202736] rounded-xl p-6">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-widest">Authorize Member</h3>
+                                        <button
+                                            onClick={() => setIsBulkMode(!isBulkMode)}
+                                            className="text-[10px] font-bold text-[#4DD4C4] uppercase bg-[#4DD4C4]/10 px-2 py-1 rounded hover:bg-[#4DD4C4]/20 transition-colors"
                                         >
-                                            <Trash2 size={16} />
+                                            {isBulkMode ? "Switch to Single" : "Switch to Bulk"}
                                         </button>
                                     </div>
-                                ))}
-                                {whitelist.length === 0 && (
-                                    <div className="p-12 text-center text-zinc-500 italic">The whitelist is currently empty.</div>
-                                )}
-                            </div>
-                        </div>
-                        </>
+
+                                    {!isBulkMode ? (
+                                        <div className="flex gap-3">
+                                            <input
+                                                className="flex-1 bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white focus:border-[#4DD4C4] focus:outline-none transition-colors"
+                                                placeholder="Enter email address..."
+                                                value={newMemberEmail}
+                                                onChange={e => setNewMemberEmail(e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && handleAddMember()}
+                                            />
+                                            <Button onClick={handleAddMember} disabled={loading || !newMemberEmail.trim()} className="bg-[#10b981] hover:bg-[#059669] text-white font-bold px-8">
+                                                {loading ? <Loader2 size={16} className="animate-spin" /> : 'Authorize Email'}
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <textarea
+                                                className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white focus:border-[#4DD4C4] focus:outline-none transition-colors h-32 font-mono text-sm"
+                                                placeholder="Paste multiple emails here... (separated by commas or newlines)"
+                                                value={bulkEmailsText}
+                                                onChange={e => setBulkEmailsText(e.target.value)}
+                                            />
+                                            <Button onClick={handleBulkAddMember} disabled={loading || !bulkEmailsText.trim()} className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold">
+                                                {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : <Lock size={16} className="mr-2" />}
+                                                Authorize All {bulkEmailsText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g)?.length || 0} Emails
+                                            </Button>
+                                        </div>
+                                    )}
+                                    <p className="text-[10px] text-zinc-500 mt-2 italic">
+                                        {isBulkMode
+                                            ? "We'll automatically extract valid emails from the text above and skip duplicates."
+                                            : "Only emails in this list will be allowed to sign up or log in."}
+                                    </p>
+                                </div>
+
+                                {/* Member List */}
+                                <div className="bg-[#121826] border border-[#202736] rounded-xl overflow-hidden flex flex-col h-[500px]">
+                                    <div className="p-4 border-b border-[#202736] bg-[#0b101c] flex justify-between items-center shrink-0">
+                                        <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Active Whitelist ({whitelist.length})</span>
+                                        <Button onClick={() => downloadCSV(whitelist, 'whitelist.csv')} variant="ghost" size="sm" className="text-[#4DD4C4] hover:text-[#3dbdb0] hover:bg-[#4DD4C4]/10 h-6">
+                                            <Download size={12} className="mr-1" /> Export CSV
+                                        </Button>
+                                    </div>
+                                    <div className="divide-y divide-[#202736] overflow-y-auto flex-1">
+                                        {whitelist.map((m: any) => (
+                                            <div key={m.email} className="p-4 flex justify-between items-center hover:bg-white/[0.02] transition-colors group">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-medium text-white">{m.email}</span>
+                                                    <span className="text-[10px] text-zinc-500">Authorized on {new Date(m.created_at).toLocaleDateString()}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleDeleteMember(m.email)}
+                                                    className="p-2 text-zinc-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                                                    title="Revoke Access"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {whitelist.length === 0 && (
+                                            <div className="p-12 text-center text-zinc-500 italic">The whitelist is currently empty.</div>
+                                        )}
+                                    </div>
+                                </div>
+                            </>
                         )}
 
                         {membersSubTab === 'waitlist' && (
-                        <div className="bg-[#121826] border border-[#202736] rounded-xl overflow-hidden flex flex-col h-[600px]">
-                            <div className="p-4 border-b border-[#202736] bg-[#0b101c] flex justify-between items-center shrink-0">
-                                <h3 className="text-xs font-bold text-[#4DD4C4] uppercase tracking-widest flex items-center gap-2">
-                                    <Clock size={14} /> Pending Waitlist ({waitlist.length})
-                                </h3>
-                                <div className="flex gap-2">
-                                    <Button onClick={() => downloadCSV(waitlist, 'waitlist.csv')} variant="ghost" size="sm" className="text-[#4DD4C4] hover:text-[#3dbdb0] hover:bg-[#4DD4C4]/10 h-6">
-                                        <Download size={12} className="mr-1" /> Export CSV
-                                    </Button>
-                                    <Button onClick={() => loadWaitlist()} variant="ghost" size="sm" className="text-zinc-500 h-6">Refresh</Button>
+                            <div className="bg-[#121826] border border-[#202736] rounded-xl overflow-hidden flex flex-col h-[600px]">
+                                <div className="p-4 border-b border-[#202736] bg-[#0b101c] flex justify-between items-center shrink-0">
+                                    <h3 className="text-xs font-bold text-[#4DD4C4] uppercase tracking-widest flex items-center gap-2">
+                                        <Clock size={14} /> Pending Waitlist ({waitlist.length})
+                                    </h3>
+                                    <div className="flex gap-2">
+                                        <Button onClick={() => downloadCSV(waitlist, 'waitlist.csv')} variant="ghost" size="sm" className="text-[#4DD4C4] hover:text-[#3dbdb0] hover:bg-[#4DD4C4]/10 h-6">
+                                            <Download size={12} className="mr-1" /> Export CSV
+                                        </Button>
+                                        <Button onClick={() => loadWaitlist()} variant="ghost" size="sm" className="text-zinc-500 h-6">Refresh</Button>
+                                    </div>
+                                </div>
+                                <div className="overflow-x-auto overflow-y-auto flex-1">
+                                    <table className="w-full text-left text-sm border-collapse relative">
+                                        <thead className="sticky top-0 bg-[#0b101c] shadow-md z-10">
+                                            <tr className="bg-black/20 text-[10px] uppercase text-zinc-500 border-b border-[#202736]">
+                                                <th className="p-4 font-black">Full Name</th>
+                                                <th className="p-4 font-black">Email</th>
+                                                <th className="p-4 font-black">WhatsApp</th>
+                                                <th className="p-4 font-black">Role</th>
+                                                <th className="p-4 font-black">Exp</th>
+                                                <th className="p-4 font-black">Source</th>
+                                                <th className="p-4 font-black text-center">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-[#202736]">
+                                            {waitlist.map((entry: any) => (
+                                                <tr key={(entry as any).id} className="hover:bg-white/[0.02] transition-colors group">
+                                                    <td className="p-4 font-medium text-white">{entry.full_name}</td>
+                                                    <td className="p-4 text-zinc-400">{entry.email}</td>
+                                                    <td className="p-4">
+                                                        <a href={`https://wa.me/${entry.whatsapp_number.replace(/\+/g, '')}`} target="_blank" className="text-[#4DD4C4] hover:underline flex items-center gap-1">
+                                                            <Phone size={12} /> {entry.whatsapp_number}
+                                                        </a>
+                                                    </td>
+                                                    <td className="p-4 text-zinc-400">{entry.job_role || entry.occupation}</td>
+                                                    <td className="p-4 text-zinc-400">{entry.experience_years}y</td>
+                                                    <td className="p-4">
+                                                        <span className="px-2 py-0.5 rounded bg-zinc-500/10 text-zinc-500 text-[10px] font-bold uppercase">{entry.source}</span>
+                                                    </td>
+                                                    <td className="p-4 text-center">
+                                                        <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button
+                                                                onClick={() => handleApproveWaitlist((entry as any).id, entry.email)}
+                                                                className="p-1.5 text-green-500 hover:bg-green-500/10 rounded transition-colors"
+                                                                title="Approve (Add to Whitelist)"
+                                                            >
+                                                                <CheckCircle2 size={16} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteWaitlist((entry as any).id, entry.email)}
+                                                                className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
+                                                                title="Reject"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                    {waitlist.length === 0 && (
+                                        <div className="p-12 text-center text-zinc-500 italic">No pending requests in the waitlist.</div>
+                                    )}
                                 </div>
                             </div>
-                            <div className="overflow-x-auto overflow-y-auto flex-1">
-                                <table className="w-full text-left text-sm border-collapse relative">
-                                    <thead className="sticky top-0 bg-[#0b101c] shadow-md z-10">
-                                        <tr className="bg-black/20 text-[10px] uppercase text-zinc-500 border-b border-[#202736]">
-                                            <th className="p-4 font-black">Full Name</th>
-                                            <th className="p-4 font-black">Email</th>
-                                            <th className="p-4 font-black">WhatsApp</th>
-                                            <th className="p-4 font-black">Role</th>
-                                            <th className="p-4 font-black">Exp</th>
-                                            <th className="p-4 font-black">Source</th>
-                                            <th className="p-4 font-black text-center">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-[#202736]">
-                                        {waitlist.map((entry: any) => (
-                                            <tr key={(entry as any).id} className="hover:bg-white/[0.02] transition-colors group">
-                                                <td className="p-4 font-medium text-white">{entry.full_name}</td>
-                                                <td className="p-4 text-zinc-400">{entry.email}</td>
-                                                <td className="p-4">
-                                                    <a href={`https://wa.me/${entry.whatsapp_number.replace(/\+/g, '')}`} target="_blank" className="text-[#4DD4C4] hover:underline flex items-center gap-1">
-                                                        <Phone size={12} /> {entry.whatsapp_number}
-                                                    </a>
-                                                </td>
-                                                <td className="p-4 text-zinc-400">{entry.job_role || entry.occupation}</td>
-                                                <td className="p-4 text-zinc-400">{entry.experience_years}y</td>
-                                                <td className="p-4">
-                                                    <span className="px-2 py-0.5 rounded bg-zinc-500/10 text-zinc-500 text-[10px] font-bold uppercase">{entry.source}</span>
-                                                </td>
-                                                <td className="p-4 text-center">
-                                                    <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button 
-                                                            onClick={() => handleApproveWaitlist((entry as any).id, entry.email)}
-                                                            className="p-1.5 text-green-500 hover:bg-green-500/10 rounded transition-colors"
-                                                            title="Approve (Add to Whitelist)"
-                                                        >
-                                                            <CheckCircle2 size={16} />
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleDeleteWaitlist((entry as any).id, entry.email)}
-                                                            className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
-                                                            title="Reject"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                {waitlist.length === 0 && (
-                                    <div className="p-12 text-center text-zinc-500 italic">No pending requests in the waitlist.</div>
-                                )}
-                            </div>
-                        </div>
                         )}
                     </div>
                 )}
@@ -1635,7 +1630,7 @@ export default function AdminDashboard() {
                                 <Loader2 size={14} className={`mr-2 ${loading ? 'animate-spin' : 'hidden'}`} /> Refresh
                             </Button>
                         </div>
-                        
+
                         <div className="grid gap-4">
                             {feedbacks.map((f: any) => (
                                 <div key={f.id} className="bg-[#121826] border border-[#202736] rounded-xl p-5 flex gap-4 items-start">
