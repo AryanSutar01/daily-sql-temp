@@ -663,6 +663,42 @@ export function DailySetClient() {
         } catch (e) { console.error(e); }
     };
 
+    const handleCommentVote = async (commentId: string, voteType: number, parentId?: string) => {
+        if (authStatus !== 'authenticated') return;
+        try {
+            const res = await api.voteComment(commentId, voteType);
+            const updateItem = (item: any) => {
+                if (item.id !== commentId) return item;
+                
+                let newLikes = item.likes || 0;
+                let newDislikes = item.dislikes || 0;
+                const oldVote = item.user_vote;
+
+                // Remove old vote impact
+                if (oldVote === 1) newLikes--;
+                else if (oldVote === -1) newDislikes--;
+
+                // Add new vote impact
+                const newVote = res.status === 'removed' ? null : res.vote_type;
+                if (newVote === 1) newLikes++;
+                else if (newVote === -1) newDislikes++;
+
+                return { ...item, likes: newLikes, dislikes: newDislikes, user_vote: newVote };
+            };
+
+            setComments(prev => prev.map(com => {
+                if (com.id === commentId) return updateItem(com);
+                if (com.id === parentId) {
+                    return { ...com, replies: com.replies.map((r: any) => updateItem(r)) };
+                }
+                if (com.replies?.some((r: any) => r.id === commentId)) {
+                    return { ...com, replies: com.replies.map((r: any) => updateItem(r)) };
+                }
+                return com;
+            }));
+        } catch (e) { console.error(e); }
+    };
+
     const handleSubmitFeedback = async () => {
         setFeedbackSubmitting(true);
         try {
@@ -1396,10 +1432,28 @@ export function DailySetClient() {
                                                             <ReactMarkdown components={discussionMarkdownComponents}>{comment.body}</ReactMarkdown>
                                                         </div>
                                                         {authStatus === 'authenticated' && (
-                                                            <button 
-                                                                onClick={() => setReplyingTo(replyingTo?.id === comment.id ? null : { id: comment.id, userName: comment.user.full_name })}
-                                                                className="mt-2 text-[10px] text-zinc-500 hover:text-[#4DD4C4] transition-colors flex items-center gap-1"
-                                                            ><Reply size={10} /> Reply</button>
+                                                            <div className="mt-3 flex items-center gap-4">
+                                                                <div className="flex items-center gap-2">
+                                                                    <button 
+                                                                        onClick={() => handleCommentVote(comment.id, 1)}
+                                                                        className={`flex items-center gap-1 text-[10px] transition-colors ${comment.user_vote === 1 ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-[#4DD4C4]'}`}
+                                                                    >
+                                                                        <ThumbsUp size={12} fill={comment.user_vote === 1 ? 'currentColor' : 'none'} />
+                                                                        <span>{comment.likes || 0}</span>
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleCommentVote(comment.id, -1)}
+                                                                        className={`flex items-center gap-1 text-[10px] transition-colors ${comment.user_vote === -1 ? 'text-red-400' : 'text-zinc-500 hover:text-red-400'}`}
+                                                                    >
+                                                                        <ThumbsDown size={12} fill={comment.user_vote === -1 ? 'currentColor' : 'none'} />
+                                                                        <span>{comment.dislikes || 0}</span>
+                                                                    </button>
+                                                                </div>
+                                                                <button 
+                                                                    onClick={() => setReplyingTo(replyingTo?.id === comment.id ? null : { id: comment.id, userName: comment.user.full_name })}
+                                                                    className="text-[10px] text-zinc-500 hover:text-[#4DD4C4] transition-colors flex items-center gap-1"
+                                                                ><Reply size={10} /> Reply</button>
+                                                            </div>
                                                         )}
                                                     </div>
                                                     
@@ -1418,6 +1472,24 @@ export function DailySetClient() {
                                                             <div className="text-[11px] text-zinc-400 leading-relaxed">
                                                                 <ReactMarkdown components={discussionMarkdownComponents}>{reply.body}</ReactMarkdown>
                                                             </div>
+                                                            {authStatus === 'authenticated' && (
+                                                                <div className="mt-2 flex items-center gap-3">
+                                                                    <button 
+                                                                        onClick={() => handleCommentVote(reply.id, 1, comment.id)}
+                                                                        className={`flex items-center gap-1 text-[9px] transition-colors ${reply.user_vote === 1 ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-[#4DD4C4]'}`}
+                                                                    >
+                                                                        <ThumbsUp size={10} fill={reply.user_vote === 1 ? 'currentColor' : 'none'} />
+                                                                        <span>{reply.likes || 0}</span>
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleCommentVote(reply.id, -1, comment.id)}
+                                                                        className={`flex items-center gap-1 text-[9px] transition-colors ${reply.user_vote === -1 ? 'text-red-400' : 'text-zinc-500 hover:text-red-400'}`}
+                                                                    >
+                                                                        <ThumbsDown size={10} fill={reply.user_vote === -1 ? 'currentColor' : 'none'} />
+                                                                        <span>{reply.dislikes || 0}</span>
+                                                                    </button>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ))}
 
