@@ -408,10 +408,8 @@ export function DailySetClient() {
                     current = current.trim();
                     if (current) {
                         // Skip table-level constraints: PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK, INDEX
-                        const upper = current.toUpperCase();
-                        if (!upper.startsWith('PRIMARY') && !upper.startsWith('FOREIGN') &&
-                            !upper.startsWith('UNIQUE') && !upper.startsWith('CHECK') &&
-                            !upper.startsWith('INDEX') && !upper.startsWith('KEY')) {
+                        const isConstraint = /^(PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE[\s(]|CHECK\s*\(|INDEX\s|KEY\s|CONSTRAINT\s)/i.test(current);
+                        if (!isConstraint) {
                             // First token is the column name (strip quotes/backticks)
                             const nameMatch = current.match(/^[`"']?([\w]+)[`"']?/);
                             if (nameMatch) columns.push(nameMatch[1]);
@@ -425,10 +423,8 @@ export function DailySetClient() {
             // Handle the last column (no trailing comma)
             current = current.trim();
             if (current) {
-                const upper = current.toUpperCase();
-                if (!upper.startsWith('PRIMARY') && !upper.startsWith('FOREIGN') &&
-                    !upper.startsWith('UNIQUE') && !upper.startsWith('CHECK') &&
-                    !upper.startsWith('INDEX') && !upper.startsWith('KEY')) {
+                const isConstraint = /^(PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE[\s(]|CHECK\s*\(|INDEX\s|KEY\s|CONSTRAINT\s)/i.test(current);
+                if (!isConstraint) {
                     const nameMatch = current.match(/^[`"']?([\w]+)[`"']?/);
                     if (nameMatch) columns.push(nameMatch[1]);
                 }
