@@ -686,7 +686,7 @@ export function DailySetClient() {
         if (platform === 'twitter') {
             window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
         } else if (platform === 'linkedin') {
-            window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, '_blank');
+            window.open(`https://www.linkedin.com/feed/?shareActive=true&shareUrl=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
         } else {
             navigator.clipboard.writeText(url);
             setToast({ message: "Link copied to clipboard!", visible: true });
@@ -1150,25 +1150,67 @@ export function DailySetClient() {
 
                                     {/* Right: vote buttons */}
                                     <div className="flex items-center gap-2.5 shrink-0">
-                                        <div className="relative group" ref={shareDropdownRef}>
+                                        <div>
                                             <button 
-                                                onClick={() => setShareDropdownOpen(!shareDropdownOpen)}
+                                                onClick={() => setShareDropdownOpen(true)}
                                                 title="Share Question"
-                                                className="flex items-center gap-1 text-xs text-zinc-500 hover:text-[#4DD4C4] transition-colors"
+                                                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-[#4DD4C4] bg-[#4DD4C4]/10 border border-[#4DD4C4]/30 hover:bg-[#4DD4C4]/20 rounded transition-all"
                                             >
                                                 <Share2 size={13} />
+                                                Share
                                             </button>
+
                                             {shareDropdownOpen && (
-                                                <div className="absolute top-full right-0 mt-2 w-40 bg-[#131924] border border-[#202736] rounded-lg overflow-hidden py-1 z-[300] shadow-xl">
-                                                    <button onClick={() => handleShare('twitter')} className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:text-white hover:bg-[#202736] flex items-center gap-3 transition-colors">
-                                                        <Twitter size={14} className="text-[#1DA1F2]" /> Twitter
-                                                    </button>
-                                                    <button onClick={() => handleShare('linkedin')} className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:text-white hover:bg-[#202736] flex items-center gap-3 transition-colors">
-                                                        <Linkedin size={14} className="text-[#0A66C2]" /> LinkedIn
-                                                    </button>
-                                                    <button onClick={() => handleShare('copy')} className="w-full text-left px-4 py-2.5 text-xs text-zinc-300 hover:text-white hover:bg-[#202736] flex items-center gap-3 transition-colors border-t border-[#202736]/50">
-                                                        <Copy size={14} className="text-zinc-400" /> Copy Link
-                                                    </button>
+                                                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={() => setShareDropdownOpen(false)}>
+                                                    <div className="bg-[#131924] border border-[#202736] rounded-2xl w-full max-w-[650px] flex overflow-hidden shadow-2xl relative" onClick={e => e.stopPropagation()}>
+                                                        <button onClick={() => setShareDropdownOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors z-10 bg-black/20 p-1.5 rounded-full">
+                                                            <X size={16} />
+                                                        </button>
+                                                        
+                                                        {/* Left Side: Buttons */}
+                                                        <div className="flex-1 p-8 space-y-6">
+                                                            <div>
+                                                                <h2 className="text-2xl font-bold text-white mb-1">Share This Question</h2>
+                                                                <p className="text-sm text-zinc-400">Share your progress with your network!</p>
+                                                            </div>
+                                                            
+                                                            <div className="space-y-3">
+                                                                <button onClick={() => handleShare('linkedin')} className="w-full flex items-center justify-center gap-3 bg-[#0A66C2]/10 hover:bg-[#0A66C2]/20 text-[#0A66C2] border border-[#0A66C2]/30 py-3.5 rounded-xl font-bold transition-colors">
+                                                                    <Linkedin size={18} /> Share on LinkedIn
+                                                                </button>
+                                                                <button onClick={() => handleShare('twitter')} className="w-full flex items-center justify-center gap-3 bg-[#1DA1F2]/10 hover:bg-[#1DA1F2]/20 text-[#1DA1F2] border border-[#1DA1F2]/30 py-3.5 rounded-xl font-bold transition-colors">
+                                                                    <Twitter size={18} /> Share on X
+                                                                </button>
+                                                                <button onClick={() => handleShare('copy')} className="w-full flex items-center justify-center gap-3 bg-[#202736] hover:bg-[#2a3441] text-zinc-300 border border-[#202736] py-3.5 rounded-xl font-bold transition-colors">
+                                                                    <Copy size={18} /> Copy link
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Right Side: Promotional */}
+                                                        <div className="w-[280px] bg-gradient-to-br from-[#4DD4C4]/10 to-[#121826] border-l border-[#202736] p-8 flex flex-col items-center justify-center text-center relative overflow-hidden hidden md:flex">
+                                                            <div className="bg-[#0b101c] p-4 rounded-xl border border-[#202736] shadow-xl relative z-10 w-full mb-6 text-left">
+                                                                <div className="flex items-center gap-3 mb-3">
+                                                                    <div className="w-8 h-8 rounded-full bg-[#4DD4C4] flex items-center justify-center font-bold text-[#080c16] text-xs">
+                                                                        DS
+                                                                    </div>
+                                                                    <div className="text-left">
+                                                                        <div className="text-xs font-bold text-white">DailySQL User</div>
+                                                                        <div className="text-[10px] text-zinc-500">@dailysql_user</div>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-[11px] text-zinc-300 leading-relaxed italic">
+                                                                    "I just crushed a SQL interview question on DailySQL! Check out my solution here 👇"
+                                                                </div>
+                                                            </div>
+                                                            <p className="text-sm font-bold text-white relative z-10 leading-relaxed">
+                                                                Tag <span className="text-[#4DD4C4]">@DailySQL</span> and we'll feature your post to our growing community of data professionals!
+                                                            </p>
+                                                            
+                                                            {/* Decorative background elements */}
+                                                            <div className="absolute -bottom-8 -right-8 w-40 h-40 bg-[#4DD4C4]/5 rounded-full blur-3xl"></div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
