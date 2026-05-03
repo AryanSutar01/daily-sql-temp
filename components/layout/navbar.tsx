@@ -209,10 +209,10 @@ export function Navbar() {
                     Log In
                   </Link>
                   <Link
-                    href="/waitlist"
+                    href="/signup"
                     className="text-sm text-[#4DD4C4] hover:text-[#30B5A6] transition-colors flex items-center gap-1 group"
                   >
-                    Join early access
+                    Sign up
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                   </Link>
                 </>
@@ -299,11 +299,11 @@ export function Navbar() {
               </>
             ) : (
               <Link
-                href="/waitlist"
+                href="/signup"
                 className="block text-sm text-[#4DD4C4] hover:text-[#30B5A6] transition-colors flex items-center gap-1"
                 onClick={() => setIsOpen(false)}
               >
-                Join early access
+                Sign up
                 <ArrowRight className="w-4 h-4" />
               </Link>
             )}

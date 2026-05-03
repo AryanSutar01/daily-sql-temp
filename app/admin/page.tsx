@@ -87,7 +87,7 @@ export default function AdminDashboard() {
     const [adminToken, setAdminToken] = useState<string | null>(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [activeTab, setActiveTab] = useState<Tab>('problems');
-    const [membersSubTab, setMembersSubTab] = useState<'whitelist' | 'waitlist'>('whitelist');
+    const [membersSubTab, setMembersSubTab] = useState<'whitelist' | 'users'>('users');
 
     // Data
     const [problems, setProblems] = useState<Problem[]>([]);
@@ -100,7 +100,7 @@ export default function AdminDashboard() {
     const [problemDatasets, setProblemDatasets] = useState<any[]>([]);
     const [feedbacks, setFeedbacks] = useState<any[]>([]);
     const [whitelist, setWhitelist] = useState<any[]>([]);
-    const [waitlist, setWaitlist] = useState<any[]>([]);
+    const [users, setUsers] = useState<any[]>([]);
     const [newMemberEmail, setNewMemberEmail] = useState("");
     const [isBulkMode, setIsBulkMode] = useState(false);
     const [bulkEmailsText, setBulkEmailsText] = useState("");
@@ -113,6 +113,8 @@ export default function AdminDashboard() {
     const [demographics, setDemographics] = useState<any>(null);
     const [sentimentData, setSentimentData] = useState<any[]>([]);
     const [analyticsSearch, setAnalyticsSearch] = useState("");
+    const [userSearch, setUserSearch] = useState("");
+    const [userStatusFilter, setUserStatusFilter] = useState<"all" | "onboarded" | "pending">("all");
 
     // Edit Form State for Drill-down
     const [editForm, setEditForm] = useState<any>(null);
@@ -204,11 +206,11 @@ export default function AdminDashboard() {
         } catch (e) { console.error(e); }
     };
 
-    const loadWaitlist = async (token?: string) => {
+    const loadUsers = async (token?: string) => {
         try {
-            const res = await fetchWithAuth(`${API_URL}/admin/waitlist`, {}, token);
+            const res = await fetchWithAuth(`${API_URL}/admin/users`, {}, token);
             if (res.ok) {
-                setWaitlist(await res.json());
+                setUsers(await res.json());
             }
         } catch (e) { console.error(e); }
     };
@@ -511,6 +513,7 @@ export default function AdminDashboard() {
                 loadSchedule(data.access_token);
                 loadFeedbacks(data.access_token);
                 loadWhitelist(data.access_token);
+                loadUsers(data.access_token);
                 loadAnalytics(data.access_token);
             } else {
                 const data = await res.json();
@@ -703,50 +706,6 @@ export default function AdminDashboard() {
         setLoading(false);
     };
 
-    const handleApproveWaitlist = async (id: string, email: string) => {
-        if (!confirm(`Approve ${email} and move to whitelist?`)) return;
-        setLoading(true);
-        try {
-            const res = await fetchWithAuth(`${API_URL}/admin/whitelist`, {
-                method: 'POST',
-                body: JSON.stringify({ email })
-            });
-            if (res.ok) {
-                const delRes = await fetchWithAuth(`${API_URL}/admin/waitlist/${id}`, {
-                    method: 'DELETE'
-                });
-                if (delRes.ok) {
-                    showToast('success', `Member ${email} approved and transferred to whitelist successfully!`);
-                    loadWhitelist();
-                    loadWaitlist();
-                } else {
-                    showToast('error', 'Added to whitelist, but failed to remove from waitlist.');
-                }
-            } else {
-                const data = await res.json();
-                showToast('error', data.detail || 'Failed to add member to whitelist');
-            }
-        } catch (e: any) { showToast('error', e.message); }
-        setLoading(false);
-    };
-
-    const handleDeleteWaitlist = async (id: string, email: string) => {
-        if (!confirm(`Are you sure you want to reject and delete ${email} from the waitlist?`)) return;
-        if (!confirm(`Before deletion, please confirm again: Delete ${email}?`)) return;
-        setLoading(true);
-        try {
-            const res = await fetchWithAuth(`${API_URL}/admin/waitlist/${id}`, {
-                method: 'DELETE'
-            });
-            if (res.ok) {
-                showToast('success', `Member ${email} has been rejected and deleted successfully.`);
-                loadWaitlist();
-            } else {
-                showToast('error', 'Failed to remove entry');
-            }
-        } catch (e: any) { showToast('error', e.message); }
-        setLoading(false);
-    };
 
     const handleBulkAddMember = async () => {
         // Regex to extract emails from text (comma, newline, space separated)
@@ -1524,14 +1483,14 @@ export default function AdminDashboard() {
                                     Whitelist
                                 </Button>
                                 <Button
-                                    onClick={() => setMembersSubTab('waitlist')}
+                                    onClick={() => setMembersSubTab('users')}
                                     variant="outline"
                                     size="sm"
-                                    className={`${membersSubTab === 'waitlist' ? 'border-[#4DD4C4] text-[#4DD4C4] bg-[#4DD4C4]/10' : 'border-[#202736] text-zinc-400'}`}
+                                    className={`${membersSubTab === 'users' ? 'border-[#4DD4C4] text-[#4DD4C4] bg-[#4DD4C4]/10' : 'border-[#202736] text-zinc-400'}`}
                                 >
-                                    Waitlist
+                                    All Users
                                 </Button>
-                                <Button onClick={() => { loadWhitelist(); loadWaitlist(); }} variant="outline" size="sm" className="border-[#202736] text-zinc-400 ml-4">
+                                <Button onClick={() => { loadWhitelist(); loadUsers(); }} variant="outline" size="sm" className="border-[#202736] text-zinc-400 ml-4">
                                     {loading && <Loader2 size={14} className="animate-spin mr-2" />} Refresh
                                 </Button>
                             </div>
@@ -1618,17 +1577,52 @@ export default function AdminDashboard() {
                             </>
                         )}
 
-                        {membersSubTab === 'waitlist' && (
+                        {membersSubTab === 'users' && (
                             <div className="bg-[#121826] border border-[#202736] rounded-xl overflow-hidden flex flex-col h-[600px]">
                                 <div className="p-4 border-b border-[#202736] bg-[#0b101c] flex justify-between items-center shrink-0">
                                     <h3 className="text-xs font-bold text-[#4DD4C4] uppercase tracking-widest flex items-center gap-2">
-                                        <Clock size={14} /> Pending Waitlist ({waitlist.length})
+                                        <Users size={14} /> Registered Users ({users.length})
                                     </h3>
-                                    <div className="flex gap-2">
-                                        <Button onClick={() => downloadCSV(waitlist, 'waitlist.csv')} variant="ghost" size="sm" className="text-[#4DD4C4] hover:text-[#3dbdb0] hover:bg-[#4DD4C4]/10 h-6">
+                                    <div className="flex gap-2 items-center">
+                                        <div className="relative mr-2">
+                                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" size={12} />
+                                            <input 
+                                                type="text" 
+                                                placeholder="Search users..." 
+                                                className="bg-[#0b101c] border border-[#202736] pl-8 pr-3 py-1 rounded text-[10px] text-white focus:border-[#4DD4C4] outline-none w-40"
+                                                value={userSearch}
+                                                onChange={e => setUserSearch(e.target.value)}
+                                            />
+                                        </div>
+                                        <select 
+                                            className="bg-[#0b101c] border border-[#202736] text-[10px] text-zinc-400 px-2 py-1 rounded outline-none"
+                                            value={userStatusFilter}
+                                            onChange={e => setUserStatusFilter(e.target.value as any)}
+                                        >
+                                            <option value="all">All Status</option>
+                                            <option value="onboarded">Onboarded</option>
+                                            <option value="pending">Pending</option>
+                                        </select>
+                                        <Button 
+                                            onClick={() => {
+                                                const nums = users
+                                                    .filter(u => u.whatsapp_number)
+                                                    .map(u => u.whatsapp_number)
+                                                    .join('\n');
+                                                navigator.clipboard.writeText(nums);
+                                                showToast('success', 'WhatsApp numbers copied to clipboard!');
+                                            }} 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="text-zinc-500 h-6 px-2"
+                                            title="Copy all WhatsApp numbers"
+                                        >
+                                            <Phone size={12} className="mr-1" /> Copy Nums
+                                        </Button>
+                                        <Button onClick={() => downloadCSV(users, 'users.csv')} variant="ghost" size="sm" className="text-[#4DD4C4] hover:text-[#3dbdb0] hover:bg-[#4DD4C4]/10 h-6">
                                             <Download size={12} className="mr-1" /> Export CSV
                                         </Button>
-                                        <Button onClick={() => loadWaitlist()} variant="ghost" size="sm" className="text-zinc-500 h-6">Refresh</Button>
+                                        <Button onClick={() => loadUsers()} variant="ghost" size="sm" className="text-zinc-500 h-6">Refresh</Button>
                                     </div>
                                 </div>
                                 <div className="overflow-x-auto overflow-y-auto flex-1">
@@ -1638,51 +1632,69 @@ export default function AdminDashboard() {
                                                 <th className="p-4 font-black">Full Name</th>
                                                 <th className="p-4 font-black">Email</th>
                                                 <th className="p-4 font-black">WhatsApp</th>
+                                                <th className="p-4 font-black text-center">Solved</th>
                                                 <th className="p-4 font-black">Role</th>
-                                                <th className="p-4 font-black">Exp</th>
                                                 <th className="p-4 font-black">Source</th>
-                                                <th className="p-4 font-black text-center">Actions</th>
+                                                <th className="p-4 font-black">Status</th>
+                                                <th className="p-4 font-black text-right">Last Active</th>
+                                                <th className="p-4 font-black text-right">Joined</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-[#202736]">
-                                            {waitlist.map((entry: any) => (
-                                                <tr key={(entry as any).id} className="hover:bg-white/[0.02] transition-colors group">
-                                                    <td className="p-4 font-medium text-white">{entry.full_name}</td>
-                                                    <td className="p-4 text-zinc-400">{entry.email}</td>
+                                            {users
+                                                .filter(u => {
+                                                    const matchesSearch = !userSearch || 
+                                                        u.full_name?.toLowerCase().includes(userSearch.toLowerCase()) || 
+                                                        u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
+                                                        u.whatsapp_number?.includes(userSearch);
+                                                    
+                                                    const matchesStatus = userStatusFilter === 'all' || 
+                                                        (userStatusFilter === 'onboarded' && u.onboarding_completed) ||
+                                                        (userStatusFilter === 'pending' && !u.onboarding_completed);
+                                                    
+                                                    return matchesSearch && matchesStatus;
+                                                })
+                                                .map((u: any) => (
+                                                <tr key={u.user_id} className="hover:bg-white/[0.02] transition-colors group">
+                                                    <td className="p-4 font-medium text-white">{u.full_name || '—'}</td>
+                                                    <td className="p-4 text-zinc-400">{u.email}</td>
                                                     <td className="p-4">
-                                                        <a href={`https://wa.me/${entry.whatsapp_number.replace(/\+/g, '')}`} target="_blank" className="text-[#4DD4C4] hover:underline flex items-center gap-1">
-                                                            <Phone size={12} /> {entry.whatsapp_number}
-                                                        </a>
-                                                    </td>
-                                                    <td className="p-4 text-zinc-400">{entry.job_role || entry.occupation}</td>
-                                                    <td className="p-4 text-zinc-400">{entry.experience_years}y</td>
-                                                    <td className="p-4">
-                                                        <span className="px-2 py-0.5 rounded bg-zinc-500/10 text-zinc-500 text-[10px] font-bold uppercase">{entry.source}</span>
+                                                        {u.whatsapp_number ? (
+                                                            <a href={`https://wa.me/${u.whatsapp_number.replace(/\+/g, '')}`} target="_blank" className="text-[#4DD4C4] hover:underline flex items-center gap-1">
+                                                                <Phone size={12} /> {u.whatsapp_number}
+                                                            </a>
+                                                        ) : '—'}
                                                     </td>
                                                     <td className="p-4 text-center">
-                                                        <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button
-                                                                onClick={() => handleApproveWaitlist((entry as any).id, entry.email)}
-                                                                className="p-1.5 text-green-500 hover:bg-green-500/10 rounded transition-colors"
-                                                                title="Approve (Add to Whitelist)"
-                                                            >
-                                                                <CheckCircle2 size={16} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteWaitlist((entry as any).id, entry.email)}
-                                                                className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
-                                                                title="Reject"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        </div>
+                                                        <span className={`px-2 py-0.5 rounded ${u.total_solved > 0 ? 'bg-orange-500/10 text-orange-500' : 'bg-zinc-500/10 text-zinc-500'} text-[10px] font-bold`}>
+                                                            {u.total_solved || 0}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 text-zinc-400">{u.job_role || u.occupation || '—'}</td>
+                                                    <td className="p-4">
+                                                        {u.source ? (
+                                                            <span className="px-2 py-0.5 rounded bg-zinc-500/10 text-zinc-500 text-[10px] font-bold uppercase">{u.source}</span>
+                                                        ) : '—'}
+                                                    </td>
+                                                    <td className="p-4">
+                                                        {u.onboarding_completed ? (
+                                                            <span className="px-2 py-0.5 rounded bg-green-500/10 text-green-500 text-[10px] font-bold uppercase tracking-tight">Onboarded</span>
+                                                        ) : (
+                                                            <span className="px-2 py-0.5 rounded bg-zinc-500/10 text-zinc-500 text-[10px] font-bold uppercase tracking-tight">Pending</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-4 text-right text-zinc-500 tabular-nums text-[11px]">
+                                                        {u.last_active_at ? new Date(u.last_active_at).toLocaleDateString() : 'Never'}
+                                                    </td>
+                                                    <td className="p-4 text-right text-zinc-500 tabular-nums">
+                                                        {new Date(u.created_at).toLocaleDateString()}
                                                     </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
-                                    {waitlist.length === 0 && (
-                                        <div className="p-12 text-center text-zinc-500 italic">No pending requests in the waitlist.</div>
+                                    {users.length === 0 && (
+                                        <div className="p-12 text-center text-zinc-500 italic">No users found.</div>
                                     )}
                                 </div>
                             </div>
@@ -1777,7 +1789,12 @@ export default function AdminDashboard() {
                                 <Metric className="text-white font-light text-4xl mt-2">{analyticsSummary?.total_users || 0}</Metric>
                             </Card>
                             <Card className="bg-[#121826] border-[#202736] ring-0 p-8">
-                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em]">Waitlist Size</Text>
+                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em]">Onboarding Rate</Text>
+                                <Metric className="text-[#4DD4C4] font-light text-4xl mt-2">{analyticsSummary?.onboarding_rate || 0}%</Metric>
+                                <Text className="text-zinc-600 text-[10px] mt-1">{analyticsSummary?.onboarded_users || 0} of {analyticsSummary?.total_users || 0} users</Text>
+                            </Card>
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-8">
+                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em]">Legacy Waitlist</Text>
                                 <Metric className="text-white font-light text-4xl mt-2">{analyticsSummary?.total_waitlist || 0}</Metric>
                             </Card>
                         </Grid>

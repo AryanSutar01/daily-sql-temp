@@ -316,6 +316,22 @@ export function DailySetClient() {
                         .then(({ solved_ids }) => setSolvedIds(new Set(solved_ids)))
                         .catch(() => {});
                 }
+
+                // Welcome Toast logic
+                if (typeof window !== 'undefined') {
+                    const search = window.location.search;
+                    if (search.includes('welcome=true')) {
+                        setToast({
+                            message: "Welcome to Daily SQL!",
+                            subMessage: "Your journey starts here. Good luck!",
+                            visible: true
+                        });
+                        setTimeout(() => setToast(null), 5000);
+                        
+                        const newUrl = window.location.pathname;
+                        window.history.replaceState({}, '', newUrl);
+                    }
+                }
             } catch (err) {
                 console.error("Failed to load initial data", err);
             } finally {

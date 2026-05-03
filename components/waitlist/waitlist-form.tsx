@@ -44,7 +44,7 @@ export function WaitlistForm({ onSubmit, isLoading = false }: WaitlistFormProps)
 
   const validate = () => {
     const newErrors: Partial<Record<keyof WaitlistFormData, string>> = {};
-    if (!formData.email.trim()) newErrors.email = "Email is required";
+    // if (!formData.email.trim()) newErrors.email = "Email is required";
     if (!formData.full_name.trim()) newErrors.full_name = "Full name is required";
     if (!formData.whatsapp_number.trim()) newErrors.whatsapp_number = "WhatsApp number is required";
     if (!formData.occupation) newErrors.occupation = "Please select a category";
@@ -69,34 +69,17 @@ export function WaitlistForm({ onSubmit, isLoading = false }: WaitlistFormProps)
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {/* --- Basic Info Section --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="full_name" className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Full Name (as per Govt ID)</Label>
-          <div className="relative group">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={16} />
-            <Input
-              id="full_name"
-              placeholder="Aryan Singh"
-              className={`bg-[#0b101c]/50 border-white/5 pl-10 h-12 focus:border-[#4DD4C4]/50 ${errors.full_name ? "border-red-500/50" : ""}`}
-              value={formData.full_name}
-              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="email" className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Email Address</Label>
-          <div className="relative group">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={16} />
-            <Input
-              id="email"
-              type="email"
-              placeholder="aryan@example.com"
-              className={`bg-[#0b101c]/50 border-white/5 pl-10 h-12 focus:border-[#4DD4C4]/50 ${errors.email ? "border-red-500/50" : ""}`}
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-          </div>
+      <div className="space-y-2">
+        <Label htmlFor="full_name" className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Full Name (as per Govt ID)</Label>
+        <div className="relative group">
+          <User className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={16} />
+          <Input
+            id="full_name"
+            placeholder="Aryan Singh"
+            className={`bg-[#0b101c]/50 border-white/5 pl-10 h-12 focus:border-[#4DD4C4]/50 ${errors.full_name ? "border-red-500/50" : ""}`}
+            value={formData.full_name}
+            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+          />
         </div>
       </div>
 
@@ -210,7 +193,7 @@ export function WaitlistForm({ onSubmit, isLoading = false }: WaitlistFormProps)
         disabled={isLoading}
         className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-[#080c16] font-extrabold h-14 rounded-xl shadow-[0_0_30px_rgba(77,212,196,0.1)] transition-all transform active:scale-[0.98] mt-4 text-base"
       >
-        {isLoading ? "Joining..." : "Reserve My Spot"}
+        {isLoading ? "Joining..." : "Start Practicing"}
       </Button>
     </form>
   );
