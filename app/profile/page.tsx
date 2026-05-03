@@ -5,7 +5,8 @@ import Link from "next/link";
 import { ArrowLeft, Edit2, Search, Loader2, Sparkles, User, Briefcase, GraduationCap, History, BarChart2, Flame, X, Code, Camera, CheckCircle2, AlertCircle, Trophy } from "lucide-react";
 import { useRef } from "react";
 import { api } from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 function polarToCartesian(centerX: number, centerY: number, radius: number, angleInDegrees: number) {
     const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
@@ -32,7 +33,17 @@ function describeArc(x: number, y: number, r: number, startAngle: number, endAng
 }
 
 export default function ProfilePage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-[#080c16] flex items-center justify-center"><Loader2 className="animate-spin text-[#4DD4C4]" /></div>}>
+            <ProfileContent />
+        </Suspense>
+    );
+}
+
+function ProfileContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const isSetupMode = searchParams.get("setup") === "true";
     const [profile, setProfile] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -164,6 +175,13 @@ export default function ProfilePage() {
         loadProfile();
     }, []);
 
+    // Set editing mode if in setup mode
+    useEffect(() => {
+        if (isSetupMode && profile && !isEditing) {
+            setIsEditing(true);
+        }
+    }, [isSetupMode, profile]);
+
     const handleOnboard = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
@@ -173,8 +191,10 @@ export default function ProfilePage() {
             setProfile(updated);
             setIsEditing(false);
             
-            // If just finished onboarding, redirect to practice
-            if (!profile.onboarding_completed) {
+            // If in setup mode or just finished onboarding, redirect to practice
+            if (isSetupMode || !profile.onboarding_completed) {
+                router.push("/practice/daily?welcome=true");
+            } else {
                 router.push("/practice/daily");
             }
         } catch (err: any) {
@@ -395,6 +415,21 @@ export default function ProfilePage() {
                     )}
 
                     <div className="flex flex-col items-center mb-8 text-center">
+                        {isSetupMode && (
+                            <div className="flex items-center justify-center gap-4 mb-8">
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-green-500/20 text-green-500 border border-green-500/30 flex items-center justify-center font-black text-xs">
+                                        <CheckCircle2 size={14} />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">Basics</span>
+                                </div>
+                                <div className="w-12 h-px bg-green-500/30"></div>
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-[#4DD4C4] text-[#080c16] flex items-center justify-center font-black text-xs shadow-[0_0_15px_rgba(77,212,196,0.3)]">2</div>
+                                    <span className="text-[10px] font-bold text-[#4DD4C4] uppercase tracking-widest">Profile</span>
+                                </div>
+                            </div>
+                        )}
                         <div 
                             onClick={handlePhotoClick}
                             className="relative w-24 h-24 rounded-3xl mb-4 p-1 border border-[#4DD4C4]/30 bg-[#4DD4C4]/5 hover:border-[#4DD4C4]/60 hover:bg-[#4DD4C4]/10 transition-all duration-300 shadow-lg shadow-[#4DD4C4]/10 cursor-pointer overflow-hidden group/avatar"
@@ -426,11 +461,11 @@ export default function ProfilePage() {
                                 </div>
                             </div>
                         </div>
-                        <h2 className="text-2xl font-bold text-white mb-2">{profile.onboarding_completed ? "Update Your Profile" : "Complete Your Profile"}</h2>
+                        <h2 className="text-2xl font-bold text-white mb-2">{profile.onboarding_completed || isSetupMode ? "Complete Your Public Profile" : "Update Your Profile"}</h2>
                         <p className="text-zinc-400 text-sm">
-                            {profile.onboarding_completed
-                                ? "Update your details below to keep your profile accurate and professional."
-                                : "Welcome! Tell us a bit about yourself to unlock practice problems and track your progress."}
+                            {isSetupMode
+                                ? "Last step! Customize your public profile and assign your username."
+                                : "Update your details below to keep your profile accurate and professional."}
                         </p>
                     </div>
 
