@@ -17,7 +17,7 @@ export function HowItWorks() {
               <div className="text-5xl font-bold text-[#4DD4C4]/20 mb-4">01</div>
               <h3 className="text-xl font-semibold text-white mb-3">Start your day</h3>
               <p className="text-[#7b8ca3]">
-                Open SQLDaily with your morning coffee. Three new questions are waiting—one easy, one medium, one advanced.
+                Open DailySQL with your morning coffee. Three new questions are waiting—one easy, one medium, one advanced.
               </p>
             </div>
 

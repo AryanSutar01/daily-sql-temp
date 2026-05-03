@@ -23,7 +23,7 @@ export function TargetAudience() {
                                 <div className="w-8 h-8 rounded-full bg-[#4DD4C4]/10 flex items-center justify-center border border-[#4DD4C4]/20">
                                     <Check className="w-4 h-4 text-[#4DD4C4]" />
                                 </div>
-                                SQLDaily is for you if you're...
+                                DailySQL is for you if you're...
                             </h3>
                             <ul className="space-y-4 pl-2">
                                 {[
