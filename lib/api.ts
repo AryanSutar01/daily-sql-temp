@@ -1,7 +1,7 @@
 import { getToken } from '@/lib/auth';
 import { Attempt, DailyPractice, Dataset, ExecutionResponse, Problem, Streak } from '@/types/api';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 function getAuthHeaders(): HeadersInit {
     const headers: HeadersInit = {
