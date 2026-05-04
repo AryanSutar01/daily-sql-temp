@@ -95,7 +95,8 @@ export default function AdminDashboard() {
     const [adminToken, setAdminToken] = useState<string | null>(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [activeTab, setActiveTab] = useState<Tab>('problems');
-    const [membersSubTab, setMembersSubTab] = useState<'whitelist' | 'users'>('users');
+    const [membersSubTab, setMembersSubTab] = useState<'whitelist' | 'users' | 'wa-group'>('users');
+
 
     // Data
     const [problems, setProblems] = useState<Problem[]>([]);
@@ -109,10 +110,15 @@ export default function AdminDashboard() {
     const [feedbacks, setFeedbacks] = useState<any[]>([]);
     const [whitelist, setWhitelist] = useState<any[]>([]);
     const [users, setUsers] = useState<any[]>([]);
+    const [waGroupChecklist, setWaGroupChecklist] = useState<any[]>([]);
+    const [waFilterOnlyPending, setWaFilterOnlyPending] = useState(true); // Default to pending
+    const [waFilterOnlyNew, setWaFilterOnlyNew] = useState(true); // Default to new users only
     const [newMemberEmail, setNewMemberEmail] = useState("");
+
     const [isBulkMode, setIsBulkMode] = useState(false);
     const [bulkEmailsText, setBulkEmailsText] = useState("");
     const [loadingDetails, setLoadingDetails] = useState(false);
+
 
     // Analytics State
     const [analyticsSummary, setAnalyticsSummary] = useState<any>(null);
@@ -223,6 +229,16 @@ export default function AdminDashboard() {
         } catch (e) { console.error(e); }
     };
 
+    const loadWaGroupChecklist = async (token?: string) => {
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/wa-group`, {}, token);
+            if (res.ok) {
+                setWaGroupChecklist(await res.json());
+            }
+        } catch (e) { console.error(e); }
+    };
+
+
     const loadAnalytics = async (token?: string) => {
         setLoading(true);
         try {
@@ -303,6 +319,20 @@ export default function AdminDashboard() {
             }
         } catch (e) { console.error(e); }
     };
+
+    const toggleWaGroupStatus = async (userId: string, currentStatus: boolean) => {
+        try {
+            const method = currentStatus ? 'DELETE' : 'POST';
+            const res = await fetchWithAuth(`${API_URL}/admin/wa-group/${userId}`, { method });
+            if (res.ok) {
+                showToast('success', currentStatus ? 'Removed from group' : 'Marked as added');
+                loadWaGroupChecklist();
+            } else {
+                showToast('error', 'Failed to update status');
+            }
+        } catch (e) { console.error(e); }
+    };
+
 
     const handleUpdateProblem = async () => {
         if (!selectedProblem) return;
@@ -1498,11 +1528,20 @@ export default function AdminDashboard() {
                                 >
                                     All Users
                                 </Button>
-                                <Button onClick={() => { loadWhitelist(); loadUsers(); }} variant="outline" size="sm" className="border-[#202736] text-zinc-400 ml-4">
+                                <Button
+                                    onClick={() => { setMembersSubTab('wa-group'); loadWaGroupChecklist(); }}
+                                    variant="outline"
+                                    size="sm"
+                                    className={`${membersSubTab === 'wa-group' ? 'border-green-500 text-green-500 bg-green-500/10' : 'border-[#202736] text-zinc-400'}`}
+                                >
+                                    WA Group {waGroupChecklist.filter(u => !u.is_added).length > 0 && <span className="ml-2 bg-green-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full">{waGroupChecklist.filter(u => !u.is_added).length}</span>}
+                                </Button>
+                                <Button onClick={() => { loadWhitelist(); loadUsers(); if (membersSubTab === 'wa-group') loadWaGroupChecklist(); }} variant="outline" size="sm" className="border-[#202736] text-zinc-400 ml-4">
                                     {loading && <Loader2 size={14} className="animate-spin mr-2" />} Refresh
                                 </Button>
                             </div>
                         </div>
+
 
                         {membersSubTab === 'whitelist' && (
                             <>
@@ -1707,8 +1746,91 @@ export default function AdminDashboard() {
                                 </div>
                             </div>
                         )}
+
+                        {membersSubTab === 'wa-group' && (
+                            <div className="space-y-4">
+                                <div className="bg-[#121826] border border-[#202736] rounded-xl p-4 flex justify-between items-center">
+                                    <div className="flex gap-4 items-center">
+                                        <div className="text-xs font-bold text-zinc-400 uppercase tracking-widest">
+                                            WA Group Checklist ({waGroupChecklist.filter(u => u.is_added).length} / {waGroupChecklist.length})
+                                        </div>
+                                        <div className="h-4 w-px bg-[#202736]" />
+                                        <label className="flex items-center gap-2 text-[10px] text-zinc-400 cursor-pointer select-none">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={waFilterOnlyNew} 
+                                                onChange={e => setWaFilterOnlyNew(e.target.checked)}
+                                                className="w-3 h-3 rounded accent-[#4DD4C4]"
+                                            />
+                                            New users only
+                                        </label>
+
+                                        <label className="flex items-center gap-2 text-[10px] text-zinc-400 cursor-pointer select-none">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={waFilterOnlyPending} 
+                                                onChange={e => setWaFilterOnlyPending(e.target.checked)}
+                                                className="w-3 h-3 rounded accent-[#4DD4C4]"
+                                            />
+                                            Show only pending
+                                        </label>
+                                    </div>
+                                    <Button onClick={() => downloadCSV(waGroupChecklist, 'wa_group_checklist.csv')} variant="ghost" size="sm" className="text-[#4DD4C4] hover:text-[#3dbdb0] hover:bg-[#4DD4C4]/10 h-6">
+                                        <Download size={12} className="mr-1" /> Export CSV
+                                    </Button>
+                                </div>
+
+                                <div className="bg-[#121826] border border-[#202736] rounded-xl overflow-hidden flex flex-col h-[600px]">
+                                    <div className="divide-y divide-[#202736] overflow-y-auto">
+                                        {waGroupChecklist
+                                            .filter(u => {
+                                                const matchesPending = !waFilterOnlyPending || !u.is_added;
+                                                const matchesNew = !waFilterOnlyNew || new Date(u.created_at) >= new Date('2026-05-04');
+                                                return matchesPending && matchesNew;
+                                            })
+                                            .map((u: any) => (
+                                                <div key={u.user_id} className={`p-4 flex justify-between items-center transition-colors hover:bg-white/[0.02] ${u.is_added ? 'opacity-50' : ''}`}>
+                                                    <div className="flex gap-4 items-center">
+                                                        <div 
+                                                            onClick={() => toggleWaGroupStatus(u.user_id, u.is_added)}
+                                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all ${u.is_added ? 'bg-green-500 border-green-500' : 'border-[#202736] hover:border-green-500/50'}`}
+                                                        >
+                                                            {u.is_added && <CheckCircle2 size={14} className="text-black" />}
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-sm font-bold text-white flex items-center gap-2">
+                                                                {u.full_name || 'Anonymous User'}
+                                                                {u.is_added && <span className="text-[10px] text-green-500 font-normal">Added ✓</span>}
+                                                            </div>
+                                                            <div className="flex items-center gap-3 text-[10px] text-zinc-500">
+                                                                <span className="flex items-center gap-1"><Phone size={10} /> {u.whatsapp_number}</span>
+                                                                <span className="flex items-center gap-1">Joined: {new Date(u.created_at).toLocaleDateString()}</span>
+                                                                {u.is_added && u.added_at && <span>Added at: {new Date(u.added_at).toLocaleDateString()}</span>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <a 
+                                                            href={`https://wa.me/${u.whatsapp_number.replace(/\D/g, '')}`} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            className="px-3 py-1 bg-green-500/10 text-green-500 border border-green-500/20 rounded text-[10px] font-bold hover:bg-green-500/20 transition-colors"
+                                                        >
+                                                            Open WhatsApp
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        {waGroupChecklist.length === 0 && (
+                                            <div className="p-12 text-center text-zinc-500 italic">No users with WhatsApp numbers found.</div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
+
 
                 {/* ============ FEEDBACK TAB ============ */}
                 {activeTab === 'feedback' && (
