@@ -968,7 +968,7 @@ export function DailySetClient() {
                                     {timerMode === 'stopwatch' ? 'SW' : 'TM'}
                                 </button>
                                 {timerMode === 'timer' && !timerRunning && (
-                                    <div className="flex items-center gap-1 border-l border-[#202736] pl-1 ml-0.5">
+                                    <div className="h-[52px] flex items-center justify-between px-2 border-b border-[#202736] bg-[#0d121c]/50">
                                         <button
                                             onClick={() => setTimerSeconds(s => Math.max(60, s - 60))}
                                             title="-1 minute"
@@ -1057,7 +1057,7 @@ export function DailySetClient() {
                     <Panel defaultSize="20" minSize="15" maxSize="30" className="flex flex-col bg-[#080c16] border-r border-[#202736]">
                         <div className="flex-1 flex flex-col h-full overflow-hidden">
                             {/* Header / Tabs */}
-                            <div className="p-4 border-b border-[#202736] bg-[#0d121c] flex justify-between items-center shrink-0">
+                            <div className="h-[52px] border-b border-[#202736] bg-[#0d121c] flex justify-between items-center px-4 shrink-0">
                                 <span className="font-semibold text-xs tracking-wide text-zinc-300">
                                     {activeSidebarTab === 'today' ? "Today's Practice" : "Problem List"}
                                 </span>
@@ -1193,7 +1193,7 @@ export function DailySetClient() {
                         {activeProblemId ? (
                             <div className="flex-1 flex flex-col h-full overflow-hidden">
                                 {/* Tab Bar */}
-                                <div className="h-11 border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0 relative">
+                                <div className="h-[52px] border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0 relative">
                                     <div className="flex items-center gap-2">
                                         {/* Prev / Next navigation */}
                                         <div className="flex items-center gap-0.5">
@@ -1484,7 +1484,7 @@ export function DailySetClient() {
                                                     {replyingTo && replyingTo.id === comment.id && (
                                                         <div className="ml-5 bg-[#080c16] rounded-2xl border border-[#4DD4C4]/20 overflow-hidden mb-4">
                                                             <div 
-                                                                className="px-3 py-2 border-b border-[#202736] bg-[#0b101c] flex items-center justify-between cursor-row-resize select-none"
+                                                                className="h-[52px] px-4 border-b border-[#202736] flex items-center justify-between bg-[#0d121c]/50 cursor-row-resize select-none"
                                                                 onMouseDown={handleReplyResizeStart}
                                                             >
                                                                 <div className="flex items-center gap-4">
@@ -1553,24 +1553,29 @@ export function DailySetClient() {
                                                 </div>
                                             ))}
                                         </div>
-                                        {/* Discussion Input */}
-                                        <div className="p-4 border-t border-[#202736] bg-[#0d121c] shrink-0">
+                                        {/* Resize Handle Separator */}
+                                        <div 
+                                            className="h-[1px] w-full bg-[#202736] hover:bg-[#4DD4C4]/50 cursor-row-resize transition-colors relative shrink-0"
+                                            onMouseDown={handleCommentResizeStart}
+                                        >
+                                            <div className="absolute -top-2 -bottom-2 left-0 right-0 z-10" />
+                                        </div>
+                                        <div className="p-4 bg-[#0d121c] shrink-0">
                                             {authStatus === 'authenticated' ? (
                                                     <div className="flex flex-col">
-                                                        {/* Top Bar / Resize Handle */}
-                                                        <div 
-                                                            className="flex items-center gap-6 mb-3 px-1 cursor-row-resize select-none"
-                                                            onMouseDown={handleCommentResizeStart}
-                                                        >
+
+
+                                                        {/* Tabs Bar */}
+                                                        <div className="flex items-center gap-6 mb-3 px-1 select-none">
                                                             <button 
-                                                                onClick={(e) => { e.stopPropagation(); setIsCommentPreview(false); }} 
+                                                                onClick={() => setIsCommentPreview(false)} 
                                                                 className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${!isCommentPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
                                                             >
                                                                 Write
                                                                 {!isCommentPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
                                                             </button>
                                                             <button 
-                                                                onClick={(e) => { e.stopPropagation(); setIsCommentPreview(true); }} 
+                                                                onClick={() => setIsCommentPreview(true)} 
                                                                 className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${isCommentPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
                                                             >
                                                                 Preview
@@ -1648,7 +1653,7 @@ export function DailySetClient() {
                     {/* ── RIGHT PANE: Editor + Output ── */}
                     <Panel minSize="30" className="flex flex-col bg-[#0b101c]">
                         {/* Editor toolbar */}
-                        <div className="h-11 border-b border-[#202736] bg-[#131924] flex items-center justify-between px-4 shrink-0">
+                        <div className="h-[52px] border-b border-[#202736] bg-[#131924] flex items-center justify-between px-4 shrink-0">
                             <span className="text-xs font-mono font-medium text-[#4DD4C4] flex items-center gap-2">
                                 <span className="text-zinc-500">&gt;_</span> PostgreSQL
                             </span>
