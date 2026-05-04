@@ -586,21 +586,7 @@ function ProfileContent() {
                             </div>
                         </div>
 
-                        <div className="pt-2 border-t border-[#202736] mt-4 flex items-center justify-between">
-                            <div>
-                                <h3 className="text-sm font-bold text-white">Public Profile</h3>
-                                <p className="text-xs text-zinc-400">Make your profile visible to others and on the leaderboard.</p>
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    className="sr-only peer"
-                                    checked={formData.is_public_profile}
-                                    onChange={(e) => setFormData({ ...formData, is_public_profile: e.target.checked })}
-                                />
-                                <div className="w-11 h-6 bg-[#202736] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#4DD4C4]"></div>
-                            </label>
-                        </div>
+
 
                         <button
                             disabled={isSaving}
@@ -661,7 +647,7 @@ function ProfileContent() {
                         {profile.username && (
                             <div className="flex items-center gap-1.5 mt-1 text-zinc-400 font-medium">
                                 <span className="text-sm">@{profile.username}</span>
-                                {profile.is_public_profile && (
+                                {profile.username && (
                                     <Link href={`/u/${profile.username}`} target="_blank" rel="noopener noreferrer" className="text-[#4DD4C4] hover:underline text-xs flex items-center gap-1">
                                         View Public Page
                                     </Link>
