@@ -47,6 +47,7 @@ import Link from "next/link";
 import { Panel, Group, Separator } from "react-resizable-panels";
 import Editor from "@monaco-editor/react";
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -487,6 +488,13 @@ export function DailySetClient() {
         ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-2.5" {...props} />,
         ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-2.5" {...props} />,
         li: ({ node, ...props }: any) => <li className="mb-1 last:mb-0" {...props} />,
+        table: ({ node, ...props }: any) => <div className="overflow-x-auto my-3"><table className="w-full border-collapse text-sm" {...props} /></div>,
+        thead: ({ node, ...props }: any) => <thead className="border-b border-[#202736]" {...props} />,
+        tbody: ({ node, ...props }: any) => <tbody {...props} />,
+        tr: ({ node, ...props }: any) => <tr className="border-b border-[#202736]/50" {...props} />,
+        th: ({ node, ...props }: any) => <th className="text-left px-3 py-2 text-xs font-bold text-zinc-300 bg-[#131924]" {...props} />,
+        td: ({ node, ...props }: any) => <td className="px-3 py-2 text-xs text-zinc-400 font-mono" {...props} />,
+        strong: ({ node, ...props }: any) => <strong className="font-semibold text-zinc-200" {...props} />,
         code: ({ node, className, children, ...props }: any) => {
             const match = /language-(\w+)/.exec(className || '');
             const isInline = !match && !className;
@@ -1318,7 +1326,7 @@ export function DailySetClient() {
                                             <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Task</h3>
                                             <div className="h-px w-full bg-[#202736] mb-3" />
                                             <div className="text-zinc-400 text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
-                                                <ReactMarkdown components={markdownComponents}>{mainDesc}</ReactMarkdown>
+                                                <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>{mainDesc}</ReactMarkdown>
                                             </div>
                                         </div>
 
@@ -1428,7 +1436,7 @@ export function DailySetClient() {
                                                 <div className="h-px w-full bg-[#202736] mb-3" />
                                                 {showHint && (
                                                     <div className="p-3 bg-[#131924] rounded-lg border border-[#202736] text-zinc-400 text-sm leading-relaxed">
-                                                        <ReactMarkdown components={markdownComponents}>{hintText}</ReactMarkdown>
+                                                        <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>{hintText}</ReactMarkdown>
                                                     </div>
                                                 )}
                                             </div>
@@ -1461,7 +1469,7 @@ export function DailySetClient() {
                                                             )}
                                                         </div>
                                                         <div className="text-xs text-zinc-300 leading-relaxed prose prose-invert prose-xs">
-                                                            <ReactMarkdown components={discussionMarkdownComponents}>{comment.body}</ReactMarkdown>
+                                                            <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{comment.body}</ReactMarkdown>
                                                         </div>
                                                         {authStatus === 'authenticated' && (
                                                             <div className="mt-3 flex items-center gap-4">
@@ -1520,7 +1528,7 @@ export function DailySetClient() {
                                                                     ) : (
                                                                         <div className="p-4 text-[11px] text-zinc-300 overflow-y-auto scrollbar-thin" style={{ height: replyEditorHeight }}>
                                                                             {replyText ? (
-                                                                                <ReactMarkdown components={discussionMarkdownComponents}>{replyText}</ReactMarkdown>
+                                                                                <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{replyText}</ReactMarkdown>
                                                                             ) : (
                                                                                 <span className="text-zinc-600 italic">Nothing to preview</span>
                                                                             )}
@@ -1546,7 +1554,7 @@ export function DailySetClient() {
                                                                 </div>
                                                             </div>
                                                             <div className="text-[11px] text-zinc-400 leading-relaxed">
-                                                                <ReactMarkdown components={discussionMarkdownComponents}>{reply.body}</ReactMarkdown>
+                                                                <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{reply.body}</ReactMarkdown>
                                                             </div>
                                                         </div>
                                                     ))}
@@ -1597,7 +1605,7 @@ export function DailySetClient() {
                                                                 ) : (
                                                                     <div className="p-5 text-[12px] text-zinc-300 overflow-y-auto scrollbar-thin" style={{ height: commentEditorHeight }}>
                                                                         {newComment ? (
-                                                                            <ReactMarkdown components={discussionMarkdownComponents}>{newComment}</ReactMarkdown>
+                                                                            <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{newComment}</ReactMarkdown>
                                                                         ) : (
                                                                             <span className="text-zinc-600 italic">Nothing to preview</span>
                                                                         )}

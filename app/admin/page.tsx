@@ -8,6 +8,7 @@ import {
     Code, FileText, Clock, Trash2, MessageSquare, X, Save, ThumbsDown, Phone, Download, BarChart3, TrendingUp, Users, Activity, Target, Zap
 } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -44,6 +45,13 @@ const problemMarkdownComponents: any = {
     ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-2.5" {...props} />,
     ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-2.5" {...props} />,
     li: ({ node, ...props }: any) => <li className="mb-1 last:mb-0" {...props} />,
+    table: ({ node, ...props }: any) => <div className="overflow-x-auto my-3"><table className="w-full border-collapse text-sm" {...props} /></div>,
+    thead: ({ node, ...props }: any) => <thead className="border-b border-[#202736]" {...props} />,
+    tbody: ({ node, ...props }: any) => <tbody {...props} />,
+    tr: ({ node, ...props }: any) => <tr className="border-b border-[#202736]/50" {...props} />,
+    th: ({ node, ...props }: any) => <th className="text-left px-3 py-2 text-xs font-bold text-zinc-300 bg-[#131924]" {...props} />,
+    td: ({ node, ...props }: any) => <td className="px-3 py-2 text-xs text-zinc-400 font-mono" {...props} />,
+    strong: ({ node, ...props }: any) => <strong className="font-semibold text-zinc-200" {...props} />,
     code: ({ node, className, children, ...props }: any) => {
         const match = /language-(\w+)/.exec(className || '');
         const isInline = !match && !className;
@@ -1264,7 +1272,7 @@ export default function AdminDashboard() {
                                             <div className="h-px w-full bg-[#181f2b]" />
                                             <div className="pt-4 text-zinc-400 text-sm leading-relaxed font-sans">
                                                 {problemForm.description ? (
-                                                    <ReactMarkdown components={problemMarkdownComponents}>
+                                                    <ReactMarkdown components={problemMarkdownComponents} remarkPlugins={[remarkGfm]}>
                                                         {problemForm.description.split('### Hint')[0]}
                                                     </ReactMarkdown>
                                                 ) : <p className="text-zinc-600 italic">No description provided.</p>}
@@ -1279,7 +1287,7 @@ export default function AdminDashboard() {
                                                 </h3>
                                                 <div className="h-px w-full bg-[#181f2b] mb-4" />
                                                 <div className="p-4 bg-[#131924] rounded-lg border border-[#202736]/50 text-zinc-400 text-sm leading-relaxed font-sans">
-                                                    <ReactMarkdown components={problemMarkdownComponents}>
+                                                    <ReactMarkdown components={problemMarkdownComponents} remarkPlugins={[remarkGfm]}>
                                                         {problemForm.description.split('### Hint')[1].trim()}
                                                     </ReactMarkdown>
                                                 </div>
