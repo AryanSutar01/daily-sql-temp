@@ -81,7 +81,7 @@ export default function TeamPage() {
           </p>
           <div className="flex items-center justify-center gap-4">
             <Button asChild size="lg" className="bg-white text-black hover:bg-zinc-200">
-              <Link href="mailto:careers@dailysql.com">Email Us</Link>
+              <Link href="mailto:careers@dailysql.in">Email Us</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="border-white/10 text-white hover:bg-white/10">
               <a href="https://twitter.com/dailysql" target="_blank" rel="noopener noreferrer">Follow Lifecycle</a>

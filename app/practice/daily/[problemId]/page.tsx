@@ -30,12 +30,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             openGraph: {
                 title: `${problem.title} | ${difficultyStr} SQL Interview Question`,
                 description: `Practice the ${problem.title} SQL interview question. Enhance your data skills on DailySQL.`,
-                url: `https://dailysql.com/practice/daily/${problemId}`,
+                url: `https://dailysql.in/practice/daily/${problemId}`,
                 siteName: 'DailySQL',
                 // Using a placeholder image for now, replace with an actual OG image later
                 images: [
                     {
-                        url: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1200&h=630',
+                        url: '/og-image.jpeg',
                         width: 1200,
                         height: 630,
                         alt: 'DailySQL Interview Question',
@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
                 card: 'summary_large_image',
                 title: `${problem.title} | ${difficultyStr} SQL Interview Question`,
                 description: `Crush this ${problem.difficulty} SQL interview question on DailySQL!`,
-                images: ['https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1200&h=630'],
+                images: ['/og-image.jpeg'],
             }
         };
     } catch (error) {

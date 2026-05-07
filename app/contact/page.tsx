@@ -76,8 +76,8 @@ export default function ContactPage() {
                     <p className="text-zinc-400 text-sm mb-3">
                       For technical issues and general inquiries.
                     </p>
-                    <Link href="mailto:support@dailysql.com" className="text-brand-base hover:text-brand-light font-medium transition-colors">
-                      support@dailysql.com
+                    <Link href="mailto:support@dailysql.in" className="text-brand-base hover:text-brand-light font-medium transition-colors">
+                      support@dailysql.in
                     </Link>
                   </div>
                 </div>

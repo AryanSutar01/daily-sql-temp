@@ -38,7 +38,7 @@ export default function PrivacyPolicy() {
 
                     <h2 className="text-2xl font-semibold text-white mt-8 mb-4">4. Contact Us</h2>
                     <p>
-                        If you have any questions about this privacy policy or our privacy practices, please contact us at support@dailysql.com.
+                        If you have any questions about this privacy policy or our privacy practices, please contact us at support@dailysql.in.
                     </p>
                 </div>
             </div>
