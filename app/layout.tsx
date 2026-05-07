@@ -11,8 +11,16 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://dailysql.in'),
   title: "Daily SQL - Stay Sharp in SQL with Just 15 Minutes a Day",
   description: "A daily SQL practice platform for professionals who already know SQL and want to stay sharp. Exactly 3 SQL questions every day with real business-style problems.",
+  openGraph: {
+    images: ['/og-image.jpeg'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: ['/og-image.jpeg'],
+  },
 };
 
 export default function RootLayout({

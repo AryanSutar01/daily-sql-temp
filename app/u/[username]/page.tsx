@@ -44,11 +44,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         openGraph: {
             title: `${profile.full_name}'s DailySQL Profile`,
             description,
-            url: `https://dailysql.com/u/${profile.username}`,
+            url: `https://dailysql.in/u/${profile.username}`,
             siteName: 'DailySQL',
             images: [
                 {
-                    url: profile.avatar_url || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1200&h=630',
+                    url: profile.avatar_url || '/og-image.jpeg',
                     width: 1200,
                     height: 630,
                     alt: `${profile.full_name}'s Profile`,
