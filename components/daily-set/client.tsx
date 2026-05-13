@@ -123,6 +123,7 @@ export function DailySetClient() {
     const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
     const [shareDropdownOpen, setShareDropdownOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
     // ── Timer / Stopwatch State ──────────────────────────
     const [timerMode, setTimerMode] = useState<'stopwatch' | 'timer'>('stopwatch');
@@ -353,10 +354,18 @@ export function DailySetClient() {
         if (urlProblemId) {
             loadProblemData(urlProblemId);
         } else {
+            // Auto-select first problem if on today's set
+            if (activeSidebarTab === 'today' && dailySet) {
+                const firstId = dailySet.easy || dailySet.medium || dailySet.advanced;
+                if (firstId) {
+                    router.replace(`/practice/daily/${firstId}?tab=today`);
+                    return;
+                }
+            }
             setActiveProblemId(null);
             setViewingDetails(false);
         }
-    }, [urlProblemId, isLoading, loadProblemData]);
+    }, [urlProblemId, isLoading, loadProblemData, activeSidebarTab, dailySet, router]);
 
     // Timer tick
     useEffect(() => {
@@ -488,13 +497,17 @@ export function DailySetClient() {
         ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-2.5" {...props} />,
         ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-2.5" {...props} />,
         li: ({ node, ...props }: any) => <li className="mb-1 last:mb-0" {...props} />,
-        table: ({ node, ...props }: any) => <div className="overflow-x-auto my-3"><table className="w-full border-collapse text-sm" {...props} /></div>,
-        thead: ({ node, ...props }: any) => <thead className="border-b border-[#202736]" {...props} />,
-        tbody: ({ node, ...props }: any) => <tbody {...props} />,
-        tr: ({ node, ...props }: any) => <tr className="border-b border-[#202736]/50" {...props} />,
-        th: ({ node, ...props }: any) => <th className="text-left px-3 py-2 text-xs font-bold text-zinc-300 bg-[#131924]" {...props} />,
-        td: ({ node, ...props }: any) => <td className="px-3 py-2 text-xs text-zinc-400 font-mono" {...props} />,
-        strong: ({ node, ...props }: any) => <strong className="font-semibold text-zinc-200" {...props} />,
+        table: ({ node, ...props }: any) => (
+            <div className="overflow-x-auto my-6 rounded-xl border border-[#202736] bg-[#0d121c] shadow-xl">
+                <table className="w-full border-collapse text-sm text-left" {...props} />
+            </div>
+        ),
+        thead: ({ node, ...props }: any) => <thead className="bg-[#131924] border-b border-[#202736]" {...props} />,
+        tbody: ({ node, ...props }: any) => <tbody className="divide-y divide-[#202736]/30" {...props} />,
+        tr: ({ node, ...props }: any) => <tr className="hover:bg-[#4DD4C4]/5 transition-colors group" {...props} />,
+        th: ({ node, ...props }: any) => <th className="px-4 py-3 text-[10px] font-bold text-[#4DD4C4] uppercase tracking-widest font-mono" {...props} />,
+        td: ({ node, ...props }: any) => <td className="px-4 py-3 text-xs text-zinc-300 font-mono group-hover:text-white transition-colors" {...props} />,
+        strong: ({ node, ...props }: any) => <strong className="font-bold text-white shadow-[#4DD4C4]/20 text-shadow-sm" {...props} />,
         code: ({ node, className, children, ...props }: any) => {
             const match = /language-(\w+)/.exec(className || '');
             const isInline = !match && !className;
@@ -882,7 +895,7 @@ export function DailySetClient() {
                                 <button
                                     onClick={() => { setActiveSidebarTab('today'); setSidebarDropdownOpen(false); }}
                                     className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${activeSidebarTab === 'today' ? 'text-[#4DD4C4] bg-[#4DD4C4]/5' : 'text-zinc-300 hover:text-white hover:bg-[#202736]'}`}
-                                >Today's Set</button>
+                                >Today&apos;s Set</button>
                                 <button
                                     onClick={() => { setActiveSidebarTab('list'); setSidebarDropdownOpen(false); }}
                                     className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${activeSidebarTab === 'list' ? 'text-[#4DD4C4] bg-[#4DD4C4]/5' : 'text-zinc-300 hover:text-white hover:bg-[#202736]'}`}
@@ -1059,97 +1072,165 @@ export function DailySetClient() {
                 MAIN WORKSPACE
             ════════════════════════════════════════════ */}
             <div className="flex-1 flex overflow-hidden">
-                <Group orientation="horizontal" className="flex-1 w-full h-full">
 
-                    {/* ── COLUMN 1: NAVIGATION & STREAK ── */}
-                    <Panel defaultSize="20" minSize="15" maxSize="30" className="flex flex-col bg-[#080c16] border-r border-[#202736]">
-                        <div className="flex-1 flex flex-col h-full overflow-hidden">
+                    {/* ── COLUMN 1: NAVIGATION & STREAK (plain div, CSS-transitioned) ── */}
+                    <div
+                        style={{
+                            width: sidebarCollapsed ? '52px' : '280px',
+                            minWidth: sidebarCollapsed ? '52px' : '220px',
+                            transition: 'width 250ms ease, min-width 250ms ease'
+                        }}
+                        className="flex flex-col bg-[#080c16] border-r border-[#202736] overflow-visible shrink-0"
+                    >
+                        <div className={`flex-1 flex flex-col h-full ${sidebarCollapsed ? 'overflow-visible' : 'overflow-hidden'}`}>
                             {/* Header / Tabs */}
-                            <div className="h-[52px] border-b border-[#202736] bg-[#0d121c] flex justify-between items-center px-4 shrink-0">
-                                <span className="font-semibold text-xs tracking-wide text-zinc-300">
-                                    {activeSidebarTab === 'today' ? "Today's Practice" : "Problem List"}
-                                </span>
-                                {activeSidebarTab === 'list' && (
-                                    <span className="text-[10px] text-zinc-500 font-bold bg-[#131924] px-2 py-0.5 rounded border border-[#202736]">
-                                        {problems.length} Problems
-                                    </span>
-                                )}
-                                {activeSidebarTab === 'today' && (
-                                    <span className="text-[10px] text-[#4DD4C4] font-mono bg-[#4DD4C4]/10 px-2 py-0.5 rounded border border-[#4DD4C4]/20">
-                                        Day {streak}
-                                    </span>
+                            <div className={`h-[52px] border-b border-[#202736] bg-[#0d121c] flex ${sidebarCollapsed ? 'flex-col justify-center' : 'justify-between'} items-center px-4 shrink-0 transition-all`}>
+                                {!sidebarCollapsed ? (
+                                    <>
+                                        <span className="font-semibold text-xs tracking-wide text-zinc-300">
+                                            {activeSidebarTab === 'today' ? "Today's Practice" : "Problem List"}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            {activeSidebarTab === 'list' && (
+                                                <span className="text-[10px] text-zinc-500 font-bold bg-[#131924] px-2 py-0.5 rounded border border-[#202736]">
+                                                    {problems.length}
+                                                </span>
+                                            )}
+                                            <button 
+                                                onClick={() => setSidebarCollapsed(true)}
+                                                className="p-1 hover:bg-[#202736] rounded text-zinc-500 hover:text-white transition-colors"
+                                                title="Collapse Sidebar"
+                                            >
+                                                <ChevronLeft size={14} />
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <button 
+                                        onClick={() => setSidebarCollapsed(false)}
+                                        className="p-2 hover:bg-[#202736] rounded text-zinc-500 hover:text-white transition-colors"
+                                        title="Expand Sidebar"
+                                    >
+                                        <ChevronRight size={16} />
+                                    </button>
                                 )}
                             </div>
 
                             {/* List Content */}
-                            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                            <div className={`flex-1 ${sidebarCollapsed ? 'py-6 overflow-visible' : 'overflow-y-auto p-3'} space-y-3`}>
                                 {activeSidebarTab === 'today' ? (
-                                    <div className="space-y-3">
-                                        {dailySet ? (['easy', 'medium', 'advanced'] as const).map((dLevel) => {
-                                            const pId = dailySet[dLevel as keyof DailyPractice];
-                                            if (!pId) return null;
-                                            const pInfo = problems.find(p => p.id === pId);
-                                            if (!pInfo) return null;
-                                            const dStyle = getDiffStyle(pInfo.difficulty);
-                                            const isSolved = solvedIds.has(pId);
-                                            const isActive = activeProblemId === pId;
-                                            return (
-                                                <div key={dLevel}
-                                                    onClick={() => handleProblemSelect(pId)}
-                                                    className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${isActive ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40' : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'}`}
-                                                >
-                                                    <div className="flex justify-between items-center">
-                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>{dStyle.label}</span>
-                                                        <CheckCircle2 size={14} className={isSolved ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
+                                    sidebarCollapsed ? (
+                                        <div className="flex flex-col items-center gap-6 overflow-visible">
+                                            {(['easy', 'medium', 'advanced'] as const).map((dLevel) => {
+                                                const pId = dailySet?.[dLevel];
+                                                if (!pId) return null;
+                                                const pInfo = problems.find(p => p.id === pId);
+                                                if (!pInfo) return null;
+                                                const dStyle = getDiffStyle(pInfo.difficulty);
+                                                const isSolved = solvedIds.has(pId);
+                                                const isActive = activeProblemId === pId;
+                                                
+                                                return (
+                                                    <div 
+                                                        key={dLevel}
+                                                        onClick={() => handleProblemSelect(pId)}
+                                                        className={`relative group cursor-pointer`}
+                                                    >
+                                                        <div className={`w-3 h-3 rounded-full transition-all duration-300 ${isActive ? 'ring-4 ring-offset-2 ring-offset-[#080c16] scale-125' : 'hover:scale-150'}`} 
+                                                            style={{ 
+                                                                backgroundColor: dStyle.hex,
+                                                                boxShadow: isActive ? `0 0 12px ${dStyle.hex}` : 'none',
+                                                            }} 
+                                                        />
+                                                        {isSolved && (
+                                                            <div className="absolute -top-1.5 -right-1.5 bg-[#080c16] rounded-full p-0.5">
+                                                                <CheckCircle2 size={10} className="text-[#4DD4C4]" />
+                                                            </div>
+                                                        )}
+                                                        {/* Tooltip — rendered at fixed z-index to escape overflow clipping */}
+                                                        <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 bg-[#131924] border border-[#4DD4C4]/20 rounded-lg text-[10px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 shadow-2xl z-[9999]">
+                                                            <div className="absolute right-full top-1/2 -translate-y-1/2 mr-0 border-4 border-transparent border-r-[#131924]" />
+                                                            <span className="font-medium">{pInfo.title}</span>
+                                                        </div>
                                                     </div>
-                                                    <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'}`}>{pInfo.title}</div>
-                                                </div>
-                                            );
-                                        }) : (
-                                            <div className="text-xs text-zinc-500 italic p-4 text-center border border-[#202736] rounded bg-[#131924]">No daily set found.</div>
-                                        )}
-                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {dailySet ? (['easy', 'medium', 'advanced'] as const).map((dLevel) => {
+                                                const pId = dailySet[dLevel as keyof DailyPractice];
+                                                if (!pId) return null;
+                                                const pInfo = problems.find(p => p.id === pId);
+                                                if (!pInfo) return null;
+                                                const dStyle = getDiffStyle(pInfo.difficulty);
+                                                const isSolved = solvedIds.has(pId);
+                                                const isActive = activeProblemId === pId;
+                                                return (
+                                                    <div key={dLevel}
+                                                        onClick={() => handleProblemSelect(pId)}
+                                                        className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${isActive ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40' : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'}`}
+                                                    >
+                                                        <div className="flex justify-between items-center">
+                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>{dStyle.label}</span>
+                                                            <CheckCircle2 size={14} className={isSolved ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
+                                                        </div>
+                                                        <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'}`}>{pInfo.title}</div>
+                                                    </div>
+                                                );
+                                            }) : (
+                                                <div className="text-xs text-zinc-500 italic p-4 text-center border border-[#202736] rounded bg-[#131924]">No daily set found.</div>
+                                            )}
+                                        </div>
+                                    )
                                 ) : (
                                     <div className="space-y-3 flex flex-col h-full">
                                         {/* Search/Filter for List mode */}
-                                        <div className="flex gap-2 mb-2 shrink-0">
-                                            <div className="flex-1 relative">
-                                                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Search..."
-                                                    value={searchQuery}
-                                                    onChange={e => setSearchQuery(e.target.value)}
-                                                    className="w-full bg-[#131924] border border-[#202736] rounded text-[11px] py-1.5 pl-8 pr-2 text-zinc-300 outline-none focus:border-[#4DD4C4]/50 transition-colors"
-                                                />
+                                        {!sidebarCollapsed && (
+                                            <div className="flex gap-2 mb-2 shrink-0">
+                                                <div className="flex-1 relative">
+                                                    <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search..."
+                                                        value={searchQuery}
+                                                        onChange={e => setSearchQuery(e.target.value)}
+                                                        className="w-full bg-[#131924] border border-[#202736] rounded text-[11px] py-1.5 pl-8 pr-2 text-zinc-300 outline-none focus:border-[#4DD4C4]/50 transition-colors"
+                                                    />
+                                                </div>
+                                                <div className="relative">
+                                                    <button 
+                                                        onClick={() => setShowDifficultyFilter(!showDifficultyFilter)}
+                                                        className={`p-1.5 border rounded transition-colors ${difficultyFilter !== 'all' ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/30 text-[#4DD4C4]' : 'bg-[#131924] border-[#202736] text-[#4DD4C4] hover:bg-[#1a2230]'}`}
+                                                    >
+                                                        <Filter size={12} />
+                                                    </button>
+                                                    {showDifficultyFilter && (
+                                                        <div className="absolute top-full right-0 mt-1.5 w-28 bg-[#131924] border border-[#202736] rounded-lg overflow-hidden py-1 z-[300] shadow-xl">
+                                                            {['all', 'easy', 'medium', 'advanced'].map((lvl) => (
+                                                                <button
+                                                                    key={lvl}
+                                                                    onClick={() => { setDifficultyFilter(lvl); setShowDifficultyFilter(false); }}
+                                                                    className={`w-full text-left px-3 py-1.5 text-[10px] font-bold uppercase transition-colors ${difficultyFilter === lvl ? 'text-[#4DD4C4] bg-[#4DD4C4]/5' : 'text-zinc-400 hover:text-white hover:bg-[#202736]'}`}
+                                                                >
+                                                                    {lvl}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="relative">
-                                                <button 
-                                                    onClick={() => setShowDifficultyFilter(!showDifficultyFilter)}
-                                                    className={`p-1.5 border rounded transition-colors ${difficultyFilter !== 'all' ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/30 text-[#4DD4C4]' : 'bg-[#131924] border-[#202736] text-[#4DD4C4] hover:bg-[#1a2230]'}`}
-                                                >
-                                                    <Filter size={12} />
-                                                </button>
-                                                {showDifficultyFilter && (
-                                                    <div className="absolute top-full right-0 mt-1.5 w-28 bg-[#131924] border border-[#202736] rounded-lg overflow-hidden py-1 z-[300] shadow-xl">
-                                                        {['all', 'easy', 'medium', 'advanced'].map((lvl) => (
-                                                            <button
-                                                                key={lvl}
-                                                                onClick={() => { setDifficultyFilter(lvl); setShowDifficultyFilter(false); }}
-                                                                className={`w-full text-left px-3 py-1.5 text-[10px] font-bold uppercase transition-colors ${difficultyFilter === lvl ? 'text-[#4DD4C4] bg-[#4DD4C4]/5' : 'text-zinc-400 hover:text-white hover:bg-[#202736]'}`}
-                                                            >
-                                                                {lvl}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
+                                        )}
                                         
                                         <div className="space-y-2">
-                                            {filteredProblems.map((p, index) => {
+                                            {filteredProblems.map((p) => {
                                                 const isActive = activeProblemId === p.id;
                                                 const dStyle = getDiffStyle(p.difficulty);
+                                                
+                                                if (sidebarCollapsed) {
+                                                    return null;
+                                                }
+
                                                 return (
                                                     <div 
                                                         key={p.id} 
@@ -1164,37 +1245,36 @@ export function DailySetClient() {
                                                     </div>
                                                 );
                                             })}
-                                            {filteredProblems.length === 0 && <div className="text-center text-xs text-zinc-500 mt-8">No problems found.</div>}
+                                            {filteredProblems.length === 0 && !sidebarCollapsed && <div className="text-center text-xs text-zinc-500 mt-8">No problems found.</div>}
                                         </div>
                                     </div>
                                 )}
                             </div>
 
                             {/* Streak Footer */}
-                            <div className="p-4 border-t border-[#202736] bg-[#0d121c] shrink-0">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Daily Streak</span>
-                                    <span className="text-sm font-bold text-white flex items-center gap-1">
-                                        {streak} <Flame size={14} className="text-[#4DD4C4] fill-[#4DD4C4]" />
-                                    </span>
+                            {!sidebarCollapsed && (
+                                <div className="p-4 border-t border-[#202736] bg-[#0d121c] shrink-0">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Daily Streak</span>
+                                        <span className="text-sm font-bold text-white flex items-center gap-1">
+                                            {streak} <Flame size={14} className="text-[#4DD4C4] fill-[#4DD4C4]" />
+                                        </span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-[#080c16] rounded-full overflow-hidden border border-[#202736]">
+                                        <div 
+                                            className="h-full bg-[#4DD4C4] shadow-[0_0_10px_rgba(77,212,196,0.5)] transition-all duration-1000" 
+                                            style={{ width: `${Math.min(100, (streak / 30) * 100)}%` }}
+                                        ></div>
+                                    </div>
+                                    <p className="text-[9px] text-zinc-500 mt-2 text-center font-medium italic">
+                                        {streak >= 30 ? "Monthly goal reached! You're a pro." : `${30 - streak} days until your monthly milestone!`}
+                                    </p>
                                 </div>
-                                <div className="h-1.5 w-full bg-[#080c16] rounded-full overflow-hidden border border-[#202736]">
-                                    <div 
-                                        className="h-full bg-[#4DD4C4] shadow-[0_0_10px_rgba(77,212,196,0.5)] transition-all duration-1000" 
-                                        style={{ width: `${Math.min(100, (streak / 30) * 100)}%` }}
-                                    ></div>
-                                </div>
-                                <p className="text-[9px] text-zinc-500 mt-2 text-center font-medium italic">
-                                    {streak >= 30 ? "Monthly goal reached! You're a pro." : `${30 - streak} days until your monthly milestone!`}
-                                </p>
-                            </div>
+                            )}
                         </div>
-                    </Panel>
+                    </div>
 
-                    {/* Resize Handle 1 */}
-                    <Separator className="w-1.5 bg-[#080c16] hover:bg-[#4DD4C4]/20 transition-colors cursor-col-resize flex flex-col items-center justify-center relative">
-                        <div className="h-8 w-0.5 bg-[#202736] rounded-full" />
-                    </Separator>
+                <Group orientation="horizontal" className="flex-1 h-full overflow-hidden">
 
                     {/* ── COLUMN 2: PROBLEM DETAILS ── */}
                     <Panel defaultSize="35" minSize="25" maxSize="50" className="flex flex-col bg-[#0d121c] border-r border-[#202736]">
@@ -1345,19 +1425,23 @@ export function DailySetClient() {
                                                         </div>
 
                                                         {/* Schema */}
-                                                        <div className="border border-[#202736] rounded-lg overflow-hidden max-w-sm">
-                                                            <table className="w-full text-[10px] text-left">
+                                                        <div className="border border-[#202736] rounded-xl overflow-hidden max-w-sm bg-[#080c16] shadow-lg">
+                                                            <table className="w-full text-[10px] text-left border-collapse">
                                                                 <thead className="bg-[#131924] text-zinc-400">
                                                                     <tr>
-                                                                        <th className="px-3 py-1.5 border-b border-[#202736] font-semibold uppercase">Column</th>
-                                                                        <th className="px-3 py-1.5 border-b border-[#202736] font-semibold uppercase">Type</th>
+                                                                        <th className="px-4 py-2.5 border-b border-[#202736] font-bold uppercase tracking-wider text-[9px]">Column</th>
+                                                                        <th className="px-4 py-2.5 border-b border-[#202736] font-bold uppercase tracking-wider text-[9px]">Type</th>
                                                                     </tr>
                                                                 </thead>
-                                                                <tbody className="bg-[#0b101c]">
+                                                                <tbody className="divide-y divide-[#202736]/30">
                                                                     {colOrder.map(col => (
-                                                                        <tr key={col} className="border-b border-[#202736]/50 last:border-0 text-zinc-400 font-mono">
-                                                                            <td className="px-3 py-1.5 font-medium">{col}</td>
-                                                                            <td className="px-3 py-1.5 text-[#4DD4C4]/80">{ds.column_types?.[col] || 'string'}</td>
+                                                                        <tr key={col} className="hover:bg-white/[0.02] transition-colors group">
+                                                                            <td className="px-4 py-2 font-mono font-medium text-zinc-300 group-hover:text-[#4DD4C4] transition-colors">{col}</td>
+                                                                            <td className="px-4 py-2">
+                                                                                <span className="bg-[#4DD4C4]/5 text-[#4DD4C4]/80 px-1.5 py-0.5 rounded border border-[#4DD4C4]/20 text-[8px] font-bold font-mono uppercase">
+                                                                                    {ds.column_types?.[col] || 'string'}
+                                                                                </span>
+                                                                            </td>
                                                                         </tr>
                                                                     ))}
                                                                 </tbody>
@@ -1365,24 +1449,28 @@ export function DailySetClient() {
                                                         </div>
 
                                                         {/* Sample Data */}
-                                                        <div className="border border-[#202736] rounded-lg overflow-hidden shadow-xl">
-                                                            <div className="bg-[#131924]/50 px-3 py-1 text-[9px] font-bold text-zinc-500 uppercase tracking-widest border-b border-[#202736]">
-                                                                Sample Rows
+                                                        <div className="border border-[#202736] rounded-xl overflow-hidden shadow-2xl bg-[#080c16]">
+                                                            <div className="bg-[#131924] px-4 py-2 text-[9px] font-bold text-[#4DD4C4] uppercase tracking-widest border-b border-[#202736] flex items-center justify-between">
+                                                                <span className="flex items-center gap-2">
+                                                                    <div className="w-1 h-1 rounded-full bg-[#4DD4C4]" />
+                                                                    Sample Rows
+                                                                </span>
+                                                                <span className="text-[8px] text-zinc-500 font-normal">Showing first {ds.sample_rows.length} rows</span>
                                                             </div>
-                                                            <div className="overflow-x-auto">
-                                                                <table className="w-full text-[10px] text-left">
+                                                            <div className="overflow-x-auto custom-scrollbar">
+                                                                <table className="w-full text-[10px] text-left border-collapse">
                                                                     <thead className="bg-[#0b101c] text-zinc-500">
                                                                         <tr>
                                                                             {colOrder.map(h => (
-                                                                                <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">{h}</th>
+                                                                                <th key={h} className="px-4 py-2.5 border-b border-[#202736] font-mono font-bold text-[9px] uppercase tracking-wider">{h}</th>
                                                                             ))}
                                                                         </tr>
                                                                     </thead>
-                                                                    <tbody className="bg-[#0b101c]">
+                                                                    <tbody className="divide-y divide-[#202736]/20">
                                                                         {ds.sample_rows.map((row: any, i: number) => (
-                                                                            <tr key={i} className="border-b border-[#202736]/50 last:border-0 text-zinc-400 font-mono hover:bg-white/[0.02]">
+                                                                            <tr key={i} className="hover:bg-[#4DD4C4]/5 transition-colors group">
                                                                                 {colOrder.map((col: string) => (
-                                                                                    <td key={col} className="px-3 py-1.5">{row[col]?.toString() ?? ''}</td>
+                                                                                    <td key={col} className="px-4 py-2.5 text-zinc-400 font-mono group-hover:text-zinc-200 transition-colors">{row[col]?.toString() ?? ''}</td>
                                                                                 ))}
                                                                             </tr>
                                                                         ))}
@@ -1402,16 +1490,16 @@ export function DailySetClient() {
                                                 const output = executionResult?.expected || expectedOutput;
                                                 if (output && output.columns.length > 0) {
                                                     return (
-                                                        <div className="border border-[#202736] rounded-lg overflow-hidden">
-                                                            <div className="overflow-x-auto">
-                                                                <table className="w-full text-[10px] text-left">
+                                                        <div className="border border-[#202736] rounded-xl overflow-hidden shadow-lg bg-[#080c16]">
+                                                            <div className="overflow-x-auto custom-scrollbar">
+                                                                <table className="w-full text-[10px] text-left border-collapse">
                                                                     <thead className="bg-[#131924] text-zinc-400">
-                                                                        <tr>{output.columns.map(h => <th key={h} className="px-3 py-1.5 border-b border-[#202736] font-mono">{h}</th>)}</tr>
+                                                                        <tr>{output.columns.map(h => <th key={h} className="px-4 py-2.5 border-b border-[#202736] font-mono font-bold text-[9px] uppercase tracking-wider">{h}</th>)}</tr>
                                                                     </thead>
-                                                                    <tbody className="bg-[#0b101c]">
+                                                                    <tbody className="divide-y divide-[#202736]/20">
                                                                         {output.rows.map((row: any, i: number) => (
-                                                                            <tr key={i} className="border-b border-[#202736]/50 last:border-0 text-green-400/80 font-mono hover:bg-white/[0.02]">
-                                                                                {row.map((cell: any, j: number) => <td key={j} className="px-3 py-1.5">{cell?.toString()}</td>)}
+                                                                            <tr key={i} className="hover:bg-green-400/[0.03] transition-colors group">
+                                                                                {row.map((cell: any, j: number) => <td key={j} className="px-4 py-2.5 text-green-400/80 font-mono group-hover:text-green-400 transition-colors">{cell?.toString()}</td>)}
                                                                             </tr>
                                                                         ))}
                                                                     </tbody>
@@ -1776,25 +1864,27 @@ export function DailySetClient() {
                                                 <div className="p-4 bg-[#080c16] border border-red-500/20 rounded-lg text-red-200/90 leading-relaxed whitespace-pre-wrap">{error}</div>
                                             </div>
                                         ) : executionResult?.user ? (
-                                            <div className="rounded-lg border border-[#202736] overflow-hidden bg-[#131924]">
-                                                <table className="w-full text-left text-xs">
-                                                    <thead className="bg-[#0b101c] text-zinc-400">
-                                                        <tr>
-                                                            {executionResult.user.columns.map((k: string) => (
-                                                                <th key={k} className="px-4 py-2 border-b border-[#202736] font-mono whitespace-nowrap">{k}</th>
-                                                            ))}
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-[#202736]/50">
-                                                        {executionResult.user.rows.map((row: any[], i: number) => (
-                                                            <tr key={i} className="hover:bg-white/[0.02]">
-                                                                {row.map((cell: any, j: number) => (
-                                                                    <td key={j} className="px-4 py-2 text-zinc-300 font-mono whitespace-nowrap">{cell?.toString()}</td>
+                                            <div className="rounded-xl border border-[#202736] overflow-hidden bg-[#080c16] shadow-2xl">
+                                                <div className="overflow-x-auto custom-scrollbar">
+                                                    <table className="w-full text-left text-[10px] border-collapse">
+                                                        <thead className="bg-[#131924] text-zinc-400">
+                                                            <tr>
+                                                                {executionResult.user.columns.map((k: string) => (
+                                                                    <th key={k} className="px-4 py-2.5 border-b border-[#202736] font-mono font-bold text-[9px] uppercase tracking-wider whitespace-nowrap">{k}</th>
                                                                 ))}
                                                             </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-[#202736]/20">
+                                                            {executionResult.user.rows.map((row: any[], i: number) => (
+                                                                <tr key={i} className="hover:bg-[#4DD4C4]/5 transition-colors group">
+                                                                    {row.map((cell: any, j: number) => (
+                                                                        <td key={j} className="px-4 py-2.5 text-zinc-300 font-mono group-hover:text-white transition-colors whitespace-nowrap">{cell?.toString()}</td>
+                                                                    ))}
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
                                                 {executionResult?.diff_reason && (
                                                     <div className="bg-red-500/10 text-red-400 w-full p-3 font-mono mt-4 rounded-b-lg border-t border-red-500/20">
                                                         Failed against expected output: {executionResult.diff_reason}
@@ -1803,6 +1893,7 @@ export function DailySetClient() {
                                             </div>
                                         ) : null}
                                     </div>
+
 
                                     <div className="p-4 border-t border-[#202736] bg-[#0b101c] flex justify-between items-center shrink-0">
                                         <div className="flex text-xs text-zinc-500 gap-4 font-mono">
@@ -1847,7 +1938,7 @@ export function DailySetClient() {
                                     <button onClick={() => setFeedbackOpen(false)} className="text-zinc-500 hover:text-white transition-colors"><X size={16} /></button>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-zinc-500 mb-2">How's your experience?</p>
+                                    <p className="text-xs text-zinc-500 mb-2">How&apos;s your experience?</p>
                                     <div className="flex gap-2">
                                         {[{ v: 1, label: 'Bad' }, { v: 2, label: 'Okay' }, { v: 3, label: 'Great' }].map(({ v, label }) => (
                                             <button
