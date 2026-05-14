@@ -407,6 +407,17 @@ function ProfileContent() {
                 <div className="max-w-2xl w-full p-8 rounded-3xl border border-[#202736] bg-[#131924] shadow-2xl relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#4DD4C4] to-transparent opacity-50"></div>
                     
+                    {/* Close Button */}
+                    {!isSetupMode && (
+                        <button 
+                            onClick={() => setIsEditing(false)}
+                            className="absolute top-5 right-5 p-2 rounded-xl bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-zinc-500 transition-all z-20"
+                            title="Cancel editing"
+                        >
+                            <X size={18} />
+                        </button>
+                    )}
+
                     {toast && (
                         <div className={`mb-6 p-4 rounded-xl border flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-[#4DD4C4]/10 border-[#4DD4C4]/30 text-[#4DD4C4]'}`}>
                             {toast.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
@@ -588,13 +599,24 @@ function ProfileContent() {
 
 
 
-                        <button
-                            disabled={isSaving}
-                            type="submit"
-                            className="w-full bg-[#4DD4C4] text-[#080c16] font-bold py-3 rounded-xl mt-6 hover:bg-[#3dbdb0] transition-colors flex items-center justify-center gap-2 group shadow-xl shadow-[#4DD4C4]/20"
-                        >
-                            {isSaving ? <Loader2 size={18} className="animate-spin" /> : <>{profile.exists && isEditing ? "Save Changes" : "Start Journey"} {profile.exists && isEditing ? <Edit2 size={18} /> : <ArrowLeft size={18} className="rotate-180 group-hover:translate-x-1 transition-transform" />}</>}
-                        </button>
+                        <div className="flex gap-3 mt-6">
+                            {!isSetupMode && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditing(false)}
+                                    className="flex-1 bg-[#131924] border border-[#202736] text-zinc-400 font-bold py-3 rounded-xl hover:text-white hover:border-zinc-500 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                            )}
+                            <button
+                                disabled={isSaving}
+                                type="submit"
+                                className={`${isSetupMode ? 'w-full' : 'flex-[2]'} bg-[#4DD4C4] text-[#080c16] font-bold py-3 rounded-xl hover:bg-[#3dbdb0] transition-colors flex items-center justify-center gap-2 group shadow-xl shadow-[#4DD4C4]/20`}
+                            >
+                                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <>{profile.exists && isEditing ? "Save Changes" : "Start Journey"} {profile.exists && isEditing ? <Edit2 size={18} /> : <ArrowLeft size={18} className="rotate-180 group-hover:translate-x-1 transition-transform" />}</>}
+                            </button>
+                        </div>
 
                         {!isEditing && !profile.exists && (
                             <div className="text-center mt-4">
