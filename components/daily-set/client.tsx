@@ -85,6 +85,7 @@ export function DailySetClient() {
     const searchParams = useSearchParams();
     const urlProblemId = params.problemId as string | undefined;
     const urlTab = searchParams.get('tab');
+    const urlCollapsed = searchParams.get('collapsed');
 
     // ── Data State ──────────────────────────────────────
     const [streak, setStreak] = useState<number>(0);
@@ -123,7 +124,8 @@ export function DailySetClient() {
     const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
     const [shareDropdownOpen, setShareDropdownOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(urlCollapsed === 'true');
+    const [sidebarLoaded, setSidebarLoaded] = useState(false);
 
     // ── Timer / Stopwatch State ──────────────────────────
     const [timerMode, setTimerMode] = useState<'stopwatch' | 'timer'>('stopwatch');
@@ -233,11 +235,11 @@ export function DailySetClient() {
  
     // ── Handlers ─────────────────────────────────────────
     const handleProblemSelect = async (id: string) => {
-        router.push(`/practice/daily/${id}?tab=${activeSidebarTab}`);
+        router.push(`/practice/daily/${id}?tab=${activeSidebarTab}${sidebarCollapsed ? '&collapsed=true' : ''}`);
     };
 
     const handleBackToList = () => {
-        router.push('/practice/daily');
+        router.push(`/practice/daily?tab=${activeSidebarTab}${sidebarCollapsed ? '&collapsed=true' : ''}`);
     };
 
     // Internal helper to load problem data (called by useEffect when URL changes)
@@ -358,7 +360,7 @@ export function DailySetClient() {
             if (activeSidebarTab === 'today' && dailySet) {
                 const firstId = dailySet.easy || dailySet.medium || dailySet.advanced;
                 if (firstId) {
-                    router.replace(`/practice/daily/${firstId}?tab=today`);
+                    router.replace(`/practice/daily/${firstId}?tab=today${sidebarCollapsed ? '&collapsed=true' : ''}`);
                     return;
                 }
             }
@@ -415,6 +417,21 @@ export function DailySetClient() {
         document.addEventListener('fullscreenchange', onChange);
         return () => document.removeEventListener('fullscreenchange', onChange);
     }, []);
+
+    // ── Sidebar Persistence ──────────────────────────────
+    useEffect(() => {
+        const saved = localStorage.getItem('sidebar_collapsed');
+        if (saved !== null) {
+            setSidebarCollapsed(saved === 'true');
+        }
+        setSidebarLoaded(true);
+    }, []);
+
+    useEffect(() => {
+        if (sidebarLoaded) {
+            localStorage.setItem('sidebar_collapsed', String(sidebarCollapsed));
+        }
+    }, [sidebarCollapsed, sidebarLoaded]);
 
     // ── Helpers ──────────────────────────────────────────
     /**
