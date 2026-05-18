@@ -79,6 +79,88 @@ const sqlHighlightStyle = {
 
 type Difficulty = 'easy' | 'medium' | 'hard' | 'advanced';
 
+export function DailySetSkeleton() {
+    return (
+        <div className="h-screen bg-[#080c16] flex flex-col overflow-hidden">
+            {/* Top Bar Skeleton */}
+            <div className="h-14 bg-[#0d121c] border-b border-[#202736] flex items-center px-6 shrink-0 justify-between">
+                <div className="flex items-center gap-4">
+                    <div className="w-20 h-5 bg-[#202736] rounded animate-pulse" />
+                    <div className="w-px h-5 bg-[#202736]" />
+                    <div className="w-32 h-8 bg-[#202736] rounded animate-pulse" />
+                </div>
+                <div className="flex gap-3">
+                    <div className="w-24 h-8 bg-[#202736] rounded animate-pulse" />
+                    <div className="w-8 h-8 bg-[#202736] rounded-full animate-pulse" />
+                </div>
+            </div>
+
+            {/* Main Workspace Skeleton */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Sidebar */}
+                <div className="w-[280px] bg-[#080c16] border-r border-[#202736] flex flex-col shrink-0">
+                    <div className="h-[52px] border-b border-[#202736] bg-[#0d121c] flex items-center px-4 justify-between">
+                        <div className="w-24 h-4 bg-[#202736] rounded animate-pulse" />
+                        <div className="w-6 h-6 bg-[#202736] rounded animate-pulse" />
+                    </div>
+                    <div className="p-3 space-y-3">
+                        {[1, 2, 3, 4, 5].map(i => (
+                            <div key={i} className="h-16 bg-[#131924] border border-[#202736] rounded-lg animate-pulse" />
+                        ))}
+                    </div>
+                </div>
+
+                {/* Question Details */}
+                <div className="flex-1 border-r border-[#202736] bg-[#080c16] flex flex-col">
+                    <div className="h-[52px] border-b border-[#202736] bg-[#0d121c] px-4 flex items-center gap-4">
+                        <div className="w-20 h-6 bg-[#202736] rounded animate-pulse" />
+                        <div className="w-20 h-6 bg-[#202736] rounded animate-pulse" />
+                    </div>
+                    <div className="p-6 space-y-6">
+                        <div className="space-y-3">
+                            <div className="w-3/4 h-8 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-1/4 h-5 bg-[#202736] rounded animate-pulse" />
+                        </div>
+                        <div className="space-y-3 mt-8">
+                            <div className="w-full h-4 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-full h-4 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-5/6 h-4 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-4/6 h-4 bg-[#202736] rounded animate-pulse" />
+                        </div>
+                        <div className="h-48 mt-8 bg-[#131924] border border-[#202736] rounded-xl animate-pulse" />
+                    </div>
+                </div>
+
+                {/* Code Editor */}
+                <div className="flex-1 flex flex-col bg-[#080c16]">
+                    <div className="h-[52px] border-b border-[#202736] bg-[#0d121c] flex items-center justify-between px-4">
+                        <div className="flex gap-2">
+                            <div className="w-20 h-8 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-20 h-8 bg-[#202736] rounded animate-pulse" />
+                        </div>
+                        <div className="w-24 h-8 bg-[#202736] rounded animate-pulse" />
+                    </div>
+                    <div className="flex-1 p-4">
+                        <div className="w-1/2 h-4 bg-[#202736] rounded animate-pulse mb-3" />
+                        <div className="w-1/3 h-4 bg-[#202736] rounded animate-pulse mb-3" />
+                        <div className="w-2/3 h-4 bg-[#202736] rounded animate-pulse mb-3" />
+                        <div className="w-1/4 h-4 bg-[#202736] rounded animate-pulse" />
+                    </div>
+                    <div className="h-[280px] border-t border-[#202736] bg-[#0b101c] flex flex-col">
+                        <div className="h-[42px] border-b border-[#202736] flex items-center px-4">
+                            <div className="w-32 h-5 bg-[#202736] rounded animate-pulse" />
+                        </div>
+                        <div className="flex-1 p-4">
+                             <div className="w-1/3 h-4 bg-[#202736] rounded animate-pulse mb-3" />
+                             <div className="w-1/4 h-4 bg-[#202736] rounded animate-pulse" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export function DailySetClient() {
     const router = useRouter();
     const params = useParams();
@@ -232,7 +314,7 @@ export function DailySetClient() {
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
     }, [replyEditorHeight]);
- 
+
     // ── Handlers ─────────────────────────────────────────
     const handleProblemSelect = async (id: string) => {
         router.push(`/practice/daily/${id}?tab=${activeSidebarTab}${sidebarCollapsed ? '&collapsed=true' : ''}`);
@@ -280,7 +362,7 @@ export function DailySetClient() {
             setComments([]);
             api.getProblemVotes(id).then(v => setProblemVotes(v)).catch(() => setProblemVotes({ likes: 0, user_has_voted: false }));
             api.getCommentCount(id).then(({ count }) => setCommentCount(count)).catch(() => setCommentCount(0));
-            
+
 
         } catch (err) {
             console.error("Failed to load datasets", err);
@@ -323,7 +405,7 @@ export function DailySetClient() {
                 if (isAuthed) {
                     api.getSolvedIds()
                         .then(({ solved_ids }) => setSolvedIds(new Set(solved_ids)))
-                        .catch(() => {});
+                        .catch(() => { });
                 }
 
                 // Welcome Toast logic
@@ -336,7 +418,7 @@ export function DailySetClient() {
                             visible: true
                         });
                         setTimeout(() => setToast(null), 5000);
-                        
+
                         const newUrl = window.location.pathname;
                         window.history.replaceState({}, '', newUrl);
                     }
@@ -418,20 +500,43 @@ export function DailySetClient() {
         return () => document.removeEventListener('fullscreenchange', onChange);
     }, []);
 
-    // ── Sidebar Persistence ──────────────────────────────
+    // ── Sidebar & Filter Persistence ──────────────────────────────
     useEffect(() => {
         const saved = localStorage.getItem('sidebar_collapsed');
         if (saved !== null) {
             setSidebarCollapsed(saved === 'true');
         }
+
+        const savedDifficulty = sessionStorage.getItem('difficulty_filter');
+        if (savedDifficulty) {
+            setDifficultyFilter(savedDifficulty);
+        }
+
+        const savedSearch = sessionStorage.getItem('search_query');
+        if (savedSearch) {
+            setSearchQuery(savedSearch);
+        }
+
         setSidebarLoaded(true);
     }, []);
 
     useEffect(() => {
         if (sidebarLoaded) {
             localStorage.setItem('sidebar_collapsed', String(sidebarCollapsed));
+
+            if (difficultyFilter === 'all') {
+                sessionStorage.removeItem('difficulty_filter');
+            } else {
+                sessionStorage.setItem('difficulty_filter', difficultyFilter);
+            }
+
+            if (searchQuery.trim() === '') {
+                sessionStorage.removeItem('search_query');
+            } else {
+                sessionStorage.setItem('search_query', searchQuery);
+            }
         }
-    }, [sidebarCollapsed, sidebarLoaded]);
+    }, [sidebarCollapsed, difficultyFilter, searchQuery, sidebarLoaded]);
 
     // ── Helpers ──────────────────────────────────────────
     /**
@@ -662,10 +767,10 @@ export function DailySetClient() {
     };
 
     const handleDislike = () => {
-        if (authStatus === 'unauthenticated') { 
-            setError('LOGIN_REQUIRED'); 
-            setShowResult(true); 
-            return; 
+        if (authStatus === 'unauthenticated') {
+            setError('LOGIN_REQUIRED');
+            setShowResult(true);
+            return;
         }
         openFeedbackModal('dislike', activeProblemId || undefined);
     };
@@ -685,11 +790,11 @@ export function DailySetClient() {
 
     const handleOpenDiscussion = async () => {
         console.log("Opening discussion for problem:", activeProblemId);
-        if (authStatus === 'unauthenticated') { 
+        if (authStatus === 'unauthenticated') {
             console.log("Auth failed: unauthenticated");
-            setError('LOGIN_REQUIRED'); 
-            setShowResult(true); 
-            return; 
+            setError('LOGIN_REQUIRED');
+            setShowResult(true);
+            return;
         }
         setActiveDetailTab('discussion');
         if (!activeProblemId) {
@@ -700,15 +805,15 @@ export function DailySetClient() {
             console.log("Comments already loaded, skipping fetch");
             return;
         }
-        
+
         setIsLoadingComments(true);
         try {
             console.log("Fetching comments from API...");
             const data = await api.getComments(activeProblemId);
             console.log("Comments fetched successfully:", data.length);
             setComments(data);
-        } catch (e) { 
-            console.error("Failed to fetch comments:", e); 
+        } catch (e) {
+            console.error("Failed to fetch comments:", e);
         }
         finally { setIsLoadingComments(false); }
     };
@@ -732,8 +837,8 @@ export function DailySetClient() {
             setCommentCount(n => n + 1);
             setNewComment(SQL_TEMPLATE);
             setIsCommentPreview(false);
-        } catch (e) { 
-            console.error("Failed to post comment:", e); 
+        } catch (e) {
+            console.error("Failed to post comment:", e);
         }
     };
 
@@ -750,8 +855,8 @@ export function DailySetClient() {
             setReplyingTo(null);
             setReplyText(SQL_TEMPLATE);
             setIsReplyPreview(false);
-        } catch (e) { 
-            console.error("Failed to post reply:", e); 
+        } catch (e) {
+            console.error("Failed to post reply:", e);
         }
     };
 
@@ -775,7 +880,7 @@ export function DailySetClient() {
             const res = await api.voteComment(commentId, voteType);
             const updateItem = (item: any) => {
                 if (item.id !== commentId) return item;
-                
+
                 let newLikes = item.likes || 0;
                 let newDislikes = item.dislikes || 0;
                 const oldVote = item.user_vote;
@@ -824,7 +929,7 @@ export function DailySetClient() {
         if (!activeProblemId) return;
         const url = `${window.location.origin}/practice/daily/${activeProblemId}`;
         const text = `Check out this SQL question: ${activeProblem?.title} on DailySQL!`;
-        
+
         if (platform === 'twitter') {
             window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
         } else if (platform === 'linkedin') {
@@ -872,14 +977,7 @@ export function DailySetClient() {
 
     // ── Loading screen ───────────────────────────────────
     if (isLoading) {
-        return (
-            <div className="h-screen bg-[#080c16] text-white flex items-center justify-center font-sans">
-                <div className="flex flex-col items-center gap-4">
-                    <Loader2 size={32} className="animate-spin text-[#4DD4C4]" />
-                    <span className="text-sm font-mono text-zinc-400">Loading Environment...</span>
-                </div>
-            </div>
-        );
+        return <DailySetSkeleton />;
     }
 
     // ── Main render ──────────────────────────────────────
@@ -943,11 +1041,10 @@ export function DailySetClient() {
                             onClick={handleSubmit}
                             disabled={executionResult?.status !== 'correct'}
                             title="Submit solution"
-                            className={`flex items-center justify-center w-9 h-9 rounded transition-colors ${
-                                executionResult?.status === 'correct'
+                            className={`flex items-center justify-center w-9 h-9 rounded transition-colors ${executionResult?.status === 'correct'
                                     ? 'bg-[#4DD4C4]/15 border border-[#4DD4C4]/40 text-[#4DD4C4] hover:bg-[#4DD4C4]/25 shadow-[0_0_8px_rgba(77,212,196,0.15)]'
                                     : 'text-zinc-600 border border-[#202736] cursor-not-allowed'
-                            }`}
+                                }`}
                         >
                             <UploadCloud size={16} />
                         </button>
@@ -1090,206 +1187,206 @@ export function DailySetClient() {
             ════════════════════════════════════════════ */}
             <div className="flex-1 flex overflow-hidden">
 
-                    {/* ── COLUMN 1: NAVIGATION & STREAK (plain div, CSS-transitioned) ── */}
-                    <div
-                        style={{
-                            width: sidebarCollapsed ? '52px' : '280px',
-                            minWidth: sidebarCollapsed ? '52px' : '220px',
-                            transition: 'width 250ms ease, min-width 250ms ease'
-                        }}
-                        className="flex flex-col bg-[#080c16] border-r border-[#202736] overflow-visible shrink-0"
-                    >
-                        <div className={`flex-1 flex flex-col h-full ${sidebarCollapsed ? 'overflow-visible' : 'overflow-hidden'}`}>
-                            {/* Header / Tabs */}
-                            <div className={`h-[52px] border-b border-[#202736] bg-[#0d121c] flex ${sidebarCollapsed ? 'flex-col justify-center' : 'justify-between'} items-center px-4 shrink-0 transition-all`}>
-                                {!sidebarCollapsed ? (
-                                    <>
-                                        <span className="font-semibold text-xs tracking-wide text-zinc-300">
-                                            {activeSidebarTab === 'today' ? "Today's Practice" : "Problem List"}
-                                        </span>
-                                        <div className="flex items-center gap-2">
-                                            {activeSidebarTab === 'list' && (
-                                                <span className="text-[10px] text-zinc-500 font-bold bg-[#131924] px-2 py-0.5 rounded border border-[#202736]">
-                                                    {problems.length}
-                                                </span>
-                                            )}
-                                            <button 
-                                                onClick={() => setSidebarCollapsed(true)}
-                                                className="p-1 hover:bg-[#202736] rounded text-zinc-500 hover:text-white transition-colors"
-                                                title="Collapse Sidebar"
-                                            >
-                                                <ChevronLeft size={14} />
-                                            </button>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <button 
-                                        onClick={() => setSidebarCollapsed(false)}
-                                        className="p-2 hover:bg-[#202736] rounded text-zinc-500 hover:text-white transition-colors"
-                                        title="Expand Sidebar"
-                                    >
-                                        <ChevronRight size={16} />
-                                    </button>
-                                )}
-                            </div>
+                {/* ── COLUMN 1: NAVIGATION & STREAK (plain div, CSS-transitioned) ── */}
+                <div
+                    style={{
+                        width: sidebarCollapsed ? '52px' : '280px',
+                        minWidth: sidebarCollapsed ? '52px' : '220px',
+                        transition: 'width 250ms ease, min-width 250ms ease'
+                    }}
+                    className="flex flex-col bg-[#080c16] border-r border-[#202736] overflow-visible shrink-0"
+                >
+                    <div className={`flex-1 flex flex-col h-full ${sidebarCollapsed ? 'overflow-visible' : 'overflow-hidden'}`}>
+                        {/* Header / Tabs */}
+                        <div className={`h-[52px] border-b border-[#202736] bg-[#0d121c] flex ${sidebarCollapsed ? 'flex-col justify-center' : 'justify-between'} items-center px-4 shrink-0 transition-all`}>
+                            {!sidebarCollapsed ? (
+                                <>
+                                    <span className="font-semibold text-xs tracking-wide text-zinc-300">
+                                        {activeSidebarTab === 'today' ? "Today's Practice" : "Problem List"}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        {activeSidebarTab === 'list' && (
+                                            <span className="text-[10px] text-zinc-500 font-bold bg-[#131924] px-2 py-0.5 rounded border border-[#202736]">
+                                                {problems.length}
+                                            </span>
+                                        )}
+                                        <button
+                                            onClick={() => setSidebarCollapsed(true)}
+                                            className="p-1 hover:bg-[#202736] rounded text-zinc-500 hover:text-white transition-colors"
+                                            title="Collapse Sidebar"
+                                        >
+                                            <ChevronLeft size={14} />
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={() => setSidebarCollapsed(false)}
+                                    className="p-2 hover:bg-[#202736] rounded text-zinc-500 hover:text-white transition-colors"
+                                    title="Expand Sidebar"
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                            )}
+                        </div>
 
-                            {/* List Content */}
-                            <div className={`flex-1 ${sidebarCollapsed ? 'py-6 overflow-visible' : 'overflow-y-auto p-3'} space-y-3`}>
-                                {activeSidebarTab === 'today' ? (
-                                    sidebarCollapsed ? (
-                                        <div className="flex flex-col items-center gap-6 overflow-visible">
-                                            {(['easy', 'medium', 'advanced'] as const).map((dLevel) => {
-                                                const pId = dailySet?.[dLevel];
-                                                if (!pId) return null;
-                                                const pInfo = problems.find(p => p.id === pId);
-                                                if (!pInfo) return null;
-                                                const dStyle = getDiffStyle(pInfo.difficulty);
-                                                const isSolved = solvedIds.has(pId);
-                                                const isActive = activeProblemId === pId;
-                                                
-                                                return (
-                                                    <div 
-                                                        key={dLevel}
-                                                        onClick={() => handleProblemSelect(pId)}
-                                                        className={`relative group cursor-pointer`}
-                                                    >
-                                                        <div className={`w-3 h-3 rounded-full transition-all duration-300 ${isActive ? 'ring-4 ring-offset-2 ring-offset-[#080c16] scale-125' : 'hover:scale-150'}`} 
-                                                            style={{ 
-                                                                backgroundColor: dStyle.hex,
-                                                                boxShadow: isActive ? `0 0 12px ${dStyle.hex}` : 'none',
-                                                            }} 
-                                                        />
-                                                        {isSolved && (
-                                                            <div className="absolute -top-1.5 -right-1.5 bg-[#080c16] rounded-full p-0.5">
-                                                                <CheckCircle2 size={10} className="text-[#4DD4C4]" />
-                                                            </div>
-                                                        )}
-                                                        {/* Tooltip — rendered at fixed z-index to escape overflow clipping */}
-                                                        <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 bg-[#131924] border border-[#4DD4C4]/20 rounded-lg text-[10px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 shadow-2xl z-[9999]">
-                                                            <div className="absolute right-full top-1/2 -translate-y-1/2 mr-0 border-4 border-transparent border-r-[#131924]" />
-                                                            <span className="font-medium">{pInfo.title}</span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {dailySet ? (['easy', 'medium', 'advanced'] as const).map((dLevel) => {
-                                                const pId = dailySet[dLevel as keyof DailyPractice];
-                                                if (!pId) return null;
-                                                const pInfo = problems.find(p => p.id === pId);
-                                                if (!pInfo) return null;
-                                                const dStyle = getDiffStyle(pInfo.difficulty);
-                                                const isSolved = solvedIds.has(pId);
-                                                const isActive = activeProblemId === pId;
-                                                return (
-                                                    <div key={dLevel}
-                                                        onClick={() => handleProblemSelect(pId)}
-                                                        className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${isActive ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40' : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'}`}
-                                                    >
-                                                        <div className="flex justify-between items-center">
-                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>{dStyle.label}</span>
-                                                            <CheckCircle2 size={14} className={isSolved ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
-                                                        </div>
-                                                        <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'}`}>{pInfo.title}</div>
-                                                    </div>
-                                                );
-                                            }) : (
-                                                <div className="text-xs text-zinc-500 italic p-4 text-center border border-[#202736] rounded bg-[#131924]">No daily set found.</div>
-                                            )}
-                                        </div>
-                                    )
-                                ) : (
-                                    <div className="space-y-3 flex flex-col h-full">
-                                        {/* Search/Filter for List mode */}
-                                        {!sidebarCollapsed && (
-                                            <div className="flex gap-2 mb-2 shrink-0">
-                                                <div className="flex-1 relative">
-                                                    <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search..."
-                                                        value={searchQuery}
-                                                        onChange={e => setSearchQuery(e.target.value)}
-                                                        className="w-full bg-[#131924] border border-[#202736] rounded text-[11px] py-1.5 pl-8 pr-2 text-zinc-300 outline-none focus:border-[#4DD4C4]/50 transition-colors"
+                        {/* List Content */}
+                        <div className={`flex-1 ${sidebarCollapsed ? 'py-6 overflow-visible' : 'overflow-y-auto p-3'} space-y-3`}>
+                            {activeSidebarTab === 'today' ? (
+                                sidebarCollapsed ? (
+                                    <div className="flex flex-col items-center gap-6 overflow-visible">
+                                        {(['easy', 'medium', 'advanced'] as const).map((dLevel) => {
+                                            const pId = dailySet?.[dLevel];
+                                            if (!pId) return null;
+                                            const pInfo = problems.find(p => p.id === pId);
+                                            if (!pInfo) return null;
+                                            const dStyle = getDiffStyle(pInfo.difficulty);
+                                            const isSolved = solvedIds.has(pId);
+                                            const isActive = activeProblemId === pId;
+
+                                            return (
+                                                <div
+                                                    key={dLevel}
+                                                    onClick={() => handleProblemSelect(pId)}
+                                                    className={`relative group cursor-pointer`}
+                                                >
+                                                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${isActive ? 'ring-4 ring-offset-2 ring-offset-[#080c16] scale-125' : 'hover:scale-150'}`}
+                                                        style={{
+                                                            backgroundColor: dStyle.hex,
+                                                            boxShadow: isActive ? `0 0 12px ${dStyle.hex}` : 'none',
+                                                        }}
                                                     />
-                                                </div>
-                                                <div className="relative">
-                                                    <button 
-                                                        onClick={() => setShowDifficultyFilter(!showDifficultyFilter)}
-                                                        className={`p-1.5 border rounded transition-colors ${difficultyFilter !== 'all' ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/30 text-[#4DD4C4]' : 'bg-[#131924] border-[#202736] text-[#4DD4C4] hover:bg-[#1a2230]'}`}
-                                                    >
-                                                        <Filter size={12} />
-                                                    </button>
-                                                    {showDifficultyFilter && (
-                                                        <div className="absolute top-full right-0 mt-1.5 w-28 bg-[#131924] border border-[#202736] rounded-lg overflow-hidden py-1 z-[300] shadow-xl">
-                                                            {['all', 'easy', 'medium', 'advanced'].map((lvl) => (
-                                                                <button
-                                                                    key={lvl}
-                                                                    onClick={() => { setDifficultyFilter(lvl); setShowDifficultyFilter(false); }}
-                                                                    className={`w-full text-left px-3 py-1.5 text-[10px] font-bold uppercase transition-colors ${difficultyFilter === lvl ? 'text-[#4DD4C4] bg-[#4DD4C4]/5' : 'text-zinc-400 hover:text-white hover:bg-[#202736]'}`}
-                                                                >
-                                                                    {lvl}
-                                                                </button>
-                                                            ))}
+                                                    {isSolved && (
+                                                        <div className="absolute -top-1.5 -right-1.5 bg-[#080c16] rounded-full p-0.5">
+                                                            <CheckCircle2 size={10} className="text-[#4DD4C4]" />
                                                         </div>
                                                     )}
-                                                </div>
-                                            </div>
-                                        )}
-                                        
-                                        <div className="space-y-2">
-                                            {filteredProblems.map((p) => {
-                                                const isActive = activeProblemId === p.id;
-                                                const dStyle = getDiffStyle(p.difficulty);
-                                                
-                                                if (sidebarCollapsed) {
-                                                    return null;
-                                                }
-
-                                                return (
-                                                    <div 
-                                                        key={p.id} 
-                                                        onClick={() => handleProblemSelect(p.id)} 
-                                                        className={`flex flex-col gap-2 p-3 rounded border cursor-pointer transition-all group ${isActive ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40' : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'}`}
-                                                    >
-                                                        <div className="flex justify-between items-center">
-                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>{dStyle.label}</span>
-                                                            <CheckCircle2 size={14} className={solvedIds.has(p.id) ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
-                                                        </div>
-                                                        <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'}`}>{p.title}</div>
+                                                    {/* Tooltip — rendered at fixed z-index to escape overflow clipping */}
+                                                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 bg-[#131924] border border-[#4DD4C4]/20 rounded-lg text-[10px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 shadow-2xl z-[9999]">
+                                                        <div className="absolute right-full top-1/2 -translate-y-1/2 mr-0 border-4 border-transparent border-r-[#131924]" />
+                                                        <span className="font-medium">{pInfo.title}</span>
                                                     </div>
-                                                );
-                                            })}
-                                            {filteredProblems.length === 0 && !sidebarCollapsed && <div className="text-center text-xs text-zinc-500 mt-8">No problems found.</div>}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {dailySet ? (['easy', 'medium', 'advanced'] as const).map((dLevel) => {
+                                            const pId = dailySet[dLevel as keyof DailyPractice];
+                                            if (!pId) return null;
+                                            const pInfo = problems.find(p => p.id === pId);
+                                            if (!pInfo) return null;
+                                            const dStyle = getDiffStyle(pInfo.difficulty);
+                                            const isSolved = solvedIds.has(pId);
+                                            const isActive = activeProblemId === pId;
+                                            return (
+                                                <div key={dLevel}
+                                                    onClick={() => handleProblemSelect(pId)}
+                                                    className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${isActive ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40' : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'}`}
+                                                >
+                                                    <div className="flex justify-between items-center">
+                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>{dStyle.label}</span>
+                                                        <CheckCircle2 size={14} className={isSolved ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
+                                                    </div>
+                                                    <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'}`}>{pInfo.title}</div>
+                                                </div>
+                                            );
+                                        }) : (
+                                            <div className="text-xs text-zinc-500 italic p-4 text-center border border-[#202736] rounded bg-[#131924]">No daily set found.</div>
+                                        )}
+                                    </div>
+                                )
+                            ) : (
+                                <div className="space-y-3 flex flex-col h-full">
+                                    {/* Search/Filter for List mode */}
+                                    {!sidebarCollapsed && (
+                                        <div className="flex gap-2 mb-2 shrink-0">
+                                            <div className="flex-1 relative">
+                                                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search..."
+                                                    value={searchQuery}
+                                                    onChange={e => setSearchQuery(e.target.value)}
+                                                    className="w-full bg-[#131924] border border-[#202736] rounded text-[11px] py-1.5 pl-8 pr-2 text-zinc-300 outline-none focus:border-[#4DD4C4]/50 transition-colors"
+                                                />
+                                            </div>
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => setShowDifficultyFilter(!showDifficultyFilter)}
+                                                    className={`p-1.5 border rounded transition-colors ${difficultyFilter !== 'all' ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/30 text-[#4DD4C4]' : 'bg-[#131924] border-[#202736] text-[#4DD4C4] hover:bg-[#1a2230]'}`}
+                                                >
+                                                    <Filter size={12} />
+                                                </button>
+                                                {showDifficultyFilter && (
+                                                    <div className="absolute top-full right-0 mt-1.5 w-28 bg-[#131924] border border-[#202736] rounded-lg overflow-hidden py-1 z-[300] shadow-xl">
+                                                        {['all', 'easy', 'medium', 'advanced'].map((lvl) => (
+                                                            <button
+                                                                key={lvl}
+                                                                onClick={() => { setDifficultyFilter(lvl); setShowDifficultyFilter(false); }}
+                                                                className={`w-full text-left px-3 py-1.5 text-[10px] font-bold uppercase transition-colors ${difficultyFilter === lvl ? 'text-[#4DD4C4] bg-[#4DD4C4]/5' : 'text-zinc-400 hover:text-white hover:bg-[#202736]'}`}
+                                                            >
+                                                                {lvl}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                            </div>
+                                    )}
 
-                            {/* Streak Footer */}
-                            {!sidebarCollapsed && (
-                                <div className="p-4 border-t border-[#202736] bg-[#0d121c] shrink-0">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Daily Streak</span>
-                                        <span className="text-sm font-bold text-white flex items-center gap-1">
-                                            {streak} <Flame size={14} className="text-[#4DD4C4] fill-[#4DD4C4]" />
-                                        </span>
+                                    <div className="space-y-2">
+                                        {filteredProblems.map((p) => {
+                                            const isActive = activeProblemId === p.id;
+                                            const dStyle = getDiffStyle(p.difficulty);
+
+                                            if (sidebarCollapsed) {
+                                                return null;
+                                            }
+
+                                            return (
+                                                <div
+                                                    key={p.id}
+                                                    onClick={() => handleProblemSelect(p.id)}
+                                                    className={`flex flex-col gap-2 p-3 rounded border cursor-pointer transition-all group ${isActive ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40' : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'}`}
+                                                >
+                                                    <div className="flex justify-between items-center">
+                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>{dStyle.label}</span>
+                                                        <CheckCircle2 size={14} className={solvedIds.has(p.id) ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
+                                                    </div>
+                                                    <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'}`}>{p.title}</div>
+                                                </div>
+                                            );
+                                        })}
+                                        {filteredProblems.length === 0 && !sidebarCollapsed && <div className="text-center text-xs text-zinc-500 mt-8">No problems found.</div>}
                                     </div>
-                                    <div className="h-1.5 w-full bg-[#080c16] rounded-full overflow-hidden border border-[#202736]">
-                                        <div 
-                                            className="h-full bg-[#4DD4C4] shadow-[0_0_10px_rgba(77,212,196,0.5)] transition-all duration-1000" 
-                                            style={{ width: `${Math.min(100, (streak / 30) * 100)}%` }}
-                                        ></div>
-                                    </div>
-                                    <p className="text-[9px] text-zinc-500 mt-2 text-center font-medium italic">
-                                        {streak >= 30 ? "Monthly goal reached! You're a pro." : `${30 - streak} days until your monthly milestone!`}
-                                    </p>
                                 </div>
                             )}
                         </div>
+
+                        {/* Streak Footer */}
+                        {!sidebarCollapsed && (
+                            <div className="p-4 border-t border-[#202736] bg-[#0d121c] shrink-0">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Daily Streak</span>
+                                    <span className="text-sm font-bold text-white flex items-center gap-1">
+                                        {streak} <Flame size={14} className="text-[#4DD4C4] fill-[#4DD4C4]" />
+                                    </span>
+                                </div>
+                                <div className="h-1.5 w-full bg-[#080c16] rounded-full overflow-hidden border border-[#202736]">
+                                    <div
+                                        className="h-full bg-[#4DD4C4] shadow-[0_0_10px_rgba(77,212,196,0.5)] transition-all duration-1000"
+                                        style={{ width: `${Math.min(100, (streak / 30) * 100)}%` }}
+                                    ></div>
+                                </div>
+                                <p className="text-[9px] text-zinc-500 mt-2 text-center font-medium italic">
+                                    {streak >= 30 ? "Monthly goal reached! You're a pro." : `${30 - streak} days until your monthly milestone!`}
+                                </p>
+                            </div>
+                        )}
                     </div>
+                </div>
 
                 <Group orientation="horizontal" className="flex-1 h-full overflow-hidden">
 
@@ -1320,16 +1417,16 @@ export function DailySetClient() {
                                             </button>
                                         </div>
                                     </div>
-                                    
+
                                     {/* Tabs */}
                                     <div className="flex items-center h-full">
-                                        <button 
+                                        <button
                                             onClick={() => setActiveDetailTab('question')}
                                             className={`flex items-center gap-1.5 h-full px-4 text-xs font-medium border-b-2 transition-colors ${activeDetailTab === 'question' ? 'text-white border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
                                         >
                                             Question
                                         </button>
-                                        <button 
+                                        <button
                                             onClick={handleOpenDiscussion}
                                             className={`flex items-center gap-1.5 h-full px-4 text-xs font-medium border-b-2 transition-colors ${activeDetailTab === 'discussion' ? 'text-white border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
                                         >
@@ -1342,7 +1439,7 @@ export function DailySetClient() {
                                     <div className="flex items-center gap-2 shrink-0">
                                         <div className="flex items-center bg-[#0d121c] border border-[#202736] rounded-md px-1.5 py-1 gap-3">
                                             <div className="relative group">
-                                                <button 
+                                                <button
                                                     onClick={handleVote}
                                                     disabled={isVoting}
                                                     className={`flex items-center gap-1.5 text-xs transition-colors ${problemVotes?.user_has_voted ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-[#4DD4C4]'}`}
@@ -1352,11 +1449,11 @@ export function DailySetClient() {
                                                 </button>
                                                 {authStatus === 'unauthenticated' && <LoginTooltip text="Sign in to like" />}
                                             </div>
-                                            
+
                                             <div className="w-[1px] h-3 bg-[#202736]" />
 
                                             <div className="relative group">
-                                                <button 
+                                                <button
                                                     onClick={handleDislike}
                                                     className="text-zinc-500 hover:text-red-400 transition-colors"
                                                     title="Dislike / Report Issue"
@@ -1368,14 +1465,14 @@ export function DailySetClient() {
                                         </div>
 
                                         <div className="relative" ref={shareDropdownRef}>
-                                            <button 
+                                            <button
                                                 onClick={() => setShareDropdownOpen(!shareDropdownOpen)}
                                                 className="flex items-center gap-2 px-3 py-1.5 bg-[#4DD4C4]/5 border border-[#4DD4C4]/20 rounded-md text-[#4DD4C4] text-[11px] font-bold hover:bg-[#4DD4C4]/10 transition-all shadow-[0_0_15px_rgba(77,212,196,0.05)]"
                                             >
                                                 <Share2 size={14} />
                                                 <span>Share</span>
                                             </button>
-                                            
+
                                             {shareDropdownOpen && (
                                                 <div className="absolute top-full right-0 mt-2 w-48 bg-[#131924] border border-[#202736] rounded-xl shadow-2xl overflow-hidden py-1 z-[300]">
                                                     <div className="px-4 py-2 border-b border-[#202736] bg-[#0b101c]">
@@ -1531,7 +1628,7 @@ export function DailySetClient() {
 
                                         {hintText && (
                                             <div>
-                                                <h3 
+                                                <h3
                                                     className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5 cursor-pointer hover:text-white transition-colors flex justify-between items-center"
                                                     onClick={() => setShowHint(!showHint)}
                                                 >
@@ -1596,20 +1693,20 @@ export function DailySetClient() {
                                                     {/* Reply Input */}
                                                     {replyingTo && replyingTo.id === comment.id && (
                                                         <div className="ml-5 bg-[#080c16] rounded-2xl border border-[#4DD4C4]/20 overflow-hidden mb-4">
-                                                            <div 
+                                                            <div
                                                                 className="h-[52px] px-4 border-b border-[#202736] flex items-center justify-between bg-[#0d121c]/50 cursor-row-resize select-none"
                                                                 onMouseDown={handleReplyResizeStart}
                                                             >
                                                                 <div className="flex items-center gap-4">
-                                                                    <button 
-                                                                        onClick={(e) => { e.stopPropagation(); setIsReplyPreview(false); }} 
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); setIsReplyPreview(false); }}
                                                                         className={`text-[9px] font-bold uppercase tracking-widest transition-colors relative py-1 ${!isReplyPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
                                                                     >
                                                                         Write
                                                                         {!isReplyPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
                                                                     </button>
-                                                                    <button 
-                                                                        onClick={(e) => { e.stopPropagation(); setIsReplyPreview(true); }} 
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); setIsReplyPreview(true); }}
                                                                         className={`text-[9px] font-bold uppercase tracking-widest transition-colors relative py-1 ${isReplyPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
                                                                     >
                                                                         Preview
@@ -1622,9 +1719,9 @@ export function DailySetClient() {
                                                             <div className="flex items-end gap-2 p-2">
                                                                 <div className="flex-1 relative bg-[#080c16] rounded-2xl border border-[#4DD4C4]/20 overflow-hidden">
                                                                     {!isReplyPreview ? (
-                                                                        <textarea 
-                                                                            value={replyText} 
-                                                                            onChange={e => setReplyText(e.target.value)} 
+                                                                        <textarea
+                                                                            value={replyText}
+                                                                            onChange={e => setReplyText(e.target.value)}
                                                                             placeholder="Write a reply..."
                                                                             className="w-full bg-transparent p-4 text-[11px] text-zinc-300 outline-none resize-none font-sans"
                                                                             style={{ height: replyEditorHeight }}
@@ -1640,7 +1737,7 @@ export function DailySetClient() {
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                                <button 
+                                                                <button
                                                                     onClick={() => handlePostReply(comment.id)}
                                                                     className="text-zinc-600 hover:text-[#4DD4C4] transition-colors p-1.5 shrink-0 mb-1"
                                                                 >
@@ -1649,7 +1746,7 @@ export function DailySetClient() {
                                                             </div>
                                                         </div>
                                                     )}
-                                                    
+
                                                     {comment.replies?.map((reply: any) => (
                                                         <div key={reply.id} className="ml-5 bg-[#0b101c] rounded-lg p-3 border border-[#202736]/60">
                                                             <div className="flex items-start justify-between mb-1">
@@ -1667,7 +1764,7 @@ export function DailySetClient() {
                                             ))}
                                         </div>
                                         {/* Resize Handle Separator */}
-                                        <div 
+                                        <div
                                             className="h-[1px] w-full bg-[#202736] hover:bg-[#4DD4C4]/50 cursor-row-resize transition-colors relative shrink-0"
                                             onMouseDown={handleCommentResizeStart}
                                         >
@@ -1675,63 +1772,63 @@ export function DailySetClient() {
                                         </div>
                                         <div className="p-4 bg-[#0d121c] shrink-0">
                                             {authStatus === 'authenticated' ? (
-                                                    <div className="flex flex-col">
+                                                <div className="flex flex-col">
 
 
-                                                        {/* Tabs Bar */}
-                                                        <div className="flex items-center gap-6 mb-3 px-1 select-none">
-                                                            <button 
-                                                                onClick={() => setIsCommentPreview(false)} 
-                                                                className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${!isCommentPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                                            >
-                                                                Write
-                                                                {!isCommentPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => setIsCommentPreview(true)} 
-                                                                className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${isCommentPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                                            >
-                                                                Preview
-                                                                {isCommentPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
-                                                            </button>
-                                                        </div>
-
-                                                        <div className="flex items-end gap-2">
-                                                            <div className="flex-1 relative bg-[#080c16] rounded-2xl border border-[#202736] overflow-hidden group focus-within:border-[#4DD4C4]/30 transition-all">
-                                                                {!isCommentPreview ? (
-                                                                    <textarea
-                                                                        value={newComment}
-                                                                        onChange={e => setNewComment(e.target.value)}
-                                                                        placeholder="Add to discussion..."
-                                                                        className="w-full bg-transparent p-5 text-[12px] text-zinc-300 outline-none resize-none font-sans"
-                                                                        style={{ height: commentEditorHeight }}
-                                                                        onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handlePostComment(); }}
-                                                                    />
-                                                                ) : (
-                                                                    <div className="p-5 text-[12px] text-zinc-300 overflow-y-auto scrollbar-thin" style={{ height: commentEditorHeight }}>
-                                                                        {newComment ? (
-                                                                            <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{newComment}</ReactMarkdown>
-                                                                        ) : (
-                                                                            <span className="text-zinc-600 italic">Nothing to preview</span>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <button 
-                                                                onClick={handlePostComment}
-                                                                className="text-zinc-600 hover:text-[#4DD4C4] transition-colors p-1.5 shrink-0 mb-2"
-                                                                title="Ctrl + Enter to send"
-                                                            >
-                                                                <Send size={18} />
-                                                            </button>
-                                                        </div>
-
-                                                        <div className="mt-2 px-1">
-                                                            <p className="text-[10px] text-zinc-500">
-                                                                Supports markdown. <span className="font-bold">Ctrl + Enter</span> to send.
-                                                            </p>
-                                                        </div>
+                                                    {/* Tabs Bar */}
+                                                    <div className="flex items-center gap-6 mb-3 px-1 select-none">
+                                                        <button
+                                                            onClick={() => setIsCommentPreview(false)}
+                                                            className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${!isCommentPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                        >
+                                                            Write
+                                                            {!isCommentPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setIsCommentPreview(true)}
+                                                            className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${isCommentPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                        >
+                                                            Preview
+                                                            {isCommentPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
+                                                        </button>
                                                     </div>
+
+                                                    <div className="flex items-end gap-2">
+                                                        <div className="flex-1 relative bg-[#080c16] rounded-2xl border border-[#202736] overflow-hidden group focus-within:border-[#4DD4C4]/30 transition-all">
+                                                            {!isCommentPreview ? (
+                                                                <textarea
+                                                                    value={newComment}
+                                                                    onChange={e => setNewComment(e.target.value)}
+                                                                    placeholder="Add to discussion..."
+                                                                    className="w-full bg-transparent p-5 text-[12px] text-zinc-300 outline-none resize-none font-sans"
+                                                                    style={{ height: commentEditorHeight }}
+                                                                    onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handlePostComment(); }}
+                                                                />
+                                                            ) : (
+                                                                <div className="p-5 text-[12px] text-zinc-300 overflow-y-auto scrollbar-thin" style={{ height: commentEditorHeight }}>
+                                                                    {newComment ? (
+                                                                        <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{newComment}</ReactMarkdown>
+                                                                    ) : (
+                                                                        <span className="text-zinc-600 italic">Nothing to preview</span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            onClick={handlePostComment}
+                                                            className="text-zinc-600 hover:text-[#4DD4C4] transition-colors p-1.5 shrink-0 mb-2"
+                                                            title="Ctrl + Enter to send"
+                                                        >
+                                                            <Send size={18} />
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="mt-2 px-1">
+                                                        <p className="text-[10px] text-zinc-500">
+                                                            Supports markdown. <span className="font-bold">Ctrl + Enter</span> to send.
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             ) : (
                                                 <div className="text-center space-y-2 flex flex-col justify-center h-full">
                                                     <p className="text-xs text-zinc-500">Sign in to join the discussion</p>
@@ -1811,7 +1908,7 @@ export function DailySetClient() {
                             <div className="absolute right-16 bottom-3 text-[10px] text-zinc-500 font-mono pointer-events-none px-2 py-1 rounded">
                                 Ln {cursorPos.lineNumber}, Col {cursorPos.column}
                             </div>
-                            
+
                             {/* ══ Relocated Feedback FAB ══ */}
                             <button
                                 onClick={() => openFeedbackModal('fab')}
@@ -1914,7 +2011,7 @@ export function DailySetClient() {
 
                                     <div className="p-4 border-t border-[#202736] bg-[#0b101c] flex justify-between items-center shrink-0">
                                         <div className="flex text-xs text-zinc-500 gap-4 font-mono">
-                                            <button 
+                                            <button
                                                 onClick={() => setShowHint(!showHint)}
                                                 className="cursor-pointer hover:text-zinc-300 transition-colors"
                                             >
