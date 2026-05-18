@@ -1,3 +1,13 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Terms of Service | Daily SQL",
+  description: "Read the Daily SQL Terms of Service. Understand your rights and responsibilities when using our platform.",
+  alternates: {
+    canonical: 'https://dailysql.in/terms',
+  }
+};
+
 export default function TermsOfService() {
     return (
         <main className="min-h-screen pt-24 pb-20 bg-[#080c16]">

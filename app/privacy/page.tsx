@@ -1,3 +1,13 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy | Daily SQL",
+  description: "Read the Daily SQL Privacy Policy to understand how we collect, use, and protect your personal data.",
+  alternates: {
+    canonical: 'https://dailysql.in/privacy',
+  }
+};
+
 export default function PrivacyPolicy() {
     return (
         <main className="min-h-screen pt-24 pb-20 bg-[#080c16]">
