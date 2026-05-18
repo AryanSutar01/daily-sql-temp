@@ -1,6 +1,15 @@
+import type { Metadata } from "next";
 import { Code2, Heart, Zap, Terminal, Cpu, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Our Team | Daily SQL",
+  description: "Meet the team behind Daily SQL. Built by developers and educators obsessed with making SQL mastery accessible.",
+  alternates: {
+    canonical: 'https://dailysql.in/team',
+  }
+};
 
 export default function TeamPage() {
   return (
