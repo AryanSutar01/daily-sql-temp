@@ -346,7 +346,10 @@ export function DailySetClient() {
                     : (Array.isArray(ds.sample_rows) ? ds.sample_rows : []),
             }));
             setActiveDatasets(normalizedDatasets);
-            if (savedSol?.submitted_query) {
+            const draftQuery = localStorage.getItem(`draft_query_${id}`);
+            if (draftQuery) {
+                setCode(draftQuery);
+            } else if (savedSol?.submitted_query) {
                 setCode(savedSol.submitted_query);
             } else {
                 const p = problems.find(x => x.id === id);
@@ -1869,7 +1872,12 @@ export function DailySetClient() {
                             </span>
                             <div className="flex items-center gap-3 text-zinc-400">
                                 <button
-                                    onClick={() => setCode('')}
+                                    onClick={() => {
+                                        setCode('');
+                                        if (activeProblemId) {
+                                            localStorage.removeItem(`draft_query_${activeProblemId}`);
+                                        }
+                                    }}
                                     className="hover:text-zinc-200 transition-colors"
                                     title="Clear Code"
                                 >
@@ -1885,7 +1893,13 @@ export function DailySetClient() {
                                 language="sql"
                                 theme="dailySqlTheme"
                                 value={code}
-                                onChange={(val) => setCode(val || "")}
+                                onChange={(val) => {
+                                    const newCode = val || "";
+                                    setCode(newCode);
+                                    if (activeProblemId) {
+                                        localStorage.setItem(`draft_query_${activeProblemId}`, newCode);
+                                    }
+                                }}
                                 beforeMount={handleEditorWillMount}
                                 onMount={handleEditorMount}
                                 options={{
