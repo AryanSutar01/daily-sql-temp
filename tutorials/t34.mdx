@@ -1,0 +1,113 @@
+## What are Temporary Tables?
+
+Temporary tables store data only for the duration of the current session (or transaction). They're automatically dropped when the session ends. They behave exactly like regular tables but are invisible to other sessions.
+
+## CREATE TEMPORARY TABLE
+
+```sql
+-- Create a temp table
+CREATE TEMPORARY TABLE temp_high_value_orders (
+  order_id    BIGINT,
+  customer_id BIGINT,
+  total       DECIMAL(10,2),
+  created_at  TIMESTAMPTZ
+);
+
+-- Populate it
+INSERT INTO temp_high_value_orders
+SELECT id, customer_id, total, created_at
+FROM orders
+WHERE total > 10000 AND status = 'completed';
+
+-- Use it in further queries
+SELECT u.name, t.total
+FROM temp_high_value_orders t
+JOIN users u ON t.customer_id = u.id
+ORDER BY t.total DESC;
+
+-- Automatically dropped when session ends
+-- Or drop explicitly:
+DROP TABLE IF EXISTS temp_high_value_orders;
+```
+
+## CREATE TEMP TABLE AS SELECT (Faster)
+
+```sql
+-- Create and populate in one step
+CREATE TEMPORARY TABLE temp_stats AS
+SELECT
+  customer_id,
+  COUNT(*)   AS order_count,
+  SUM(total) AS total_spent
+FROM orders
+WHERE status = 'completed'
+GROUP BY customer_id;
+
+-- Add index for performance
+CREATE INDEX ON temp_stats(customer_id);
+
+-- Use in a report
+SELECT
+  u.name,
+  u.email,
+  ts.order_count,
+  ts.total_spent
+FROM temp_stats ts
+JOIN users u ON ts.customer_id = u.id
+WHERE ts.total_spent > 50000;
+```
+
+## Temp Tables vs CTEs - When to Use Which
+
+| | CTE | Temporary Table |
+|-|-----|----------------|
+| Scope | Single query | Entire session |
+| Indexed | ❌ No | ✅ Yes |
+| Reusable across queries | ❌ No | ✅ Yes |
+| Materializes data | Usually no | ✅ Always |
+| Best for | Single complex query | Multi-query workflows |
+
+```sql
+-- Use CTE when: one query, results used once
+WITH big_spenders AS (
+  SELECT customer_id FROM orders GROUP BY 1 HAVING SUM(total) > 50000
+)
+SELECT u.name FROM users u JOIN big_spenders bs ON u.id = bs.customer_id;
+
+-- Use temp table when: results used in multiple subsequent queries
+CREATE TEMP TABLE big_spenders AS
+SELECT customer_id, SUM(total) AS spent FROM orders GROUP BY 1 HAVING SUM(total) > 50000;
+
+-- Query 1
+SELECT COUNT(*) FROM big_spenders;
+-- Query 2
+SELECT * FROM big_spenders JOIN users u ON customer_id = u.id;
+-- Query 3
+UPDATE users SET tier = 'Gold' WHERE id IN (SELECT customer_id FROM big_spenders);
+```
+
+## Transaction-Scoped Temp Tables
+
+In PostgreSQL, you can create temp tables that are dropped at the end of the transaction:
+
+```sql
+BEGIN;
+
+CREATE TEMPORARY TABLE temp_batch (id BIGINT)
+ON COMMIT DROP;  -- automatically dropped on COMMIT or ROLLBACK
+
+INSERT INTO temp_batch SELECT id FROM orders WHERE status = 'pending';
+
+UPDATE orders SET status = 'processing'
+WHERE id IN (SELECT id FROM temp_batch);
+
+COMMIT;  -- temp_batch is automatically dropped here
+```
+
+## Summary
+
+- Temporary tables exist only for the current session and are auto-dropped on disconnect
+- Use `CREATE TEMP TABLE ... AS SELECT` to create and populate in one step
+- Add indexes on temp tables for joins and filters - they're real tables
+- Prefer CTEs for single-query use; use temp tables when results are needed across multiple queries
+- `ON COMMIT DROP` creates a transaction-scoped temp table - gone after COMMIT/ROLLBACK

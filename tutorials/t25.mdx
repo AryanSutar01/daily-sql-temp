@@ -1,0 +1,175 @@
+## What Are Window Functions?
+
+Window functions calculate a value for each row based on a "window" of related rows - without collapsing the result like GROUP BY does.
+
+```sql
+-- GROUP BY: collapses rows - one result per group
+SELECT department, AVG(salary) FROM employees GROUP BY department;
+-- 3 rows (one per department)
+
+-- Window function: keeps all rows, adds the group value alongside
+SELECT name, department, salary,
+  AVG(salary) OVER (PARTITION BY department) AS dept_avg
+FROM employees;
+-- All rows returned, each with its department average
+```
+
+## Syntax
+
+```sql
+function_name() OVER (
+  PARTITION BY column   -- divide into independent groups
+  ORDER BY column       -- order within each partition
+  ROWS/RANGE frame      -- which rows to include
+)
+```
+
+- `PARTITION BY` - like GROUP BY for window functions; omit to use all rows as one window
+- `ORDER BY` - determines row sequence within the partition
+- The frame - which rows around the current row to include (default: all rows up to current)
+
+## ROW_NUMBER
+
+Assigns a unique sequential integer to each row within a partition. No ties - every row gets a different number.
+
+```sql
+SELECT
+  name,
+  department,
+  salary,
+  ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC) AS rn
+FROM employees;
+
+-- Result:
+-- Alice    | Engineering | 95000 | 1
+-- Bob      | Engineering | 82000 | 2
+-- Charlie  | Engineering | 76000 | 3
+-- Diana    | Marketing   | 71000 | 1  ← resets per partition
+-- Eve      | Marketing   | 65000 | 2
+```
+
+### Most Common Use: Top N Per Group
+
+```sql
+-- Highest paid employee per department
+SELECT name, department, salary
+FROM (
+  SELECT *,
+    ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC) AS rn
+  FROM employees
+) t
+WHERE rn = 1;
+
+-- Top 3 products by revenue per category
+SELECT product_name, category, revenue
+FROM (
+  SELECT *,
+    ROW_NUMBER() OVER (PARTITION BY category ORDER BY revenue DESC) AS rn
+  FROM product_revenue
+) t
+WHERE rn <= 3;
+```
+
+## RANK
+
+Assigns rankings like a competition - tied rows get the same rank, and the next rank skips numbers.
+
+```sql
+SELECT name, score,
+  RANK() OVER (ORDER BY score DESC) AS rank
+FROM leaderboard;
+
+-- Score: 95 → Rank 1
+-- Score: 90 → Rank 2  (tied)
+-- Score: 90 → Rank 2  (tied)
+-- Score: 85 → Rank 4  (3 is skipped - two people tied for 2nd)
+```
+
+## DENSE_RANK
+
+Like RANK but without gaps - ranks are always consecutive.
+
+```sql
+SELECT name, score,
+  DENSE_RANK() OVER (ORDER BY score DESC) AS dense_rank
+FROM leaderboard;
+
+-- Score: 95 → Dense Rank 1
+-- Score: 90 → Dense Rank 2  (tied)
+-- Score: 90 → Dense Rank 2  (tied)
+-- Score: 85 → Dense Rank 3  (no gap - consecutive)
+```
+
+## ROW_NUMBER vs RANK vs DENSE_RANK
+
+```sql
+SELECT name, score,
+  ROW_NUMBER()  OVER (ORDER BY score DESC) AS row_num,
+  RANK()        OVER (ORDER BY score DESC) AS rank,
+  DENSE_RANK()  OVER (ORDER BY score DESC) AS dense_rank
+FROM scores;
+```
+
+Result:
+```
+name   | score | row_num | rank | dense_rank
+Alice  | 95    | 1       | 1    | 1
+Bob    | 90    | 2       | 2    | 2
+Carol  | 90    | 3       | 2    | 2    ← tied with Bob
+Dave   | 85    | 4       | 4    | 3    ← RANK skips 3, DENSE_RANK doesn't
+Eve    | 80    | 5       | 5    | 4
+```
+
+**When to use which:**
+- `ROW_NUMBER` - when you need a unique ID for each row (pagination, deduplication)
+- `RANK` - when tied positions should share a rank and the next rank should skip (competition scores)
+- `DENSE_RANK` - when tied positions share a rank but you don't want gaps (customer tiers)
+
+## PARTITION BY - Independent Windows Per Group
+
+```sql
+-- Rank employees within each department independently
+SELECT
+  name,
+  department,
+  salary,
+  RANK() OVER (PARTITION BY department ORDER BY salary DESC) AS dept_rank
+FROM employees;
+-- Alice is #1 in Engineering, Diana is #1 in Marketing
+-- Without PARTITION BY: one global ranking across all departments
+```
+
+## Without PARTITION BY - Global Window
+
+```sql
+-- Global rank across the entire company
+SELECT name, department, salary,
+  RANK() OVER (ORDER BY salary DESC) AS global_rank
+FROM employees;
+```
+
+## Interview Questions
+
+**Q: What's the difference between RANK and DENSE_RANK?**
+Both assign the same rank to tied rows. RANK skips the next rank after a tie (1, 2, 2, 4). DENSE_RANK uses consecutive ranks with no gaps (1, 2, 2, 3).
+
+**Q: How would you select the 3rd highest salary?**
+```sql
+SELECT DISTINCT salary FROM (
+  SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS rnk
+  FROM employees
+) t WHERE rnk = 3;
+```
+
+**Q: How would you get the top 1 per group (handling ties)?**
+- Use RANK() not ROW_NUMBER() so tied rows are both included
+- Use ROW_NUMBER() if you want exactly one row even when tied (arbitrary tiebreaker)
+
+## Summary
+
+- Window functions compute per-row values using a set of related rows - without collapsing
+- `PARTITION BY` creates independent windows per group value
+- `ROW_NUMBER()` - unique sequential numbers, no ties
+- `RANK()` - competition ranking, gaps after ties (1, 2, 2, 4)
+- `DENSE_RANK()` - consecutive ranking, no gaps (1, 2, 2, 3)
+- Top-N per group = ROW_NUMBER/RANK in a subquery, then filter by rn <= N

@@ -1,0 +1,159 @@
+## What is an INNER JOIN?
+
+An INNER JOIN returns rows that have **matching values in both tables**. If a row in either table has no match in the other, it is excluded from the result.
+
+```sql
+SELECT columns
+FROM table_a
+INNER JOIN table_b ON table_a.key = table_b.key;
+
+-- JOIN = INNER JOIN (shorthand, most common)
+SELECT columns
+FROM table_a
+JOIN table_b ON table_a.key = table_b.key;
+```
+
+## Basic Example
+
+```
+users:                    orders:
+id | name                 id | customer_id | total
+1  | Alice                1  | 1           | 500
+2  | Bob                  2  | 1           | 300
+3  | Charlie              3  | 2           | 750
+                          4  | 99          | 200  ← customer 99 doesn't exist
+```
+
+```sql
+SELECT u.name, o.total
+FROM users u
+JOIN orders o ON u.id = o.customer_id;
+
+-- Result:
+-- Alice  | 500
+-- Alice  | 300
+-- Bob    | 750
+-- Charlie is excluded (no orders)
+-- order #4 is excluded (customer 99 doesn't exist in users)
+```
+
+## Table Aliases - Always Use Them
+
+```sql
+-- Without aliases: verbose and error-prone
+SELECT users.name, users.email, orders.total, orders.created_at
+FROM users
+JOIN orders ON users.id = orders.customer_id;
+
+-- With aliases: clean and readable
+SELECT u.name, u.email, o.total, o.created_at
+FROM users u
+JOIN orders o ON u.id = o.customer_id;
+```
+
+## JOIN on Multiple Conditions
+
+```sql
+-- Join on multiple columns
+SELECT *
+FROM order_items oi
+JOIN orders o ON oi.order_id = o.id
+             AND o.status = 'completed';  -- additional condition in ON
+
+-- Alternative: put extra condition in WHERE
+SELECT *
+FROM order_items oi
+JOIN orders o ON oi.order_id = o.id
+WHERE o.status = 'completed';
+```
+
+**ON vs WHERE for JOIN conditions:**
+- Conditions in `ON` are evaluated during the join
+- Conditions in `WHERE` are evaluated after the join
+- For INNER JOIN they produce the same result - for OUTER JOINs they behave differently
+
+## Joining Three or More Tables
+
+```sql
+SELECT
+  u.name        AS customer,
+  p.name        AS product,
+  oi.quantity,
+  oi.unit_price,
+  o.created_at  AS order_date
+FROM orders o
+JOIN users      u  ON o.customer_id  = u.id
+JOIN order_items oi ON o.id          = oi.order_id
+JOIN products   p  ON oi.product_id  = p.id
+WHERE o.status = 'completed'
+  AND o.created_at >= '2024-01-01'
+ORDER BY o.created_at DESC;
+```
+
+**Join order tip:** Start from the most central table (often the fact table like `orders`) and JOIN outward to dimension tables.
+
+## JOIN with Aggregation
+
+```sql
+-- Total revenue per customer with their name
+SELECT
+  u.id,
+  u.name,
+  u.email,
+  COUNT(o.id)        AS order_count,
+  SUM(o.total)       AS total_spent,
+  MAX(o.created_at)  AS last_order
+FROM users u
+JOIN orders o ON u.id = o.customer_id
+WHERE o.status = 'completed'
+GROUP BY u.id, u.name, u.email
+ORDER BY total_spent DESC;
+```
+
+## Common Interview Question: ON vs WHERE
+
+```sql
+-- For INNER JOIN, these two produce the same result:
+
+-- Filter in ON:
+SELECT u.name, o.total
+FROM users u
+JOIN orders o ON u.id = o.customer_id AND o.status = 'completed';
+
+-- Filter in WHERE:
+SELECT u.name, o.total
+FROM users u
+JOIN orders o ON u.id = o.customer_id
+WHERE o.status = 'completed';
+```
+
+But for LEFT JOIN they behave completely differently (covered in the LEFT JOIN tutorial).
+
+## Avoiding Duplicate Rows
+
+A common pitfall: joining to a one-to-many table multiplies rows.
+
+```sql
+-- users has 1 row per user
+-- orders has N rows per user
+-- This produces one output row per order, not per user
+SELECT u.name, o.total
+FROM users u
+JOIN orders o ON u.id = o.customer_id;
+-- If Alice has 5 orders → Alice appears 5 times
+
+-- To get one row per user, aggregate:
+SELECT u.name, COUNT(o.id) AS orders, SUM(o.total) AS spent
+FROM users u
+JOIN orders o ON u.id = o.customer_id
+GROUP BY u.name;
+```
+
+## Summary
+
+- INNER JOIN (or just JOIN) returns only rows with matches in both tables
+- Rows with no matching row in the other table are excluded
+- Always use table aliases (u, o, p) for readability
+- Start joins from the central table and join outward
+- INNER JOIN + WHERE = same result as INNER JOIN + ON for the filter condition
+- Watch out for row multiplication when joining one-to-many tables

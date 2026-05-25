@@ -1,0 +1,174 @@
+## What is Pivoting?
+
+Pivoting transforms row values into column headers - turning a "tall" (normalized) table into a "wide" (report-style) table.
+
+```
+Before (tall):              After (pivot):
+month | category | revenue  category | Jan   | Feb   | Mar
+Jan   | Mobile   | 50000    Mobile   | 50000 | 62000 | 71000
+Jan   | Laptop   | 80000    Laptop   | 80000 | 95000 | 88000
+Feb   | Mobile   | 62000
+Feb   | Laptop   | 95000
+Mar   | Mobile   | 71000
+Mar   | Laptop   | 88000
+```
+
+## Manual Pivot with CASE WHEN (Works in All Databases)
+
+```sql
+SELECT
+  category,
+  SUM(CASE WHEN month_num = 1  THEN revenue ELSE 0 END) AS jan,
+  SUM(CASE WHEN month_num = 2  THEN revenue ELSE 0 END) AS feb,
+  SUM(CASE WHEN month_num = 3  THEN revenue ELSE 0 END) AS mar,
+  SUM(CASE WHEN month_num = 4  THEN revenue ELSE 0 END) AS apr,
+  SUM(CASE WHEN month_num = 5  THEN revenue ELSE 0 END) AS may,
+  SUM(CASE WHEN month_num = 6  THEN revenue ELSE 0 END) AS jun,
+  SUM(CASE WHEN month_num = 7  THEN revenue ELSE 0 END) AS jul,
+  SUM(CASE WHEN month_num = 8  THEN revenue ELSE 0 END) AS aug,
+  SUM(CASE WHEN month_num = 9  THEN revenue ELSE 0 END) AS sep,
+  SUM(CASE WHEN month_num = 10 THEN revenue ELSE 0 END) AS oct,
+  SUM(CASE WHEN month_num = 11 THEN revenue ELSE 0 END) AS nov,
+  SUM(CASE WHEN month_num = 12 THEN revenue ELSE 0 END) AS dec,
+  SUM(revenue) AS annual_total
+FROM (
+  SELECT
+    c.name AS category,
+    EXTRACT(MONTH FROM o.created_at)::INT AS month_num,
+    SUM(oi.quantity * oi.unit_price) AS revenue
+  FROM order_items oi
+  JOIN orders    o  ON oi.order_id   = o.id
+  JOIN products  p  ON oi.product_id = p.id
+  JOIN categories c ON p.category_id = c.id
+  WHERE o.status = 'completed'
+    AND EXTRACT(YEAR FROM o.created_at) = 2024
+  GROUP BY c.name, EXTRACT(MONTH FROM o.created_at)
+) monthly
+GROUP BY category
+ORDER BY annual_total DESC;
+```
+
+## Pivot with FILTER (PostgreSQL 9.4+)
+
+Cleaner syntax for conditional aggregation:
+
+```sql
+SELECT
+  category,
+  SUM(revenue) FILTER (WHERE month_num = 1)  AS jan,
+  SUM(revenue) FILTER (WHERE month_num = 2)  AS feb,
+  SUM(revenue) FILTER (WHERE month_num = 3)  AS mar,
+  SUM(revenue) FILTER (WHERE month_num = 4)  AS apr,
+  SUM(revenue) FILTER (WHERE month_num = 5)  AS may,
+  SUM(revenue) FILTER (WHERE month_num = 6)  AS jun,
+  SUM(revenue) AS total
+FROM monthly_revenue
+GROUP BY category;
+```
+
+## Pivot User Counts by Status and City
+
+```sql
+SELECT
+  city,
+  COUNT(*) FILTER (WHERE status = 'active')   AS active,
+  COUNT(*) FILTER (WHERE status = 'inactive') AS inactive,
+  COUNT(*) FILTER (WHERE status = 'banned')   AS banned,
+  COUNT(*) AS total
+FROM users
+GROUP BY city
+ORDER BY total DESC;
+```
+
+## CROSSTAB (PostgreSQL tablefunc Extension)
+
+For dynamic pivots, PostgreSQL has `crosstab`:
+
+```sql
+-- Enable the extension
+CREATE EXTENSION IF NOT EXISTS tablefunc;
+
+-- Use crosstab for dynamic column headers
+SELECT * FROM crosstab(
+  'SELECT category, month_name, revenue
+   FROM monthly_sales
+   ORDER BY 1, 2',
+  'SELECT DISTINCT month_name FROM monthly_sales ORDER BY 1'
+) AS pivot_table (
+  category TEXT,
+  jan NUMERIC, feb NUMERIC, mar NUMERIC,
+  apr NUMERIC, may NUMERIC, jun NUMERIC
+);
+```
+
+## PIVOT in SQL Server
+
+```sql
+-- SQL Server has native PIVOT syntax
+SELECT *
+FROM (
+  SELECT category, month_name, revenue FROM monthly_sales
+) source
+PIVOT (
+  SUM(revenue) FOR month_name IN ([Jan], [Feb], [Mar], [Apr], [May], [Jun])
+) AS pivot_result;
+```
+
+## Unpivot - Columns to Rows
+
+Unpivoting does the reverse - turns column headers into row values.
+
+```sql
+-- Wide format (pivot table):
+-- category | jan   | feb   | mar
+-- Mobile   | 50000 | 62000 | 71000
+
+-- Unpivot using UNION ALL (works everywhere)
+SELECT 'Mobile' AS category, 'Jan' AS month, 50000 AS revenue
+UNION ALL SELECT 'Mobile', 'Feb', 62000
+UNION ALL SELECT 'Mobile', 'Mar', 71000;
+
+-- Better: from an actual wide table
+SELECT category, 'Jan' AS month, jan AS revenue FROM pivot_table WHERE jan IS NOT NULL
+UNION ALL
+SELECT category, 'Feb', feb FROM pivot_table WHERE feb IS NOT NULL
+UNION ALL
+SELECT category, 'Mar', mar FROM pivot_table WHERE mar IS NOT NULL
+ORDER BY category, month;
+```
+
+## SQL Server UNPIVOT
+
+```sql
+SELECT category, month, revenue
+FROM pivot_table
+UNPIVOT (
+  revenue FOR month IN (jan, feb, mar, apr, may, jun)
+) AS unpivoted;
+```
+
+## Real-World Example: Survey Results Pivot
+
+```sql
+-- responses: user_id, question_id, answer
+-- Pivot: one row per user, one column per question
+
+SELECT
+  user_id,
+  MAX(CASE WHEN question_id = 1 THEN answer END) AS q1_satisfaction,
+  MAX(CASE WHEN question_id = 2 THEN answer END) AS q2_recommend,
+  MAX(CASE WHEN question_id = 3 THEN answer END) AS q3_ease_of_use,
+  MAX(CASE WHEN question_id = 4 THEN answer END) AS q4_support
+FROM survey_responses
+GROUP BY user_id
+ORDER BY user_id;
+```
+
+## Summary
+
+- Pivot: rows → columns - use CASE WHEN + SUM/COUNT/MAX for the aggregate
+- `FILTER (WHERE ...)` is cleaner PostgreSQL syntax for conditional aggregation
+- Use UNION ALL to unpivot (columns → rows)
+- SQL Server has native `PIVOT` and `UNPIVOT` syntax
+- PostgreSQL `crosstab()` handles dynamic pivots but requires tablefunc extension
+- In practice, most pivoting is done in the BI tool (Tableau, Power BI, Metabase) - SQL pivots are for when you need the data already shaped

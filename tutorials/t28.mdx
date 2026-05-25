@@ -1,0 +1,190 @@
+## What is a CTE?
+
+A CTE (Common Table Expression) is a named temporary result set defined at the top of a query using `WITH`. It can be referenced like a table in the main query.
+
+```sql
+WITH cte_name AS (
+  SELECT ...  -- your subquery
+)
+SELECT * FROM cte_name;
+```
+
+CTEs don't store data - they're just named subqueries. But they make complex queries dramatically more readable.
+
+## Why Use CTEs Instead of Subqueries?
+
+```sql
+-- ❌ Nested subqueries: hard to read and debug
+SELECT name FROM users
+WHERE id IN (
+  SELECT customer_id FROM orders
+  WHERE total > (
+    SELECT AVG(total) FROM orders
+  )
+);
+
+-- ✅ CTE version: read top to bottom like a story
+WITH avg_order AS (
+  SELECT AVG(total) AS avg FROM orders
+),
+high_value_customers AS (
+  SELECT customer_id FROM orders, avg_order
+  WHERE total > avg_order.avg
+)
+SELECT name FROM users
+WHERE id IN (SELECT customer_id FROM high_value_customers);
+```
+
+## Basic CTE
+
+```sql
+WITH active_users AS (
+  SELECT id, name, email FROM users WHERE status = 'active'
+)
+SELECT * FROM active_users WHERE city = 'Mumbai';
+```
+
+## Multiple CTEs - Chain Them Together
+
+```sql
+WITH
+-- Step 1: Get completed orders
+completed_orders AS (
+  SELECT customer_id, total, created_at
+  FROM orders
+  WHERE status = 'completed'
+),
+-- Step 2: Aggregate per customer
+customer_totals AS (
+  SELECT
+    customer_id,
+    COUNT(*)   AS order_count,
+    SUM(total) AS total_spent
+  FROM completed_orders
+  GROUP BY customer_id
+),
+-- Step 3: Assign tiers
+customer_tiers AS (
+  SELECT *,
+    CASE
+      WHEN total_spent >= 100000 THEN 'Platinum'
+      WHEN total_spent >= 50000  THEN 'Gold'
+      WHEN total_spent >= 10000  THEN 'Silver'
+      ELSE 'Bronze'
+    END AS tier
+  FROM customer_totals
+)
+-- Final: join back to get names
+SELECT u.name, u.email, ct.order_count, ct.total_spent, ct.tier
+FROM users u
+JOIN customer_tiers ct ON u.id = ct.customer_id
+ORDER BY ct.total_spent DESC;
+```
+
+## CTE vs Subquery - When to Use Which
+
+| | Subquery | CTE |
+|-|----------|-----|
+| Readability | Gets messy when nested | Clean, linear flow |
+| Reuse in same query | ❌ Must repeat | ✅ Reference by name |
+| Recursive | ❌ No | ✅ Yes |
+| Debugging | Hard to isolate | Easy to test each step |
+
+**Rule of thumb:** Use a subquery for simple, one-off inline references. Use a CTE when:
+- The logic is complex (more than one level of nesting)
+- You need to reference the result multiple times
+- You want to make the query readable and maintainable
+
+## Recursive CTEs
+
+A recursive CTE references itself - useful for hierarchical data like org charts, categories, and paths.
+
+```sql
+WITH RECURSIVE org_chart AS (
+  -- Base case: top-level employees (no manager)
+  SELECT id, name, manager_id, 1 AS level
+  FROM employees
+  WHERE manager_id IS NULL
+
+  UNION ALL
+
+  -- Recursive case: employees whose manager is already in the CTE
+  SELECT e.id, e.name, e.manager_id, oc.level + 1
+  FROM employees e
+  JOIN org_chart oc ON e.manager_id = oc.id
+)
+SELECT
+  REPEAT('  ', level - 1) || name AS indented_name,
+  level
+FROM org_chart
+ORDER BY level, name;
+```
+
+### Number Series with Recursive CTE
+
+```sql
+-- Generate numbers 1 to 10
+WITH RECURSIVE nums AS (
+  SELECT 1 AS n
+  UNION ALL
+  SELECT n + 1 FROM nums WHERE n < 10
+)
+SELECT n FROM nums;
+```
+
+### Date Series (Alternative to generate_series)
+
+```sql
+WITH RECURSIVE dates AS (
+  SELECT '2024-01-01'::DATE AS d
+  UNION ALL
+  SELECT d + 1 FROM dates WHERE d < '2024-01-31'
+)
+SELECT d FROM dates;
+```
+
+## CTE for Readability in Reports
+
+```sql
+/*
+  Sales performance report
+  Shows each rep's performance vs team average
+*/
+WITH
+rep_sales AS (
+  SELECT
+    sales_rep_id,
+    COUNT(*)   AS deals_closed,
+    SUM(value) AS total_revenue
+  FROM deals
+  WHERE status = 'won'
+    AND closed_at >= DATE_TRUNC('month', NOW())
+  GROUP BY sales_rep_id
+),
+team_avg AS (
+  SELECT
+    AVG(total_revenue) AS avg_revenue,
+    SUM(total_revenue) AS team_total
+  FROM rep_sales
+)
+SELECT
+  u.name              AS rep_name,
+  rs.deals_closed,
+  rs.total_revenue,
+  ta.avg_revenue      AS team_avg,
+  rs.total_revenue - ta.avg_revenue AS vs_avg,
+  ROUND(rs.total_revenue * 100.0 / ta.team_total, 1) AS pct_of_team
+FROM rep_sales rs
+JOIN users u     ON rs.sales_rep_id = u.id
+CROSS JOIN team_avg ta
+ORDER BY rs.total_revenue DESC;
+```
+
+## Summary
+
+- CTE = named temporary result set, defined with `WITH cte_name AS (...)`
+- Makes complex queries readable by breaking them into named, logical steps
+- Multiple CTEs are separated by commas, can reference previous CTEs
+- Recursive CTEs reference themselves - used for hierarchies, number/date series
+- CTEs don't persist after the query - they're just named subqueries
+- Prefer CTEs over deeply nested subqueries for maintainability

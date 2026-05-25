@@ -1,0 +1,218 @@
+## Running Total (Cumulative Sum)
+
+A running total accumulates values row by row. Each row shows the sum of all rows up to and including itself.
+
+```sql
+WITH daily AS (
+  SELECT
+    DATE(created_at)  AS date,
+    SUM(total)         AS daily_revenue
+  FROM orders
+  WHERE status = 'completed'
+  GROUP BY DATE(created_at)
+)
+SELECT
+  date,
+  daily_revenue,
+  SUM(daily_revenue) OVER (
+    ORDER BY date
+    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+  ) AS running_total
+FROM daily
+ORDER BY date;
+```
+
+Result:
+```
+date       | daily_revenue | running_total
+2024-01-01 | 15000         | 15000
+2024-01-02 | 23000         | 38000
+2024-01-03 | 18000         | 56000
+2024-01-04 | 31000         | 87000
+```
+
+The default frame when you use ORDER BY in a window function is already
+`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` - so you can write it shorter:
+
+```sql
+SUM(daily_revenue) OVER (ORDER BY date) AS running_total
+```
+
+## Running Total per Group (PARTITION BY)
+
+```sql
+-- Running total per product category
+SELECT
+  category,
+  month,
+  monthly_revenue,
+  SUM(monthly_revenue) OVER (
+    PARTITION BY category
+    ORDER BY month
+  ) AS category_running_total
+FROM category_monthly_revenue
+ORDER BY category, month;
+```
+
+## Running Count
+
+```sql
+-- Cumulative new user count by day
+SELECT
+  DATE(created_at) AS date,
+  COUNT(*) AS new_users,
+  SUM(COUNT(*)) OVER (ORDER BY DATE(created_at)) AS total_users
+FROM users
+GROUP BY DATE(created_at)
+ORDER BY date;
+```
+
+## Running Percentage
+
+```sql
+-- Each day's revenue as % of total and as running %
+WITH daily AS (
+  SELECT DATE(created_at) AS date, SUM(total) AS rev
+  FROM orders WHERE status = 'completed'
+  GROUP BY DATE(created_at)
+)
+SELECT
+  date,
+  rev,
+  ROUND(rev * 100.0 / SUM(rev) OVER (), 2) AS pct_of_total,
+  ROUND(SUM(rev) OVER (ORDER BY date) * 100.0 / SUM(rev) OVER (), 2) AS running_pct
+FROM daily
+ORDER BY date;
+```
+
+## Moving Average
+
+A moving average smooths out short-term fluctuations. The window frame controls how many rows to include.
+
+```sql
+-- 7-day moving average of daily revenue
+WITH daily AS (
+  SELECT DATE(created_at) AS date, SUM(total) AS revenue
+  FROM orders WHERE status = 'completed'
+  GROUP BY DATE(created_at)
+)
+SELECT
+  date,
+  revenue,
+  ROUND(AVG(revenue) OVER (
+    ORDER BY date
+    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+  ), 2) AS moving_avg_7d,
+  ROUND(AVG(revenue) OVER (
+    ORDER BY date
+    ROWS BETWEEN 29 PRECEDING AND CURRENT ROW
+  ), 2) AS moving_avg_30d
+FROM daily
+ORDER BY date;
+```
+
+The `ROWS BETWEEN 6 PRECEDING AND CURRENT ROW` frame includes the current row + 6 rows before it = 7 rows total.
+
+## Centered Moving Average
+
+```sql
+-- 7-day centered moving average (3 before + current + 3 after)
+SELECT
+  date,
+  revenue,
+  ROUND(AVG(revenue) OVER (
+    ORDER BY date
+    ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING
+  ), 2) AS centered_7d_avg
+FROM daily_revenue;
+```
+
+## Exponential Moving Average (EMA) Approximation
+
+True EMA requires recursive calculation, but you can approximate:
+
+```sql
+-- Weighted moving average (more recent days weighted more)
+SELECT
+  date,
+  revenue,
+  ROUND(
+    SUM(revenue * weight) OVER (ORDER BY date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)
+    / SUM(weight) OVER (ORDER BY date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW),
+    2
+  ) AS weighted_avg
+FROM (
+  SELECT date, revenue,
+    ROW_NUMBER() OVER (ORDER BY date) AS weight  -- recent = higher weight
+  FROM daily_revenue
+) t;
+```
+
+## Window Frame Options
+
+```sql
+-- All rows from start to current row (running total)
+ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+
+-- Last 7 rows including current (7-day window)
+ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+
+-- Last 30 rows
+ROWS BETWEEN 29 PRECEDING AND CURRENT ROW
+
+-- Centered 7-day window
+ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING
+
+-- Only future rows (lead)
+ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
+
+-- All rows in partition (grand total on every row)
+ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+```
+
+## Complete Analytics Dashboard Query
+
+```sql
+WITH daily AS (
+  SELECT
+    DATE(created_at)        AS date,
+    COUNT(*)                 AS orders,
+    COUNT(DISTINCT customer_id) AS customers,
+    SUM(total)               AS revenue
+  FROM orders
+  WHERE status = 'completed'
+    AND created_at >= NOW() - INTERVAL '90 days'
+  GROUP BY DATE(created_at)
+)
+SELECT
+  date,
+  orders,
+  customers,
+  revenue,
+  -- Running totals
+  SUM(revenue)   OVER (ORDER BY date) AS cumulative_revenue,
+  SUM(orders)    OVER (ORDER BY date) AS cumulative_orders,
+  -- Moving averages
+  ROUND(AVG(revenue) OVER (ORDER BY date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW), 0)
+    AS revenue_7d_avg,
+  ROUND(AVG(orders)  OVER (ORDER BY date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW), 1)
+    AS orders_7d_avg,
+  -- Day-over-day change
+  revenue - LAG(revenue) OVER (ORDER BY date) AS revenue_dod_change,
+  ROUND(
+    (revenue - LAG(revenue) OVER (ORDER BY date)) * 100.0
+    / NULLIF(LAG(revenue) OVER (ORDER BY date), 0),
+    2
+  ) AS revenue_dod_pct
+FROM daily
+ORDER BY date;
+```
+
+## Summary
+
+- Running total: `SUM(col) OVER (ORDER BY date)` - default frame is cumulative
+- Running total per group: add `PARTITION BY category` before `ORDER BY`
+- Moving average: `AVG(col) OVER (ORDER BY date ROWS BETWEEN N PRECEDING AND CURRENT ROW)`
+- 7-day window = `ROWS BETWEEN 6 PRECEDING AND CURRENT ROW` (6 past + current = 7)
+- Centered window = `ROWS BETWEEN N PRECEDING AND N FOLLOWING`
+- Running % = `SUM(col) OVER (ORDER BY date) * 100.0 / SUM(col) OVER ()`

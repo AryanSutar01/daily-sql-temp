@@ -1,290 +1,263 @@
-## What is Normalization?
+## SQL Comments
 
-Normalization is the process of organizing a database to reduce **data redundancy** and improve **data integrity**. It involves structuring tables so that data is stored in one place and relationships are clean.
+Comments are ignored by the database engine - they exist to explain the code to humans.
 
-### The Problem: Unnormalized Table
-
-```
-orders_flat table (BAD):
-+----------+-----------+---------------------+------------+----------+---------+----------+
-| order_id | cust_name | cust_email          | cust_city  | product  | price   | quantity |
-+----------+-----------+---------------------+------------+----------+---------+----------+
-| 1        | Alice     | alice@email.com     | Mumbai     | Laptop   | 50000   | 1        |
-| 2        | Alice     | alice@email.com     | Mumbai     | Mouse    | 500     | 2        |
-| 3        | Bob       | bob@email.com       | Delhi      | Keyboard | 1500    | 1        |
-| 4        | Alice     | alice@email.com     | Mumbai     | Laptop   | 50000   | 1        |
-+----------+-----------+---------------------+------------+----------+---------+----------+
-```
-
-Problems:
-- Alice's email is stored 3 times → **update anomaly** (change it in one row, others are wrong)
-- Laptop price stored twice → **redundancy**
-- Delete Bob's order → Bob's data is lost → **deletion anomaly**
-
-## Normal Forms
-
-### 1NF — First Normal Form
-
-Rules:
-- Each column contains atomic (indivisible) values
-- No repeating groups or arrays
-- Each row is unique
+### Single-Line Comments
 
 ```sql
--- ❌ Violates 1NF: multiple values in one column
-+----------+---------------------------+
-| order_id | products                  |
-+----------+---------------------------+
-| 1        | Laptop, Mouse, Keyboard   |  ← not atomic!
-+----------+---------------------------+
+-- This is a single-line comment
+SELECT * FROM users; -- returns all users
 
--- ✅ 1NF compliant: one value per cell
-+----------+----------+
-| order_id | product  |
-+----------+----------+
-| 1        | Laptop   |
-| 1        | Mouse    |
-| 1        | Keyboard |
-+----------+----------+
+-- Useful for quick notes
+SELECT
+  id,
+  name,       -- customer's full name
+  email,      -- primary contact
+  -- phone,   -- temporarily excluded
+  city
+FROM users;
 ```
 
-### 2NF — Second Normal Form
-
-Rules:
-- Must be in 1NF
-- Every non-key column must depend on the **entire** primary key (no partial dependencies)
-- Applies to tables with composite primary keys
+### Multi-Line Comments
 
 ```sql
--- ❌ Violates 2NF: product_name depends only on product_id, not the full key
-order_items:
-+----------+------------+--------------+----------+
-| order_id | product_id | product_name | quantity |  ← composite PK: (order_id, product_id)
-+----------+------------+--------------+----------+
-| 1        | 5          | Laptop       | 1        |  product_name depends only on product_id
-| 2        | 5          | Laptop       | 2        |  ← redundant!
-+----------+------------+--------------+----------+
+/* This is a
+   multi-line comment */
 
--- ✅ 2NF: split product_name into its own table
-order_items:                          products:
-+----------+------------+----------+  +------------+--------------+--------+
-| order_id | product_id | quantity |  | product_id | product_name | price  |
-+----------+------------+----------+  +------------+--------------+--------+
-| 1        | 5          | 1        |  | 5          | Laptop       | 50000  |
-| 2        | 5          | 2        |  +------------+--------------+--------+
-+----------+------------+----------+
+SELECT *
+/*
+  TODO: add pagination
+  Author: Alice
+  Date: 2024-06-15
+*/
+FROM orders;
 ```
 
-### 3NF — Third Normal Form
-
-Rules:
-- Must be in 2NF
-- No transitive dependencies (non-key column depending on another non-key column)
+### When to Use Comments
 
 ```sql
--- ❌ Violates 3NF: zip_code → city (city depends on zip, not on customer_id)
-customers:
-+-------------+-------+----------+-----------+
-| customer_id | name  | zip_code | city      |
-+-------------+-------+----------+-----------+
-| 1           | Alice | 400001   | Mumbai    |
-| 2           | Bob   | 400001   | Mumbai    |  ← city repeated for same zip
-+-------------+-------+----------+-----------+
+-- ✅ Explain WHY, not WHAT - the SQL itself shows what
+-- Bad comment (states the obvious):
+SELECT * FROM users; -- selects users
 
--- ✅ 3NF: separate zip_code → city into its own table
-customers:                          zip_codes:
-+-------------+-------+----------+  +----------+-----------+
-| customer_id | name  | zip_code |  | zip_code | city      |
-+-------------+-------+----------+  +----------+-----------+
-| 1           | Alice | 400001   |  | 400001   | Mumbai    |
-| 2           | Bob   | 400001   |  +----------+-----------+
-+-------------+-------+----------+
+-- Good comment (explains the business reason):
+-- Include inactive users because billing still applies during grace period
+SELECT * FROM users WHERE status IN ('active', 'grace_period');
+
+-- ✅ Document complex logic
+/*
+  Calculates LTV (Lifetime Value) using 12-month revenue window.
+  Users with < 3 orders are excluded as insufficient data.
+  Formula: SUM(order_total) / months_since_first_order
+*/
+WITH ltv_base AS (
+  SELECT customer_id, ...
 ```
 
-## Relationships
+## SQL Formatting Conventions
 
-### One-to-Many (most common)
+Well-formatted SQL is much easier to read, debug, and maintain. These conventions are widely used in professional settings.
 
-One user can have many orders.
+### Capitalization
 
 ```sql
-CREATE TABLE users (
-  id   SERIAL PRIMARY KEY,
-  name VARCHAR(100)
-);
+-- SQL keywords in UPPERCASE (common convention)
+SELECT name, email
+FROM users
+WHERE status = 'active'
+ORDER BY name;
 
-CREATE TABLE orders (
-  id          SERIAL PRIMARY KEY,
-  customer_id INT REFERENCES users(id),  -- foreign key
-  amount      DECIMAL(10, 2),
-  order_date  DATE
-);
+-- Some teams prefer lowercase keywords (also valid)
+select name, email
+from users
+where status = 'active'
+order by name;
 ```
 
-### Many-to-Many
+Most teams use UPPERCASE for SQL keywords. Be consistent within a project.
 
-A student can enroll in many courses; a course can have many students.
+### One Clause Per Line
 
 ```sql
--- Requires a junction/bridge table
-CREATE TABLE students (id SERIAL PRIMARY KEY, name VARCHAR(100));
-CREATE TABLE courses  (id SERIAL PRIMARY KEY, name VARCHAR(100));
+-- ❌ Hard to read
+SELECT name, email, city FROM users WHERE status = 'active' AND age > 18 ORDER BY name LIMIT 10;
 
-CREATE TABLE enrollments (
-  student_id INT REFERENCES students(id),
-  course_id  INT REFERENCES courses(id),
-  enrolled_at DATE,
-  PRIMARY KEY (student_id, course_id)  -- composite PK
-);
+-- ✅ Easy to read
+SELECT name, email, city
+FROM users
+WHERE status = 'active'
+  AND age > 18
+ORDER BY name
+LIMIT 10;
 ```
 
-### One-to-One
-
-A user has exactly one profile.
+### Indent Column Lists
 
 ```sql
-CREATE TABLE users   (id SERIAL PRIMARY KEY, email VARCHAR(100));
-CREATE TABLE profiles (
-  user_id   INT PRIMARY KEY REFERENCES users(id),  -- also FK
-  bio       TEXT,
-  avatar_url VARCHAR(255)
-);
+-- ✅ Aligned columns - easy to add/remove/comment out
+SELECT
+  id,
+  name,
+  email,
+  city,
+  created_at
+FROM users;
+
+-- ✅ Align aliases for readability
+SELECT
+  u.id                AS user_id,
+  u.name              AS customer_name,
+  u.email             AS contact_email,
+  COUNT(o.id)         AS order_count,
+  SUM(o.total)        AS lifetime_value,
+  MAX(o.created_at)   AS last_order_date
+FROM users u
+LEFT JOIN orders o ON u.id = o.customer_id
+GROUP BY u.id, u.name, u.email;
 ```
 
-## Primary Keys and Foreign Keys
+### Indent Subqueries and CTEs
 
 ```sql
-CREATE TABLE orders (
-  id          SERIAL PRIMARY KEY,
-  customer_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  product_id  INT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
-  amount      DECIMAL(10, 2) NOT NULL CHECK (amount > 0),
-  status      VARCHAR(20) DEFAULT 'pending',
-  created_at  TIMESTAMP DEFAULT NOW()
-);
+-- ✅ Clearly nested structure
+SELECT *
+FROM (
+  SELECT
+    customer_id,
+    SUM(total) AS total_spent
+  FROM orders
+  WHERE status = 'completed'
+  GROUP BY customer_id
+) AS spending
+WHERE total_spent > 10000;
+
+-- ✅ CTEs - each one clearly separated
+WITH active_users AS (
+  SELECT id, name
+  FROM users
+  WHERE status = 'active'
+),
+user_orders AS (
+  SELECT customer_id, COUNT(*) AS order_count
+  FROM orders
+  GROUP BY customer_id
+)
+SELECT
+  u.name,
+  COALESCE(uo.order_count, 0) AS orders
+FROM active_users u
+LEFT JOIN user_orders uo ON u.id = uo.customer_id;
 ```
 
-### ON DELETE behaviors:
-| Option | Behavior |
-|--------|----------|
-| `CASCADE` | Delete child rows when parent is deleted |
-| `RESTRICT` | Prevent deletion if child rows exist |
-| `SET NULL` | Set FK to NULL when parent is deleted |
-| `SET DEFAULT` | Set FK to default value |
-
-## Data Types (PostgreSQL)
+### Trailing vs Leading Commas
 
 ```sql
--- Common data types
-id          SERIAL / BIGSERIAL     -- auto-incrementing integer
-name        VARCHAR(100)           -- variable-length string
-bio         TEXT                   -- unlimited string
-price       DECIMAL(10, 2)         -- exact decimal (10 digits, 2 after point)
-is_active   BOOLEAN                -- true/false
-created_at  TIMESTAMP              -- date and time
-birth_date  DATE                   -- date only
-metadata    JSONB                  -- JSON (binary, indexed)
-tags        TEXT[]                 -- array of text
-user_id     UUID                   -- universally unique identifier
+-- Trailing commas (more common)
+SELECT
+  name,
+  email,
+  city
+FROM users;
+
+-- Leading commas (easier to comment out a line)
+SELECT
+   name
+  ,email
+  ,city
+FROM users;
 ```
 
-## Constraints
+Both are valid - just be consistent. Most style guides use trailing commas.
+
+### JOIN Formatting
 
 ```sql
-CREATE TABLE products (
-  id          SERIAL PRIMARY KEY,
-  name        VARCHAR(200) NOT NULL,
-  sku         VARCHAR(50)  UNIQUE NOT NULL,
-  price       DECIMAL(10, 2) CHECK (price >= 0),
-  category_id INT NOT NULL REFERENCES categories(id),
-  stock       INT DEFAULT 0 CHECK (stock >= 0),
-  created_at  TIMESTAMP DEFAULT NOW()
-);
+-- ✅ Each JOIN on its own line, condition indented
+SELECT
+  u.name,
+  p.name AS product,
+  o.total,
+  o.created_at
+FROM orders o
+  JOIN users    u  ON o.customer_id = u.id
+  JOIN products p  ON o.product_id  = p.id
+WHERE o.status = 'completed'
+  AND o.created_at >= '2024-01-01';
 ```
 
-| Constraint | Purpose |
-|-----------|---------|
-| `PRIMARY KEY` | Unique identifier, not null |
-| `FOREIGN KEY` | Link to another table |
-| `UNIQUE` | No duplicate values |
-| `NOT NULL` | Value is required |
-| `CHECK` | Custom validation rule |
-| `DEFAULT` | Default value if not provided |
-
-## Denormalization
-
-Sometimes you intentionally break normalization rules for performance.
+### WHERE Conditions
 
 ```sql
--- Normalized: requires JOIN to get category name
-SELECT p.name, c.name AS category
-FROM products p JOIN categories c ON p.category_id = c.id;
-
--- Denormalized: store category_name directly on product
--- Faster reads, but category_name can become stale
-SELECT name, category_name FROM products;
+-- ✅ Each condition on its own line, AND/OR at the start
+SELECT *
+FROM users
+WHERE status = 'active'
+  AND age BETWEEN 18 AND 35
+  AND city IN ('Mumbai', 'Delhi')
+  AND email IS NOT NULL;
 ```
 
-Denormalization is appropriate for:
-- Read-heavy tables where joins are too expensive
-- Analytics / reporting tables (data warehouses)
-- Caching frequently needed data
+## SQL Formatting Tools
 
-## Full Schema Example
+In real projects, use a formatter:
+
+- **pgFormatter** - online and CLI tool for PostgreSQL
+- **SQLFluff** - linter and auto-formatter, supports many dialects
+- **Prettier (with SQL plugin)** - for teams using Prettier
+- Most SQL IDEs (DataGrip, DBeaver) have built-in formatters
+
+## Naming Conventions
 
 ```sql
--- E-commerce schema
-CREATE TABLE users (
-  id         BIGSERIAL PRIMARY KEY,
-  email      VARCHAR(255) UNIQUE NOT NULL,
-  name       VARCHAR(100) NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
-);
+-- Tables: plural snake_case
+users, order_items, product_categories
 
-CREATE TABLE categories (
-  id   SERIAL PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
-  slug VARCHAR(100) UNIQUE NOT NULL
-);
+-- Columns: singular snake_case
+user_id, first_name, created_at, is_active
 
-CREATE TABLE products (
-  id          BIGSERIAL PRIMARY KEY,
-  name        VARCHAR(200) NOT NULL,
-  description TEXT,
-  price       DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
-  stock       INT NOT NULL DEFAULT 0,
-  category_id INT REFERENCES categories(id),
-  created_at  TIMESTAMP DEFAULT NOW()
-);
+-- Indexes: descriptive, include table and column
+idx_users_email
+idx_orders_customer_created
 
-CREATE TABLE orders (
-  id          BIGSERIAL PRIMARY KEY,
-  customer_id BIGINT NOT NULL REFERENCES users(id),
-  total       DECIMAL(10, 2) NOT NULL,
-  status      VARCHAR(20) DEFAULT 'pending',
-  created_at  TIMESTAMP DEFAULT NOW()
-);
+-- Constraints: prefix by type
+pk_users       -- primary key
+fk_orders_user -- foreign key
+uq_users_email -- unique
+chk_age_range  -- check
+```
 
-CREATE TABLE order_items (
-  id         BIGSERIAL PRIMARY KEY,
-  order_id   BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  product_id BIGINT NOT NULL REFERENCES products(id),
-  quantity   INT NOT NULL CHECK (quantity > 0),
-  unit_price DECIMAL(10, 2) NOT NULL
-);
+## A Well-Formatted Real Query
 
--- Indexes for common queries
-CREATE INDEX idx_orders_customer ON orders(customer_id);
-CREATE INDEX idx_order_items_order ON order_items(order_id);
-CREATE INDEX idx_products_category ON products(category_id);
+```sql
+/*
+  Monthly revenue report
+  - Only completed orders
+  - Grouped by month
+  - Last 12 months only
+*/
+SELECT
+  DATE_TRUNC('month', o.created_at)::DATE   AS month,
+  COUNT(DISTINCT o.id)                       AS total_orders,
+  COUNT(DISTINCT o.customer_id)              AS unique_customers,
+  SUM(o.total)                               AS revenue,
+  ROUND(AVG(o.total), 2)                     AS avg_order_value,
+  SUM(o.total) - LAG(SUM(o.total)) OVER (
+    ORDER BY DATE_TRUNC('month', o.created_at)
+  )                                          AS revenue_change
+FROM orders o
+WHERE
+  o.status = 'completed'
+  AND o.created_at >= NOW() - INTERVAL '12 months'
+GROUP BY DATE_TRUNC('month', o.created_at)
+ORDER BY month DESC;
 ```
 
 ## Summary
 
-- Normalization reduces redundancy and prevents data anomalies
-- **1NF** — atomic values, no repeating groups
-- **2NF** — no partial dependencies on composite keys
-- **3NF** — no transitive dependencies
-- Relationships: one-to-many, many-to-many (junction table), one-to-one
-- Use foreign keys and constraints to enforce data integrity
-- Denormalize intentionally for performance when needed
+- Use `--` for single-line comments and `/* */` for multi-line
+- Comment the WHY, not the WHAT - SQL is self-documenting for the what
+- Put each SQL clause on its own line
+- Indent column lists and subqueries
+- Use UPPERCASE for SQL keywords (standard convention)
+- Align column aliases for long SELECT lists
+- Consistent formatting makes SQL easier to review, debug, and maintain

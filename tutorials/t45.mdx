@@ -1,0 +1,160 @@
+## Partitioning
+
+Partitioning splits a single large table into smaller physical pieces (partitions) while presenting them as one logical table. Queries that filter by the partition key only scan relevant partitions - dramatically reducing I/O.
+
+```
+orders table (logical - one table to query)
+├── orders_2022  (physical partition - Jan-Dec 2022)
+├── orders_2023  (physical partition - Jan-Dec 2023)
+├── orders_2024  (physical partition - Jan-Dec 2024)
+└── orders_default (catch-all)
+
+Query: SELECT * FROM orders WHERE created_at >= '2024-01-01'
+→ Scans only orders_2024 - skips 3 years of data!
+```
+
+## Range Partitioning (Most Common)
+
+```sql
+CREATE TABLE orders (
+  id          BIGSERIAL,
+  customer_id BIGINT,
+  total       DECIMAL(10,2),
+  created_at  TIMESTAMPTZ NOT NULL
+) PARTITION BY RANGE (created_at);
+
+-- Create partitions (one per year)
+CREATE TABLE orders_2023 PARTITION OF orders
+  FOR VALUES FROM ('2023-01-01') TO ('2024-01-01');
+
+CREATE TABLE orders_2024 PARTITION OF orders
+  FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
+
+CREATE TABLE orders_2025 PARTITION OF orders
+  FOR VALUES FROM ('2025-01-01') TO ('2026-01-01');
+
+-- Indexes on each partition
+CREATE INDEX ON orders_2024 (customer_id);
+CREATE INDEX ON orders_2025 (customer_id);
+```
+
+## List Partitioning
+
+Partition by a discrete set of values:
+
+```sql
+CREATE TABLE users (
+  id     BIGSERIAL,
+  name   VARCHAR(100),
+  region VARCHAR(50) NOT NULL
+) PARTITION BY LIST (region);
+
+CREATE TABLE users_india PARTITION OF users
+  FOR VALUES IN ('Mumbai', 'Delhi', 'Bangalore', 'Pune');
+
+CREATE TABLE users_us PARTITION OF users
+  FOR VALUES IN ('New York', 'San Francisco', 'Chicago');
+
+CREATE TABLE users_eu PARTITION OF users
+  FOR VALUES IN ('London', 'Berlin', 'Paris');
+```
+
+## Hash Partitioning
+
+Distributes rows evenly across N partitions using a hash function - useful when there's no natural range:
+
+```sql
+CREATE TABLE events (
+  id      BIGSERIAL,
+  user_id BIGINT,
+  type    VARCHAR(50),
+  created_at TIMESTAMPTZ
+) PARTITION BY HASH (user_id);
+
+CREATE TABLE events_0 PARTITION OF events FOR VALUES WITH (MODULUS 4, REMAINDER 0);
+CREATE TABLE events_1 PARTITION OF events FOR VALUES WITH (MODULUS 4, REMAINDER 1);
+CREATE TABLE events_2 PARTITION OF events FOR VALUES WITH (MODULUS 4, REMAINDER 2);
+CREATE TABLE events_3 PARTITION OF events FOR VALUES WITH (MODULUS 4, REMAINDER 3);
+```
+
+## Partition Management
+
+```sql
+-- Add a new year's partition
+CREATE TABLE orders_2026 PARTITION OF orders
+  FOR VALUES FROM ('2026-01-01') TO ('2027-01-01');
+
+-- Archive: detach old partition (instant - no data moved)
+ALTER TABLE orders DETACH PARTITION orders_2021;
+-- orders_2021 still exists as a standalone table
+
+-- Drop old partition (instant vs slow DELETE)
+DROP TABLE orders_2021;
+-- Much faster than: DELETE FROM orders WHERE created_at < '2022-01-01';
+
+-- Check partition sizes
+SELECT
+  child.relname  AS partition,
+  pg_size_pretty(pg_relation_size(child.oid)) AS size
+FROM pg_inherits
+JOIN pg_class parent ON pg_inherits.inhparent = parent.oid
+JOIN pg_class child  ON pg_inherits.inhrelid  = child.oid
+WHERE parent.relname = 'orders'
+ORDER BY pg_relation_size(child.oid) DESC;
+```
+
+## Partition Pruning - The Key Benefit
+
+```sql
+-- Always include the partition key in WHERE for pruning to work:
+SELECT * FROM orders WHERE created_at >= '2024-01-01';
+-- ✅ Scans only relevant partitions
+
+SELECT * FROM orders WHERE customer_id = 101;
+-- ❌ Scans ALL partitions (customer_id is not the partition key)
+
+-- Verify pruning with EXPLAIN
+EXPLAIN SELECT * FROM orders WHERE created_at = '2024-06-15';
+-- Should show: "Partitions: orders_2024" (not all partitions)
+```
+
+## Sharding
+
+Sharding splits data across multiple database servers (horizontal scaling). Unlike partitioning (one server, multiple files), sharding means multiple independent databases.
+
+```
+Shard 1 (DB Server 1): users with id 1 to 1,000,000
+Shard 2 (DB Server 2): users with id 1,000,001 to 2,000,000
+Shard 3 (DB Server 3): users with id 2,000,001 to 3,000,000
+```
+
+**Shard key selection:**
+- High cardinality (many distinct values)
+- Avoid hot spots (don't shard by date - all writes go to today's shard)
+- Common choices: user_id, tenant_id, geographic region
+
+**Trade-offs:**
+- Cross-shard queries are expensive or impossible
+- Transactions across shards require distributed transaction protocols
+- Schema changes must be applied to every shard
+
+## Partitioning vs Sharding
+
+| | Partitioning | Sharding |
+|-|-------------|---------|
+| Servers | One database server | Multiple database servers |
+| Transparency | Fully transparent | Application must route queries |
+| Cross-partition queries | ✅ Possible (planner handles) | ❌ Complex, expensive |
+| Scale type | Vertical (bigger server) | Horizontal (more servers) |
+| Complexity | Low | High |
+| Use when | Table > 100M rows | Single server maxed out |
+
+## Summary
+
+- Partitioning splits one large table into smaller physical pieces on one server
+- Range: by date ranges - best for time-series data
+- List: by discrete values - best for regions, categories
+- Hash: even distribution - best when no natural range or list exists
+- Always include the partition key in WHERE for partition pruning
+- Drop old partitions instantly instead of slow DELETE
+- Sharding = multiple database servers - much more complex, use only when one server isn't enough

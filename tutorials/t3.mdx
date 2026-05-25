@@ -1,201 +1,302 @@
-## ORDER BY
+## DDL - Data Definition Language
 
-`ORDER BY` sorts the result set by one or more columns.
+DDL commands define and manage the **structure** of your database - the tables, columns, indexes, and constraints. They don't touch the data itself; they define the containers that hold it.
 
-```sql
--- Sort users by age ascending (default)
-SELECT * FROM users ORDER BY age;
+| Command | Purpose |
+|---------|---------|
+| `CREATE` | Build a new database object |
+| `ALTER` | Modify an existing object |
+| `DROP` | Permanently delete an object |
+| `TRUNCATE` | Remove all rows (keep structure) |
+| `RENAME` | Rename an object |
 
--- Sort users by age descending
-SELECT * FROM users ORDER BY age DESC;
-
--- Sort users by name ascending
-SELECT * FROM users ORDER BY name ASC;
-```
-
-## ASC vs DESC
-
-| Keyword | Meaning | Default? |
-|---------|---------|---------|
-| `ASC` | Ascending (A→Z, 0→9, oldest→newest) | Yes |
-| `DESC` | Descending (Z→A, 9→0, newest→oldest) | No |
+## CREATE DATABASE
 
 ```sql
--- Most recent orders first
-SELECT * FROM orders ORDER BY order_date DESC;
+-- Basic
+CREATE DATABASE myapp;
 
--- Highest salary first
-SELECT * FROM employees ORDER BY salary DESC;
+-- PostgreSQL with options
+CREATE DATABASE myapp
+  ENCODING = 'UTF8'
+  LC_COLLATE = 'en_US.UTF-8';
+
+-- Only create if it doesn't exist (MySQL)
+CREATE DATABASE IF NOT EXISTS myapp;
 ```
 
-## Sorting by Multiple Columns
-
-You can sort by multiple columns. The second column is used as a tiebreaker when the first column has equal values.
+## CREATE TABLE
 
 ```sql
--- Sort by city ASC, then by age DESC within each city
-SELECT name, city, age
-FROM users
-ORDER BY city ASC, age DESC;
+-- Full syntax
+CREATE TABLE users (
+  id         BIGSERIAL PRIMARY KEY,
+  email      VARCHAR(255) UNIQUE NOT NULL,
+  name       VARCHAR(100) NOT NULL,
+  age        INT CHECK (age >= 0 AND age <= 150),
+  city       VARCHAR(100),
+  status     VARCHAR(20) DEFAULT 'active',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
-Result:
-```
-+----------+-----------+-----+
-| name     | city      | age |
-+----------+-----------+-----+
-| Rahul    | Delhi     | 35  |
-| Priya    | Delhi     | 28  |
-| Amit     | Mumbai    | 42  |
-| Sneha    | Mumbai    | 31  |
-| Kiran    | Pune      | 25  |
-+----------+-----------+-----+
-```
-
-## Sorting by Column Position
-
-You can reference columns by their position number in the SELECT list.
+### Constraints Inline vs Table-Level
 
 ```sql
--- Same as ORDER BY name ASC, age DESC
-SELECT name, age, city FROM users ORDER BY 1 ASC, 2 DESC;
+-- Inline constraint (attached to one column)
+CREATE TABLE orders (
+  id          BIGSERIAL PRIMARY KEY,
+  customer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  total       DECIMAL(10,2) CHECK (total >= 0)
+);
+
+-- Table-level constraint (can span multiple columns)
+CREATE TABLE order_items (
+  order_id   BIGINT,
+  product_id BIGINT,
+  quantity   INT NOT NULL CHECK (quantity > 0),
+
+  PRIMARY KEY (order_id, product_id),                     -- composite PK
+  FOREIGN KEY (order_id)   REFERENCES orders(id),
+  FOREIGN KEY (product_id) REFERENCES products(id),
+  UNIQUE (order_id, product_id)
+);
 ```
 
-> **Tip:** Avoid this in production code — it's fragile if column order changes.
-
-## Sorting with NULL Values
-
-By default:
-- In **PostgreSQL** — NULLs appear last in ASC, first in DESC
-- In **MySQL** — NULLs appear first in ASC, last in DESC
-
-You can control this in PostgreSQL:
+### ON DELETE Behaviors
 
 ```sql
--- NULLs last in descending order
-SELECT * FROM users ORDER BY age DESC NULLS LAST;
+-- CASCADE: delete children when parent is deleted
+customer_id BIGINT REFERENCES users(id) ON DELETE CASCADE
 
--- NULLs first in ascending order
-SELECT * FROM users ORDER BY age ASC NULLS FIRST;
+-- RESTRICT: prevent deletion if children exist (default)
+product_id BIGINT REFERENCES products(id) ON DELETE RESTRICT
+
+-- SET NULL: set FK to NULL when parent is deleted
+category_id INT REFERENCES categories(id) ON DELETE SET NULL
+
+-- SET DEFAULT: set FK to its default value
+status_id INT DEFAULT 1 REFERENCES statuses(id) ON DELETE SET DEFAULT
 ```
 
-## LIMIT
-
-`LIMIT` restricts how many rows are returned. Essential for performance and pagination.
+### CREATE TABLE AS (Copy)
 
 ```sql
--- Return only the first 5 users
-SELECT * FROM users LIMIT 5;
+-- Copy structure AND data
+CREATE TABLE orders_backup AS SELECT * FROM orders;
 
--- Top 10 highest-paid employees
-SELECT name, salary FROM employees
-ORDER BY salary DESC
-LIMIT 10;
+-- Copy structure only (no rows)
+CREATE TABLE orders_backup AS SELECT * FROM orders WHERE 1 = 0;
+
+-- Copy with transformation
+CREATE TABLE customer_revenue AS
+SELECT customer_id, SUM(total) AS revenue FROM orders GROUP BY customer_id;
 ```
 
-## OFFSET
-
-`OFFSET` skips a number of rows before starting to return results. Used together with `LIMIT` for pagination.
+### Temporary Tables
 
 ```sql
--- Skip first 10 rows, return next 10 (page 2)
-SELECT * FROM users
-ORDER BY id
-LIMIT 10 OFFSET 10;
+-- Exists only for the current session, auto-dropped on disconnect
+CREATE TEMPORARY TABLE temp_results (
+  id    INT,
+  score DECIMAL(5, 2)
+);
 
--- Page 3 (rows 21-30)
-SELECT * FROM users
-ORDER BY id
-LIMIT 10 OFFSET 20;
+INSERT INTO temp_results VALUES (1, 95.5), (2, 87.0);
+SELECT * FROM temp_results;
+-- Table is gone after session ends
 ```
 
-## Pagination Formula
+## ALTER TABLE
 
-```
-OFFSET = (page_number - 1) * page_size
-```
+### Add Columns
 
 ```sql
--- Page 1: LIMIT 10 OFFSET 0
--- Page 2: LIMIT 10 OFFSET 10
--- Page 3: LIMIT 10 OFFSET 20
--- Page N: LIMIT 10 OFFSET (N-1)*10
+-- Add a single column
+ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+
+-- Add with default and constraint
+ALTER TABLE users
+  ADD COLUMN is_verified BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Add multiple columns at once
+ALTER TABLE users
+  ADD COLUMN phone      VARCHAR(20),
+  ADD COLUMN avatar_url TEXT,
+  ADD COLUMN last_login TIMESTAMPTZ;
 ```
 
-## FETCH (SQL Standard Alternative to LIMIT)
-
-Some databases (PostgreSQL, SQL Server) support the SQL standard syntax:
+### Modify Columns
 
 ```sql
--- PostgreSQL / SQL Server
-SELECT * FROM users
-ORDER BY id
-FETCH FIRST 10 ROWS ONLY;
+-- PostgreSQL: change data type
+ALTER TABLE users ALTER COLUMN age TYPE BIGINT;
 
--- With offset
-SELECT * FROM users
-ORDER BY id
-OFFSET 10 ROWS
-FETCH NEXT 10 ROWS ONLY;
+-- Set a default
+ALTER TABLE users ALTER COLUMN status SET DEFAULT 'active';
+ALTER TABLE users ALTER COLUMN status DROP DEFAULT;
+
+-- Add/remove NOT NULL
+ALTER TABLE users ALTER COLUMN email SET NOT NULL;
+ALTER TABLE users ALTER COLUMN phone DROP NOT NULL;
+
+-- MySQL: MODIFY replaces all column attributes
+ALTER TABLE users MODIFY COLUMN age BIGINT NOT NULL DEFAULT 0;
 ```
 
-## TOP (SQL Server / MS Access)
+### Rename
 
 ```sql
--- SQL Server syntax
-SELECT TOP 10 * FROM users ORDER BY salary DESC;
+-- Rename a column (PostgreSQL / MySQL 8+)
+ALTER TABLE users RENAME COLUMN name TO full_name;
+
+-- Rename a table
+ALTER TABLE users RENAME TO app_users;
+
+-- MySQL alternative
+RENAME TABLE users TO app_users;
 ```
 
-## Real World Examples
+### Drop Columns
 
 ```sql
--- Latest 5 orders for a specific customer
-SELECT order_id, product, amount, order_date
-FROM orders
-WHERE customer_id = 101
-ORDER BY order_date DESC
-LIMIT 5;
+-- Drop a column
+ALTER TABLE users DROP COLUMN phone;
 
--- Leaderboard: Top 3 users by score
-SELECT name, score
-FROM game_scores
-ORDER BY score DESC
-LIMIT 3;
+-- Safe drop (no error if it doesn't exist)
+ALTER TABLE users DROP COLUMN IF EXISTS phone;
 
--- Products page 3 (10 per page), sorted by price
-SELECT product_name, price
-FROM products
-ORDER BY price ASC
-LIMIT 10 OFFSET 20;
+-- Drop with cascade (removes dependent views/indexes)
+ALTER TABLE users DROP COLUMN status CASCADE;
 ```
 
-## ORDER BY with WHERE
-
-The full query clause order is:
+### Add / Drop Constraints
 
 ```sql
-SELECT columns
-FROM table
-WHERE conditions
-ORDER BY column ASC/DESC
-LIMIT n
-OFFSET n;
+-- Add a named constraint
+ALTER TABLE users ADD CONSTRAINT chk_age CHECK (age >= 0 AND age <= 150);
+ALTER TABLE users ADD CONSTRAINT uq_email UNIQUE (email);
+ALTER TABLE orders ADD CONSTRAINT fk_customer
+  FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE CASCADE;
+
+-- Drop a constraint by name
+ALTER TABLE users DROP CONSTRAINT chk_age;
+ALTER TABLE users DROP CONSTRAINT uq_email;
 ```
 
+## DROP
+
 ```sql
--- Active users from Mumbai, sorted by name, first 20
-SELECT name, email
-FROM users
-WHERE status = 'active' AND city = 'Mumbai'
-ORDER BY name ASC
-LIMIT 20;
+-- Drop a table (permanent - cannot undo!)
+DROP TABLE orders;
+
+-- Safe drop (no error if it doesn't exist)
+DROP TABLE IF EXISTS orders;
+
+-- Drop multiple tables at once
+DROP TABLE IF EXISTS order_items, orders, products;
+
+-- CASCADE: also drops objects that depend on it (views, FK constraints)
+DROP TABLE users CASCADE;
+
+-- Drop a database
+DROP DATABASE myapp;
+DROP DATABASE IF EXISTS myapp;
+```
+
+> **Warning:** `DROP TABLE` is immediate and permanent in most databases. Always double-check the table name - especially on production.
+
+## TRUNCATE
+
+```sql
+-- Remove ALL rows, keep the table structure
+TRUNCATE TABLE logs;
+
+-- Reset auto-increment counter too
+TRUNCATE TABLE users RESTART IDENTITY;
+
+-- With cascade (also truncates tables with FK references)
+TRUNCATE TABLE users CASCADE;
+
+-- Truncate multiple tables
+TRUNCATE TABLE order_items, orders;
+```
+
+### DELETE vs TRUNCATE vs DROP
+
+| | DELETE | TRUNCATE | DROP |
+|-|--------|----------|------|
+| Removes rows | ✅ (with WHERE) | ✅ (all rows) | ✅ (with table) |
+| Keeps table structure | ✅ | ✅ | ❌ |
+| Can use WHERE | ✅ | ❌ | ❌ |
+| Rollback possible | ✅ | ❌ (mostly) | ❌ |
+| Resets auto-increment | ❌ | ✅ | - |
+| Speed on 10M rows | Slow | Fast | Instant |
+| Fires triggers | ✅ | ❌ | ❌ |
+
+## Practical: Full E-Commerce Schema
+
+```sql
+-- Step 1: Categories
+CREATE TABLE categories (
+  id   SERIAL PRIMARY KEY,
+  name VARCHAR(100) UNIQUE NOT NULL,
+  slug VARCHAR(100) UNIQUE NOT NULL
+);
+
+-- Step 2: Products
+CREATE TABLE products (
+  id          BIGSERIAL PRIMARY KEY,
+  name        VARCHAR(200) NOT NULL,
+  slug        VARCHAR(200) UNIQUE NOT NULL,
+  price       DECIMAL(10,2) NOT NULL CHECK (price >= 0),
+  stock       INT NOT NULL DEFAULT 0 CHECK (stock >= 0),
+  category_id INT REFERENCES categories(id) ON DELETE SET NULL,
+  is_active   BOOLEAN DEFAULT TRUE,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Step 3: Users
+CREATE TABLE users (
+  id         BIGSERIAL PRIMARY KEY,
+  email      VARCHAR(255) UNIQUE NOT NULL,
+  name       VARCHAR(100) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Step 4: Orders
+CREATE TABLE orders (
+  id          BIGSERIAL PRIMARY KEY,
+  customer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  total       DECIMAL(10,2) NOT NULL CHECK (total >= 0),
+  status      VARCHAR(20) DEFAULT 'pending',
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Step 5: Order Items (many-to-many junction)
+CREATE TABLE order_items (
+  id         BIGSERIAL PRIMARY KEY,
+  order_id   BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  quantity   INT NOT NULL CHECK (quantity > 0),
+  unit_price DECIMAL(10,2) NOT NULL,
+  UNIQUE (order_id, product_id)
+);
+
+-- Step 6: Indexes for performance
+CREATE INDEX idx_products_category  ON products(category_id);
+CREATE INDEX idx_orders_customer    ON orders(customer_id);
+CREATE INDEX idx_orders_status      ON orders(status) WHERE status = 'pending';
+CREATE INDEX idx_order_items_order  ON order_items(order_id);
 ```
 
 ## Summary
 
-- `ORDER BY col ASC` — sort ascending (default)
-- `ORDER BY col DESC` — sort descending
-- Multiple columns — secondary sort as tiebreaker
-- `LIMIT n` — return only n rows
-- `OFFSET n` — skip n rows (for pagination)
-- Pagination formula: `OFFSET = (page - 1) * page_size`
+- `CREATE TABLE` - define columns, types, and constraints upfront
+- `ALTER TABLE` - add/modify/drop columns and constraints without recreating the table
+- `DROP TABLE` - permanent deletion, use `IF EXISTS` to avoid errors
+- `TRUNCATE` - fastest way to empty a table (much faster than `DELETE` on large tables)
+- Always create tables in dependency order: referenced tables before referencing tables
+- Use `ON DELETE CASCADE` for child records that shouldn't outlive their parent
+- DDL changes are auto-committed - no rollback, so test on dev first

@@ -1,0 +1,198 @@
+## Why JSON in SQL?
+
+Sometimes data doesn't fit neatly into columns - user preferences, product attributes, API responses, event metadata. JSON columns let you store flexible data alongside structured relational data.
+
+```sql
+-- Instead of 10 nullable columns for rarely-used attributes:
+ALTER TABLE products ADD COLUMN attributes JSONB;
+-- Now store any attributes: {"color": "red", "weight": "2kg", "warranty": "1year"}
+```
+
+## JSONB vs JSON (PostgreSQL)
+
+| | JSON | JSONB |
+|-|------|-------|
+| Storage | Text (as-is) | Binary (parsed, compressed) |
+| Indexing | ❌ No | ✅ Yes (GIN index) |
+| Query speed | Slower (re-parse each time) | Faster |
+| Key order preserved | ✅ Yes | ❌ No |
+| Duplicate keys | ✅ Kept | ❌ Last wins |
+
+**Always use JSONB.** JSON is rarely the right choice.
+
+## Inserting JSON Data
+
+```sql
+-- Insert a JSONB column
+INSERT INTO users (name, settings) VALUES
+('Alice', '{"theme": "dark", "lang": "en", "notifications": true}'),
+('Bob',   '{"theme": "light", "lang": "hi", "notifications": false, "timezone": "Asia/Kolkata"}');
+
+-- Or use jsonb_build_object
+INSERT INTO products (name, attributes) VALUES (
+  'Laptop',
+  jsonb_build_object(
+    'brand', 'Dell',
+    'ram_gb', 16,
+    'storage_gb', 512,
+    'color', 'silver',
+    'tags', ARRAY['laptop', 'electronics']
+  )
+);
+```
+
+## Querying JSON Fields
+
+```sql
+-- -> returns JSON value (keeps JSON type)
+SELECT settings -> 'theme' FROM users;           -- "dark" (with quotes - JSON string)
+
+-- ->> returns text value (extracts as text)
+SELECT settings ->> 'theme' FROM users;          -- dark (no quotes - plain text)
+
+-- Nested access
+SELECT settings -> 'address' ->> 'city' FROM users;
+
+-- In WHERE clause
+SELECT * FROM users WHERE settings ->> 'theme' = 'dark';
+SELECT * FROM users WHERE settings -> 'notifications' = 'true';
+
+-- Existence operator: does key exist?
+SELECT * FROM users WHERE settings ? 'timezone';
+
+-- Contains operator: does JSON contain this subset?
+SELECT * FROM users WHERE settings @> '{"theme": "dark"}';
+SELECT * FROM products WHERE attributes @> '{"brand": "Dell"}';
+```
+
+## JSON Array Operations
+
+```sql
+-- Array of objects stored in JSONB
+INSERT INTO orders (customer_id, items) VALUES (
+  1,
+  '[{"product_id": 5, "qty": 2}, {"product_id": 8, "qty": 1}]'::JSONB
+);
+
+-- Get array element by index (0-based)
+SELECT items -> 0 FROM orders;                      -- {"product_id": 5, "qty": 2}
+SELECT items -> 0 ->> 'product_id' FROM orders;    -- "5"
+
+-- Array length
+SELECT jsonb_array_length(items) AS item_count FROM orders;
+
+-- Expand array to rows
+SELECT
+  order_id,
+  item ->> 'product_id' AS product_id,
+  item ->> 'qty' AS qty
+FROM orders,
+LATERAL jsonb_array_elements(items) AS item;
+```
+
+## Modifying JSON Data
+
+```sql
+-- Set a key (returns new JSONB - doesn't modify in place)
+SELECT settings || '{"theme": "blue"}' FROM users;    -- merge/override
+SELECT jsonb_set(settings, '{theme}', '"blue"') FROM users;
+
+-- Update in place
+UPDATE users
+SET settings = jsonb_set(settings, '{theme}', '"blue"')
+WHERE id = 1;
+
+-- Add a new key
+UPDATE users
+SET settings = settings || '{"premium": true}'::JSONB
+WHERE id = 1;
+
+-- Remove a key
+UPDATE users
+SET settings = settings - 'old_key'
+WHERE id = 1;
+```
+
+## Indexing JSON (GIN Index)
+
+```sql
+-- GIN index enables fast containment queries
+CREATE INDEX idx_users_settings ON users USING GIN (settings);
+
+-- These queries now use the index:
+SELECT * FROM users WHERE settings @> '{"theme": "dark"}';
+SELECT * FROM users WHERE settings ? 'timezone';
+
+-- Index a specific JSON path (for equality queries)
+CREATE INDEX idx_users_theme ON users ((settings ->> 'theme'));
+SELECT * FROM users WHERE settings ->> 'theme' = 'dark';  -- uses index
+```
+
+## Aggregating JSON
+
+```sql
+-- Aggregate rows into a JSON array
+SELECT jsonb_agg(jsonb_build_object('name', name, 'email', email))
+FROM users WHERE city = 'Mumbai';
+
+-- Aggregate rows into a JSON object (key-value pairs)
+SELECT jsonb_object_agg(id, name) FROM users;
+-- {"1": "Alice", "2": "Bob", ...}
+
+-- Build a nested JSON report
+SELECT jsonb_build_object(
+  'total_orders', COUNT(*),
+  'total_revenue', SUM(total),
+  'avg_order', ROUND(AVG(total), 2),
+  'by_status', jsonb_object_agg(status, status_count)
+) AS report
+FROM (
+  SELECT status, COUNT(*) AS status_count, SUM(total), AVG(total)
+  FROM orders GROUP BY status
+) t;
+```
+
+## MySQL JSON
+
+```sql
+-- MySQL 5.7+ has JSON support
+CREATE TABLE users (
+  id       INT AUTO_INCREMENT PRIMARY KEY,
+  name     VARCHAR(100),
+  settings JSON
+);
+
+-- Extract values
+SELECT JSON_EXTRACT(settings, '$.theme') FROM users;
+SELECT settings->>'$.theme' FROM users;   -- shorthand
+
+-- Modify
+UPDATE users SET settings = JSON_SET(settings, '$.theme', 'dark') WHERE id = 1;
+
+-- Check key existence
+SELECT * FROM users WHERE JSON_CONTAINS_PATH(settings, 'one', '$.timezone');
+```
+
+## When to Use JSON Columns
+
+**Good use cases:**
+- User preferences (rarely queried by specific keys, frequently read as whole object)
+- Product attributes (highly variable: electronics vs clothing)
+- API request/response logging
+- Event metadata (different fields per event type)
+- Feature flags
+
+**Bad use cases:**
+- Data you filter/sort by frequently (use a real column instead)
+- Data with strict schema requirements (use proper columns)
+- Relationships between entities (use a foreign key, not a JSON array of IDs)
+
+## Summary
+
+- Always use `JSONB` in PostgreSQL, not `JSON`
+- `->` extracts as JSON; `->>` extracts as text
+- `@>` containment: `settings @> '{"theme": "dark"}'`
+- `?` key existence: `settings ? 'timezone'`
+- GIN index on the entire column for containment queries; expression index on extracted field for equality
+- `jsonb_array_elements` expands a JSON array into rows
+- `jsonb_agg` and `jsonb_object_agg` aggregate rows into JSON

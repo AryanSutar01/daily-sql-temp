@@ -1,0 +1,142 @@
+## Set Operations
+
+Set operations combine the results of two or more SELECT queries into one result set. The queries must have:
+1. The same number of columns
+2. Compatible data types in corresponding columns
+
+| Operation | Returns |
+|-----------|---------|
+| `UNION` | All rows from both, duplicates removed |
+| `UNION ALL` | All rows from both, duplicates kept |
+| `INTERSECT` | Only rows that appear in BOTH |
+| `EXCEPT` / `MINUS` | Rows in first query but NOT in second |
+
+## UNION
+
+Stacks two result sets and removes duplicates:
+
+```sql
+-- All emails from both customers and newsletter subscribers (no duplicates)
+SELECT email, 'customer'    AS source FROM customers
+UNION
+SELECT email, 'newsletter'  AS source FROM newsletter_subscribers;
+```
+
+UNION internally sorts and deduplicates - this has a performance cost.
+
+## UNION ALL
+
+Stacks two result sets and KEEPS duplicates. Always faster than UNION:
+
+```sql
+-- All orders from 2023 and 2024 combined (no dedup needed)
+SELECT id, customer_id, total, created_at FROM orders_2023
+UNION ALL
+SELECT id, customer_id, total, created_at FROM orders_2024;
+```
+
+**When to use which:**
+- Use `UNION ALL` when you know there are no duplicates, or duplicates are acceptable
+- Use `UNION` only when deduplication is genuinely required
+- In practice, `UNION ALL` is almost always the right choice
+
+```sql
+-- Performance comparison:
+-- UNION ALL: stack and return → O(n)
+-- UNION:     stack, sort, deduplicate → O(n log n) minimum
+```
+
+## INTERSECT
+
+Returns only rows that appear in **both** result sets:
+
+```sql
+-- Users who are both customers AND newsletter subscribers
+SELECT email FROM customers
+INTERSECT
+SELECT email FROM newsletter_subscribers;
+
+-- Products ordered in both January AND February
+SELECT product_id FROM order_items oi
+JOIN orders o ON oi.order_id = o.id
+WHERE EXTRACT(MONTH FROM o.created_at) = 1
+INTERSECT
+SELECT product_id FROM order_items oi
+JOIN orders o ON oi.order_id = o.id
+WHERE EXTRACT(MONTH FROM o.created_at) = 2;
+```
+
+## EXCEPT (MINUS in Oracle)
+
+Returns rows from the first query that do **not** appear in the second:
+
+```sql
+-- Customers who have NOT subscribed to the newsletter
+SELECT email FROM customers
+EXCEPT
+SELECT email FROM newsletter_subscribers;
+
+-- Products that have NEVER been ordered
+SELECT id FROM products
+EXCEPT
+SELECT DISTINCT product_id FROM order_items;
+
+-- Users who were active last month but NOT this month (churned)
+SELECT user_id FROM user_activity WHERE month = '2024-05-01'
+EXCEPT
+SELECT user_id FROM user_activity WHERE month = '2024-06-01';
+```
+
+## Column Names Come from the First Query
+
+```sql
+-- The output column names are determined by the FIRST SELECT
+SELECT name AS customer_name, email FROM customers
+UNION ALL
+SELECT full_name, contact_email FROM vendors;
+-- Output columns: customer_name, email (from first query)
+```
+
+## ORDER BY with Set Operations
+
+`ORDER BY` applies to the final combined result, not individual queries:
+
+```sql
+SELECT email, 'customer' AS source FROM customers
+UNION ALL
+SELECT email, 'newsletter' AS source FROM newsletter_subscribers
+ORDER BY email ASC;  -- sorts the combined result
+```
+
+## Combining with CTEs
+
+```sql
+WITH customer_emails AS (SELECT email FROM customers),
+     newsletter_emails AS (SELECT email FROM newsletters)
+SELECT email FROM customer_emails
+EXCEPT
+SELECT email FROM newsletter_emails;
+```
+
+## Interview Questions
+
+**Q: What's the difference between UNION and UNION ALL?**
+UNION removes duplicates (slower). UNION ALL keeps all rows including duplicates (faster). Use UNION ALL unless deduplication is required.
+
+**Q: What's the difference between EXCEPT and NOT IN?**
+```sql
+-- These often return the same result:
+SELECT id FROM a EXCEPT SELECT id FROM b;
+SELECT id FROM a WHERE id NOT IN (SELECT id FROM b);
+
+-- But EXCEPT handles NULLs safely - if b has NULL ids,
+-- EXCEPT still works correctly, while NOT IN returns no rows
+```
+
+## Summary
+
+- Set operations combine two SELECT results with matching column counts and types
+- `UNION ALL` is faster than `UNION` - prefer it unless deduplication is needed
+- `INTERSECT` - rows in both sets
+- `EXCEPT` - rows in first set but not second (handles NULLs safely unlike NOT IN)
+- `ORDER BY` goes at the end and applies to the entire combined result

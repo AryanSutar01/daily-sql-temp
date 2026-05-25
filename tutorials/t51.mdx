@@ -1,0 +1,195 @@
+## Cohort Analysis
+
+A cohort is a group of users who share a common characteristic, typically their first activity date. Cohort analysis tracks what those users do over time.
+
+### Monthly Cohort Retention
+
+```sql
+WITH cohorts AS (
+  -- Each user's first purchase month = their cohort
+  SELECT
+    customer_id,
+    DATE_TRUNC('month', MIN(created_at))::DATE AS cohort_month
+  FROM orders
+  GROUP BY customer_id
+),
+activity AS (
+  -- All purchases with cohort info and relative month offset
+  SELECT
+    o.customer_id,
+    c.cohort_month,
+    DATE_TRUNC('month', o.created_at)::DATE AS order_month,
+    (
+      (DATE_PART('year', o.created_at) - DATE_PART('year', c.cohort_month)) * 12
+      + DATE_PART('month', o.created_at) - DATE_PART('month', c.cohort_month)
+    )::INT AS months_since_join
+  FROM orders o
+  JOIN cohorts c ON o.customer_id = c.customer_id
+)
+SELECT
+  cohort_month,
+  -- Month 0 = cohort size
+  COUNT(DISTINCT CASE WHEN months_since_join = 0 THEN customer_id END) AS m0,
+  COUNT(DISTINCT CASE WHEN months_since_join = 1 THEN customer_id END) AS m1,
+  COUNT(DISTINCT CASE WHEN months_since_join = 2 THEN customer_id END) AS m2,
+  COUNT(DISTINCT CASE WHEN months_since_join = 3 THEN customer_id END) AS m3,
+  COUNT(DISTINCT CASE WHEN months_since_join = 6 THEN customer_id END) AS m6,
+  COUNT(DISTINCT CASE WHEN months_since_join = 12 THEN customer_id END) AS m12
+FROM activity
+GROUP BY cohort_month
+ORDER BY cohort_month;
+```
+
+### Cohort Retention as Percentage
+
+```sql
+WITH cohort_data AS (
+  -- ... same as above ...
+  SELECT cohort_month,
+    COUNT(DISTINCT CASE WHEN months_since_join = 0  THEN customer_id END) AS m0,
+    COUNT(DISTINCT CASE WHEN months_since_join = 1  THEN customer_id END) AS m1,
+    COUNT(DISTINCT CASE WHEN months_since_join = 3  THEN customer_id END) AS m3,
+    COUNT(DISTINCT CASE WHEN months_since_join = 6  THEN customer_id END) AS m6,
+    COUNT(DISTINCT CASE WHEN months_since_join = 12 THEN customer_id END) AS m12
+  FROM activity
+  GROUP BY cohort_month
+)
+SELECT
+  cohort_month,
+  m0 AS cohort_size,
+  ROUND(m1  * 100.0 / NULLIF(m0, 0), 1) AS m1_retention_pct,
+  ROUND(m3  * 100.0 / NULLIF(m0, 0), 1) AS m3_retention_pct,
+  ROUND(m6  * 100.0 / NULLIF(m0, 0), 1) AS m6_retention_pct,
+  ROUND(m12 * 100.0 / NULLIF(m0, 0), 1) AS m12_retention_pct
+FROM cohort_data
+ORDER BY cohort_month;
+```
+
+## Funnel Analysis
+
+A funnel tracks how many users progress through a sequence of steps (e.g., visited → signed up → made first purchase).
+
+```sql
+-- E-commerce funnel: 5 steps
+WITH funnel AS (
+  SELECT
+    COUNT(DISTINCT user_id) FILTER (WHERE event_type = 'page_view')     AS step1_viewed,
+    COUNT(DISTINCT user_id) FILTER (WHERE event_type = 'add_to_cart')   AS step2_carted,
+    COUNT(DISTINCT user_id) FILTER (WHERE event_type = 'checkout_start') AS step3_checkout,
+    COUNT(DISTINCT user_id) FILTER (WHERE event_type = 'payment_info')   AS step4_payment,
+    COUNT(DISTINCT user_id) FILTER (WHERE event_type = 'purchase')       AS step5_purchased
+  FROM user_events
+  WHERE created_at >= NOW() - INTERVAL '30 days'
+)
+SELECT
+  'Step 1: Viewed'     AS step, step1_viewed AS users, 100.0 AS conversion_pct FROM funnel
+UNION ALL
+SELECT 'Step 2: Added to Cart', step2_carted,
+  ROUND(step2_carted * 100.0 / NULLIF(step1_viewed, 0), 1) FROM funnel
+UNION ALL
+SELECT 'Step 3: Started Checkout', step3_checkout,
+  ROUND(step3_checkout * 100.0 / NULLIF(step1_viewed, 0), 1) FROM funnel
+UNION ALL
+SELECT 'Step 4: Payment Info', step4_payment,
+  ROUND(step4_payment * 100.0 / NULLIF(step1_viewed, 0), 1) FROM funnel
+UNION ALL
+SELECT 'Step 5: Purchased', step5_purchased,
+  ROUND(step5_purchased * 100.0 / NULLIF(step1_viewed, 0), 1) FROM funnel;
+```
+
+## Ordered Funnel (User Must Complete Steps in Order)
+
+```sql
+WITH step_times AS (
+  SELECT
+    user_id,
+    MIN(CASE WHEN event_type = 'signup_start'    THEN created_at END) AS t1,
+    MIN(CASE WHEN event_type = 'email_verified'  THEN created_at END) AS t2,
+    MIN(CASE WHEN event_type = 'profile_created' THEN created_at END) AS t3,
+    MIN(CASE WHEN event_type = 'first_purchase'  THEN created_at END) AS t4
+  FROM user_events
+  GROUP BY user_id
+)
+SELECT
+  COUNT(*)                                                AS step1_started,
+  COUNT(*) FILTER (WHERE t2 > t1)                        AS step2_verified,
+  COUNT(*) FILTER (WHERE t2 > t1 AND t3 > t2)            AS step3_profile,
+  COUNT(*) FILTER (WHERE t2 > t1 AND t3 > t2 AND t4 > t3) AS step4_purchased
+FROM step_times
+WHERE t1 IS NOT NULL;
+```
+
+## Retention Analysis
+
+### Day-N Retention
+
+```sql
+-- What % of users who signed up on day 0 came back on day N?
+WITH signups AS (
+  SELECT user_id, DATE(created_at) AS signup_date FROM users
+),
+returns AS (
+  SELECT DISTINCT user_id, DATE(event_time) AS active_date FROM user_activity
+)
+SELECT
+  s.signup_date,
+  COUNT(DISTINCT s.user_id) AS cohort_size,
+  COUNT(DISTINCT CASE WHEN r.active_date = s.signup_date + 1  THEN s.user_id END) AS day1,
+  COUNT(DISTINCT CASE WHEN r.active_date = s.signup_date + 7  THEN s.user_id END) AS day7,
+  COUNT(DISTINCT CASE WHEN r.active_date = s.signup_date + 14 THEN s.user_id END) AS day14,
+  COUNT(DISTINCT CASE WHEN r.active_date = s.signup_date + 30 THEN s.user_id END) AS day30
+FROM signups s
+LEFT JOIN returns r ON s.user_id = r.user_id
+GROUP BY s.signup_date
+ORDER BY s.signup_date;
+```
+
+## Active User Metrics (DAU, WAU, MAU)
+
+```sql
+-- Daily, Weekly, Monthly Active Users
+SELECT
+  DATE(event_time) AS date,
+  COUNT(DISTINCT user_id) AS dau,
+  COUNT(DISTINCT user_id) OVER (
+    ORDER BY DATE(event_time)
+    RANGE BETWEEN INTERVAL '6 days' PRECEDING AND CURRENT ROW
+  ) AS wau_7d,
+  COUNT(DISTINCT user_id) OVER (
+    ORDER BY DATE(event_time)
+    RANGE BETWEEN INTERVAL '29 days' PRECEDING AND CURRENT ROW
+  ) AS mau_30d
+FROM user_activity
+GROUP BY DATE(event_time)
+ORDER BY date;
+```
+
+## LTV - Lifetime Value
+
+```sql
+-- Customer LTV: revenue per customer over their lifetime
+SELECT
+  customer_id,
+  COUNT(*)                                               AS total_orders,
+  SUM(total)                                             AS ltv,
+  ROUND(AVG(total), 2)                                   AS avg_order_value,
+  MAX(created_at) - MIN(created_at)                      AS customer_lifetime,
+  ROUND(SUM(total) / NULLIF(
+    EXTRACT(DAY FROM MAX(created_at) - MIN(created_at)) / 30.0,
+    0
+  ), 2)                                                  AS monthly_ltv
+FROM orders
+WHERE status = 'completed'
+GROUP BY customer_id
+HAVING COUNT(*) >= 2
+ORDER BY ltv DESC;
+```
+
+## Summary
+
+- Cohort analysis: group users by first activity date, track their behavior over time
+- Use `CASE WHEN months_since_join = N THEN customer_id END` inside COUNT(DISTINCT ...) for cohort columns
+- Funnel analysis: count users at each step using FILTER (WHERE event_type = '...')
+- Ordered funnel: track event timestamps and check t2 > t1 > t0 etc.
+- DAU/WAU/MAU: use window function with RANGE BETWEEN for rolling distinct user counts
+- LTV: SUM(order total) per customer, normalize by lifetime duration for monthly LTV

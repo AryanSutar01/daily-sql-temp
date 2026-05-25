@@ -1,0 +1,136 @@
+## The Core Difference
+
+**SQL databases** store data in tables with rows and columns. Data is structured, schema is fixed, relationships are enforced.
+
+**NoSQL databases** use a variety of data models (documents, key-value, graph, column-family). Schema is flexible, horizontal scaling is built in.
+
+## SQL Databases
+
+**Examples:** PostgreSQL, MySQL, SQLite, SQL Server, Oracle
+
+```sql
+-- Structured, relational data
+users (id, name, email, created_at)
+orders (id, customer_id, total, status)
+products (id, name, price, category_id)
+
+-- ACID transactions
+BEGIN;
+  UPDATE accounts SET balance = balance - 1000 WHERE id = 1;
+  UPDATE accounts SET balance = balance + 1000 WHERE id = 2;
+COMMIT;
+
+-- Complex queries with JOINs
+SELECT u.name, SUM(o.total) FROM users u
+JOIN orders o ON u.id = o.customer_id
+GROUP BY u.name ORDER BY 2 DESC;
+```
+
+**Strengths:**
+- ACID transactions - critical for financial, inventory, user data
+- Complex queries - JOINs, aggregations, window functions
+- Strong consistency - data is always in a valid state
+- Mature ecosystem - decades of tooling, expertise, documentation
+- Standardized query language - SQL knowledge transfers across databases
+
+**Weaknesses:**
+- Rigid schema - changing structure requires migrations
+- Vertical scaling (mostly) - scale up, not out
+- Can struggle with unstructured or highly variable data
+
+## NoSQL Types and Use Cases
+
+### Document Stores (MongoDB, Firestore)
+Store JSON-like documents. Good for flexible, hierarchical data.
+
+```json
+// MongoDB document - no fixed schema
+{
+  "_id": "abc123",
+  "name": "Alice",
+  "address": { "city": "Mumbai", "zip": "400001" },
+  "preferences": ["dark_mode", "notifications"],
+  "last_seen": "2024-06-15"
+}
+```
+
+Best for: Content management, user profiles, catalogs, mobile apps
+
+### Key-Value Stores (Redis, DynamoDB)
+Extremely fast lookups by key. No complex queries.
+
+```
+SET session:user123 "{'cart': [1,2,3], 'theme': 'dark'}"
+GET session:user123
+```
+
+Best for: Caching, sessions, rate limiting, real-time leaderboards
+
+### Wide-Column Stores (Cassandra, HBase)
+Optimized for massive write throughput and time-series data.
+
+Best for: IoT sensor data, logs, metrics, time-series at massive scale
+
+### Graph Databases (Neo4j, Amazon Neptune)
+Nodes and edges - optimized for relationship traversal.
+
+Best for: Social networks, fraud detection, recommendation engines, knowledge graphs
+
+## Comparison Table
+
+| Feature | SQL | NoSQL |
+|---------|-----|-------|
+| Data model | Tables (rows/columns) | Document, KV, Graph, Column |
+| Schema | Fixed, defined upfront | Flexible, dynamic |
+| Relationships | Strong (foreign keys) | Application-managed |
+| ACID transactions | ✅ Full support | Varies (MongoDB has it; Redis doesn't) |
+| Horizontal scaling | Limited | ✅ Built for it |
+| Query flexibility | ✅ Very high (SQL) | Depends on type |
+| Consistency | Strong | Often eventual |
+| Learning curve | Moderate | Varies by type |
+
+## When to Choose SQL
+
+- **User accounts and authentication** - ACID required, relational data
+- **Financial transactions** - bank accounts, payments, ledgers
+- **Inventory management** - stock levels, product catalogs
+- **Order management** - orders, line items, fulfillment
+- **Reporting and analytics** - complex aggregations and JOINs
+- **Any use case where data integrity is critical**
+
+## When to Choose NoSQL
+
+- **Caching** - Redis: session storage, query results, rate limiting
+- **Real-time feeds** - social media posts, activity feeds (document store)
+- **Event logs / metrics** - append-only, time-series (Cassandra)
+- **Recommendation engines** - graph relationships (Neo4j)
+- **Flexible schemas** - user-generated content with variable fields
+- **Massive horizontal scale** - tens of millions of writes per second
+
+## The Modern Reality: Polyglot Persistence
+
+Most large applications use multiple database types:
+
+```
+PostgreSQL          → user accounts, orders, inventory (ACID required)
+Redis               → sessions, caching, rate limiting (speed required)
+Elasticsearch       → full-text search (specialized queries)
+Cassandra           → event logs, analytics (massive write scale)
+MongoDB             → product catalog (flexible schema)
+```
+
+Choose the right tool for each job - not one database for everything.
+
+## Interview Answer: SQL vs NoSQL
+
+**"SQL databases are the right choice when data is structured, relationships between entities matter, and transactions must be ACID-compliant - think user accounts, orders, financial records. NoSQL is better when you need massive horizontal scale, flexible or unstructured schemas, or purpose-built data models like graphs or time-series. In practice, most production systems use both - PostgreSQL for transactional data, Redis for caching, and perhaps Elasticsearch for search."**
+
+## Summary
+
+- SQL: structured tables, fixed schema, ACID, complex queries, strong consistency
+- NoSQL: flexible schema, horizontal scale, purpose-built models, eventual consistency
+- Document stores: flexible hierarchical data
+- Key-value stores: caching and sessions (Redis)
+- Wide-column: massive write throughput, time-series
+- Graph: relationship traversal, social networks
+- Real-world systems use multiple database types (polyglot persistence) - use the right tool for each problem

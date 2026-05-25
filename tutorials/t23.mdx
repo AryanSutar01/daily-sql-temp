@@ -1,0 +1,151 @@
+## Common Numeric Functions
+
+```sql
+-- Absolute value
+SELECT ABS(-42);          -- 42
+SELECT ABS(-3.14);        -- 3.14
+
+-- Rounding
+SELECT ROUND(3.14159, 2); -- 3.14
+SELECT ROUND(3.14159, 0); -- 3.0
+SELECT ROUND(3.5);        -- 4
+SELECT ROUND(2.5);        -- 2 (banker's rounding in PostgreSQL - rounds to even)
+SELECT ROUND(-3.5);       -- -4
+
+-- Ceiling and Floor
+SELECT CEIL(3.1);         -- 4  (round up to nearest integer)
+SELECT CEILING(3.1);      -- 4  (synonym)
+SELECT FLOOR(3.9);        -- 3  (round down to nearest integer)
+SELECT FLOOR(-3.1);       -- -4 (towards negative infinity)
+
+-- Truncate (cut off decimal - no rounding)
+SELECT TRUNC(3.99);       -- 3
+SELECT TRUNC(-3.99);      -- -3  (towards zero, unlike FLOOR)
+SELECT TRUNC(3.456, 2);   -- 3.45  (PostgreSQL: truncate to 2 decimal places)
+```
+
+## Modulo - Remainder
+
+```sql
+SELECT MOD(10, 3);        -- 1  (10 ÷ 3 = 3 remainder 1)
+SELECT 10 % 3;            -- 1  (operator syntax)
+SELECT MOD(15, 5);        -- 0  (evenly divisible)
+
+-- Practical uses:
+-- Check if a number is even or odd
+SELECT id, CASE WHEN id % 2 = 0 THEN 'Even' ELSE 'Odd' END FROM orders;
+
+-- Distribute records into N groups (sharding)
+SELECT id, id % 4 AS shard_id FROM users;  -- groups 0, 1, 2, 3
+
+-- Every Nth row
+SELECT * FROM orders WHERE id % 10 = 0;  -- every 10th order
+```
+
+## Power and Roots
+
+```sql
+SELECT POWER(2, 10);      -- 1024
+SELECT POWER(2.5, 3);     -- 15.625
+SELECT SQRT(144);         -- 12.0
+SELECT SQRT(2);           -- 1.4142...
+SELECT CBRT(27);          -- 3.0  (cube root, PostgreSQL)
+
+-- Compound interest: A = P(1 + r)^n
+SELECT
+  principal * POWER(1 + rate, years) AS future_value
+FROM investments;
+```
+
+## Logarithms and Exponentials
+
+```sql
+SELECT EXP(1);            -- 2.718... (e^1)
+SELECT LN(2.718);         -- ~1.0 (natural log)
+SELECT LOG(100);          -- 2.0 (log base 10)
+SELECT LOG(2, 1024);      -- 10 (log base 2 of 1024, PostgreSQL)
+```
+
+## Random Numbers
+
+```sql
+SELECT RANDOM();                          -- random float between 0 and 1
+SELECT FLOOR(RANDOM() * 100) + 1;        -- random integer 1-100
+SELECT FLOOR(RANDOM() * (max - min + 1)) + min; -- random between min and max
+
+-- Random sample of 100 rows (approximately)
+SELECT * FROM users WHERE RANDOM() < 0.01 LIMIT 100;
+
+-- Shuffle rows randomly
+SELECT * FROM products ORDER BY RANDOM() LIMIT 10;
+```
+
+## DIV - Integer Division
+
+```sql
+SELECT 17 / 5;            -- 3.4 (standard division in PostgreSQL)
+SELECT 17 / 5::FLOAT;     -- 3.4
+SELECT DIV(17, 5);        -- 3 (integer division, no remainder)
+SELECT 17 :: INT / 5;     -- 3 (integer division via casting)
+```
+
+## GREATEST and LEAST
+
+```sql
+SELECT GREATEST(10, 20, 5, 15);   -- 20
+SELECT LEAST(10, 20, 5, 15);      -- 5
+
+-- Enforce a minimum price
+SELECT name, GREATEST(price, 0) AS non_negative_price FROM products;
+
+-- Cap a value at a maximum
+SELECT name, LEAST(discount, 50) AS capped_discount FROM promotions;
+
+-- Clamp a value between min and max
+SELECT GREATEST(0, LEAST(score, 100)) AS clamped_score FROM assessments;
+```
+
+## Practical Numeric Examples
+
+```sql
+-- Round currency to 2 decimal places
+SELECT name, ROUND(price * 1.18, 2) AS price_with_gst FROM products;
+
+-- Percentage calculation (avoid integer division)
+SELECT
+  category,
+  COUNT(*) AS count,
+  ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS percentage
+FROM products
+GROUP BY category;
+
+-- Safe division (avoid divide by zero)
+SELECT
+  product_id,
+  total_revenue / NULLIF(units_sold, 0) AS revenue_per_unit
+FROM product_stats;
+
+-- Bin ages into groups
+SELECT
+  CASE
+    WHEN age < 18              THEN 'Under 18'
+    WHEN age BETWEEN 18 AND 24 THEN '18-24'
+    WHEN age BETWEEN 25 AND 34 THEN '25-34'
+    WHEN age BETWEEN 35 AND 44 THEN '35-44'
+    ELSE '45+'
+  END AS age_group,
+  COUNT(*) AS users
+FROM users
+GROUP BY 1
+ORDER BY 1;
+```
+
+## Summary
+
+- `ROUND(x, n)` - round to n decimal places; `CEIL` - up; `FLOOR` - down; `TRUNC` - cut off
+- `MOD(a, b)` or `a % b` - remainder after division
+- `POWER(base, exp)` - exponentiation; `SQRT` - square root
+- `RANDOM()` - random float 0-1, useful for sampling and shuffle
+- `GREATEST` / `LEAST` - pick the largest/smallest from a list of values
+- Always use `NULLIF(denominator, 0)` to avoid divide-by-zero errors
+- Use `100.0` (not `100`) in percentage calculations to avoid integer division truncation

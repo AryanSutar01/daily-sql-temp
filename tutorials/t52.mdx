@@ -1,0 +1,229 @@
+## Why Dialects Differ
+
+SQL has an ANSI standard, but every database adds extensions and diverges in edge cases. Understanding these differences is essential when switching between systems or writing portable SQL.
+
+## String Concatenation
+
+```sql
+-- PostgreSQL, SQLite, Standard SQL
+SELECT first_name || ' ' || last_name AS full_name FROM users;
+
+-- MySQL, SQL Server
+SELECT CONCAT(first_name, ' ', last_name) AS full_name FROM users;
+
+-- All databases support CONCAT() - safest for portability
+```
+
+## Auto-Increment / Identity
+
+```sql
+-- PostgreSQL
+id BIGSERIAL PRIMARY KEY
+id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY
+
+-- MySQL
+id BIGINT AUTO_INCREMENT PRIMARY KEY
+
+-- SQL Server
+id BIGINT IDENTITY(1,1) PRIMARY KEY
+
+-- SQLite
+id INTEGER PRIMARY KEY AUTOINCREMENT
+```
+
+## Getting Last Inserted ID
+
+```sql
+-- PostgreSQL: use RETURNING
+INSERT INTO users (name) VALUES ('Alice') RETURNING id;
+
+-- MySQL
+INSERT INTO users (name) VALUES ('Alice');
+SELECT LAST_INSERT_ID();
+
+-- SQL Server
+INSERT INTO users (name) VALUES ('Alice');
+SELECT SCOPE_IDENTITY();
+
+-- SQLite
+SELECT last_insert_rowid();
+```
+
+## LIMIT / TOP
+
+```sql
+-- PostgreSQL, MySQL, SQLite
+SELECT * FROM users ORDER BY id LIMIT 10;
+SELECT * FROM users ORDER BY id LIMIT 10 OFFSET 20;
+
+-- SQL Server / MS Access
+SELECT TOP 10 * FROM users ORDER BY id;
+SELECT TOP 10 PERCENT * FROM users ORDER BY id;
+-- Offset in SQL Server (2012+)
+SELECT * FROM users ORDER BY id OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY;
+
+-- Oracle
+SELECT * FROM users WHERE ROWNUM <= 10;
+-- Oracle 12c+
+SELECT * FROM users ORDER BY id FETCH FIRST 10 ROWS ONLY;
+```
+
+## Date Functions
+
+```sql
+-- Current timestamp
+SELECT NOW();              -- MySQL, PostgreSQL
+SELECT CURRENT_TIMESTAMP;  -- All databases (standard)
+SELECT GETDATE();          -- SQL Server
+SELECT SYSDATE FROM DUAL;  -- Oracle
+
+-- Extract year
+SELECT EXTRACT(YEAR FROM created_at);   -- PostgreSQL, MySQL, standard
+SELECT YEAR(created_at);                -- MySQL, SQL Server
+SELECT strftime('%Y', created_at);      -- SQLite
+
+-- Date truncation
+SELECT DATE_TRUNC('month', NOW());            -- PostgreSQL
+SELECT DATE_FORMAT(NOW(), '%Y-%m-01');        -- MySQL
+SELECT DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0); -- SQL Server
+
+-- Add interval
+SELECT NOW() + INTERVAL '7 days';            -- PostgreSQL
+SELECT DATE_ADD(NOW(), INTERVAL 7 DAY);      -- MySQL
+SELECT DATEADD(day, 7, GETDATE());           -- SQL Server
+```
+
+## String Functions
+
+```sql
+-- Substring
+SELECT SUBSTRING(name, 1, 3) FROM users;     -- All
+SELECT SUBSTR(name, 1, 3) FROM users;        -- PostgreSQL, SQLite, Oracle
+SELECT LEFT(name, 3) FROM users;             -- MySQL, SQL Server, PostgreSQL
+
+-- String position
+SELECT POSITION('o' IN name) FROM users;     -- PostgreSQL, MySQL (standard)
+SELECT CHARINDEX('o', name) FROM users;      -- SQL Server
+SELECT INSTR(name, 'o') FROM users;          -- MySQL, Oracle
+
+-- Case-insensitive like
+SELECT * FROM users WHERE name ILIKE '%alice%';   -- PostgreSQL
+SELECT * FROM users WHERE name LIKE '%alice%';    -- MySQL (case-insensitive by default)
+SELECT * FROM users WHERE name LIKE '%alice%' COLLATE SQL_Latin1_General_CP1_CI_AS; -- SQL Server
+```
+
+## Conditional Expressions
+
+```sql
+-- CASE WHEN: all databases
+SELECT CASE WHEN age >= 18 THEN 'Adult' ELSE 'Minor' END FROM users;
+
+-- IF: MySQL only
+SELECT IF(age >= 18, 'Adult', 'Minor') AS category FROM users;
+
+-- IIF: SQL Server
+SELECT IIF(age >= 18, 'Adult', 'Minor') AS category FROM users;
+
+-- COALESCE: all databases (standard SQL)
+SELECT COALESCE(phone, 'N/A') FROM users;
+
+-- NVL: Oracle
+SELECT NVL(phone, 'N/A') FROM users;
+
+-- ISNULL: SQL Server
+SELECT ISNULL(phone, 'N/A') FROM users;
+```
+
+## Upsert (Insert or Update)
+
+```sql
+-- PostgreSQL
+INSERT INTO users (email, name) VALUES ('a@b.com', 'Alice')
+ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name;
+
+-- MySQL
+INSERT INTO users (email, name) VALUES ('a@b.com', 'Alice')
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+-- SQL Server (MERGE)
+MERGE INTO users AS target
+USING (VALUES ('a@b.com', 'Alice')) AS source (email, name)
+ON target.email = source.email
+WHEN MATCHED THEN UPDATE SET name = source.name
+WHEN NOT MATCHED THEN INSERT (email, name) VALUES (source.email, source.name);
+```
+
+## JSON Support
+
+```sql
+-- PostgreSQL: JSONB (most powerful)
+SELECT settings ->> 'theme' FROM users;
+SELECT * FROM users WHERE settings @> '{"theme": "dark"}';
+
+-- MySQL 5.7+
+SELECT JSON_EXTRACT(settings, '$.theme') FROM users;
+SELECT * FROM users WHERE JSON_CONTAINS(settings, '"dark"', '$.theme');
+
+-- SQL Server (since 2016 - no native JSON type, stored as NVARCHAR)
+SELECT JSON_VALUE(settings, '$.theme') FROM users;
+```
+
+## Window Functions Availability
+
+| Feature | PostgreSQL | MySQL 8+ | SQL Server | SQLite 3.25+ |
+|---------|-----------|----------|------------|-------------|
+| ROW_NUMBER | ✅ | ✅ | ✅ | ✅ |
+| RANK / DENSE_RANK | ✅ | ✅ | ✅ | ✅ |
+| LAG / LEAD | ✅ | ✅ | ✅ | ✅ |
+| PARTITION BY | ✅ | ✅ | ✅ | ✅ |
+| FILTER clause | ✅ | ❌ | ❌ | ✅ |
+| LATERAL JOIN | ✅ | ✅ | ❌ | ❌ |
+
+## CTEs and Recursive CTEs
+
+```sql
+-- All major databases support standard CTEs:
+WITH cte AS (SELECT ...)
+SELECT * FROM cte;
+
+-- Recursive CTEs (RECURSIVE keyword varies):
+-- PostgreSQL, SQLite:
+WITH RECURSIVE cte AS (...)
+
+-- SQL Server, MySQL 8+:
+WITH cte AS (...)  -- MySQL doesn't need RECURSIVE keyword, uses it automatically
+
+-- Oracle:
+WITH cte (col1, col2) AS (...)  -- must list columns
+```
+
+## Portability Tips
+
+1. **Use standard SQL** where possible: CASE, COALESCE, CAST, BETWEEN, standard JOINs
+2. **Avoid database-specific functions** in shared code: use SUBSTRING not LEFT/RIGHT, use EXTRACT not YEAR()
+3. **Test on both databases** when migrating - even "the same" functions can have edge case differences
+4. **Document your dialect** - note which database a script targets at the top of the file
+5. **Use an ORM** when portability matters - Prisma, SQLAlchemy handle most dialect differences
+
+## Quick Cheat Sheet
+
+| Task | PostgreSQL | MySQL | SQL Server |
+|------|-----------|-------|------------|
+| Auto-increment | BIGSERIAL | AUTO_INCREMENT | IDENTITY(1,1) |
+| Last insert ID | RETURNING id | LAST_INSERT_ID() | SCOPE_IDENTITY() |
+| Limit rows | LIMIT n | LIMIT n | TOP n |
+| Add days | + INTERVAL '7 days' | DATE_ADD(d, INTERVAL 7 DAY) | DATEADD(day,7,d) |
+| Current time | NOW() | NOW() | GETDATE() |
+| Concat | string1 \|\| string2 | CONCAT(s1, s2) | s1 + s2 |
+| Case-insensitive LIKE | ILIKE | LIKE (default) | LIKE (with collation) |
+| Upsert | ON CONFLICT DO UPDATE | ON DUPLICATE KEY UPDATE | MERGE |
+| JSON | JSONB (->, ->>) | JSON_EXTRACT | JSON_VALUE |
+
+## Summary
+
+- All databases support core SQL: SELECT, WHERE, GROUP BY, ORDER BY, JOINs, CASE, COALESCE
+- Key differences: auto-increment syntax, LIMIT vs TOP, date functions, upsert syntax, JSON support
+- PostgreSQL has the most powerful feature set (JSONB, LATERAL, FILTER, recursive CTEs)
+- MySQL is case-insensitive by default for LIKE; PostgreSQL is case-sensitive (use ILIKE)
+- Window functions work in all modern databases (MySQL 8+, SQL Server 2012+, SQLite 3.25+)
+- When writing portable SQL: prefer standard functions, avoid database-specific shortcuts

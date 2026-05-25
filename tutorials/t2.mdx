@@ -1,188 +1,226 @@
-## The SELECT Statement
+## Why Data Types Matter
 
-`SELECT` is the most fundamental SQL command. It retrieves data from one or more tables.
+Every column in a SQL table must have a data type. Choosing the right type matters for:
+- **Storage efficiency** - TINYINT uses 1 byte; BIGINT uses 8 bytes
+- **Data integrity** - a DATE column won't accept "hello"
+- **Performance** - comparisons on INT are faster than on VARCHAR
+- **Correctness** - FLOAT has rounding errors; DECIMAL does not
 
-```sql
--- Select all columns
-SELECT * FROM users;
+## Numeric Types
 
--- Select specific columns
-SELECT name, email FROM users;
+### Integer Types
 
--- Select with an alias
-SELECT name AS full_name, email AS contact FROM users;
-```
-
-## The WHERE Clause
-
-`WHERE` filters rows based on a condition. Only rows that satisfy the condition are returned.
-
-```sql
-SELECT * FROM users WHERE age > 25;
-
-SELECT * FROM users WHERE city = 'New York';
-
-SELECT * FROM users WHERE age > 18 AND city = 'London';
-```
-
-## Comparison Operators
-
-| Operator | Meaning | Example |
-|----------|---------|---------|
-| `=` | Equal | `age = 25` |
-| `!=` or `<>` | Not equal | `age != 25` |
-| `>` | Greater than | `age > 25` |
-| `<` | Less than | `age < 25` |
-| `>=` | Greater than or equal | `age >= 25` |
-| `<=` | Less than or equal | `age <= 25` |
-
-## Logical Operators
-
-### AND
-All conditions must be true.
+| Type | Storage | Range | Use When |
+|------|---------|-------|----------|
+| `TINYINT` | 1 byte | 0–255 (unsigned) | Age, rating (1-5), small counts |
+| `SMALLINT` | 2 bytes | -32,768 to 32,767 | Inventory, short codes |
+| `INT` / `INTEGER` | 4 bytes | -2.1B to 2.1B | IDs, counts, most integers |
+| `BIGINT` | 8 bytes | ±9.2 quintillion | User IDs at scale, timestamps, large counters |
 
 ```sql
-SELECT * FROM users
-WHERE age > 18 AND city = 'Mumbai';
+CREATE TABLE products (
+  id          SERIAL PRIMARY KEY,     -- auto-increment INT
+  view_count  BIGINT DEFAULT 0,       -- could be millions
+  stock       SMALLINT DEFAULT 0,     -- typically < 10,000
+  rating      TINYINT                 -- 1 to 5
+);
 ```
 
-### OR
-At least one condition must be true.
+**Auto-increment shortcuts:**
+```sql
+-- PostgreSQL
+id SERIAL          -- auto-increment INT (4 bytes)
+id BIGSERIAL       -- auto-increment BIGINT (8 bytes)
+
+-- MySQL
+id INT AUTO_INCREMENT
+
+-- SQL Standard (PostgreSQL 10+)
+id INT GENERATED ALWAYS AS IDENTITY
+```
+
+### Decimal Types
+
+| Type | Precision | Use When |
+|------|-----------|----------|
+| `DECIMAL(p, s)` | Exact | Money, tax rates, percentages |
+| `NUMERIC(p, s)` | Exact | Same as DECIMAL (synonym) |
+| `FLOAT` | Approximate | Scientific calculations, coordinates |
+| `REAL` | Approximate | Less precise float |
 
 ```sql
-SELECT * FROM users
-WHERE city = 'Mumbai' OR city = 'Delhi';
+price      DECIMAL(10, 2)   -- up to 99,999,999.99
+tax_rate   DECIMAL(5, 4)    -- e.g. 0.1800 (18%)
+latitude   FLOAT            -- approximate is fine for coordinates
 ```
 
-### NOT
-Negates a condition.
+> **Critical rule: Always use DECIMAL for money - never FLOAT.**
 
 ```sql
-SELECT * FROM users
-WHERE NOT city = 'Mumbai';
+-- FLOAT has rounding errors
+SELECT 0.1 + 0.2;  -- returns 0.30000000000000004 ← wrong!
+
+-- DECIMAL is exact
+SELECT CAST(0.1 AS DECIMAL(10,2)) + CAST(0.2 AS DECIMAL(10,2));  -- 0.30 ✓
 ```
 
-## BETWEEN
+## String / Text Types
 
-Filters rows within a range (inclusive).
+| Type | Max Size | Use When |
+|------|----------|----------|
+| `CHAR(n)` | Exactly n chars | Fixed-length codes (country 'IN', currency 'USD') |
+| `VARCHAR(n)` | Up to n chars | Names, emails, titles, descriptions |
+| `TEXT` | Unlimited | Blog posts, comments, long content |
 
 ```sql
--- Users aged between 20 and 30
-SELECT * FROM users WHERE age BETWEEN 20 AND 30;
-
--- Orders placed in January 2024
-SELECT * FROM orders
-WHERE order_date BETWEEN '2024-01-01' AND '2024-01-31';
+CREATE TABLE users (
+  id           SERIAL PRIMARY KEY,
+  country_code CHAR(2),          -- always 2: 'IN', 'US', 'GB'
+  name         VARCHAR(100),     -- up to 100 chars
+  email        VARCHAR(255),     -- email standard max is 254
+  bio          TEXT              -- unlimited
+);
 ```
 
-## IN
+**CHAR vs VARCHAR:**
+```sql
+-- Storing 'Hi' in CHAR(10):   'Hi        '  (10 bytes, padded with spaces)
+-- Storing 'Hi' in VARCHAR(10): 'Hi'          (2 bytes + 1-2 byte length prefix)
+```
+Use `CHAR` only for fixed-length codes. Use `VARCHAR` for everything else.
 
-Filters rows where a column matches any value in a list. Much cleaner than multiple OR conditions.
+## Date and Time Types
+
+| Type | Example | Use When |
+|------|---------|----------|
+| `DATE` | 2024-06-15 | Birth dates, deadlines, event dates |
+| `TIME` | 14:30:00 | Store hours, scheduled times |
+| `TIMESTAMP` | 2024-06-15 14:30:00 | Created/updated timestamps |
+| `TIMESTAMPTZ` | 2024-06-15 14:30:00+05:30 | Any timestamp in a multi-timezone app |
+| `INTERVAL` | 30 days | Durations, expiration periods |
 
 ```sql
--- Instead of this:
-SELECT * FROM users
-WHERE city = 'Mumbai' OR city = 'Delhi' OR city = 'Pune';
-
--- Use this:
-SELECT * FROM users
-WHERE city IN ('Mumbai', 'Delhi', 'Pune');
-
--- NOT IN
-SELECT * FROM users
-WHERE city NOT IN ('Mumbai', 'Delhi');
+CREATE TABLE orders (
+  id           SERIAL PRIMARY KEY,
+  order_date   DATE,                           -- just the date
+  ordered_at   TIMESTAMPTZ DEFAULT NOW(),      -- full timestamp with timezone
+  expires_at   TIMESTAMPTZ,
+  delivery_window INTERVAL DEFAULT '2 days'   -- duration
+);
 ```
 
-## LIKE
+> **Always use TIMESTAMPTZ in production.** It stores UTC internally and converts to the local timezone automatically, so your app works correctly across timezones.
 
-Filters rows based on a pattern match. Used for text/string searches.
-
-### Wildcards
-- `%` — matches zero or more characters
-- `_` — matches exactly one character
+## Boolean Type
 
 ```sql
--- Names starting with 'A'
-SELECT * FROM users WHERE name LIKE 'A%';
+is_active    BOOLEAN DEFAULT TRUE
+is_verified  BOOLEAN DEFAULT FALSE
+has_paid     BOOLEAN
 
--- Names ending with 'Kumar'
-SELECT * FROM users WHERE name LIKE '%Kumar';
+-- Valid values: TRUE/FALSE, 't'/'f', 'yes'/'no', 1/0
+INSERT INTO users (is_active) VALUES (TRUE);
+INSERT INTO users (is_active) VALUES ('yes');  -- also valid
 
--- Names containing 'raj'
-SELECT * FROM users WHERE name LIKE '%raj%';
-
--- Names with exactly 5 characters
-SELECT * FROM users WHERE name LIKE '_____';
-
--- Names starting with 'A' and ending with 'a'
-SELECT * FROM users WHERE name LIKE 'A%a';
+-- Querying booleans
+SELECT * FROM users WHERE is_active = TRUE;
+SELECT * FROM users WHERE is_active;       -- shorthand
+SELECT * FROM users WHERE NOT is_verified;
 ```
 
-### Case Sensitivity
-- In **MySQL** — LIKE is case-insensitive by default
-- In **PostgreSQL** — use `ILIKE` for case-insensitive matching
+## UUID Type
+
+A UUID (Universally Unique Identifier) is a 128-bit random value — globally unique.
 
 ```sql
--- PostgreSQL case-insensitive search
-SELECT * FROM users WHERE name ILIKE 'alice%';
+-- PostgreSQL
+id UUID DEFAULT gen_random_uuid() PRIMARY KEY
+
+-- Example: '550e8400-e29b-41d4-a716-446655440000'
 ```
 
-## IS NULL / IS NOT NULL
+**SERIAL vs UUID - when to use which:**
 
-NULL means missing or unknown value. You cannot use `=` to check for NULL.
+| | SERIAL / BIGSERIAL | UUID |
+|-|-------------------|------|
+| Size | 4 or 8 bytes | 16 bytes |
+| Readable | Yes (1, 2, 3...) | No (random string) |
+| Sequential | Yes | No (random) |
+| Predictable | Yes (security risk?) | No |
+| Best for | Single database | Distributed systems, public APIs |
+
+Use UUID when you expose IDs in URLs (prevents enumeration attacks) or merge data from multiple databases.
+
+## JSON Types (PostgreSQL)
 
 ```sql
--- Find users with no email
-SELECT * FROM users WHERE email IS NULL;
+-- JSONB: binary storage, indexed, fast queries (recommended)
+-- JSON:  text storage, slower, preserves whitespace/key order
 
--- Find users who have an email
-SELECT * FROM users WHERE email IS NOT NULL;
+CREATE TABLE users (
+  id       SERIAL PRIMARY KEY,
+  name     VARCHAR(100),
+  settings JSONB DEFAULT '{}'   -- flexible extra fields
+);
+
+-- Store any structure
+INSERT INTO users (name, settings) VALUES (
+  'Alice',
+  '{"theme": "dark", "notifications": true, "tags": ["premium"]}'
+);
+
+-- Query JSON fields
+SELECT name, settings->>'theme' AS theme FROM users;
+SELECT * FROM users WHERE settings->>'theme' = 'dark';
+SELECT * FROM users WHERE settings @> '{"notifications": true}';
+
+-- Index a JSON field
+CREATE INDEX idx_users_theme ON users ((settings->>'theme'));
 ```
 
-## Combining Filters — Real Example
+## Choosing the Right Type - Quick Reference
+
+| Data | Recommended Type | Why |
+|------|-----------------|-----|
+| Auto-increment ID | `BIGSERIAL` | Handles large tables |
+| Public-facing ID | `UUID` | Prevents enumeration |
+| Price / money | `DECIMAL(10,2)` | No rounding errors |
+| Name / email | `VARCHAR(100-255)` | Bounded length |
+| Long text | `TEXT` | No artificial limit |
+| Country code | `CHAR(2)` | Always exactly 2 chars |
+| Timestamp | `TIMESTAMPTZ` | Timezone safe |
+| Date only | `DATE` | No time component |
+| True/false | `BOOLEAN` | Semantic clarity |
+| Flexible data | `JSONB` | Schema-less flexibility |
+
+## Type Casting
 
 ```sql
--- Find active users from Mumbai or Delhi aged between 25 and 40
--- whose name starts with 'A' and have an email address
+-- Explicit cast
+SELECT CAST('2024-01-15' AS DATE);
+SELECT CAST('123' AS INTEGER);
 
-SELECT id, name, email, age, city
-FROM users
-WHERE
-  status = 'active'
-  AND city IN ('Mumbai', 'Delhi')
-  AND age BETWEEN 25 AND 40
-  AND name LIKE 'A%'
-  AND email IS NOT NULL;
+-- PostgreSQL shorthand (:: operator)
+SELECT '2024-01-15'::DATE;
+SELECT '123'::INT;
+SELECT price::TEXT FROM products;
+
+-- Cast in WHERE
+SELECT * FROM logs WHERE created_at::DATE = '2024-06-15';
 ```
 
-## DISTINCT
+## Interview Question: What's the difference between CHAR and VARCHAR?
 
-Removes duplicate values from results.
-
-```sql
--- Get unique cities from users table
-SELECT DISTINCT city FROM users;
-
--- Get unique combinations
-SELECT DISTINCT city, status FROM users;
-```
-
-## LIMIT
-
-Restricts the number of rows returned (covered more in the next tutorial).
-
-```sql
--- Return only the first 10 users
-SELECT * FROM users LIMIT 10;
-```
+**Answer:**
+- `CHAR(n)` is fixed-length - always stores exactly n bytes, padding with spaces if the value is shorter. Slightly faster for fixed-length data because the database knows exactly where each value ends.
+- `VARCHAR(n)` is variable-length - stores only as many bytes as needed, plus a 1-2 byte length prefix.
+- In practice, use `CHAR` only for fixed-length codes like country codes (`CHAR(2)`) or currency codes (`CHAR(3)`). Use `VARCHAR` for everything else.
 
 ## Summary
 
-- `SELECT` retrieves data from tables
-- `WHERE` filters rows using conditions
-- `AND`, `OR`, `NOT` combine multiple conditions
-- `BETWEEN` filters within a range
-- `IN` matches any value from a list
-- `LIKE` matches string patterns using `%` and `_`
-- `IS NULL` checks for missing values
-- `DISTINCT` removes duplicate rows
+- Use `DECIMAL` for money - never `FLOAT`
+- Use `VARCHAR` for most strings; `CHAR` only for fixed-length codes; `TEXT` for unlimited content
+- Always use `TIMESTAMPTZ` in production apps
+- `BIGSERIAL` for single-DB IDs; `UUID` for distributed systems or public APIs
+- `JSONB` (not `JSON`) for flexible structured data in PostgreSQL
+- Choosing the right type improves storage, performance, and data integrity

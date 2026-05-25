@@ -1,0 +1,147 @@
+## Why Read Execution Plans?
+
+When a query is slow, you need to understand *how* the database is executing it. `EXPLAIN` shows you exactly what the query planner decided to do - and EXPLAIN ANALYZE shows what actually happened.
+
+## EXPLAIN vs EXPLAIN ANALYZE
+
+```sql
+-- EXPLAIN: estimates only (doesn't run the query)
+EXPLAIN SELECT * FROM orders WHERE customer_id = 101;
+
+-- EXPLAIN ANALYZE: runs the query and shows actual stats
+EXPLAIN ANALYZE SELECT * FROM orders WHERE customer_id = 101;
+
+-- Most useful format (PostgreSQL)
+EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+SELECT * FROM orders WHERE customer_id = 101;
+```
+
+**Use EXPLAIN when the query is too slow to run.** Use EXPLAIN ANALYZE to see actual vs estimated.
+
+## Reading the Output
+
+```
+Index Scan using idx_orders_customer on orders
+  (cost=0.43..8.45 rows=3 width=64)
+  (actual time=0.031..0.035 rows=5 loops=1)
+  Index Cond: (customer_id = 101)
+Planning Time: 0.1 ms
+Execution Time: 0.05 ms
+```
+
+**Cost numbers:**
+```
+(cost=0.43..8.45 rows=3 width=64)
+       ↑        ↑    ↑      ↑
+  startup   total  est.  avg row
+   cost    cost   rows  bytes
+```
+
+- Startup cost: cost before first row returned
+- Total cost: cost to return ALL rows
+- rows: **estimated** number of rows (planner's guess)
+- width: average row size in bytes
+
+**Actual numbers (EXPLAIN ANALYZE):**
+```
+(actual time=0.031..0.035 rows=5 loops=1)
+              ↑           ↑       ↑
+           actual      actual   how many
+           timing       rows    times run
+```
+
+## Key Warning Sign: Estimated vs Actual Rows
+
+```
+rows=3 (estimated) vs rows=500000 (actual) ← BIG problem!
+```
+
+When estimates are far off, the planner chooses a bad plan. Fix: run `ANALYZE table_name` to refresh statistics.
+
+## Node Types - What to Look For
+
+| Node | What It Means | Good or Bad |
+|------|--------------|-------------|
+| `Seq Scan` | Full table scan | ❌ Bad on large tables |
+| `Index Scan` | Uses an index | ✅ Good |
+| `Index Only Scan` | Answered from index alone | ✅ Best |
+| `Bitmap Index Scan` | Multiple conditions combined | ✅ Good |
+| `Nested Loop` | Row-by-row join | OK for small tables |
+| `Hash Join` | Hash-table based join | ✅ Good for large unsorted tables |
+| `Merge Join` | Sorted merge join | ✅ Good when both sides sorted |
+| `Sort` | Explicit sort step | ⚠️ Can be expensive |
+| `Hash` | Build hash table | ⚠️ Uses memory |
+
+## Identifying a Slow Seq Scan
+
+```sql
+EXPLAIN ANALYZE SELECT * FROM events WHERE user_id = 42;
+
+-- Bad output:
+Seq Scan on events (cost=0..450000 rows=1 width=50)
+                    (actual time=120.0..120.5 rows=1 loops=1)
+  Filter: (user_id = 42)
+  Rows Removed by Filter: 5000000
+```
+
+This scanned 5 million rows to find 1. Fix: add an index.
+
+```sql
+CREATE INDEX idx_events_user ON events(user_id);
+-- Now: Index Scan (cost=0.44..8.46 rows=1 width=50)
+--      actual time=0.03..0.04 rows=1 loops=1
+```
+
+## Reading a Multi-Step Plan
+
+Plans are indented - inner nodes run first, outer nodes use their output:
+
+```
+Hash Join  (outer node - runs last)
+  → Hash  (builds hash table from orders)
+      → Seq Scan on orders
+  → Seq Scan on users  (probe side)
+```
+
+Reading tip: find the innermost (most indented) nodes - they run first.
+
+## BUFFERS - Cache Hit Analysis
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM orders WHERE customer_id = 101;
+
+-- Output includes:
+Buffers: shared hit=3 read=1
+--              ↑          ↑
+--         from cache   from disk (slow)
+```
+
+Many `read` (disk) blocks = data not in cache = consider increasing `shared_buffers` or optimizing access patterns.
+
+## Common Fixes Based on EXPLAIN Output
+
+| Problem in EXPLAIN | Fix |
+|--------------------|-----|
+| Seq Scan on large table | Add an index on the filter column |
+| Rows estimate way off | Run `ANALYZE table_name` |
+| Sort node on large data | Add index matching ORDER BY |
+| Nested Loop with large outer | Force Hash Join or add better index |
+| Index Scan but still slow | Consider partial or covering index |
+
+## EXPLAIN for UPDATE/DELETE
+
+```sql
+EXPLAIN ANALYZE
+DELETE FROM logs WHERE created_at < '2023-01-01';
+-- Shows what it would scan - useful before running destructive operations
+```
+
+## Summary
+
+- `EXPLAIN` shows the plan without running; `EXPLAIN ANALYZE` runs and shows actual stats
+- Compare estimated rows to actual rows - large discrepancies = stale statistics (run ANALYZE)
+- Seq Scan on large tables = missing index
+- Index Only Scan = best possible - query answered entirely from index
+- Read plans from innermost (most indented) nodes outward
+- `BUFFERS` shows cache hits vs disk reads - high disk reads = cold data
