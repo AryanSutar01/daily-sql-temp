@@ -1,0 +1,190 @@
+## LIKE - Pattern Matching
+
+`LIKE` filters strings based on a pattern. Two special wildcard characters:
+
+| Wildcard | Matches |
+|----------|---------|
+| `%` | Zero or more of any character |
+| `_` | Exactly one character |
+
+```sql
+-- Starts with 'A'
+SELECT * FROM users WHERE name LIKE 'A%';
+
+-- Ends with 'Kumar'
+SELECT * FROM users WHERE name LIKE '%Kumar';
+
+-- Contains 'sql' anywhere
+SELECT * FROM courses WHERE title LIKE '%sql%';
+
+-- Exactly 4 characters
+SELECT * FROM codes WHERE code LIKE '____';
+
+-- 'PRD' followed by exactly 3 characters
+SELECT * FROM products WHERE sku LIKE 'PRD___';
+
+-- Second character is 'a'
+SELECT * FROM users WHERE name LIKE '_a%';
+```
+
+## NOT LIKE
+
+```sql
+SELECT * FROM users WHERE email NOT LIKE '%@gmail.com';
+SELECT * FROM products WHERE name NOT LIKE '%refurbished%';
+```
+
+## Case Sensitivity
+
+```sql
+-- MySQL: LIKE is case-insensitive by default
+SELECT * FROM users WHERE name LIKE 'alice%';  -- matches 'Alice', 'ALICE', 'alice'
+
+-- PostgreSQL: LIKE is case-sensitive
+SELECT * FROM users WHERE name LIKE 'alice%';  -- only matches 'alice...'
+
+-- PostgreSQL: use ILIKE for case-insensitive matching
+SELECT * FROM users WHERE name ILIKE 'alice%'; -- matches 'Alice', 'ALICE', 'alice'
+
+-- NOT ILIKE
+SELECT * FROM users WHERE email NOT ILIKE '%@temp.%';
+```
+
+## Escaping Wildcards
+
+What if you need to search for a literal `%` or `_`?
+
+```sql
+-- Search for strings containing a literal '%'
+SELECT * FROM notes WHERE content LIKE '%100\%%' ESCAPE '';
+-- The \% means literal percent sign
+
+-- PostgreSQL: use $$ or explicit ESCAPE
+SELECT * FROM products WHERE name LIKE '%50\% off%' ESCAPE '';
+```
+
+## REGEXP / REGEXP_MATCH - Regular Expressions
+
+Regular expressions provide far more power than LIKE for complex pattern matching.
+
+### PostgreSQL
+
+```sql
+-- ~ operator: matches regex (case-sensitive)
+-- ~* operator: matches regex (case-insensitive)
+-- !~ and !~*: does NOT match
+
+-- Valid email format (basic check)
+SELECT * FROM users WHERE email ~ '^[^@]+@[^@]+\.[^@]{2,}$';
+
+-- Phone numbers with exactly 10 digits
+SELECT * FROM users WHERE phone ~ '^[0-9]{10}$';
+
+-- Names with only letters and spaces
+SELECT * FROM users WHERE name ~ '^[A-Za-z ]+$';
+
+-- Case-insensitive regex
+SELECT * FROM products WHERE name ~* 'wireless|bluetooth';
+```
+
+### MySQL
+
+```sql
+-- REGEXP or RLIKE operator
+SELECT * FROM users WHERE email REGEXP '^[^@]+@[^@]+\.[^@]{2,}$';
+SELECT * FROM products WHERE name REGEXP 'wireless|bluetooth';
+SELECT * FROM users WHERE phone REGEXP '^[0-9]{10}$';
+```
+
+## REGEXP_REPLACE - Replace by Pattern
+
+```sql
+-- Remove all non-digit characters from phone
+SELECT REGEXP_REPLACE(phone, '[^0-9]', '', 'g') AS clean_phone FROM users;
+-- '+91-98765-43210' → '919876543210'
+
+-- Normalize multiple spaces to single space
+SELECT REGEXP_REPLACE(name, '\s+', ' ', 'g') AS clean_name FROM users;
+
+-- Remove HTML tags
+SELECT REGEXP_REPLACE(content, '<[^>]+>', '', 'g') AS plain_text FROM articles;
+```
+
+## REGEXP_MATCHES / REGEXP_SUBSTR - Extract by Pattern
+
+```sql
+-- PostgreSQL: extract matching groups
+SELECT REGEXP_MATCH('alice@gmail.com', '^([^@]+)@(.+)$');
+-- {alice, gmail.com}
+
+-- Get the domain part of an email
+SELECT (REGEXP_MATCH(email, '@(.+)$'))[1] AS domain FROM users;
+
+-- MySQL: REGEXP_SUBSTR
+SELECT REGEXP_SUBSTR(email, '[^@]+$') AS domain FROM users;
+```
+
+## Common Regex Patterns
+
+| Pattern | Matches |
+|---------|---------|
+| `^` | Start of string |
+| `$` | End of string |
+| `.` | Any single character |
+| `[abc]` | Any of a, b, c |
+| `[^abc]` | Anything except a, b, c |
+| `[a-z]` | Any lowercase letter |
+| `[0-9]` | Any digit |
+| `\d` | Any digit (shorthand) |
+| `\w` | Word character [a-zA-Z0-9_] |
+| `\s` | Whitespace |
+| `*` | 0 or more |
+| `+` | 1 or more |
+| `?` | 0 or 1 |
+| `{n}` | Exactly n |
+| `{n,m}` | Between n and m |
+| `a\|b` | a or b |
+
+```sql
+-- Indian mobile number (starts with 6-9, then 9 digits)
+WHERE phone ~ '^[6-9][0-9]{9}$'
+
+-- PIN code (6 digits)
+WHERE pincode ~ '^[0-9]{6}$'
+
+-- Valid URL starts with http or https
+WHERE url ~ '^https?://'
+
+-- Contains at least one number
+WHERE password ~ '[0-9]'
+
+-- Alphanumeric only
+WHERE username ~ '^[a-zA-Z0-9_]+$'
+```
+
+## LIKE vs REGEXP - When to Use Which
+
+| | LIKE | REGEXP |
+|-|------|--------|
+| Simplicity | ✅ Simple | More complex |
+| Power | Limited (% and _) | Very powerful |
+| Performance | Faster | Slower (especially without index) |
+| Use for | Simple prefix/suffix/contains | Complex patterns, validation |
+
+```sql
+-- Use LIKE for simple patterns
+WHERE name LIKE 'A%'
+WHERE email LIKE '%@gmail.com'
+
+-- Use REGEXP for complex patterns
+WHERE phone ~ '^[6-9][0-9]{9}$'
+WHERE email ~ '^[^@]+@[^@]+\.[a-zA-Z]{2,}$'
+```
+
+## Summary
+
+- `LIKE` with `%` (any chars) and `_` (one char) handles most simple pattern needs
+- `ILIKE` (PostgreSQL) is the case-insensitive version of `LIKE`
+- Regular expressions (`~`, `REGEXP`) are far more powerful for complex validation and extraction
+- `REGEXP_REPLACE` replaces matched patterns - great for data cleaning
+- For index-supported pattern matching, `col LIKE 'prefix%'` (trailing wildcard only) can use an index; `'%suffix'` cannot

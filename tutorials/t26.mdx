@@ -1,0 +1,160 @@
+## LAG - Access the Previous Row
+
+`LAG(column, offset, default)` returns the value from a row that is `offset` rows behind the current row.
+
+```sql
+-- Compare each month's revenue to the previous month
+SELECT
+  month,
+  revenue,
+  LAG(revenue) OVER (ORDER BY month) AS prev_month_revenue
+FROM monthly_revenue;
+
+-- Month    | Revenue | Prev Month
+-- Jan 2024 | 50000   | NULL        ← no previous row
+-- Feb 2024 | 62000   | 50000
+-- Mar 2024 | 58000   | 62000
+-- Apr 2024 | 71000   | 58000
+```
+
+### With Offset and Default
+
+```sql
+-- LAG(column, N, default)
+-- N = how many rows back (default 1)
+-- default = value when no previous row exists (default NULL)
+
+SELECT
+  month,
+  revenue,
+  LAG(revenue, 1, 0) OVER (ORDER BY month) AS prev_month,
+  LAG(revenue, 3, 0) OVER (ORDER BY month) AS revenue_3mo_ago
+FROM monthly_revenue;
+```
+
+## LEAD - Access the Next Row
+
+`LEAD` is the mirror of LAG - looks forward instead of backward.
+
+```sql
+SELECT
+  month,
+  revenue,
+  LEAD(revenue) OVER (ORDER BY month) AS next_month_revenue,
+  LEAD(revenue, 3) OVER (ORDER BY month) AS revenue_3mo_ahead
+FROM monthly_revenue;
+```
+
+## Month-Over-Month Change
+
+```sql
+SELECT
+  month,
+  revenue,
+  LAG(revenue) OVER (ORDER BY month) AS prev_month,
+  revenue - LAG(revenue) OVER (ORDER BY month) AS absolute_change,
+  ROUND(
+    (revenue - LAG(revenue) OVER (ORDER BY month))
+    * 100.0 / NULLIF(LAG(revenue) OVER (ORDER BY month), 0),
+    2
+  ) AS pct_change
+FROM monthly_revenue
+ORDER BY month;
+```
+
+## LAG with PARTITION BY
+
+```sql
+-- Month-over-month change per product category
+SELECT
+  category,
+  month,
+  revenue,
+  LAG(revenue) OVER (PARTITION BY category ORDER BY month) AS prev_month
+FROM category_monthly_revenue;
+-- LAG resets at the start of each category's window
+```
+
+## FIRST_VALUE and LAST_VALUE
+
+Return the first or last value in the window frame.
+
+```sql
+-- Each employee's salary vs the highest in their department
+SELECT
+  name,
+  department,
+  salary,
+  FIRST_VALUE(salary) OVER (
+    PARTITION BY department
+    ORDER BY salary DESC
+  ) AS dept_max_salary,
+  FIRST_VALUE(name) OVER (
+    PARTITION BY department
+    ORDER BY salary DESC
+  ) AS highest_paid_in_dept
+FROM employees;
+```
+
+### LAST_VALUE - Watch the Frame!
+
+`LAST_VALUE` behaves unexpectedly because the default window frame ends at the current row, not the partition end:
+
+```sql
+-- ❌ Wrong: default frame = ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+-- LAST_VALUE just returns the current row's value
+SELECT name, salary,
+  LAST_VALUE(salary) OVER (PARTITION BY department ORDER BY salary)
+FROM employees;
+
+-- ✅ Correct: extend the frame to the partition end
+SELECT name, salary,
+  LAST_VALUE(salary) OVER (
+    PARTITION BY department
+    ORDER BY salary
+    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+  ) AS dept_min_salary  -- last in ASC order = minimum
+FROM employees;
+```
+
+## NTH_VALUE
+
+Returns the value from the Nth row in the window:
+
+```sql
+-- Second highest salary in each department
+SELECT
+  name,
+  department,
+  salary,
+  NTH_VALUE(salary, 2) OVER (
+    PARTITION BY department
+    ORDER BY salary DESC
+    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+  ) AS second_highest
+FROM employees;
+```
+
+## Practical: Finding Gaps Between Events
+
+```sql
+-- Time between consecutive orders per customer
+SELECT
+  customer_id,
+  order_id,
+  created_at,
+  LAG(created_at) OVER (PARTITION BY customer_id ORDER BY created_at) AS prev_order,
+  created_at - LAG(created_at) OVER (PARTITION BY customer_id ORDER BY created_at)
+    AS days_since_last_order
+FROM orders
+ORDER BY customer_id, created_at;
+```
+
+## Summary
+
+- `LAG(col, n, default)` - value from n rows behind current row
+- `LEAD(col, n, default)` - value from n rows ahead of current row
+- Both are essential for period-over-period comparisons (month-over-month, day-over-day)
+- `FIRST_VALUE` - first value in the window (straightforward to use)
+- `LAST_VALUE` - needs explicit `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING` to work as expected
+- `PARTITION BY` makes LAG/LEAD reset at group boundaries

@@ -1,0 +1,150 @@
+## What is a Trigger?
+
+A trigger is a function that automatically executes when a specified event (INSERT, UPDATE, DELETE) occurs on a table. Triggers are used for automation - you don't call them directly.
+
+## When to Use Triggers
+
+- Auto-populate derived columns (`updated_at`, `slug`, `full_name`)
+- Audit logging - record who changed what and when
+- Enforce complex constraints that CHECK can't handle
+- Maintain denormalized summary data
+- Cascade custom business rules
+
+## Creating a Trigger (Two Steps)
+
+### Step 1: Create the trigger function
+
+```sql
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();  -- modify the row being inserted/updated
+  RETURN NEW;              -- return modified row
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### Step 2: Attach the trigger to a table
+
+```sql
+CREATE TRIGGER trg_users_updated_at
+BEFORE UPDATE ON users
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+-- Now every UPDATE on users automatically sets updated_at = NOW()
+UPDATE users SET name = 'Alice New' WHERE id = 1;
+-- updated_at is automatically set - no application code needed
+```
+
+## Trigger Timing
+
+| Timing | When | Can modify NEW? | Use for |
+|--------|------|----------------|---------|
+| `BEFORE` | Before the operation | ✅ Yes | Modify/validate data, cancel the operation |
+| `AFTER` | After the operation | ❌ No | Audit logging, cascading to other tables |
+| `INSTEAD OF` | Replace the operation | ✅ Yes | Making views updatable |
+
+## Common Trigger Patterns
+
+### Audit Log Trigger
+
+```sql
+CREATE TABLE audit_log (
+  id         BIGSERIAL PRIMARY KEY,
+  table_name TEXT,
+  operation  TEXT,
+  old_data   JSONB,
+  new_data   JSONB,
+  changed_by TEXT DEFAULT current_user,
+  changed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE OR REPLACE FUNCTION log_changes()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO audit_log (table_name, operation, old_data, new_data)
+  VALUES (
+    TG_TABLE_NAME,
+    TG_OP,
+    CASE WHEN TG_OP = 'DELETE' THEN row_to_json(OLD)::JSONB ELSE NULL END,
+    CASE WHEN TG_OP != 'DELETE' THEN row_to_json(NEW)::JSONB ELSE NULL END
+  );
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER audit_users
+AFTER INSERT OR UPDATE OR DELETE ON users
+FOR EACH ROW EXECUTE FUNCTION log_changes();
+```
+
+### Auto-generate Slug
+
+```sql
+CREATE OR REPLACE FUNCTION generate_slug()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.slug = LOWER(REGEXP_REPLACE(NEW.title, '[^a-zA-Z0-9]+', '-', 'g'));
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_articles_slug
+BEFORE INSERT ON articles
+FOR EACH ROW EXECUTE FUNCTION generate_slug();
+```
+
+### Maintain Summary Table
+
+```sql
+CREATE OR REPLACE FUNCTION sync_customer_stats()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO customer_stats (customer_id, order_count, total_spent)
+  VALUES (NEW.customer_id, 1, NEW.total)
+  ON CONFLICT (customer_id) DO UPDATE SET
+    order_count = customer_stats.order_count + 1,
+    total_spent = customer_stats.total_spent + NEW.total,
+    updated_at  = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_orders_sync_stats
+AFTER INSERT ON orders
+FOR EACH ROW EXECUTE FUNCTION sync_customer_stats();
+```
+
+## Special Trigger Variables
+
+```sql
+-- Available inside trigger functions:
+TG_TABLE_NAME  -- name of the table ('users', 'orders')
+TG_OP          -- operation: 'INSERT', 'UPDATE', 'DELETE'
+NEW            -- the new row (INSERT/UPDATE only)
+OLD            -- the old row (UPDATE/DELETE only)
+```
+
+## Managing Triggers
+
+```sql
+-- List triggers
+SELECT trigger_name, event_manipulation, event_object_table
+FROM information_schema.triggers WHERE trigger_schema = 'public';
+
+-- Disable/enable
+ALTER TABLE users DISABLE TRIGGER trg_users_updated_at;
+ALTER TABLE users ENABLE  TRIGGER trg_users_updated_at;
+
+-- Drop
+DROP TRIGGER IF EXISTS trg_users_updated_at ON users;
+```
+
+## Summary
+
+- Triggers fire automatically on INSERT, UPDATE, or DELETE - you never call them directly
+- Two steps: create a trigger function (returns TRIGGER), then attach it with CREATE TRIGGER
+- BEFORE triggers can modify or cancel the operation; AFTER triggers are for side effects
+- Common uses: `updated_at` automation, audit logs, slug generation, summary table maintenance
+- Triggers add hidden behavior - always document them and use them sparingly

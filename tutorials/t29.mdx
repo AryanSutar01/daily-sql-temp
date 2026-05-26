@@ -1,0 +1,172 @@
+## What is a Recursive CTE?
+
+A recursive CTE is one that references itself. It keeps running until no new rows are produced. It has two parts:
+
+```sql
+WITH RECURSIVE cte_name AS (
+  -- 1. Base case: starting rows (runs once)
+  SELECT ...
+
+  UNION ALL
+
+  -- 2. Recursive case: references cte_name, runs repeatedly
+  SELECT ... FROM source JOIN cte_name ON condition
+)
+SELECT * FROM cte_name;
+```
+
+The database:
+1. Runs the base case → produces initial rows
+2. Runs the recursive case on those rows → produces more rows
+3. Runs recursive case on those new rows → produces more rows
+4. Stops when the recursive case produces zero rows
+
+## Org Chart - Hierarchy Traversal
+
+```sql
+-- employees table
+-- id | name    | manager_id
+-- 1  | CEO     | NULL
+-- 2  | Alice   | 1
+-- 3  | Bob     | 1
+-- 4  | Charlie | 2
+-- 5  | Diana   | 2
+
+WITH RECURSIVE org AS (
+  -- Base case: start from the CEO (no manager)
+  SELECT id, name, manager_id, 0 AS depth, name AS path
+  FROM employees
+  WHERE manager_id IS NULL
+
+  UNION ALL
+
+  -- Recursive: find direct reports of people already in the result
+  SELECT
+    e.id,
+    e.name,
+    e.manager_id,
+    org.depth + 1,
+    org.path || ' > ' || e.name
+  FROM employees e
+  JOIN org ON e.manager_id = org.id
+)
+SELECT
+  REPEAT('    ', depth) || name AS indented_org_chart,
+  depth AS level,
+  path
+FROM org
+ORDER BY path;
+
+-- Output:
+-- CEO
+--     Alice
+--         Charlie
+--         Diana
+--     Bob
+```
+
+## Find All Descendants of a Node
+
+```sql
+-- Find everyone who reports to Alice (directly or indirectly)
+WITH RECURSIVE reports_to_alice AS (
+  -- Base: Alice herself
+  SELECT id, name FROM employees WHERE name = 'Alice'
+
+  UNION ALL
+
+  -- Recursive: their reports
+  SELECT e.id, e.name
+  FROM employees e
+  JOIN reports_to_alice r ON e.manager_id = r.id
+)
+SELECT name FROM reports_to_alice WHERE name != 'Alice';
+```
+
+## Category Tree (Breadcrumbs)
+
+```sql
+-- categories: id | name | parent_id
+
+WITH RECURSIVE breadcrumb AS (
+  -- Start from a specific category
+  SELECT id, name, parent_id, name AS breadcrumb
+  FROM categories
+  WHERE id = 42
+
+  UNION ALL
+
+  -- Walk up to parent
+  SELECT c.id, c.name, c.parent_id, c.name || ' > ' || b.breadcrumb
+  FROM categories c
+  JOIN breadcrumb b ON c.id = b.parent_id
+)
+SELECT breadcrumb FROM breadcrumb WHERE parent_id IS NULL;
+-- Output: 'Electronics > Mobile > Smartphones'
+```
+
+## Generate a Number or Date Series
+
+```sql
+-- Generate numbers 1 to 100
+WITH RECURSIVE numbers AS (
+  SELECT 1 AS n
+  UNION ALL
+  SELECT n + 1 FROM numbers WHERE n < 100
+)
+SELECT n FROM numbers;
+
+-- Generate dates for all of 2024
+WITH RECURSIVE calendar AS (
+  SELECT '2024-01-01'::DATE AS d
+  UNION ALL
+  SELECT d + INTERVAL '1 day' FROM calendar WHERE d < '2024-12-31'
+)
+SELECT d AS date, TO_CHAR(d, 'Day') AS day_name FROM calendar;
+```
+
+## Preventing Infinite Loops
+
+A recursive CTE with a bug can loop forever. Always include a termination condition and optionally a depth limit:
+
+```sql
+WITH RECURSIVE safe_traversal AS (
+  SELECT id, parent_id, 1 AS depth
+  FROM nodes WHERE id = 1
+
+  UNION ALL
+
+  SELECT n.id, n.parent_id, st.depth + 1
+  FROM nodes n
+  JOIN safe_traversal st ON n.parent_id = st.id
+  WHERE st.depth < 100   -- ← depth limit prevents infinite loop
+)
+SELECT * FROM safe_traversal;
+```
+
+## Detecting Cycles
+
+In graph data with cycles, you need to track visited nodes:
+
+```sql
+WITH RECURSIVE path AS (
+  SELECT id, ARRAY[id] AS visited, FALSE AS cycle
+  FROM nodes WHERE id = 1
+
+  UNION ALL
+
+  SELECT n.id, p.visited || n.id, n.id = ANY(p.visited)
+  FROM nodes n
+  JOIN path p ON n.parent_id = p.id
+  WHERE NOT p.cycle
+)
+SELECT id, visited, cycle FROM path;
+```
+
+## Summary
+
+- Recursive CTEs have two parts: a base case and a recursive case connected by UNION ALL
+- They run until the recursive case produces zero rows
+- Essential for: org charts, category trees, path finding, number/date series generation
+- Always include a termination condition or depth limit to prevent infinite loops
+- PostgreSQL supports recursive CTEs natively; MySQL 8+, SQL Server also support them

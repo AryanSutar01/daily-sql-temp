@@ -1,0 +1,135 @@
+## What is Denormalization?
+
+Denormalization is the deliberate introduction of redundancy into a normalized database schema to improve read performance. It trades write complexity for read speed.
+
+```
+Normalized (3NF):             Denormalized:
+orders → customers             orders (has customer_name stored directly)
+orders → products              orders (has product_name stored directly)
+
+Read: requires JOINs           Read: no JOINs needed - faster
+Write: no redundancy           Write: must update name in multiple places
+```
+
+## When to Denormalize
+
+**Consider denormalization when:**
+- Queries require many expensive JOINs that run thousands of times per second
+- The data being denormalized changes rarely (product names, category names)
+- You're building a read-heavy analytics/reporting system
+- You're building a data warehouse (star schema)
+
+**Don't denormalize when:**
+- The denormalized data changes frequently (user email, price - these cause data drift)
+- Your system is primarily write-heavy
+- The JOIN performance is acceptable - measure before optimizing
+
+## Common Denormalization Patterns
+
+### 1. Storing Computed Values
+
+```sql
+-- Normalized: calculate total on every read
+SELECT SUM(oi.quantity * oi.unit_price) FROM order_items WHERE order_id = 1;
+
+-- Denormalized: store total in orders table
+ALTER TABLE orders ADD COLUMN item_total DECIMAL(10,2);
+-- Update it when order_items change (trigger or application code)
+-- Read is now instant: SELECT item_total FROM orders WHERE id = 1;
+```
+
+### 2. Storing Foreign Key Labels
+
+```sql
+-- Normalized: JOIN to get category name
+SELECT p.name, c.name AS category
+FROM products p JOIN categories c ON p.category_id = c.id;
+
+-- Denormalized: store category_name directly in products
+ALTER TABLE products ADD COLUMN category_name VARCHAR(100);
+-- Read: SELECT name, category_name FROM products; (no JOIN)
+-- Risk: if category name changes, must update all products
+```
+
+### 3. Precomputed Aggregates (Summary Tables)
+
+```sql
+-- Create a summary table (updated via trigger or scheduled job)
+CREATE TABLE customer_stats (
+  customer_id   BIGINT PRIMARY KEY REFERENCES users(id),
+  order_count   INT DEFAULT 0,
+  total_spent   DECIMAL(12,2) DEFAULT 0,
+  last_order_at TIMESTAMPTZ,
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Dashboard query: instant, no aggregation needed
+SELECT u.name, cs.order_count, cs.total_spent
+FROM users u
+JOIN customer_stats cs ON u.id = cs.customer_id
+WHERE cs.total_spent > 50000;
+```
+
+### 4. Materialized Views (Managed Denormalization)
+
+```sql
+-- PostgreSQL: let the database manage the denormalized copy
+CREATE MATERIALIZED VIEW monthly_sales AS
+SELECT
+  DATE_TRUNC('month', created_at) AS month,
+  category_id,
+  SUM(total) AS revenue
+FROM orders o
+JOIN order_items oi ON o.id = oi.order_id
+JOIN products p ON oi.product_id = p.id
+GROUP BY 1, 2;
+
+CREATE INDEX ON monthly_sales(month, category_id);
+
+-- Refresh on a schedule (e.g., nightly)
+REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_sales;
+```
+
+### 5. Star Schema (Data Warehousing)
+
+In analytics databases, data is deliberately denormalized into fact and dimension tables:
+
+```sql
+-- Fact table: transactions
+CREATE TABLE fact_sales (
+  date_id      INT,
+  product_id   INT,
+  customer_id  INT,
+  region_id    INT,
+  quantity     INT,
+  revenue      DECIMAL(12,2)
+);
+
+-- Dimension tables: denormalized attributes
+CREATE TABLE dim_product (
+  product_id   INT PRIMARY KEY,
+  product_name VARCHAR(200),
+  category     VARCHAR(100),    -- denormalized (normally separate table)
+  subcategory  VARCHAR(100)     -- denormalized
+);
+```
+
+This allows analytics queries to be extremely fast - one JOIN to each dimension instead of many nested JOINs through a normalized schema.
+
+## Risks of Denormalization
+
+| Risk | Description | Mitigation |
+|------|-------------|-----------|
+| Data drift | Denormalized copy gets out of sync with source | Triggers, scheduled jobs, or materialized views |
+| Write complexity | Every write must update multiple places | Encapsulate in procedures/triggers |
+| Storage bloat | Same data stored multiple times | Acceptable trade-off in most cases |
+| Confusion | Developers unsure which is authoritative | Document clearly, use views as interface |
+
+## Summary
+
+- Denormalization adds controlled redundancy to speed up reads
+- Common patterns: precomputed totals, stored labels, summary tables, materialized views
+- Use when JOINs are too expensive and data changes rarely
+- Materialized views are the safest form of denormalization - the database manages the refresh
+- Star schema is intentional denormalization for analytics - optimizes for read performance
+- Always measure query performance before denormalizing - premature optimization is costly

@@ -1,0 +1,167 @@
+## What is an Index?
+
+An index is a separate data structure that the database maintains alongside a table. It allows the database to find rows without scanning every row (a full table scan).
+
+```
+Without index: Scan all 10,000,000 rows → O(n)
+With index:    Jump directly to matching rows → O(log n)
+```
+
+## Creating and Dropping Indexes
+
+```sql
+-- Basic index
+CREATE INDEX idx_users_email ON users(email);
+
+-- Unique index (also enforces uniqueness)
+CREATE UNIQUE INDEX idx_users_email ON users(email);
+
+-- Composite index (multiple columns)
+CREATE INDEX idx_orders_customer_date ON orders(customer_id, created_at DESC);
+
+-- Drop
+DROP INDEX idx_users_email;           -- PostgreSQL
+DROP INDEX idx_users_email ON users;  -- MySQL
+```
+
+## B-Tree Index (Default)
+
+B-Tree (Balanced Tree) is the default index type. It supports:
+- Equality: `WHERE email = 'alice@email.com'`
+- Range: `WHERE age BETWEEN 20 AND 30`
+- Sorting: `ORDER BY created_at DESC`
+- Prefix matching: `WHERE name LIKE 'Alice%'`
+
+```sql
+-- All of these use a B-Tree index efficiently:
+WHERE email = 'x'
+WHERE salary > 50000
+WHERE created_at BETWEEN '2024-01-01' AND '2024-12-31'
+WHERE name LIKE 'Ali%'     -- ✅ trailing wildcard only
+WHERE name LIKE '%Ali'     -- ❌ leading wildcard cannot use index
+```
+
+## Hash Index
+
+Only supports equality (`=`). Slightly faster than B-Tree for exact lookups, but cannot support range queries or sorting.
+
+```sql
+CREATE INDEX idx_sessions_token ON sessions USING HASH (token);
+-- Only useful for: WHERE token = 'abc123'
+-- Cannot use for: WHERE token > 'abc' or ORDER BY token
+```
+
+In practice, B-Tree is usually preferred even for equality - it's versatile and PostgreSQL optimizes it well.
+
+## Composite Index - Column Order Matters
+
+```sql
+CREATE INDEX idx_orders_customer_date ON orders(customer_id, created_at);
+```
+
+A composite index can be used when the query filters on the **leftmost** columns:
+
+```sql
+WHERE customer_id = 101                              -- ✅ uses index (leftmost col)
+WHERE customer_id = 101 AND created_at > '2024-01'  -- ✅ uses both columns
+WHERE created_at > '2024-01'                         -- ❌ skips leftmost col
+```
+
+**Rule:** Design composite indexes to match your most common query patterns - most selective column first.
+
+## Partial Index - Index a Subset of Rows
+
+```sql
+-- Only index active users (if 90% are inactive, don't waste space on them)
+CREATE INDEX idx_active_users ON users(email) WHERE status = 'active';
+
+-- Query that benefits from this index:
+SELECT * FROM users WHERE status = 'active' AND email = 'alice@email.com';
+
+-- Pending orders index (only a small fraction of orders)
+CREATE INDEX idx_pending_orders ON orders(created_at) WHERE status = 'pending';
+```
+
+Partial indexes are smaller and faster because they contain fewer rows.
+
+## Covering Index (Include)
+
+A covering index stores extra columns so the query can be answered from the index alone - no need to touch the main table.
+
+```sql
+-- Query: SELECT amount, order_date FROM orders WHERE customer_id = 101
+-- Without covering index: index lookup → then fetch row from table for amount and order_date
+-- With covering index: everything needed is in the index
+
+CREATE INDEX idx_orders_covering
+ON orders(customer_id)
+INCLUDE (amount, created_at);   -- PostgreSQL 11+ INCLUDE syntax
+-- Now: Index Only Scan - never touches the main table
+```
+
+## GIN Index - Full-Text Search, Arrays, JSONB
+
+```sql
+-- Full-text search
+CREATE INDEX idx_articles_fts ON articles USING GIN (to_tsvector('english', content));
+SELECT * FROM articles WHERE to_tsvector('english', content) @@ to_tsquery('database');
+
+-- JSONB fields
+CREATE INDEX idx_users_metadata ON users USING GIN (metadata);
+SELECT * FROM users WHERE metadata @> '{"city": "Mumbai"}';
+
+-- Array contains
+CREATE INDEX idx_products_tags ON products USING GIN (tags);
+SELECT * FROM products WHERE tags @> ARRAY['wireless'];
+```
+
+## When to Add an Index
+
+**Good candidates:**
+- Columns used in `WHERE` clauses frequently
+- Columns used in `JOIN` conditions (`ON u.id = o.customer_id`)
+- Columns used in `ORDER BY` with a matching filter
+- Foreign key columns (not auto-indexed in PostgreSQL)
+
+**Bad candidates:**
+- Low-cardinality columns (e.g., `status` with only 2 values - full scan may be faster)
+- Very small tables (< a few thousand rows - full scan is negligible)
+- Columns that are rarely queried
+- Tables with extremely high write rates (every write must update all indexes)
+
+## Index Anti-Patterns
+
+```sql
+-- ❌ Function on column: index cannot be used
+WHERE UPPER(email) = 'ALICE@EMAIL.COM'
+-- ✅ Fix: store lowercase, or create a functional index
+CREATE INDEX idx_users_email_lower ON users (LOWER(email));
+
+-- ❌ Leading wildcard: index cannot be used
+WHERE name LIKE '%Kumar'
+-- ✅ Fix: reverse the string and index, or use full-text search
+
+-- ❌ Implicit type conversion: prevents index use
+WHERE customer_id = '101'   -- customer_id is INT, '101' is string
+-- ✅ Fix: match the data type
+WHERE customer_id = 101
+```
+
+## EXPLAIN - Verify Index Usage
+
+```sql
+EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'alice@email.com';
+
+-- Good: "Index Scan using idx_users_email"
+-- Bad: "Seq Scan on users (cost=0..180000 rows=1000000)"
+```
+
+## Summary
+
+- B-Tree (default): equality, range, sorting, prefix LIKE - use for almost everything
+- Hash: equality only - rarely needed, B-Tree usually better
+- Composite: column order matters - put leftmost filter column first
+- Partial: index subset of rows - great for status = 'pending' or similar
+- Covering: include extra columns to enable Index Only Scans
+- GIN: full-text search, arrays, JSONB containment queries
+- Too many indexes slow down INSERT/UPDATE/DELETE - index strategically

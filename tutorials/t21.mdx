@@ -1,0 +1,179 @@
+## Why String Functions?
+
+Real-world data is messy. Names have extra spaces, emails have inconsistent casing, phone numbers have dashes. String functions let you clean, transform, and extract exactly what you need.
+
+## Case Conversion
+
+```sql
+SELECT UPPER('hello world');       -- 'HELLO WORLD'
+SELECT LOWER('HELLO WORLD');       -- 'hello world'
+SELECT INITCAP('hello world');     -- 'Hello World'  (PostgreSQL)
+
+-- Normalize emails for comparison (case-insensitive lookup)
+SELECT * FROM users WHERE LOWER(email) = LOWER('Alice@Email.COM');
+
+-- ⚠️ Performance note: applying a function to an indexed column prevents index use
+-- Add a functional index if you do this frequently:
+CREATE INDEX idx_users_email_lower ON users (LOWER(email));
+```
+
+## String Length
+
+```sql
+SELECT LENGTH('hello');           -- 5
+SELECT CHAR_LENGTH('hello');      -- 5 (MySQL/standard)
+SELECT LENGTH(NULL);              -- NULL
+
+-- Find users with suspiciously short or long names
+SELECT * FROM users WHERE LENGTH(name) < 2 OR LENGTH(name) > 100;
+
+-- Validate password length
+SELECT * FROM users WHERE LENGTH(password_hash) != 60;
+```
+
+## Trimming Whitespace
+
+```sql
+SELECT TRIM('  hello  ');          -- 'hello'
+SELECT LTRIM('  hello  ');         -- 'hello  '
+SELECT RTRIM('  hello  ');         -- '  hello'
+SELECT TRIM(BOTH 'x' FROM 'xxxhelloxx'); -- 'hello'
+
+-- Clean dirty user input
+UPDATE users SET name = TRIM(name);
+UPDATE users SET email = LOWER(TRIM(email));
+```
+
+## Concatenation
+
+```sql
+-- CONCAT function (works in MySQL, PostgreSQL)
+SELECT CONCAT(first_name, ' ', last_name) AS full_name FROM users;
+
+-- || operator (PostgreSQL, SQLite, standard SQL)
+SELECT first_name || ' ' || last_name AS full_name FROM users;
+
+-- CONCAT_WS: concat With Separator - skips NULLs
+SELECT CONCAT_WS(', ', city, state, country) AS address FROM users;
+-- If state is NULL → 'Mumbai, India'  (no double comma)
+-- vs CONCAT('Mumbai', ', ', NULL, ', ', 'India') → 'Mumbai, , India' (bad!)
+```
+
+## SUBSTRING / SUBSTR
+
+```sql
+-- SUBSTRING(string, start, length)  [1-indexed]
+SELECT SUBSTRING('Hello World', 1, 5);   -- 'Hello'
+SELECT SUBSTRING('Hello World', 7);      -- 'World' (to end)
+SELECT SUBSTR('Hello World', 7, 5);      -- 'World'
+
+-- Extract username from email
+SELECT SUBSTRING(email, 1, POSITION('@' IN email) - 1) AS username
+FROM users;
+-- 'alice@email.com' → 'alice'
+
+-- LEFT and RIGHT (shortcuts for substring from ends)
+SELECT LEFT('Hello World', 5);    -- 'Hello'
+SELECT RIGHT('Hello World', 5);   -- 'World'
+SELECT LEFT(phone, 4);            -- First 4 digits (country code area)
+```
+
+## Search and Position
+
+```sql
+SELECT POSITION('@' IN 'alice@email.com');     -- 6
+SELECT STRPOS('alice@email.com', '@');         -- 6  (PostgreSQL)
+SELECT LOCATE('@', 'alice@email.com');         -- 6  (MySQL)
+SELECT CHARINDEX('@', 'alice@email.com');      -- 6  (SQL Server)
+
+-- Does the string contain a substring?
+SELECT * FROM products WHERE POSITION('wireless' IN LOWER(name)) > 0;
+-- Or more commonly:
+SELECT * FROM products WHERE name ILIKE '%wireless%';
+```
+
+## REPLACE
+
+```sql
+SELECT REPLACE('Hello World', 'World', 'SQL');  -- 'Hello SQL'
+
+-- Remove all dashes from phone numbers
+UPDATE users SET phone = REPLACE(phone, '-', '');
+
+-- Clean currency symbols before converting to number
+SELECT CAST(REPLACE(price_text, '$', '') AS DECIMAL(10,2)) AS price
+FROM raw_imports;
+```
+
+## SPLIT_PART (PostgreSQL)
+
+```sql
+-- Split by delimiter, get Nth part (1-indexed)
+SELECT SPLIT_PART('alice@gmail.com', '@', 1);  -- 'alice'
+SELECT SPLIT_PART('alice@gmail.com', '@', 2);  -- 'gmail.com'
+SELECT SPLIT_PART('2024-06-15', '-', 1);       -- '2024' (year)
+
+-- Get file extension
+SELECT SPLIT_PART(filename, '.', -1) AS ext FROM files; -- PostgreSQL 14+
+```
+
+## Padding
+
+```sql
+SELECT LPAD('42', 6, '0');       -- '000042'  (pad left to width 6)
+SELECT RPAD('hello', 10, '.');   -- 'hello.....'  (pad right)
+
+-- Format order IDs with leading zeros
+SELECT LPAD(id::TEXT, 8, '0') AS formatted_id FROM orders;
+-- 42 → '00000042'
+```
+
+## REPEAT and REVERSE
+
+```sql
+SELECT REPEAT('ab', 3);   -- 'ababab'
+SELECT REVERSE('hello');  -- 'olleh'
+```
+
+## REGEXP_REPLACE / REGEXP_MATCH
+
+```sql
+-- Remove all non-digit characters from phone number
+SELECT REGEXP_REPLACE(phone, '[^0-9]', '', 'g') AS clean_phone
+FROM users;
+-- '+91-98765-43210' → '919876543210'
+
+-- Extract digits only
+SELECT REGEXP_REPLACE('Order #12345 placed', '[^0-9]', '', 'g');
+-- '12345'
+
+-- Validate email format (basic)
+SELECT * FROM users WHERE email !~ '^[^@]+@[^@]+\.[^@]+$';
+-- Find emails that DON'T match basic email pattern
+```
+
+## Practical: Data Cleaning Pipeline
+
+```sql
+-- Clean a messy user import
+SELECT
+  TRIM(INITCAP(LOWER(name)))          AS cleaned_name,
+  LOWER(TRIM(email))                   AS cleaned_email,
+  REGEXP_REPLACE(phone, '[^0-9]', '', 'g') AS cleaned_phone,
+  NULLIF(TRIM(city), '')              AS cleaned_city
+FROM raw_user_import
+WHERE LENGTH(TRIM(email)) > 0
+  AND POSITION('@' IN email) > 1;
+```
+
+## Summary
+
+- `UPPER` / `LOWER` / `INITCAP` - normalize case
+- `TRIM` / `LTRIM` / `RTRIM` - remove whitespace or specific characters
+- `CONCAT` / `||` - combine strings; `CONCAT_WS` skips NULLs automatically
+- `SUBSTRING` / `LEFT` / `RIGHT` - extract parts of a string
+- `REPLACE` - find and replace text
+- `POSITION` / `STRPOS` - find position of a substring
+- `SPLIT_PART` (PostgreSQL) - split by delimiter
+- `REGEXP_REPLACE` - powerful pattern-based replacement
+- Applying functions to indexed columns prevents index use - create functional indexes for frequent lookups

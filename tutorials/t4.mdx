@@ -1,213 +1,255 @@
-## What Are Aggregate Functions?
+## DML - Data Manipulation Language
 
-Aggregate functions perform a calculation on a set of rows and return a single value. They collapse multiple rows into one summary result.
+DML commands work with the **actual data** inside tables. Unlike DDL, all DML can be wrapped in a transaction and rolled back.
 
-| Function | Description |
-|----------|-------------|
-| `COUNT()` | Number of rows |
-| `SUM()` | Total of a numeric column |
-| `AVG()` | Average of a numeric column |
-| `MIN()` | Smallest value |
-| `MAX()` | Largest value |
+| Command | Purpose |
+|---------|---------|
+| `INSERT` | Add new rows |
+| `UPDATE` | Modify existing rows |
+| `DELETE` | Remove rows |
 
-## COUNT
+## INSERT
+
+### Single Row
 
 ```sql
--- Total number of users
-SELECT COUNT(*) FROM users;
+-- Always specify column names (safer, order-independent)
+INSERT INTO users (name, email, city)
+VALUES ('Alice', 'alice@email.com', 'Mumbai');
 
--- Count users with an email (ignores NULLs)
-SELECT COUNT(email) FROM users;
-
--- Count unique cities
-SELECT COUNT(DISTINCT city) FROM users;
+-- Without column names (must match exact column order - fragile)
+INSERT INTO users
+VALUES (DEFAULT, 'Bob', 'bob@email.com', 'Delhi', NOW());
 ```
 
-## SUM
+### Multiple Rows (Batch Insert)
 
 ```sql
--- Total revenue
-SELECT SUM(amount) FROM orders;
-
--- Total salary expense
-SELECT SUM(salary) FROM employees;
+-- One INSERT, many rows - much faster than individual inserts
+INSERT INTO products (name, price, category_id) VALUES
+  ('Laptop',    75000.00, 1),
+  ('Mouse',       599.00, 1),
+  ('Keyboard',   1299.00, 1),
+  ('Desk',       8999.00, 2),
+  ('Chair',     12000.00, 2);
 ```
 
-## AVG
+### INSERT ... SELECT
 
 ```sql
--- Average order value
-SELECT AVG(amount) FROM orders;
-
--- Average age of users
-SELECT AVG(age) FROM users;
-```
-
-## MIN and MAX
-
-```sql
--- Youngest and oldest user
-SELECT MIN(age), MAX(age) FROM users;
-
--- Cheapest and most expensive product
-SELECT MIN(price) AS cheapest, MAX(price) AS most_expensive
-FROM products;
-
--- First and last order date
-SELECT MIN(order_date) AS first_order, MAX(order_date) AS last_order
-FROM orders;
-```
-
-## GROUP BY
-
-`GROUP BY` groups rows that have the same value in a column, then applies aggregate functions to each group.
-
-```sql
--- Count users per city
-SELECT city, COUNT(*) AS user_count
+-- Insert rows from another table or query
+INSERT INTO users_archive (id, name, email, created_at)
+SELECT id, name, email, created_at
 FROM users
-GROUP BY city;
-```
+WHERE created_at < '2023-01-01';
 
-Result:
-```
-+-----------+------------+
-| city      | user_count |
-+-----------+------------+
-| Mumbai    | 142        |
-| Delhi     | 98         |
-| Pune      | 67         |
-| Bangalore | 203        |
-+-----------+------------+
-```
-
-```sql
--- Total revenue per product
-SELECT product_id, SUM(amount) AS total_revenue
-FROM orders
-GROUP BY product_id;
-
--- Average salary per department
-SELECT department, AVG(salary) AS avg_salary
-FROM employees
-GROUP BY department;
-
--- Orders count and total per customer
-SELECT customer_id, COUNT(*) AS order_count, SUM(amount) AS total_spent
+-- Insert aggregated data
+INSERT INTO customer_stats (customer_id, total_orders, total_spent)
+SELECT customer_id, COUNT(*), SUM(total)
 FROM orders
 GROUP BY customer_id;
 ```
 
-## GROUP BY Multiple Columns
+### RETURNING (PostgreSQL)
 
 ```sql
--- Revenue per product per month
-SELECT
-  product_id,
-  EXTRACT(MONTH FROM order_date) AS month,
-  SUM(amount) AS monthly_revenue
-FROM orders
-GROUP BY product_id, EXTRACT(MONTH FROM order_date)
-ORDER BY product_id, month;
+-- Get the inserted row's data back immediately
+INSERT INTO users (name, email)
+VALUES ('Alice', 'alice@email.com')
+RETURNING id, created_at;
+
+-- Useful to get the auto-generated ID
+INSERT INTO orders (customer_id, total)
+VALUES (1, 5000.00)
+RETURNING id;
 ```
 
-## HAVING
+### ON CONFLICT - Upsert
 
-`HAVING` filters groups after aggregation — like `WHERE` but for groups.
+Handle duplicate key violations gracefully.
 
 ```sql
--- Cities with more than 100 users
-SELECT city, COUNT(*) AS user_count
-FROM users
-GROUP BY city
-HAVING COUNT(*) > 100;
+-- Do nothing on conflict (skip duplicates silently)
+INSERT INTO users (email, name)
+VALUES ('alice@email.com', 'Alice')
+ON CONFLICT (email) DO NOTHING;
 
--- Departments with average salary above 50000
-SELECT department, AVG(salary) AS avg_salary
-FROM employees
-GROUP BY department
-HAVING AVG(salary) > 50000;
-
--- Products with total revenue above 1 million
-SELECT product_id, SUM(amount) AS total_revenue
-FROM orders
-GROUP BY product_id
-HAVING SUM(amount) > 1000000;
+-- Update on conflict (upsert - insert or update)
+INSERT INTO users (email, name, login_count)
+VALUES ('alice@email.com', 'Alice', 1)
+ON CONFLICT (email) DO UPDATE SET
+  name        = EXCLUDED.name,
+  login_count = users.login_count + 1,
+  updated_at  = NOW();
+-- EXCLUDED refers to the row that was attempted to be inserted
 ```
 
-## WHERE vs HAVING
+## UPDATE
 
-This is a very common interview question!
-
-| | WHERE | HAVING |
-|-|-------|--------|
-| Filters | Individual rows | Groups |
-| When applied | Before grouping | After grouping |
-| Can use aggregates | ❌ No | ✅ Yes |
+### Basic Update
 
 ```sql
--- WHERE filters rows BEFORE grouping
--- HAVING filters groups AFTER grouping
+-- Update one column
+UPDATE users SET city = 'Pune' WHERE id = 1;
 
-SELECT city, COUNT(*) AS user_count
-FROM users
-WHERE status = 'active'        -- filters rows first
-GROUP BY city
-HAVING COUNT(*) > 50;          -- then filters groups
+-- Update multiple columns
+UPDATE users
+SET
+  name       = 'Alice Kumar',
+  city       = 'Bangalore',
+  updated_at = NOW()
+WHERE id = 1;
 ```
 
-## Full Aggregation Query Order
+> ⚠️ **Always include a WHERE clause.** `UPDATE users SET status = 'inactive'` without WHERE updates EVERY row in the table.
+
+### Update with Expressions
 
 ```sql
-SELECT   city, COUNT(*) AS user_count   -- 5. Select columns
-FROM     users                           -- 1. From table
-WHERE    status = 'active'              -- 2. Filter rows
-GROUP BY city                           -- 3. Group
-HAVING   COUNT(*) > 50                  -- 4. Filter groups
-ORDER BY user_count DESC                -- 6. Sort
-LIMIT    10;                            -- 7. Limit
+-- Increment / decrement
+UPDATE products SET stock     = stock - 1      WHERE id = 5;
+UPDATE users    SET login_count = login_count + 1 WHERE id = 42;
+
+-- Apply a calculation
+UPDATE order_items SET total_price = quantity * unit_price;
+
+-- Update using CASE
+UPDATE users
+SET tier = CASE
+  WHEN total_spent >= 100000 THEN 'Platinum'
+  WHEN total_spent >= 50000  THEN 'Gold'
+  WHEN total_spent >= 10000  THEN 'Silver'
+  ELSE 'Bronze'
+END;
 ```
 
-## Real World Examples
+### UPDATE from Another Table (PostgreSQL)
 
 ```sql
--- Monthly sales report
-SELECT
-  EXTRACT(YEAR FROM order_date)  AS year,
-  EXTRACT(MONTH FROM order_date) AS month,
-  COUNT(*)                       AS total_orders,
-  SUM(amount)                    AS total_revenue,
-  AVG(amount)                    AS avg_order_value
-FROM orders
-WHERE status = 'completed'
-GROUP BY
-  EXTRACT(YEAR FROM order_date),
-  EXTRACT(MONTH FROM order_date)
-ORDER BY year DESC, month DESC;
+-- Update using values from a joined table
+UPDATE orders
+SET status = 'confirmed'
+FROM payments
+WHERE orders.id = payments.order_id
+  AND payments.status = 'completed';
 
--- Top 5 customers by spending
-SELECT
-  customer_id,
-  COUNT(*)    AS order_count,
-  SUM(amount) AS total_spent
-FROM orders
-GROUP BY customer_id
-ORDER BY total_spent DESC
-LIMIT 5;
+-- MySQL syntax uses JOIN
+UPDATE orders o
+JOIN payments p ON o.id = p.order_id
+SET o.status = 'confirmed'
+WHERE p.status = 'completed';
+```
 
--- Categories with more than 10 products under $50
-SELECT category, COUNT(*) AS affordable_products
-FROM products
-WHERE price < 50
-GROUP BY category
-HAVING COUNT(*) > 10
-ORDER BY affordable_products DESC;
+### RETURNING (PostgreSQL)
+
+```sql
+-- See which rows were updated
+UPDATE users
+SET status = 'inactive'
+WHERE last_login < NOW() - INTERVAL '1 year'
+RETURNING id, name, email;
+```
+
+## DELETE
+
+### Basic Delete
+
+```sql
+-- Delete specific rows
+DELETE FROM users WHERE id = 1;
+
+-- Delete with multiple conditions
+DELETE FROM orders
+WHERE status = 'cancelled'
+  AND created_at < NOW() - INTERVAL '90 days';
+```
+
+> ⚠️ **Always include a WHERE clause.** `DELETE FROM users` without WHERE deletes every single row.
+
+### Delete Using a Subquery
+
+```sql
+-- Delete users who have never ordered
+DELETE FROM users
+WHERE id NOT IN (
+  SELECT DISTINCT customer_id FROM orders
+);
+
+-- Delete duplicate rows, keep lowest ID
+DELETE FROM users
+WHERE id NOT IN (
+  SELECT MIN(id) FROM users GROUP BY email
+);
+```
+
+### DELETE from Multiple Tables (MySQL)
+
+```sql
+-- Delete related rows in one query (MySQL)
+DELETE oi FROM order_items oi
+JOIN orders o ON oi.order_id = o.id
+WHERE o.status = 'cancelled';
+```
+
+### RETURNING (PostgreSQL)
+
+```sql
+-- See what was deleted
+DELETE FROM sessions
+WHERE expires_at < NOW()
+RETURNING id, user_id, created_at;
+```
+
+## Safe DML Practices
+
+### Always Preview with SELECT First
+
+```sql
+-- Step 1: See exactly what will be affected
+SELECT * FROM users WHERE last_login < '2022-01-01';
+
+-- Step 2: If it looks right, run the DELETE
+DELETE FROM users WHERE last_login < '2022-01-01';
+```
+
+### Use Transactions for Multi-Step Operations
+
+```sql
+BEGIN;
+
+UPDATE accounts SET balance = balance - 1000 WHERE id = 1;
+UPDATE accounts SET balance = balance + 1000 WHERE id = 2;
+
+-- Check the result looks correct
+SELECT id, balance FROM accounts WHERE id IN (1, 2);
+
+COMMIT;   -- save if correct
+-- ROLLBACK;  -- undo if something looks wrong
+```
+
+### Batch Large Deletes
+
+```sql
+-- ❌ Dangerous on large tables: locks for a long time
+DELETE FROM logs WHERE created_at < '2023-01-01';
+
+-- ✅ Better: delete in batches
+DELETE FROM logs
+WHERE id IN (
+  SELECT id FROM logs
+  WHERE created_at < '2023-01-01'
+  LIMIT 10000
+);
+-- Run this in a loop from application code until 0 rows affected
 ```
 
 ## Summary
 
-- Aggregate functions — `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`
-- `GROUP BY` — groups rows, then applies aggregate per group
-- `HAVING` — filters groups (like WHERE but after grouping)
-- `WHERE` filters rows before grouping; `HAVING` filters after
-- Execution order: FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT
+| Command | Key Rule |
+|---------|---------|
+| `INSERT` | Always list column names; use batch inserts for multiple rows |
+| `UPDATE` | ALWAYS include WHERE - no WHERE = updates every row |
+| `DELETE` | ALWAYS include WHERE - no WHERE = deletes every row |
+| Upsert | Use `ON CONFLICT DO UPDATE` in PostgreSQL |
+| Safety | SELECT first to preview; use transactions for multi-step ops |
+| Scale | Batch large deletes to avoid long table locks |

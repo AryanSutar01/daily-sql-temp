@@ -1,0 +1,163 @@
+## Primary Key
+
+A primary key uniquely identifies each row in a table. Rules:
+- Must be unique across all rows
+- Cannot be NULL
+- A table can have only one primary key (but it can span multiple columns)
+
+```sql
+-- Single column PK
+CREATE TABLE users (
+  id    BIGSERIAL PRIMARY KEY,
+  email VARCHAR(255) NOT NULL
+);
+
+-- Named PK constraint
+CREATE TABLE users (
+  id    BIGSERIAL,
+  email VARCHAR(255),
+  CONSTRAINT pk_users PRIMARY KEY (id)
+);
+
+-- Add PK to existing table
+ALTER TABLE users ADD PRIMARY KEY (id);
+```
+
+## Natural vs Surrogate Keys
+
+**Surrogate key:** An artificial ID with no business meaning (SERIAL, UUID)
+
+```sql
+id BIGSERIAL PRIMARY KEY   -- purely for identification, no meaning
+```
+
+**Natural key:** A real-world attribute that happens to be unique
+
+```sql
+email VARCHAR(255) PRIMARY KEY   -- naturally unique
+tax_id CHAR(15)    PRIMARY KEY   -- unique business identifier
+```
+
+**Which to use?**
+- Surrogate keys are almost always better in practice
+- Natural keys change (email addresses, tax IDs can be reassigned or updated)
+- Surrogate keys are stable, short, and fast to index
+
+## Foreign Key
+
+A foreign key links a column to the primary key of another table. Enforces **referential integrity** - you can't reference a row that doesn't exist.
+
+```sql
+CREATE TABLE orders (
+  id          BIGSERIAL PRIMARY KEY,
+  customer_id BIGINT NOT NULL REFERENCES users(id),
+  total       DECIMAL(10,2)
+);
+
+-- Explicit syntax with named constraint
+CREATE TABLE orders (
+  id          BIGSERIAL PRIMARY KEY,
+  customer_id BIGINT NOT NULL,
+  CONSTRAINT fk_orders_customer
+    FOREIGN KEY (customer_id) REFERENCES users(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+);
+```
+
+### ON DELETE Behaviors
+
+```sql
+ON DELETE CASCADE      -- delete child rows when parent is deleted
+ON DELETE RESTRICT     -- prevent deletion if child rows exist (default, strictest)
+ON DELETE SET NULL     -- set FK column to NULL when parent deleted
+ON DELETE SET DEFAULT  -- set FK column to default value
+ON DELETE NO ACTION    -- same as RESTRICT but checked at end of transaction
+```
+
+**Choosing the right behavior:**
+- `CASCADE` - for dependent records that shouldn't exist without the parent (order_items → orders)
+- `RESTRICT` - when deletion should be blocked (delete a user who has orders → error)
+- `SET NULL` - for optional relationships (orders.sales_rep_id → employees: rep can leave, order stays)
+
+## Composite Primary Key
+
+A primary key across multiple columns - uniqueness is enforced on the combination.
+
+```sql
+-- Order items: one product per order (combination is unique, neither column alone is)
+CREATE TABLE order_items (
+  order_id   BIGINT REFERENCES orders(id),
+  product_id BIGINT REFERENCES products(id),
+  quantity   INT NOT NULL CHECK (quantity > 0),
+  unit_price DECIMAL(10,2) NOT NULL,
+
+  PRIMARY KEY (order_id, product_id)   -- composite PK
+);
+
+-- Cannot add the same product twice to the same order:
+INSERT INTO order_items VALUES (1, 5, 2, 999);
+INSERT INTO order_items VALUES (1, 5, 1, 999);  -- ❌ ERROR: duplicate key
+```
+
+## Composite Foreign Key
+
+```sql
+-- Reference a composite PK
+CREATE TABLE order_item_discounts (
+  order_id    BIGINT,
+  product_id  BIGINT,
+  discount    DECIMAL(5,2),
+
+  FOREIGN KEY (order_id, product_id) REFERENCES order_items(order_id, product_id)
+);
+```
+
+## Unique Constraints vs Primary Keys
+
+```sql
+-- PRIMARY KEY: one per table, cannot be NULL, clustered index (usually)
+id BIGSERIAL PRIMARY KEY
+
+-- UNIQUE: multiple allowed per table, can be NULL (one NULL allowed per column in most DBs)
+email VARCHAR(255) UNIQUE
+
+-- Composite UNIQUE
+UNIQUE (user_id, provider)   -- a user can have one account per OAuth provider
+```
+
+## Checking Constraints
+
+```sql
+CREATE TABLE products (
+  id       BIGSERIAL PRIMARY KEY,
+  price    DECIMAL(10,2) CHECK (price >= 0),
+  discount DECIMAL(5,2)  CHECK (discount BETWEEN 0 AND 100),
+  stock    INT           CHECK (stock >= 0),
+  status   VARCHAR(20)   CHECK (status IN ('active', 'inactive', 'discontinued'))
+);
+
+-- Named check constraint
+CONSTRAINT chk_price_positive CHECK (price >= 0)
+```
+
+## Indexing Foreign Keys
+
+Foreign key columns are frequently used in JOINs - always index them:
+
+```sql
+-- FK columns are not automatically indexed (in PostgreSQL)
+-- Always add an index manually:
+CREATE INDEX idx_orders_customer ON orders(customer_id);
+CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX idx_order_items_product ON order_items(product_id);
+```
+
+## Summary
+
+- Primary key: unique + not null identifier for each row; one per table
+- Surrogate keys (BIGSERIAL, UUID) are preferred over natural keys - they don't change
+- Foreign key: links to another table's PK, enforces referential integrity
+- `ON DELETE CASCADE` for dependent records; `RESTRICT` to block deletion; `SET NULL` for optional relationships
+- Composite PK: uniqueness enforced on the combination of multiple columns
+- Always index foreign key columns - they're used in JOINs constantly

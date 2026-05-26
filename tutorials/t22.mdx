@@ -1,0 +1,173 @@
+## Getting Current Date/Time
+
+```sql
+SELECT NOW();               -- 2024-06-15 14:30:00.123456+05:30
+SELECT CURRENT_TIMESTAMP;   -- same as NOW()
+SELECT CURRENT_DATE;        -- 2024-06-15  (date only)
+SELECT CURRENT_TIME;        -- 14:30:00.123456
+
+-- PostgreSQL specific
+SELECT CLOCK_TIMESTAMP();   -- actual current time (changes during a transaction)
+SELECT NOW();               -- transaction start time (constant within a transaction)
+```
+
+## EXTRACT - Get a Part of a Date
+
+```sql
+SELECT EXTRACT(YEAR   FROM NOW());   -- 2024
+SELECT EXTRACT(MONTH  FROM NOW());   -- 6
+SELECT EXTRACT(DAY    FROM NOW());   -- 15
+SELECT EXTRACT(HOUR   FROM NOW());   -- 14
+SELECT EXTRACT(MINUTE FROM NOW());   -- 30
+SELECT EXTRACT(DOW    FROM NOW());   -- 0=Sunday, 6=Saturday
+SELECT EXTRACT(DOY    FROM NOW());   -- day of year (1-366)
+SELECT EXTRACT(WEEK   FROM NOW());   -- ISO week number
+SELECT EXTRACT(QUARTER FROM NOW());  -- 1, 2, 3, or 4
+
+-- Practical: group orders by month
+SELECT
+  EXTRACT(YEAR FROM created_at)  AS year,
+  EXTRACT(MONTH FROM created_at) AS month,
+  COUNT(*)                        AS orders
+FROM orders
+GROUP BY 1, 2
+ORDER BY 1 DESC, 2 DESC;
+```
+
+## DATE_TRUNC - Truncate to Precision
+
+Rounds down a timestamp to the nearest unit. Essential for time-based grouping.
+
+```sql
+SELECT DATE_TRUNC('year',    NOW());  -- 2024-01-01 00:00:00
+SELECT DATE_TRUNC('quarter', NOW());  -- 2024-04-01 00:00:00
+SELECT DATE_TRUNC('month',   NOW());  -- 2024-06-01 00:00:00
+SELECT DATE_TRUNC('week',    NOW());  -- 2024-06-10 00:00:00  (Monday)
+SELECT DATE_TRUNC('day',     NOW());  -- 2024-06-15 00:00:00
+SELECT DATE_TRUNC('hour',    NOW());  -- 2024-06-15 14:00:00
+
+-- Group by month (correct way)
+SELECT
+  DATE_TRUNC('month', created_at) AS month,
+  SUM(total) AS revenue
+FROM orders
+GROUP BY DATE_TRUNC('month', created_at)
+ORDER BY month;
+```
+
+**Why DATE_TRUNC over EXTRACT for grouping?**
+`DATE_TRUNC` returns an actual timestamp - you can ORDER BY it and it handles year boundaries correctly. `EXTRACT(MONTH ...)` returns just the number 6, which doesn't distinguish June 2023 from June 2024.
+
+## Date Arithmetic - Adding/Subtracting
+
+```sql
+-- Add intervals
+SELECT NOW() + INTERVAL '7 days';       -- 7 days from now
+SELECT NOW() + INTERVAL '1 month';      -- 1 month from now
+SELECT NOW() + INTERVAL '2 hours 30 minutes';
+SELECT NOW() - INTERVAL '30 days';      -- 30 days ago
+SELECT CURRENT_DATE + 7;               -- MySQL: add 7 days to date
+
+-- Practical queries
+SELECT * FROM orders WHERE created_at >= NOW() - INTERVAL '30 days';
+SELECT * FROM sessions WHERE expires_at < NOW();
+SELECT * FROM users WHERE last_login < NOW() - INTERVAL '1 year';
+SELECT * FROM subscriptions
+WHERE trial_ends_at BETWEEN NOW() AND NOW() + INTERVAL '3 days';
+```
+
+## Date Differences
+
+```sql
+-- Difference in days
+SELECT DATE '2024-12-31' - DATE '2024-01-01';   -- 365 (PostgreSQL)
+SELECT DATEDIFF('2024-12-31', '2024-01-01');     -- 365 (MySQL)
+
+-- Age function (PostgreSQL)
+SELECT AGE('2000-01-15'::DATE);               -- years, months, days to today
+SELECT AGE(NOW(), created_at) AS account_age FROM users;
+
+-- Extract days difference
+SELECT EXTRACT(DAY FROM NOW() - created_at) AS days_since_join
+FROM users;
+
+-- Days until subscription expires
+SELECT name, EXTRACT(DAY FROM expires_at - NOW()) AS days_left
+FROM subscriptions
+WHERE expires_at > NOW()
+ORDER BY days_left ASC;
+```
+
+## Formatting Dates - TO_CHAR
+
+```sql
+-- PostgreSQL: TO_CHAR(timestamp, format)
+SELECT TO_CHAR(NOW(), 'YYYY-MM-DD');             -- '2024-06-15'
+SELECT TO_CHAR(NOW(), 'DD Mon YYYY');            -- '15 Jun 2024'
+SELECT TO_CHAR(NOW(), 'Month DD, YYYY');         -- 'June     15, 2024'
+SELECT TO_CHAR(NOW(), 'Day, DD Month YYYY');     -- 'Saturday, 15 June 2024'
+SELECT TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS');  -- '2024-06-15 14:30:00'
+SELECT TO_CHAR(NOW(), '"Q"Q YYYY');              -- 'Q2 2024'
+
+-- Format numbers too
+SELECT TO_CHAR(1234567.89, 'FM₹9,99,99,999.00');  -- '₹12,34,567.89'
+```
+
+## Parsing Strings to Dates
+
+```sql
+-- TO_DATE: string → date
+SELECT TO_DATE('15-06-2024', 'DD-MM-YYYY');   -- PostgreSQL
+SELECT STR_TO_DATE('15-06-2024', '%d-%m-%Y'); -- MySQL
+
+-- Cast
+SELECT '2024-06-15'::DATE;       -- PostgreSQL
+SELECT CAST('2024-06-15' AS DATE);
+```
+
+## Common Date Patterns
+
+```sql
+-- Last 7 days
+WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+
+-- Current month
+WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+
+-- Previous month
+WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
+
+-- Current year
+WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
+
+-- Between two dates (index-friendly - doesn't apply function to column)
+WHERE created_at >= '2024-01-01' AND created_at < '2025-01-01'
+-- Better than: WHERE EXTRACT(YEAR FROM created_at) = 2024 (can't use index)
+```
+
+## Timezone Handling
+
+```sql
+-- Convert timezone
+SELECT NOW() AT TIME ZONE 'UTC';
+SELECT NOW() AT TIME ZONE 'Asia/Kolkata';
+
+-- Store always in UTC, display in user's timezone
+SELECT
+  created_at AT TIME ZONE 'Asia/Kolkata' AS created_ist,
+  created_at AT TIME ZONE 'America/New_York' AS created_est
+FROM orders;
+
+-- Set session timezone
+SET timezone = 'Asia/Kolkata';
+```
+
+## Summary
+
+- `NOW()` - current timestamp; `CURRENT_DATE` - date only
+- `EXTRACT` - get one part of a date (year, month, day, hour...)
+- `DATE_TRUNC` - truncate to precision - use for GROUP BY on time periods
+- Date arithmetic with `INTERVAL` - add/subtract days, months, hours
+- `TO_CHAR` - format timestamps as readable strings
+- Always store timestamps as `TIMESTAMPTZ` and use index-friendly range comparisons
+- Use `DATE_TRUNC` not `EXTRACT` when grouping by month (handles year boundaries correctly)

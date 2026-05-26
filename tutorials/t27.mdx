@@ -1,0 +1,138 @@
+## The Core Difference
+
+This is one of the most frequently asked SQL interview questions.
+
+| | GROUP BY | PARTITION BY |
+|-|----------|-------------|
+| Output rows | One row per group | Same number of rows as input |
+| Effect | Collapses rows into groups | Divides rows into windows for calculation |
+| Used with | Aggregate functions | Window functions |
+| Can mix with individual row data | ❌ No | ✅ Yes |
+
+## GROUP BY - Collapses Rows
+
+```sql
+-- GROUP BY: 3 rows (one per department)
+SELECT department, AVG(salary) AS avg_salary
+FROM employees
+GROUP BY department;
+
+-- department    | avg_salary
+-- Engineering   | 85000
+-- Marketing     | 68000
+-- Sales         | 55000
+```
+
+You lose all individual row data. You cannot also show `name` or `salary` unless you aggregate them.
+
+## PARTITION BY - Keeps All Rows
+
+```sql
+-- PARTITION BY: all rows retained, avg_salary added alongside
+SELECT
+  name,
+  department,
+  salary,
+  AVG(salary) OVER (PARTITION BY department) AS dept_avg
+FROM employees;
+
+-- name     | dept        | salary | dept_avg
+-- Alice    | Engineering | 95000  | 85000
+-- Bob      | Engineering | 82000  | 85000
+-- Charlie  | Engineering | 78000  | 85000
+-- Diana    | Marketing   | 71000  | 68000
+-- Eve      | Marketing   | 65000  | 68000
+```
+
+Every row is returned. The department average is computed per partition but shown on every row.
+
+## Why This Matters - The Killer Use Case
+
+With GROUP BY alone, you CAN'T answer: "Show each employee alongside their department average and their difference from that average."
+
+With PARTITION BY you CAN:
+
+```sql
+SELECT
+  name,
+  department,
+  salary,
+  ROUND(AVG(salary) OVER (PARTITION BY department), 0) AS dept_avg,
+  salary - AVG(salary) OVER (PARTITION BY department)  AS diff_from_avg,
+  ROUND(salary * 100.0 / AVG(salary) OVER (PARTITION BY department), 1) AS pct_of_avg
+FROM employees
+ORDER BY department, salary DESC;
+```
+
+## Using Both Together
+
+You can use GROUP BY and PARTITION BY in the same query:
+
+```sql
+-- Monthly revenue per category, with running total per category
+WITH monthly AS (
+  SELECT
+    c.name                                    AS category,
+    DATE_TRUNC('month', o.created_at)         AS month,
+    SUM(oi.quantity * oi.unit_price)          AS monthly_revenue
+  FROM order_items oi
+  JOIN orders    o  ON oi.order_id   = o.id
+  JOIN products  p  ON oi.product_id = p.id
+  JOIN categories c ON p.category_id = c.id
+  WHERE o.status = 'completed'
+  GROUP BY c.name, DATE_TRUNC('month', o.created_at)  -- GROUP BY used here
+)
+SELECT
+  category,
+  month,
+  monthly_revenue,
+  SUM(monthly_revenue) OVER (
+    PARTITION BY category ORDER BY month       -- PARTITION BY used here
+  ) AS cumulative_revenue
+FROM monthly
+ORDER BY category, month;
+```
+
+## PARTITION BY Without ORDER BY
+
+When you use PARTITION BY without ORDER BY in the OVER clause, all rows in the partition are included in every calculation:
+
+```sql
+-- Total revenue per category on every row (no ordering)
+SELECT
+  name,
+  category,
+  revenue,
+  SUM(revenue) OVER (PARTITION BY category) AS category_total,
+  revenue * 100.0 / SUM(revenue) OVER (PARTITION BY category) AS pct_of_category
+FROM product_revenue;
+```
+
+## PARTITION BY With ORDER BY - Running Totals
+
+When ORDER BY is added, the default frame becomes "from the start of the partition to the current row":
+
+```sql
+-- Running total of revenue per category
+SELECT
+  category,
+  month,
+  monthly_revenue,
+  SUM(monthly_revenue) OVER (
+    PARTITION BY category
+    ORDER BY month               -- now it's a running total, not a grand total
+  ) AS running_total
+FROM monthly_revenue;
+```
+
+## Interview Answer: GROUP BY vs PARTITION BY
+
+**"GROUP BY aggregates rows and returns one row per group - you lose individual row data. PARTITION BY is used with window functions and doesn't collapse rows - it adds the aggregated value alongside every individual row. Use GROUP BY when you want summaries. Use PARTITION BY when you want individual rows enriched with group-level calculations."**
+
+## Summary
+
+- `GROUP BY` → one row per group, individual data lost
+- `PARTITION BY` → all rows kept, group calculation added alongside
+- Both can be used in the same query (GROUP BY first, then PARTITION BY in window function)
+- `PARTITION BY` without `ORDER BY` → all-rows-in-partition calculation (grand total per group)
+- `PARTITION BY` with `ORDER BY` → running/cumulative calculation within partition

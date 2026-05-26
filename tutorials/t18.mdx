@@ -1,0 +1,168 @@
+## What is a Subquery?
+
+A subquery (also called an inner query or nested query) is a SELECT statement written inside another SQL statement. The inner query runs first, and its result is used by the outer query.
+
+```sql
+-- Find users who have placed at least one order
+SELECT name FROM users
+WHERE id IN (
+  SELECT DISTINCT customer_id FROM orders  -- inner query runs first
+);
+```
+
+## Types of Subqueries
+
+### 1. Scalar Subquery (Returns One Value)
+
+Returns exactly one row and one column. Can be used anywhere a single value is expected.
+
+```sql
+-- Products priced above average
+SELECT name, price FROM products
+WHERE price > (SELECT AVG(price) FROM products);
+--             ↑ returns one number e.g. 2500
+
+-- Show each product's price and the overall average side by side
+SELECT
+  name,
+  price,
+  (SELECT ROUND(AVG(price), 2) FROM products) AS avg_price,
+  price - (SELECT AVG(price) FROM products)   AS diff_from_avg
+FROM products;
+```
+
+### 2. Row Subquery (Returns One Row, Multiple Columns)
+
+```sql
+-- Find the product with the highest price
+SELECT * FROM products
+WHERE (category_id, price) = (
+  SELECT category_id, MAX(price) FROM products GROUP BY category_id LIMIT 1
+);
+```
+
+### 3. Table Subquery (Returns Multiple Rows - Used in FROM)
+
+Used in the FROM clause as a derived table. Must be given an alias.
+
+```sql
+-- Average of per-customer spending totals
+SELECT AVG(customer_total) AS avg_customer_ltv
+FROM (
+  SELECT customer_id, SUM(total) AS customer_total
+  FROM orders
+  WHERE status = 'completed'
+  GROUP BY customer_id
+) AS customer_summary;
+-- ↑ the alias is required
+```
+
+### 4. Column Subquery (Returns Multiple Rows - Used in IN/NOT IN)
+
+```sql
+-- Users from cities where we have more than 10 orders
+SELECT name, city FROM users
+WHERE city IN (
+  SELECT city FROM users u
+  JOIN orders o ON u.id = o.customer_id
+  GROUP BY city
+  HAVING COUNT(*) > 10
+);
+```
+
+## Non-Correlated vs Correlated Subqueries
+
+### Non-Correlated
+Runs **once**, completely independent of the outer query.
+
+```sql
+-- Inner query runs ONCE, result reused for every outer row
+SELECT name FROM products
+WHERE price > (SELECT AVG(price) FROM products);
+--             ↑ calculated once = e.g. 2500
+--             then: WHERE price > 2500 for every row
+```
+
+### Correlated
+References a column from the outer query - runs **once per row** of the outer query.
+
+```sql
+-- For EACH product, compare to its own category average
+SELECT name, price FROM products p
+WHERE price > (
+  SELECT AVG(price) FROM products
+  WHERE category_id = p.category_id  -- ← references outer row p
+);
+-- Runs once per product row - potentially slow on large tables
+```
+
+**Interview question:** What's wrong with correlated subqueries at scale?
+They execute once per outer row. On a 1M-row table, the inner query runs 1M times. Rewrite as a window function or JOIN for performance.
+
+```sql
+-- Correlated subquery → rewritten as window function (much faster)
+SELECT name, price FROM (
+  SELECT *,
+    AVG(price) OVER (PARTITION BY category_id) AS cat_avg
+  FROM products
+) t
+WHERE price > cat_avg;
+```
+
+## Subquery in SELECT (Scalar)
+
+```sql
+-- Count orders per user shown alongside each user
+SELECT
+  u.id,
+  u.name,
+  (SELECT COUNT(*) FROM orders WHERE customer_id = u.id) AS order_count,
+  (SELECT MAX(total) FROM orders WHERE customer_id = u.id) AS biggest_order
+FROM users u;
+-- This is a correlated subquery - runs twice per user row
+-- Better: use LEFT JOIN + GROUP BY for performance
+```
+
+## Subquery in WHERE
+
+```sql
+-- Users who spent above the average customer spending
+SELECT name FROM users
+WHERE id IN (
+  SELECT customer_id FROM orders
+  GROUP BY customer_id
+  HAVING SUM(total) > (SELECT AVG(total_spent) FROM (
+    SELECT SUM(total) AS total_spent FROM orders GROUP BY customer_id
+  ) t)
+);
+```
+
+## Subquery Best Practices
+
+```sql
+-- ✅ Use CTE instead of deeply nested subqueries (more readable)
+WITH customer_totals AS (
+  SELECT customer_id, SUM(total) AS total_spent
+  FROM orders GROUP BY customer_id
+),
+avg_spending AS (
+  SELECT AVG(total_spent) AS avg FROM customer_totals
+)
+SELECT u.name
+FROM users u
+JOIN customer_totals ct ON u.id = ct.customer_id
+CROSS JOIN avg_spending a
+WHERE ct.total_spent > a.avg;
+
+-- ✅ Replace correlated subqueries with window functions when possible
+-- ✅ Replace IN (subquery) with EXISTS for large datasets - EXISTS short-circuits
+```
+
+## Summary
+
+- Scalar subquery: returns one value, used in SELECT or WHERE
+- Table subquery (derived table): used in FROM, must have an alias
+- Column subquery: returns many rows, used with IN / NOT IN
+- Non-correlated: runs once - fast
+- Correlated: runs once per outer row - can be slow, consider rewriting as JOIN or window function
+- CTEs are subqueries that are named and defined at the top - same execution, much more readable

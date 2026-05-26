@@ -1,0 +1,144 @@
+## What is a View?
+
+A view is a saved SQL query that behaves like a table. It doesn't store data - it re-runs the underlying query each time it's accessed.
+
+```sql
+CREATE VIEW active_customers AS
+SELECT id, name, email, city
+FROM users
+WHERE status = 'active';
+
+-- Use it exactly like a table
+SELECT * FROM active_customers WHERE city = 'Mumbai';
+SELECT COUNT(*) FROM active_customers;
+```
+
+## Why Use Views?
+
+**1. Simplify complex queries**
+Write the JOIN once, reuse everywhere without repeating:
+```sql
+CREATE VIEW order_details AS
+SELECT o.id, u.name AS customer, p.name AS product,
+       oi.quantity, oi.unit_price, o.created_at
+FROM orders o
+JOIN users u ON o.customer_id = u.id
+JOIN order_items oi ON o.id = oi.order_id
+JOIN products p ON oi.product_id = p.id;
+
+-- Now anyone can query it simply
+SELECT * FROM order_details WHERE customer = 'Alice';
+```
+
+**2. Security - hide sensitive columns**
+```sql
+CREATE VIEW public_users AS
+SELECT id, name, city, created_at
+FROM users;
+-- Password hash, phone, payment info hidden
+
+GRANT SELECT ON public_users TO reporting_role;
+```
+
+**3. Consistency - business logic in one place**
+```sql
+CREATE VIEW customer_tiers AS
+SELECT id, name,
+  CASE WHEN total_spent >= 100000 THEN 'Platinum'
+       WHEN total_spent >= 50000  THEN 'Gold'
+       ELSE 'Bronze' END AS tier
+FROM customer_summary;
+-- Tier logic is defined once, not scattered across 20 queries
+```
+
+## CREATE, REPLACE, DROP
+
+```sql
+-- Create
+CREATE VIEW active_users AS
+SELECT id, name, email FROM users WHERE status = 'active';
+
+-- Replace (update without dropping)
+CREATE OR REPLACE VIEW active_users AS
+SELECT id, name, email, city FROM users WHERE status = 'active';
+
+-- Drop
+DROP VIEW IF EXISTS active_users;
+
+-- Rename
+ALTER VIEW active_users RENAME TO online_users;
+```
+
+## Updatable Views
+
+Simple views (no GROUP BY, no JOIN, no DISTINCT) can be used for INSERT/UPDATE/DELETE:
+
+```sql
+CREATE VIEW mumbai_users AS
+SELECT id, name, email, city FROM users WHERE city = 'Mumbai';
+
+-- These modify the underlying users table
+UPDATE mumbai_users SET name = 'Alice K' WHERE id = 1;
+INSERT INTO mumbai_users (name, email, city) VALUES ('Bob', 'bob@e.com', 'Mumbai');
+DELETE FROM mumbai_users WHERE id = 5;
+```
+
+### WITH CHECK OPTION
+
+Prevents inserts/updates that would make the row invisible in the view:
+
+```sql
+CREATE VIEW mumbai_users AS
+SELECT * FROM users WHERE city = 'Mumbai'
+WITH CHECK OPTION;
+
+-- ❌ Fails: new row wouldn't be visible in this view
+INSERT INTO mumbai_users (name, city) VALUES ('Bob', 'Delhi');
+-- ERROR: new row violates check option for view "mumbai_users"
+```
+
+## Materialized Views - Store the Result
+
+A materialized view physically stores the query result. Much faster for complex queries but data can be stale.
+
+```sql
+-- Create
+CREATE MATERIALIZED VIEW monthly_revenue AS
+SELECT
+  DATE_TRUNC('month', created_at) AS month,
+  SUM(total) AS revenue,
+  COUNT(*) AS orders
+FROM orders
+WHERE status = 'completed'
+GROUP BY DATE_TRUNC('month', created_at);
+
+CREATE INDEX ON monthly_revenue(month);  -- indexable like a real table
+
+-- Query (instant - reads stored result)
+SELECT * FROM monthly_revenue WHERE month >= '2024-01-01';
+
+-- Refresh (rebuild the data)
+REFRESH MATERIALIZED VIEW monthly_revenue;
+
+-- Refresh without blocking reads (requires a UNIQUE index)
+CREATE UNIQUE INDEX ON monthly_revenue(month);
+REFRESH MATERIALIZED VIEW CONCURRENTLY monthly_revenue;
+```
+
+### Regular View vs Materialized View
+
+| | Regular View | Materialized View |
+|-|-------------|-------------------|
+| Stores data | ❌ No | ✅ Yes |
+| Always current | ✅ Yes | ❌ No (until refreshed) |
+| Indexable | ❌ No | ✅ Yes |
+| Query speed | Depends on base tables | Fast (pre-computed) |
+| Use for | Security, abstraction | Heavy aggregations, dashboards |
+
+## Summary
+
+- A view is a named saved query - behaves like a table, stores no data
+- `CREATE OR REPLACE VIEW` updates without dropping; `DROP VIEW IF EXISTS` removes safely
+- Simple views are updatable; `WITH CHECK OPTION` enforces the view's WHERE condition
+- Materialized views store the result physically - fast to query, but need explicit REFRESH
+- Use regular views for abstraction and security; use materialized views for performance

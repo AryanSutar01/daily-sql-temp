@@ -1,0 +1,179 @@
+## What is CASE WHEN?
+
+`CASE WHEN` is SQL's conditional expression. It evaluates conditions and returns a value based on the first condition that matches - like if-else in programming.
+
+CASE expressions can appear in: SELECT, WHERE, ORDER BY, GROUP BY, HAVING, and UPDATE SET.
+
+## Two Forms of CASE
+
+### Simple CASE - Compare One Expression
+
+```sql
+CASE expression
+  WHEN value1 THEN result1
+  WHEN value2 THEN result2
+  ELSE default_result
+END
+```
+
+```sql
+SELECT
+  name,
+  CASE status
+    WHEN 'active'   THEN '✅ Active'
+    WHEN 'inactive' THEN '⏸ Inactive'
+    WHEN 'banned'   THEN '🚫 Banned'
+    ELSE '❓ Unknown'
+  END AS status_label
+FROM users;
+```
+
+### Searched CASE - Evaluate Conditions Independently
+
+```sql
+CASE
+  WHEN condition1 THEN result1
+  WHEN condition2 THEN result2
+  ELSE default_result
+END
+```
+
+```sql
+SELECT
+  name,
+  total_spent,
+  CASE
+    WHEN total_spent >= 100000 THEN 'Platinum'
+    WHEN total_spent >= 50000  THEN 'Gold'
+    WHEN total_spent >= 10000  THEN 'Silver'
+    ELSE                            'Bronze'
+  END AS tier
+FROM customer_summary
+ORDER BY total_spent DESC;
+```
+
+**Important:** CASE evaluates conditions top to bottom and returns on the FIRST match. Order matters!
+
+```sql
+-- ✅ Correct: most restrictive first
+CASE
+  WHEN salary >= 100000 THEN 'Senior'
+  WHEN salary >= 60000  THEN 'Mid'
+  ELSE 'Junior'
+END
+
+-- ❌ Wrong: everyone earning >= 60000 matches first condition first
+CASE
+  WHEN salary >= 60000  THEN 'Mid'    -- Senior gets 'Mid' too!
+  WHEN salary >= 100000 THEN 'Senior' -- Never reached
+  ELSE 'Junior'
+END
+```
+
+## CASE in ORDER BY - Custom Sort
+
+```sql
+-- Sort by business priority, not alphabetically
+SELECT * FROM orders
+ORDER BY
+  CASE status
+    WHEN 'urgent'    THEN 1
+    WHEN 'pending'   THEN 2
+    WHEN 'confirmed' THEN 3
+    WHEN 'shipped'   THEN 4
+    WHEN 'delivered' THEN 5
+    ELSE                  6
+  END,
+  created_at ASC;
+```
+
+## CASE in Aggregations - Conditional Counting (Pivot)
+
+This is one of the most powerful patterns - count or sum rows that match different conditions in a single query:
+
+```sql
+-- User status breakdown in one row
+SELECT
+  COUNT(*)                                         AS total,
+  COUNT(CASE WHEN status = 'active'   THEN 1 END) AS active,
+  COUNT(CASE WHEN status = 'inactive' THEN 1 END) AS inactive,
+  COUNT(CASE WHEN status = 'banned'   THEN 1 END) AS banned,
+  SUM(CASE WHEN city = 'Mumbai'       THEN 1 ELSE 0 END) AS mumbai_users
+FROM users;
+
+-- Revenue by order status in one row
+SELECT
+  SUM(CASE WHEN status = 'completed'  THEN total ELSE 0 END) AS completed_revenue,
+  SUM(CASE WHEN status = 'cancelled'  THEN total ELSE 0 END) AS cancelled_revenue,
+  COUNT(CASE WHEN status = 'pending'  THEN 1     END)        AS pending_orders
+FROM orders;
+```
+
+## Pivot Table with CASE
+
+```sql
+-- Monthly revenue as columns (pivot)
+SELECT
+  EXTRACT(YEAR FROM created_at) AS year,
+  SUM(CASE WHEN EXTRACT(MONTH FROM created_at) = 1  THEN total ELSE 0 END) AS jan,
+  SUM(CASE WHEN EXTRACT(MONTH FROM created_at) = 2  THEN total ELSE 0 END) AS feb,
+  SUM(CASE WHEN EXTRACT(MONTH FROM created_at) = 3  THEN total ELSE 0 END) AS mar,
+  SUM(CASE WHEN EXTRACT(MONTH FROM created_at) = 4  THEN total ELSE 0 END) AS apr,
+  SUM(CASE WHEN EXTRACT(MONTH FROM created_at) = 5  THEN total ELSE 0 END) AS may,
+  SUM(CASE WHEN EXTRACT(MONTH FROM created_at) = 6  THEN total ELSE 0 END) AS jun,
+  SUM(total) AS annual_total
+FROM orders
+WHERE status = 'completed'
+GROUP BY EXTRACT(YEAR FROM created_at)
+ORDER BY year;
+```
+
+## CASE in UPDATE
+
+```sql
+-- Update multiple tiers in one query instead of multiple UPDATE statements
+UPDATE users
+SET tier = CASE
+  WHEN total_spent >= 100000 THEN 'Platinum'
+  WHEN total_spent >= 50000  THEN 'Gold'
+  WHEN total_spent >= 10000  THEN 'Silver'
+  ELSE 'Bronze'
+END
+WHERE status = 'active';
+```
+
+## CASE with NULL Handling
+
+```sql
+-- Handle NULL as a specific category
+SELECT
+  name,
+  CASE
+    WHEN city IS NULL THEN 'Location Unknown'
+    WHEN city IN ('Mumbai', 'Delhi', 'Bangalore') THEN 'Metro'
+    ELSE 'Other'
+  END AS location_type
+FROM users;
+```
+
+## IIF / IF (Shorthand for Simple CASE)
+
+```sql
+-- SQL Server: IIF (if-then-else in one function)
+SELECT name, IIF(age >= 18, 'Adult', 'Minor') AS category FROM users;
+
+-- MySQL: IF function
+SELECT name, IF(age >= 18, 'Adult', 'Minor') AS category FROM users;
+
+-- PostgreSQL: no IIF, use CASE
+SELECT name, CASE WHEN age >= 18 THEN 'Adult' ELSE 'Minor' END AS category FROM users;
+```
+
+## Summary
+
+- CASE WHEN is SQL's if-else - works in SELECT, ORDER BY, WHERE, UPDATE, and aggregations
+- Simple CASE compares one expression to multiple values
+- Searched CASE evaluates independent conditions - more flexible
+- Conditions evaluate top-to-bottom, returns on first match - order matters
+- CASE in aggregations enables conditional counting and pivot tables in a single query
+- Always include an ELSE clause to handle unexpected values (otherwise returns NULL)

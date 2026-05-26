@@ -1,202 +1,208 @@
-## Creating Indexes
+---
+title: "DISTINCT & Aliases"
+description: "Remove duplicate rows with DISTINCT and make queries more readable using column and table aliases."
+section: "Foundations"
+level: "Beginner"
+tags: ["Concept"]
+order: 8
+---
+
+## DISTINCT
+
+`DISTINCT` removes duplicate rows from query results. It applies to the entire selected row - not just one column.
+
+### Basic Usage
 
 ```sql
--- Single column index
-CREATE INDEX idx_users_email ON users(email);
+-- All cities where users live (no duplicates)
+SELECT DISTINCT city FROM users;
 
--- Multi-column (composite) index
-CREATE INDEX idx_orders_customer_date ON orders(customer_id, order_date);
+-- Without DISTINCT - repeated for every user in that city
+SELECT city FROM users;
+-- Mumbai, Mumbai, Mumbai, Delhi, Delhi, Pune ...
 
--- Unique index (also enforces uniqueness)
-CREATE UNIQUE INDEX idx_users_email_unique ON users(email);
-
--- Drop an index
-DROP INDEX idx_users_email;
+-- With DISTINCT - each city appears once
+SELECT DISTINCT city FROM users;
+-- Mumbai, Delhi, Pune, Bangalore
 ```
 
-## How Indexes Work (B-Tree)
+### DISTINCT on Multiple Columns
 
-```
-Without index — full table scan:
-Scan row 1 → Scan row 2 → ... → Scan row 1,000,000
-
-With B-Tree index on email:
-Root node
-├── emails A-M
-│   ├── A-F → [row pointers]
-│   └── G-M → [row pointers]
-└── emails N-Z
-    └── ...
-→ Find "alice@email.com" in ~20 comparisons instead of 1,000,000
-```
-
-## When to Add an Index
-
-**Good candidates:**
-- Columns used frequently in `WHERE` clauses
-- Columns used in `JOIN` conditions (`ON u.id = o.customer_id`)
-- Columns used in `ORDER BY` when combined with filtering
-- Foreign key columns
+DISTINCT applies to the combination of all selected columns:
 
 ```sql
--- These queries benefit from an index on (customer_id)
-SELECT * FROM orders WHERE customer_id = 101;
-SELECT * FROM orders WHERE customer_id = 101 ORDER BY order_date DESC;
+-- Unique (city, status) pairs
+SELECT DISTINCT city, status FROM users;
+-- Mumbai + active
+-- Mumbai + inactive
+-- Delhi + active
+-- These are all different combinations
 ```
 
-**Bad candidates:**
-- Columns with very few unique values (e.g., `status` with only 'active'/'inactive')
-- Tables with very few rows
-- Columns that are rarely queried
-
-## Composite Index — Column Order Matters
+### COUNT DISTINCT
 
 ```sql
-CREATE INDEX idx_orders_customer_date ON orders(customer_id, order_date);
+-- How many unique cities do our users come from?
+SELECT COUNT(DISTINCT city) AS unique_cities FROM users;
+
+-- How many unique customers placed orders?
+SELECT COUNT(DISTINCT customer_id) AS unique_customers FROM orders;
+
+-- How many unique products were sold last month?
+SELECT COUNT(DISTINCT product_id) AS products_sold
+FROM order_items oi
+JOIN orders o ON oi.order_id = o.id
+WHERE o.created_at >= NOW() - INTERVAL '30 days';
 ```
 
-This index efficiently supports:
+### DISTINCT vs GROUP BY
+
+Both can deduplicate - they often produce the same result but work differently:
+
 ```sql
-WHERE customer_id = 101                          -- ✅ uses index
-WHERE customer_id = 101 AND order_date > '2024'  -- ✅ uses index
-WHERE order_date > '2024'                        -- ❌ cannot use index (leading column missing)
+-- These produce the same result:
+SELECT DISTINCT city FROM users ORDER BY city;
+
+SELECT city FROM users GROUP BY city ORDER BY city;
+
+-- Use DISTINCT when you just want unique values
+-- Use GROUP BY when you also want to aggregate (COUNT, SUM, etc.)
+SELECT city, COUNT(*) FROM users GROUP BY city;  -- can't do this with DISTINCT alone
 ```
 
-> **Rule:** A composite index can only be used when the query includes the **leftmost** columns of the index.
+### Performance Note
 
-## EXPLAIN / EXPLAIN ANALYZE
-
-Always use `EXPLAIN` to understand what the database is doing.
+`DISTINCT` requires sorting and deduplication internally - it can be slow on large result sets. If you find yourself using DISTINCT to fix duplicate rows from a JOIN, that usually means there's a problem with the JOIN logic itself.
 
 ```sql
--- PostgreSQL
-EXPLAIN SELECT * FROM users WHERE email = 'alice@email.com';
+-- ❌ DISTINCT hiding a problem - why are there duplicates?
+SELECT DISTINCT u.name FROM users u JOIN orders o ON u.id = o.customer_id;
 
--- PostgreSQL with actual execution stats
-EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'alice@email.com';
-
--- MySQL
-EXPLAIN SELECT * FROM users WHERE email = 'alice@email.com';
-```
-
-Key things to look for in the output:
-
-| Term | Meaning | Good or Bad |
-|------|---------|-------------|
-| Seq Scan | Full table scan | Bad on large tables |
-| Index Scan | Uses an index | Good |
-| Index Only Scan | All data from index, no table lookup | Best |
-| Nested Loop | Row-by-row join | OK for small tables |
-| Hash Join | Hash table-based join | Good for large tables |
-
-## Common Query Anti-Patterns
-
-### 1. Function on indexed column
-```sql
--- ❌ Bad: index on email cannot be used
-SELECT * FROM users WHERE UPPER(email) = 'ALICE@EMAIL.COM';
-
--- ✅ Good: store emails lowercase, or use a functional index
-SELECT * FROM users WHERE email = 'alice@email.com';
-```
-
-### 2. Leading wildcard in LIKE
-```sql
--- ❌ Bad: cannot use index (starts with %)
-SELECT * FROM users WHERE name LIKE '%kumar';
-
--- ✅ Good: trailing wildcard can use index
-SELECT * FROM users WHERE name LIKE 'kumar%';
-```
-
-### 3. SELECT *
-```sql
--- ❌ Bad: fetches all columns, prevents index-only scans
-SELECT * FROM orders WHERE customer_id = 101;
-
--- ✅ Good: fetch only what you need
-SELECT order_id, amount, order_date FROM orders WHERE customer_id = 101;
-```
-
-### 4. Implicit type conversion
-```sql
--- ❌ Bad: customer_id is INT, but compared to string
-SELECT * FROM orders WHERE customer_id = '101';
-
--- ✅ Good: match the column type
-SELECT * FROM orders WHERE customer_id = 101;
-```
-
-### 5. OR on different columns
-```sql
--- ❌ Bad: cannot efficiently use a single index
-SELECT * FROM orders WHERE customer_id = 1 OR product_id = 5;
-
--- ✅ Good: use UNION
-SELECT * FROM orders WHERE customer_id = 1
-UNION
-SELECT * FROM orders WHERE product_id = 5;
-```
-
-## Query Optimization Tips
-
-### Use EXISTS instead of COUNT
-```sql
--- ❌ Slower: counts all matching rows
-SELECT * FROM users WHERE (SELECT COUNT(*) FROM orders WHERE customer_id = users.id) > 0;
-
--- ✅ Faster: stops at first match
-SELECT * FROM users u WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = u.id);
-```
-
-### Avoid N+1 queries
-```sql
--- ❌ Bad: 1 query to get users + N queries to get each user's orders
--- (this is an application-level problem, but use JOINs to solve it)
-
--- ✅ Good: single JOIN
+-- ✅ Better: understand why duplicates exist
+-- A user appears once per order → use COUNT or fix the query logic
 SELECT u.name, COUNT(o.id) AS order_count
 FROM users u
 LEFT JOIN orders o ON u.id = o.customer_id
 GROUP BY u.name;
 ```
 
-### Limit early
-```sql
--- ❌ Slower: sorts all rows then takes 10
-SELECT * FROM orders ORDER BY amount DESC LIMIT 10;
+## Aliases
 
--- ✅ Better: filter first, then sort
-SELECT * FROM orders
-WHERE order_date >= '2024-01-01'
-ORDER BY amount DESC
-LIMIT 10;
+Aliases give temporary names to columns or tables. They make queries more readable without changing the actual data.
+
+### Column Aliases
+
+```sql
+-- Rename a column in the output
+SELECT name AS customer_name FROM users;
+SELECT email AS contact_email FROM users;
+
+-- Alias a calculated expression
+SELECT
+  name,
+  price * 1.18          AS price_with_gst,
+  price * 0.9           AS discounted_price,
+  stock * price         AS inventory_value
+FROM products;
+
+-- AS keyword is optional
+SELECT name customer_name, email contact FROM users;
+-- (AS is more readable - always include it)
 ```
 
-## Types of Indexes
-
-| Type | Use Case |
-|------|----------|
-| B-Tree (default) | Equality and range queries |
-| Hash | Equality only (=) |
-| GIN | Full-text search, arrays (PostgreSQL) |
-| GiST | Geometric data, full-text (PostgreSQL) |
-| Partial Index | Index only a subset of rows |
-| Covering Index | Include extra columns for index-only scans |
+### Where Aliases Can and Cannot Be Used
 
 ```sql
--- Partial index: only index active users
-CREATE INDEX idx_active_users ON users(email) WHERE status = 'active';
+-- ✅ ORDER BY (runs after SELECT - alias is available)
+SELECT salary * 12 AS annual_salary FROM employees
+ORDER BY annual_salary DESC;
 
--- Covering index: include extra columns
-CREATE INDEX idx_orders_covering ON orders(customer_id) INCLUDE (amount, order_date);
+-- ✅ GROUP BY in some databases (PostgreSQL allows it)
+SELECT city, COUNT(*) AS total FROM users
+GROUP BY city ORDER BY total DESC;
+
+-- ❌ WHERE (runs before SELECT - alias not yet defined)
+SELECT salary * 12 AS annual_salary FROM employees
+WHERE annual_salary > 600000;
+-- ERROR: column "annual_salary" does not exist
+
+-- ✅ Fix: repeat the expression
+WHERE salary * 12 > 600000;
+
+-- ✅ Or use a subquery / CTE
+WITH base AS (SELECT *, salary * 12 AS annual_salary FROM employees)
+SELECT * FROM base WHERE annual_salary > 600000;
+
+-- ❌ HAVING (if referencing a SELECT alias - depends on database)
+-- Safe approach: repeat the expression
+HAVING COUNT(*) > 5        -- ✅ works everywhere
+HAVING total_count > 5     -- may not work in all databases
+```
+
+### Table Aliases
+
+Table aliases (also called correlation names) shorten table references in queries:
+
+```sql
+-- Without aliases - verbose
+SELECT users.name, users.email, orders.total, orders.created_at
+FROM users
+JOIN orders ON users.id = orders.customer_id;
+
+-- With aliases - much cleaner
+SELECT u.name, u.email, o.total, o.created_at
+FROM users u
+JOIN orders o ON u.id = o.customer_id;
+
+-- AS is optional for table aliases
+FROM users AS u  -- same as FROM users u
+```
+
+### When Table Aliases Are Required
+
+Self-joins require aliases to distinguish the two instances of the same table:
+
+```sql
+-- Employee and their manager - same table, two aliases
+SELECT
+  e.name  AS employee,
+  m.name  AS manager
+FROM employees e
+JOIN employees m ON e.manager_id = m.id;
+```
+
+### Naming Conventions for Aliases
+
+```sql
+-- Common single-letter abbreviations
+FROM users u
+FROM orders o
+FROM products p
+FROM order_items oi
+FROM categories c
+
+-- Or meaningful short names
+FROM users usr
+FROM orders ord
+FROM customer_stats cs
+```
+
+## Combining DISTINCT and Aliases
+
+```sql
+SELECT DISTINCT
+  u.city                        AS customer_city,
+  u.status                      AS account_status,
+  COUNT(*) OVER ()              AS total_combinations
+FROM users u
+ORDER BY customer_city, account_status;
 ```
 
 ## Summary
 
-- Indexes allow the database to find rows without full table scans
-- Add indexes on columns used in WHERE, JOIN, and ORDER BY
-- Composite index column order matters — leftmost columns first
-- Use `EXPLAIN ANALYZE` to see how your query actually runs
-- Avoid functions on indexed columns, leading wildcards, and SELECT *
-- Too many indexes slow down INSERT/UPDATE/DELETE — index wisely
+- `DISTINCT` removes duplicate rows from results - applies to all selected columns together
+- `COUNT(DISTINCT col)` counts unique values in a column
+- If you need DISTINCT because of duplicates from a JOIN, the JOIN is probably wrong
+- Column aliases (`AS`) rename output columns - required for expressions, optional for columns
+- Table aliases shorten table names in queries - especially useful with JOINs and self-joins
+- Aliases in SELECT are available in ORDER BY but NOT in WHERE or HAVING (in standard SQL)

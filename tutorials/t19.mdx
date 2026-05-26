@@ -1,0 +1,155 @@
+## IN
+
+`IN` checks if a value matches any value in a list or subquery.
+
+```sql
+-- Static list
+SELECT * FROM users WHERE city IN ('Mumbai', 'Delhi', 'Pune');
+
+-- Subquery
+SELECT * FROM users
+WHERE id IN (SELECT customer_id FROM orders WHERE total > 5000);
+
+-- NOT IN
+SELECT * FROM users WHERE city NOT IN ('Mumbai', 'Delhi');
+```
+
+## The NOT IN NULL Trap - Critical Interview Topic
+
+This is one of the most common SQL bugs and interview questions.
+
+```sql
+-- Find users who have NO orders
+SELECT * FROM users
+WHERE id NOT IN (SELECT customer_id FROM orders);
+
+-- ⚠️ If ANY customer_id in orders is NULL → returns ZERO rows!
+```
+
+**Why?** SQL's three-valued logic:
+
+```
+id NOT IN (1, 2, NULL)
+= id != 1 AND id != 2 AND id != NULL
+= id != 1 AND id != 2 AND UNKNOWN
+= UNKNOWN
+→ Row excluded (WHERE only keeps TRUE)
+```
+
+**The fix - always use NOT EXISTS:**
+
+```sql
+-- ✅ Handles NULLs correctly, also faster on large datasets
+SELECT * FROM users u
+WHERE NOT EXISTS (
+  SELECT 1 FROM orders o WHERE o.customer_id = u.id
+);
+```
+
+## EXISTS
+
+`EXISTS` returns TRUE if the subquery returns at least one row. It stops as soon as the first match is found (short-circuit evaluation).
+
+```sql
+-- Users who have placed at least one order
+SELECT name FROM users u
+WHERE EXISTS (
+  SELECT 1 FROM orders o WHERE o.customer_id = u.id
+);
+
+-- Users who have placed a high-value order (> 10,000)
+SELECT name FROM users u
+WHERE EXISTS (
+  SELECT 1 FROM orders o
+  WHERE o.customer_id = u.id AND o.total > 10000
+);
+```
+
+**`SELECT 1` vs `SELECT *` in EXISTS:**
+The content of the subquery doesn't matter - EXISTS only cares whether any rows are returned. `SELECT 1` is conventional to signal this intent clearly.
+
+## EXISTS vs IN - When to Use Which
+
+```sql
+-- These return the same result:
+SELECT * FROM users WHERE id IN (SELECT customer_id FROM orders);
+SELECT * FROM users u WHERE EXISTS (SELECT 1 FROM orders WHERE customer_id = u.id);
+```
+
+| | IN | EXISTS |
+|-|----|----|
+| NULLs safe | ❌ NOT IN is dangerous | ✅ NOT EXISTS is safe |
+| Short-circuits | ❌ No | ✅ Yes |
+| Best for | Static lists, small subqueries | Large subqueries, correlated checks |
+| Readability | ✅ Simple | Slightly more verbose |
+
+**Rule of thumb:** Use `IN` for static lists and small non-nullable subqueries. Use `EXISTS` (and `NOT EXISTS`) for correlated checks and any subquery that might return NULLs.
+
+## ANY / SOME
+
+`ANY` returns TRUE if the condition is true for **at least one** value in the subquery.
+
+```sql
+-- Products more expensive than at least one product in the 'Budget' category
+SELECT name, price FROM products
+WHERE price > ANY (
+  SELECT price FROM products WHERE category = 'Budget'
+);
+-- Equivalent to: price > MIN(SELECT price ... WHERE category='Budget')
+
+-- SOME is identical to ANY
+WHERE price > SOME (SELECT price FROM products WHERE category = 'Budget');
+```
+
+**`= ANY` is identical to `IN`:**
+```sql
+WHERE id = ANY (SELECT customer_id FROM orders)
+-- Same as:
+WHERE id IN (SELECT customer_id FROM orders)
+```
+
+## ALL
+
+`ALL` returns TRUE if the condition is true for **every** value in the subquery.
+
+```sql
+-- Products more expensive than ALL products in the 'Budget' category
+SELECT name, price FROM products
+WHERE price > ALL (
+  SELECT price FROM products WHERE category = 'Budget'
+);
+-- Equivalent to: price > MAX(SELECT price ... WHERE category='Budget')
+
+-- Find the most expensive product overall
+SELECT name, price FROM products
+WHERE price >= ALL (SELECT price FROM products);
+-- Same as: WHERE price = (SELECT MAX(price) FROM products)
+```
+
+**Common equivalences:**
+```sql
+= ANY(subquery)    ≡  IN (subquery)
+!= ALL(subquery)   ≡  NOT IN (subquery)  -- but ALL is NULL-safe!
+> ANY(subquery)    ≡  > MIN of subquery
+> ALL(subquery)    ≡  > MAX of subquery
+< ANY(subquery)    ≡  < MAX of subquery
+< ALL(subquery)    ≡  < MIN of subquery
+```
+
+## Interview Question: IN vs EXISTS - Which is Faster?
+
+**Answer:** It depends on the database and query, but:
+
+- `EXISTS` short-circuits - stops at the first matching row. More efficient for large subqueries.
+- `IN` evaluates the entire subquery first, then checks membership. Good for small result sets.
+- Modern query planners (PostgreSQL, MySQL 8+) often optimize both to the same plan anyway.
+- The most important practical difference is NULL safety: **always use `NOT EXISTS` instead of `NOT IN`**.
+
+## Summary
+
+- `IN` matches against a list or subquery result - simple and readable
+- `NOT IN` is dangerous when the subquery can return NULLs - use `NOT EXISTS` instead
+- `EXISTS` short-circuits on first match - efficient for large correlated subqueries
+- `NOT EXISTS` is always the safe choice for "rows that have no match"
+- `ANY` = true if condition holds for at least one value (= ANY is same as IN)
+- `ALL` = true only if condition holds for every value (> ALL is same as > MAX)

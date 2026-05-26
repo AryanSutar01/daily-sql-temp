@@ -1,230 +1,202 @@
-## What is a JOIN?
+## The SELECT Statement
 
-A JOIN combines rows from two or more tables based on a related column. This is the heart of relational databases — data is split across tables and JOINs bring it back together.
+`SELECT` is the most-used SQL command. It retrieves data from one or more tables. Every data query starts with SELECT.
 
-### Sample Tables
-
-```sql
--- users table
-+----+----------+
-| id | name     |
-+----+----------+
-| 1  | Alice    |
-| 2  | Bob      |
-| 3  | Charlie  |
-| 4  | Diana    |
-+----+----------+
-
--- orders table
-+----+-------------+---------+
-| id | customer_id | amount  |
-+----+-------------+---------+
-| 1  | 1           | 500     |
-| 2  | 1           | 300     |
-| 3  | 2           | 750     |
-| 4  | 5           | 200     |  ← customer_id 5 doesn't exist in users
-+----+-------------+---------+
-```
-
-## INNER JOIN
-
-Returns only rows that have a match in **both** tables. Non-matching rows are excluded.
+### Basic Syntax
 
 ```sql
-SELECT users.name, orders.amount
-FROM users
-INNER JOIN orders ON users.id = orders.customer_id;
+SELECT column1, column2, ...
+FROM table_name;
 ```
 
-Result:
-```
-+-------+--------+
-| name  | amount |
-+-------+--------+
-| Alice | 500    |
-| Alice | 300    |
-| Bob   | 750    |
-+-------+--------+
-```
-
-Charlie and Diana have no orders → excluded.
-Order with customer_id=5 → excluded (no matching user).
+### Select All Columns
 
 ```sql
--- Shorthand: JOIN = INNER JOIN
-SELECT u.name, o.amount
+-- * returns every column in the table
+SELECT * FROM users;
+```
+
+> `SELECT *` is convenient for exploration but avoid it in production code - it fetches unnecessary columns, breaks when columns are added/removed, and prevents index-only scans.
+
+### Select Specific Columns
+
+```sql
+-- Only retrieve what you need
+SELECT name, email FROM users;
+
+SELECT id, name, price FROM products;
+```
+
+### Selecting Expressions
+
+You can calculate values directly in SELECT:
+
+```sql
+-- Arithmetic
+SELECT name, price, price * 1.18 AS price_with_gst FROM products;
+
+-- String concatenation
+SELECT first_name || ' ' || last_name AS full_name FROM users;
+
+-- Conditional
+SELECT name, CASE WHEN stock > 0 THEN 'In Stock' ELSE 'Out of Stock' END AS availability
+FROM products;
+```
+
+## Column Aliases - AS
+
+`AS` gives a column (or expression) a readable name in the output.
+
+```sql
+-- Rename a column in the result
+SELECT name AS customer_name, email AS contact FROM users;
+
+-- Alias an expression
+SELECT salary * 12 AS annual_salary FROM employees;
+
+-- Alias a table (shorthand)
+SELECT u.name, u.email FROM users AS u;
+SELECT u.name, u.email FROM users u;  -- AS is optional
+```
+
+**Important:** Column aliases defined in SELECT cannot be used in WHERE (WHERE runs before SELECT).
+
+```sql
+-- ❌ Error: annual_salary alias not available in WHERE
+SELECT salary * 12 AS annual_salary FROM employees
+WHERE annual_salary > 600000;
+
+-- ✅ Repeat the expression
+WHERE salary * 12 > 600000;
+
+-- ✅ Or wrap in a subquery
+SELECT * FROM (
+  SELECT *, salary * 12 AS annual_salary FROM employees
+) t
+WHERE annual_salary > 600000;
+```
+
+## DISTINCT - Remove Duplicates
+
+```sql
+-- Get unique cities where users live
+SELECT DISTINCT city FROM users;
+
+-- Get unique (city, status) combinations
+SELECT DISTINCT city, status FROM users;
+
+-- Count unique values
+SELECT COUNT(DISTINCT city) AS unique_cities FROM users;
+```
+
+## FROM - The Source Table
+
+`FROM` specifies which table(s) to query. It can also reference:
+
+### Subquery as a Table
+
+```sql
+SELECT *
+FROM (
+  SELECT customer_id, SUM(total) AS total_spent
+  FROM orders
+  GROUP BY customer_id
+) AS customer_summary
+WHERE total_spent > 10000;
+```
+
+### Multiple Tables (Implicit Join - Old Style)
+
+```sql
+-- Old-style join (avoid this - use explicit JOIN instead)
+SELECT u.name, o.total
+FROM users u, orders o
+WHERE u.id = o.customer_id;
+
+-- Modern explicit syntax (much clearer)
+SELECT u.name, o.total
 FROM users u
 JOIN orders o ON u.id = o.customer_id;
 ```
 
-## LEFT JOIN
-
-Returns **all rows from the left table** and matching rows from the right table. Non-matching right rows become NULL.
+## SELECT with Literal Values
 
 ```sql
-SELECT users.name, orders.amount
-FROM users
-LEFT JOIN orders ON users.id = orders.customer_id;
-```
-
-Result:
-```
-+---------+--------+
-| name    | amount |
-+---------+--------+
-| Alice   | 500    |
-| Alice   | 300    |
-| Bob     | 750    |
-| Charlie | NULL   |  ← no orders, but Charlie is included
-| Diana   | NULL   |  ← no orders, but Diana is included
-+---------+--------+
-```
-
-### Common Use Case: Find users with NO orders
-
-```sql
-SELECT users.name
-FROM users
-LEFT JOIN orders ON users.id = orders.customer_id
-WHERE orders.id IS NULL;
-```
-
-Result:
-```
-+---------+
-| name    |
-+---------+
-| Charlie |
-| Diana   |
-+---------+
-```
-
-## RIGHT JOIN
-
-Returns **all rows from the right table** and matching rows from the left. Opposite of LEFT JOIN.
-
-```sql
-SELECT users.name, orders.amount
-FROM users
-RIGHT JOIN orders ON users.id = orders.customer_id;
-```
-
-Result:
-```
-+-------+--------+
-| name  | amount |
-+-------+--------+
-| Alice | 500    |
-| Alice | 300    |
-| Bob   | 750    |
-| NULL  | 200    |  ← order with unknown customer_id=5
-+-------+--------+
-```
-
-> **Tip:** RIGHT JOIN is rarely used. You can always rewrite it as a LEFT JOIN by swapping the table order.
-
-## FULL OUTER JOIN
-
-Returns **all rows from both tables**. Non-matching rows from either side become NULL.
-
-```sql
-SELECT users.name, orders.amount
-FROM users
-FULL OUTER JOIN orders ON users.id = orders.customer_id;
-```
-
-Result:
-```
-+---------+--------+
-| name    | amount |
-+---------+--------+
-| Alice   | 500    |
-| Alice   | 300    |
-| Bob     | 750    |
-| Charlie | NULL   |
-| Diana   | NULL   |
-| NULL    | 200    |
-+---------+--------+
-```
-
-> **Note:** MySQL does not support FULL OUTER JOIN. Simulate it with UNION of LEFT and RIGHT JOIN.
-
-```sql
--- MySQL workaround for FULL OUTER JOIN
-SELECT users.name, orders.amount
-FROM users
-LEFT JOIN orders ON users.id = orders.customer_id
-
-UNION
-
-SELECT users.name, orders.amount
-FROM users
-RIGHT JOIN orders ON users.id = orders.customer_id;
-```
-
-## CROSS JOIN
-
-Returns every combination of rows from both tables (cartesian product). Use with caution — can produce huge result sets.
-
-```sql
-SELECT colors.name, sizes.name
-FROM colors
-CROSS JOIN sizes;
-```
-
-If colors has 3 rows and sizes has 4 rows → 12 rows returned.
-
-## SELF JOIN
-
-A table joined with itself. Useful for hierarchical data like employee-manager relationships.
-
-```sql
--- employees table has a manager_id column pointing to another employee
+-- Include constants in output
 SELECT
-  e.name AS employee,
-  m.name AS manager
-FROM employees e
-JOIN employees m ON e.manager_id = m.id;
+  name,
+  'active'       AS status,
+  0              AS default_score,
+  NOW()          AS exported_at
+FROM users;
 ```
 
-## JOIN with Multiple Tables
+## SELECT without FROM
+
+Some databases allow SELECT without a table:
 
 ```sql
+-- PostgreSQL / MySQL
+SELECT 1 + 1;          -- 2
+SELECT NOW();           -- current timestamp
+SELECT UPPER('hello'); -- 'HELLO'
+SELECT 'test';         -- 'test'
+
+-- Used in EXISTS checks
+WHERE EXISTS (SELECT 1 FROM orders WHERE customer_id = u.id)
+-- SELECT 1 is a common pattern - returns a constant, fast
+```
+
+## Controlling Output - Column Order
+
+Columns appear in SELECT output in the order you list them:
+
+```sql
+-- This determines column order in results
+SELECT id, name, email, created_at FROM users;
+
+-- Different order
+SELECT created_at, email, name, id FROM users;
+```
+
+## SELECT with LIMIT (Preview Data)
+
+```sql
+-- Quick look at a table's structure and sample data
+SELECT * FROM orders LIMIT 5;
+
+-- Without LIMIT on a large table → millions of rows returned → very slow
+```
+
+## Putting It Together
+
+```sql
+-- A complete foundational query
 SELECT
-  u.name        AS customer,
-  p.name        AS product,
-  o.amount,
-  o.order_date
-FROM orders o
-JOIN users    u ON o.customer_id = u.id
-JOIN products p ON o.product_id  = p.id
-WHERE o.order_date >= '2024-01-01'
-ORDER BY o.order_date DESC;
+  u.id,
+  u.name                    AS customer,
+  u.email,
+  u.city,
+  u.created_at::DATE        AS joined_date
+FROM users u
+WHERE u.status = 'active'
+  AND u.city IN ('Mumbai', 'Delhi', 'Bangalore')
+ORDER BY u.created_at DESC
+LIMIT 50;
 ```
 
-## JOIN Cheat Sheet
+## Interview Question: What's the difference between SELECT * and SELECT column?
 
-```
-Table A    Table B
-  1          1   ← INNER JOIN returns this
-  2          2   ← INNER JOIN returns this
-  3              ← LEFT JOIN includes this (NULL for B)
-               4 ← RIGHT JOIN includes this (NULL for A)
-```
-
-| JOIN Type | Returns |
-|-----------|---------|
-| INNER JOIN | Only matching rows from both tables |
-| LEFT JOIN | All left rows + matching right rows |
-| RIGHT JOIN | All right rows + matching left rows |
-| FULL OUTER JOIN | All rows from both tables |
-| CROSS JOIN | Every combination of rows |
+**Answer:**
+- `SELECT *` retrieves every column - convenient but wasteful. It fetches more data over the network, prevents the query planner from using index-only scans, and breaks if columns are reordered or removed.
+- `SELECT column1, column2` retrieves only what you need - faster, more explicit, safer to maintain.
+- In interviews, always select specific columns to show you understand query efficiency.
 
 ## Summary
 
-- `INNER JOIN` — only rows with matches in both tables
-- `LEFT JOIN` — all left rows, NULL for unmatched right rows
-- `RIGHT JOIN` — all right rows, NULL for unmatched left rows
-- `FULL OUTER JOIN` — all rows from both tables
-- Always use table aliases (`u`, `o`) for cleaner queries
-- Use `LEFT JOIN ... WHERE right.id IS NULL` to find unmatched rows
+- `SELECT col FROM table` is the foundation of every read query
+- Use column aliases (`AS`) to make output readable
+- `DISTINCT` removes duplicate rows from results
+- `SELECT *` is for exploration only - always name columns in production code
+- Column aliases in SELECT cannot be referenced in WHERE (use a subquery or repeat the expression)
+- Include `LIMIT` when exploring unknown tables to avoid pulling millions of rows

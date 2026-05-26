@@ -1,0 +1,164 @@
+## What Are Aggregate Functions?
+
+Aggregate functions collapse multiple rows into a single summary value. Instead of returning one row per record, they return one value per group.
+
+| Function | Returns | Ignores NULLs? |
+|----------|---------|---------------|
+| `COUNT(*)` | Number of rows | ❌ No |
+| `COUNT(col)` | Number of non-NULL values | ✅ Yes |
+| `SUM(col)` | Total of all values | ✅ Yes |
+| `AVG(col)` | Average of all values | ✅ Yes |
+| `MIN(col)` | Smallest value | ✅ Yes |
+| `MAX(col)` | Largest value | ✅ Yes |
+
+## COUNT
+
+```sql
+-- Count all rows
+SELECT COUNT(*) AS total_users FROM users;
+
+-- Count non-NULL values only
+SELECT COUNT(phone) AS users_with_phone FROM users;
+
+-- Count distinct values
+SELECT COUNT(DISTINCT city) AS unique_cities FROM users;
+
+-- Interview: Why might COUNT(*) differ from COUNT(column)?
+-- COUNT(*) = 1000 but COUNT(phone) = 650 means 350 users have no phone (NULL)
+```
+
+## SUM
+
+```sql
+-- Total revenue
+SELECT SUM(total) AS total_revenue FROM orders;
+
+-- Total per category
+SELECT category_id, SUM(price * stock) AS inventory_value
+FROM products
+GROUP BY category_id;
+
+-- SUM with condition
+SELECT SUM(CASE WHEN status = 'completed' THEN total ELSE 0 END) AS completed_revenue
+FROM orders;
+```
+
+## AVG
+
+```sql
+-- Average order value
+SELECT ROUND(AVG(total), 2) AS avg_order_value FROM orders;
+
+-- Average salary per department
+SELECT department, ROUND(AVG(salary), 0) AS avg_salary
+FROM employees
+GROUP BY department;
+```
+
+**Interview trap:** AVG ignores NULLs. If 3 of 5 salary values are NULL, AVG divides by 2, not 5. This inflates the average compared to what users might expect.
+
+```sql
+-- These give different results when NULLs are present:
+SELECT AVG(salary) FROM employees;               -- divides by non-NULL count
+SELECT SUM(salary) / COUNT(*) FROM employees;    -- divides by ALL rows
+```
+
+## MIN and MAX
+
+```sql
+-- Salary range
+SELECT MIN(salary) AS lowest, MAX(salary) AS highest FROM employees;
+
+-- Earliest and latest order
+SELECT MIN(created_at) AS first_order, MAX(created_at) AS last_order
+FROM orders;
+
+-- Alphabetically first and last product name
+SELECT MIN(name) AS first_alpha, MAX(name) AS last_alpha FROM products;
+
+-- Per-customer order history
+SELECT
+  customer_id,
+  MIN(created_at) AS first_purchase,
+  MAX(created_at) AS last_purchase,
+  MAX(total)      AS largest_order
+FROM orders
+GROUP BY customer_id;
+```
+
+## Aggregates Without GROUP BY
+
+Without GROUP BY, aggregate functions collapse the ENTIRE table into one row:
+
+```sql
+SELECT
+  COUNT(*)         AS total_orders,
+  COUNT(DISTINCT customer_id) AS unique_customers,
+  SUM(total)       AS total_revenue,
+  ROUND(AVG(total), 2) AS avg_order,
+  MIN(total)       AS smallest_order,
+  MAX(total)       AS largest_order
+FROM orders
+WHERE status = 'completed';
+```
+
+## Multiple Aggregates in One Query
+
+```sql
+-- Complete sales summary
+SELECT
+  COUNT(*)                  AS total_orders,
+  COUNT(DISTINCT customer_id) AS unique_buyers,
+  SUM(total)                AS gross_revenue,
+  SUM(total) * 0.18         AS gst_collected,
+  ROUND(AVG(total), 2)      AS avg_order_value,
+  MIN(total)                AS min_order,
+  MAX(total)                AS max_order
+FROM orders
+WHERE status = 'completed'
+  AND created_at >= '2024-01-01';
+```
+
+## HAVING - Filter After Aggregation
+
+```sql
+-- Only departments with more than 5 employees
+SELECT department, COUNT(*) AS headcount
+FROM employees
+GROUP BY department
+HAVING COUNT(*) > 5
+ORDER BY headcount DESC;
+
+-- Products with total sales > 1M
+SELECT product_id, SUM(quantity * unit_price) AS revenue
+FROM order_items
+GROUP BY product_id
+HAVING SUM(quantity * unit_price) > 1000000;
+```
+
+## Real-World: Customer Analytics Dashboard
+
+```sql
+SELECT
+  customer_id,
+  COUNT(*)                AS total_orders,
+  SUM(total)              AS lifetime_value,
+  ROUND(AVG(total), 2)    AS avg_order,
+  MIN(created_at)         AS first_order_date,
+  MAX(created_at)         AS last_order_date,
+  MAX(created_at) - MIN(created_at) AS customer_tenure
+FROM orders
+WHERE status = 'completed'
+GROUP BY customer_id
+HAVING COUNT(*) >= 2
+ORDER BY lifetime_value DESC
+LIMIT 100;
+```
+
+## Summary
+
+- Aggregate functions collapse many rows into one summary value
+- `COUNT(*)` counts rows; `COUNT(col)` skips NULLs; `COUNT(DISTINCT col)` counts unique non-NULL values
+- `AVG` ignores NULLs - this can inflate the average when many values are missing
+- `HAVING` filters groups after aggregation (like WHERE but for aggregate results)
+- You can have multiple aggregates in a single SELECT for a complete summary

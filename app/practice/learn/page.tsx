@@ -1,6 +1,9 @@
 import { Card } from "@/components/learn/card"
+import {getTutorialsByCategory} from "@/tutorials/manifest";
 
 export default function LearnPage() {
+  const tutorialsByCategory = getTutorialsByCategory()
+
   return (
     <main className="min-h-screen bg-[#0a0f1c]">
       {/* Header Section */}
@@ -43,9 +46,77 @@ export default function LearnPage() {
         </div>
       </div>
 
-      {/* Grid Section */}
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <Card />
+      {/*Content Section*/}
+      <div className="mx-auto mx-w-6xl px-12 py-12 space-y-16">
+        {tutorialsByCategory.beginner.length > 0 && (
+            <section>
+              <div className="mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <h2 className="text-2xl font-bold text-white">Foundation</h2>
+                </div>
+                <p className="text-sm text-[#8b96ad]">
+                  Core SQL syntax and concepts every beginner must know before writing their first query.
+                </p>
+              </div>
+              <Card tutorials={tutorialsByCategory.beginner} />
+            </section>
+        )}
+
+        {tutorialsByCategory.intermediate.length > 0 && (
+          <section>
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-xl font-bold text-white">Core Querying</h2>
+              </div>
+              <p className="text-sm text-[#8b96ad]">
+                The bread and butter of SQL interviews - aggregations, joins, and filtering logic.
+              </p>
+            </div>
+            <Card tutorials={tutorialsByCategory.intermediate} />
+          </section>
+        )}
+
+        {tutorialsByCategory.advance.length > 0 && (
+          <section>
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-xl font-bold text-white">Advance Topics</h2>
+              </div>
+              <p className="text-sm text-[#8b96ad]">
+                Topics that separate average candidates from strong ones in interviews.
+              </p>
+            </div>
+            <Card tutorials={tutorialsByCategory.advance} />
+          </section>
+        )}
+
+        {tutorialsByCategory.designAndPerformance.length > 0 && (
+          <section>
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-xl font-bold text-white">Design & Performance</h2>
+              </div>
+              <p className="text-sm text-[#8b96ad]">
+                Schema design, performance tuning, and database internals - critical for senior roles.
+              </p>
+            </div>
+            <Card tutorials={tutorialsByCategory.designAndPerformance} />
+          </section>
+        )}
+
+        {tutorialsByCategory.bonus.length > 0 && (
+          <section>
+            <div className="mb-6">
+              <div className="flex items-center gap-3 text-white">
+                <h2 className="text-xl font-bold text-white">Real-World & Analytics</h2>
+              </div>
+              <p className="text-sm text-[#8b96ad]">
+                Practical topics for data analysts, data engineers, and modern SQL users.
+              </p>
+            </div>
+            <Card tutorials={tutorialsByCategory.bonus} />
+          </section>
+        )}
       </div>
     </main>
   )

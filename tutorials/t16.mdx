@@ -1,0 +1,102 @@
+## What is a CROSS JOIN?
+
+A CROSS JOIN returns every possible combination of rows from two tables - called the **cartesian product**. If Table A has 3 rows and Table B has 4 rows, the result has 3 × 4 = 12 rows.
+
+```sql
+SELECT * FROM colors CROSS JOIN sizes;
+
+-- colors (3 rows): Red, Green, Blue
+-- sizes  (4 rows): S, M, L, XL
+-- Result: 12 rows - Red+S, Red+M, Red+L, Red+XL, Green+S...
+```
+
+## When to Use CROSS JOIN
+
+### 1. Generating All Combinations (e.g., product variants)
+
+```sql
+-- All possible product variants
+SELECT
+  p.name    AS product,
+  c.name    AS color,
+  s.name    AS size
+FROM products p
+CROSS JOIN colors c
+CROSS JOIN sizes s
+ORDER BY p.name, c.name, s.name;
+```
+
+### 2. Building a Date Spine (Fill Missing Dates)
+
+```sql
+-- All months in 2024 × all product categories
+-- Used to ensure every month appears even with zero sales
+SELECT
+  months.month,
+  categories.name AS category
+FROM (
+  SELECT generate_series(
+    '2024-01-01'::DATE,
+    '2024-12-01'::DATE,
+    '1 month'
+  ) AS month
+) months
+CROSS JOIN categories;
+```
+
+### 3. Applying a Constant to Every Row
+
+```sql
+-- Apply a tax rate to every product (tax stored in a single-row settings table)
+SELECT
+  p.name,
+  p.price,
+  t.rate,
+  p.price * t.rate AS tax_amount
+FROM products p
+CROSS JOIN (SELECT 0.18 AS rate) t;
+```
+
+## CROSS JOIN in Analytical Queries
+
+```sql
+-- Compare every product's price to every other product's price
+SELECT
+  a.name AS product_a,
+  b.name AS product_b,
+  a.price - b.price AS price_diff
+FROM products a
+CROSS JOIN products b
+WHERE a.id != b.id
+ORDER BY ABS(a.price - b.price) DESC;
+```
+
+## Implicit CROSS JOIN
+
+```sql
+-- Old-style (implicit): comma between tables WITHOUT a WHERE join condition
+SELECT * FROM colors, sizes;
+-- Same as CROSS JOIN - avoid this style, it's easy to accidentally create
+
+-- Explicit (preferred):
+SELECT * FROM colors CROSS JOIN sizes;
+```
+
+## Warning: CROSS JOIN Can Be Huge
+
+```sql
+-- 1,000 rows × 1,000 rows = 1,000,000 rows
+-- 10,000 rows × 10,000 rows = 100,000,000 rows
+
+-- Always be aware of result size before running a CROSS JOIN
+SELECT COUNT(*) FROM table_a;  -- check sizes first
+SELECT COUNT(*) FROM table_b;
+```
+
+## Summary
+
+- CROSS JOIN returns every combination of rows from two tables
+- Result size = rows in A × rows in B - can be enormous
+- Useful for generating combinations (variants, date spines, test data)
+- An accidental CROSS JOIN from a missing JOIN condition is a common bug to watch for
+- Always check table sizes before running a CROSS JOIN in production

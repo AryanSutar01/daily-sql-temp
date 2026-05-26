@@ -1,0 +1,131 @@
+## The Problem
+
+When multiple transactions run simultaneously, three types of anomalies can occur:
+
+**Dirty Read:** Reading uncommitted data from another transaction
+```
+T1: UPDATE balance = 0   (not committed)
+T2: SELECT balance → 0   ← reads uncommitted data!
+T1: ROLLBACK             ← balance is back to original
+T2 made a decision on data that never existed
+```
+
+**Non-Repeatable Read:** Same query returns different results within one transaction
+```
+T1: SELECT balance → 500
+T2: UPDATE balance = 200; COMMIT
+T1: SELECT balance → 200   ← different result!
+```
+
+**Phantom Read:** New rows appear in a repeated query within one transaction
+```
+T1: SELECT COUNT(*) WHERE amount > 100 → 5
+T2: INSERT a new row with amount=150; COMMIT
+T1: SELECT COUNT(*) WHERE amount > 100 → 6   ← phantom row!
+```
+
+## The Four Isolation Levels
+
+Each level prevents progressively more anomalies (at the cost of concurrency):
+
+| Level | Dirty Read | Non-Repeatable | Phantom Read |
+|-------|-----------|----------------|-------------|
+| READ UNCOMMITTED | ✅ Possible | ✅ Possible | ✅ Possible |
+| READ COMMITTED | ❌ Prevented | ✅ Possible | ✅ Possible |
+| REPEATABLE READ | ❌ Prevented | ❌ Prevented | ✅ Possible |
+| SERIALIZABLE | ❌ Prevented | ❌ Prevented | ❌ Prevented |
+
+## READ UNCOMMITTED
+
+Allows dirty reads - you can see uncommitted changes from other transactions. Rarely used.
+
+```sql
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+-- Useful only in specific reporting scenarios where approximate data is acceptable
+-- Not supported in PostgreSQL (treated as READ COMMITTED)
+```
+
+## READ COMMITTED (Default in PostgreSQL)
+
+Each statement sees only committed data. A statement always reads the latest committed snapshot.
+
+```sql
+BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED;
+  SELECT balance FROM accounts WHERE id = 1;  -- sees committed data only
+  -- If another transaction commits between here and the next SELECT,
+  -- the next SELECT will see the new value (non-repeatable read is possible)
+  SELECT balance FROM accounts WHERE id = 1;  -- might return different value!
+COMMIT;
+```
+
+**Use for:** Most read operations, dashboards, reports that don't need perfect consistency.
+
+## REPEATABLE READ
+
+The same SELECT returns the same data every time within a transaction - even if another transaction commits changes between reads.
+
+```sql
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+  SELECT balance FROM accounts WHERE id = 1;  -- returns 500
+  -- Another transaction commits: UPDATE balance = 200
+  SELECT balance FROM accounts WHERE id = 1;  -- still returns 500 (snapshot)
+COMMIT;
+```
+
+**Use for:** Multi-step reads that must be consistent (e.g., generating a report that reads multiple tables and they must all be from the same point in time).
+
+## SERIALIZABLE
+
+The strictest level - transactions behave as if they executed one at a time (serially), even though they actually run concurrently. Prevents all three anomalies.
+
+```sql
+BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+  SELECT COUNT(*) FROM seats WHERE status = 'available';  -- 1 seat left
+  -- Another transaction also sees 1 seat and tries to book it
+  -- PostgreSQL detects the conflict and aborts one transaction
+  INSERT INTO bookings (seat_id, customer_id) VALUES (42, 1);
+COMMIT;  -- May fail with: ERROR: could not serialize access due to concurrent update
+-- Application must retry the transaction
+```
+
+**Use for:** Financial transactions, inventory booking, anything where correctness is critical and you can handle retries.
+
+## Setting Isolation Level
+
+```sql
+-- For a specific transaction
+BEGIN;
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+-- ... your queries ...
+COMMIT;
+
+-- Shorthand
+BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+-- Session-level default (PostgreSQL)
+SET default_transaction_isolation = 'repeatable read';
+
+-- MySQL
+SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+```
+
+## Choosing the Right Level
+
+| Scenario | Recommended Level |
+|----------|------------------|
+| General app reads, dashboards | READ COMMITTED (default) |
+| Consistent multi-table reports | REPEATABLE READ |
+| Financial transfers, inventory booking | SERIALIZABLE |
+| Approximate analytics, log reading | READ COMMITTED |
+
+## PostgreSQL Specifics
+
+PostgreSQL doesn't truly implement READ UNCOMMITTED - it silently uses READ COMMITTED instead. PostgreSQL's REPEATABLE READ also prevents phantom reads (stronger than the SQL standard requires).
+
+## Summary
+
+- READ COMMITTED (default): see committed data only; non-repeatable reads possible
+- REPEATABLE READ: consistent snapshot for the transaction; phantom reads possible (though PostgreSQL prevents them)
+- SERIALIZABLE: full isolation; transactions appear to run serially; highest correctness, lowest concurrency
+- Higher isolation = more locking overhead = lower throughput - use the minimum isolation you need
+- SERIALIZABLE transactions may be aborted due to conflicts - always retry on serialization failure

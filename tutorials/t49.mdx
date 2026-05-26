@@ -1,0 +1,201 @@
+# What are Gap & Island Problems?
+
+- **Islands** - consecutive sequences of rows (e.g., consecutive login days, consecutive IDs)
+- **Gaps** - breaks in a sequence (e.g., missing dates, missing IDs)
+
+These problems appear in:
+- Login streak detection
+- Session grouping
+- Detecting service outages (gaps in monitoring data)
+- Finding missing order IDs
+- Consecutive sales targets met
+
+## The Key Technique: Date Minus Row Number
+
+If dates are consecutive, `date - ROW_NUMBER()` gives the same result for every date in the island. A gap shifts all subsequent values to a different "group".
+
+```sql
+-- Example:
+-- dates: Jun 1, Jun 2, Jun 3, [gap], Jun 5, Jun 6
+-- rn:      1,     2,     3,           4,     5
+-- date-rn: May31, May31, May31,       Jun1, Jun1
+--                 ↑ same group         ↑ different group
+```
+
+## Finding Login Streaks
+
+```sql
+WITH daily_logins AS (
+  -- One row per user per day (remove duplicates)
+  SELECT DISTINCT
+    user_id,
+    DATE(login_time) AS login_date
+  FROM user_logins
+),
+grouped AS (
+  -- date - row_number = constant for consecutive dates
+  SELECT
+    user_id,
+    login_date,
+    login_date - (ROW_NUMBER() OVER (
+      PARTITION BY user_id ORDER BY login_date
+    ) * INTERVAL '1 day')::DATE AS streak_group
+  FROM daily_logins
+),
+streaks AS (
+  -- Each consecutive group becomes one row
+  SELECT
+    user_id,
+    MIN(login_date) AS streak_start,
+    MAX(login_date) AS streak_end,
+    COUNT(*)         AS streak_length
+  FROM grouped
+  GROUP BY user_id, streak_group
+)
+-- Show each user's longest and current streak
+SELECT
+  user_id,
+  MAX(streak_length) AS longest_streak,
+  MAX(CASE
+    WHEN streak_end >= CURRENT_DATE - 1
+    THEN streak_length ELSE 0
+  END) AS current_streak
+FROM streaks
+GROUP BY user_id
+ORDER BY longest_streak DESC;
+```
+
+## Grouping Events into Sessions (30-min gap = new session)
+
+```sql
+WITH events_with_gap AS (
+  SELECT
+    user_id,
+    event_time,
+    LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) AS prev_time
+  FROM page_events
+),
+session_starts AS (
+  SELECT
+    user_id,
+    event_time,
+    CASE
+      WHEN prev_time IS NULL THEN 1
+      WHEN event_time - prev_time > INTERVAL '30 minutes' THEN 1
+      ELSE 0
+    END AS is_new_session
+  FROM events_with_gap
+),
+session_ids AS (
+  SELECT
+    user_id,
+    event_time,
+    SUM(is_new_session) OVER (
+      PARTITION BY user_id ORDER BY event_time
+    ) AS session_id
+  FROM session_starts
+)
+SELECT
+  user_id,
+  session_id,
+  MIN(event_time) AS session_start,
+  MAX(event_time) AS session_end,
+  COUNT(*)         AS event_count,
+  MAX(event_time) - MIN(event_time) AS duration
+FROM session_ids
+GROUP BY user_id, session_id
+ORDER BY user_id, session_start;
+```
+
+## Finding Missing IDs (Gaps in Sequence)
+
+```sql
+-- Method 1: generate_series (PostgreSQL)
+SELECT s.id AS missing_id
+FROM generate_series(
+  (SELECT MIN(id) FROM orders),
+  (SELECT MAX(id) FROM orders)
+) AS s(id)
+LEFT JOIN orders o ON s.id = o.id
+WHERE o.id IS NULL
+ORDER BY missing_id;
+
+-- Method 2: Self-join to find gaps
+SELECT
+  o1.id + 1 AS gap_start,
+  MIN(o2.id) - 1 AS gap_end
+FROM orders o1
+JOIN orders o2 ON o2.id > o1.id
+GROUP BY o1.id
+HAVING o1.id + 1 < MIN(o2.id)
+ORDER BY gap_start;
+```
+
+## Finding Missing Dates
+
+```sql
+-- All dates in 2024 with no orders
+WITH all_dates AS (
+  SELECT generate_series(
+    '2024-01-01'::DATE,
+    '2024-12-31'::DATE,
+    '1 day'::INTERVAL
+  )::DATE AS date
+)
+SELECT ad.date AS missing_date
+FROM all_dates ad
+LEFT JOIN orders o ON ad.date = DATE(o.created_at)
+WHERE o.id IS NULL
+ORDER BY date;
+```
+
+## Consecutive Rows with Same Value (Islands of a Status)
+
+```sql
+-- Find periods where a server was 'down' (consecutive rows with status='down')
+WITH numbered AS (
+  SELECT
+    check_time,
+    status,
+    ROW_NUMBER() OVER (ORDER BY check_time) AS rn,
+    ROW_NUMBER() OVER (PARTITION BY status ORDER BY check_time) AS rn_status
+  FROM server_checks
+),
+islands AS (
+  SELECT
+    status,
+    MIN(check_time) AS period_start,
+    MAX(check_time) AS period_end,
+    COUNT(*)         AS consecutive_checks
+  FROM numbered
+  GROUP BY status, rn - rn_status  -- the "group key" for consecutive same-status rows
+)
+SELECT * FROM islands
+WHERE status = 'down'
+ORDER BY period_start;
+```
+
+## The Tabibitosan Method (General Pattern)
+
+This is the formal name for the date-minus-row-number trick:
+
+```sql
+-- General pattern for any consecutive grouping:
+SELECT
+  key_column,
+  value_column,
+  value_column - ROW_NUMBER() OVER (
+    PARTITION BY key_column ORDER BY value_column
+  ) AS island_group
+FROM your_table;
+-- Then GROUP BY key_column, island_group to aggregate each island
+```
+
+## Summary
+
+- Islands = consecutive sequences; Gaps = breaks in sequences
+- Key technique: `date - ROW_NUMBER()` = constant for consecutive dates in the same island
+- Session grouping: `LAG()` to detect gaps, `SUM(is_new_session) OVER (ORDER BY time)` to assign session IDs
+- Missing IDs/dates: `generate_series` LEFT JOIN → `WHERE id IS NULL`
+- Consecutive status periods: `ROW_NUMBER() - ROW_NUMBER() OVER (PARTITION BY status)` = island group key
+- These patterns appear frequently in data engineering and analytics interviews

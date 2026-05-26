@@ -1,0 +1,152 @@
+## Why Normalize?
+
+An unnormalized database leads to:
+- **Update anomaly** - change a value in one row, forget to update it in 50 others
+- **Insert anomaly** - can't insert partial data without filling unrelated columns
+- **Delete anomaly** - deleting a row accidentally removes unrelated data
+
+Normalization eliminates these problems by ensuring each piece of data is stored in exactly one place.
+
+## The Problem Table
+
+```
+orders_flat (completely unnormalized):
++----------+-----------+------------------+----------+---------+--------+----------+
+| order_id | cust_name | cust_email       | cust_city| product | price  | qty      |
++----------+-----------+------------------+----------+---------+--------+----------+
+| 1        | Alice     | alice@email.com  | Mumbai   | Laptop  | 50000  | 1        |
+| 2        | Alice     | alice@email.com  | Mumbai   | Mouse   | 500    | 2        |
+| 3        | Bob       | bob@email.com    | Delhi    | Laptop  | 50000  | 1        |
++----------+-----------+------------------+----------+---------+--------+----------+
+```
+
+Problems:
+- Alice's email stored twice - if she changes it, must update multiple rows
+- Laptop price stored twice - price change means multiple row updates
+- Delete Bob's order → Bob's contact info is lost
+
+## 1NF - First Normal Form
+
+**Rules:**
+1. Each column contains atomic (indivisible) values - no lists, no arrays
+2. Each row is unique (has a primary key)
+3. No repeating groups of columns
+
+```sql
+-- ❌ Violates 1NF: multi-valued cell
+order_id | products
+1        | 'Laptop, Mouse, Keyboard'   ← not atomic!
+
+-- ✅ 1NF: one value per cell, one row per product
+order_id | product
+1        | Laptop
+1        | Mouse
+1        | Keyboard
+```
+
+## 2NF - Second Normal Form
+
+**Rules:**
+1. Must already be in 1NF
+2. Every non-key column must depend on the **entire** primary key (no partial dependencies)
+3. Only applies to tables with composite primary keys
+
+```sql
+-- ❌ Violates 2NF: product_name depends only on product_id, not (order_id, product_id)
+order_items (PK = order_id + product_id):
+order_id | product_id | product_name | qty | unit_price
+1        | 5          | Laptop       | 1   | 50000
+2        | 5          | Laptop       | 1   | 50000   ← product_name duplicated!
+
+-- ✅ 2NF: move product_name to its own table
+order_items:               products:
+order_id | product_id | qty  product_id | product_name | price
+1        | 5          | 1   5          | Laptop       | 50000
+2        | 5          | 1
+```
+
+## 3NF - Third Normal Form
+
+**Rules:**
+1. Must already be in 2NF
+2. No transitive dependencies - non-key columns must depend ONLY on the primary key, not on other non-key columns
+
+```sql
+-- ❌ Violates 3NF: zip_code → city (city depends on zip, not on customer_id)
+customers:
+customer_id | name  | zip_code | city
+1           | Alice | 400001   | Mumbai
+2           | Bob   | 400001   | Mumbai   ← city duplicated because zip is the same
+
+-- ✅ 3NF: separate zip → city relationship
+customers:              zip_codes:
+customer_id | name | zip_code    zip_code | city
+1           | Alice| 400001      400001   | Mumbai
+2           | Bob  | 400001
+```
+
+## BCNF - Boyce-Codd Normal Form
+
+Stricter than 3NF. Every determinant must be a candidate key.
+
+```sql
+-- ❌ Violates BCNF: a non-key column determines part of the key
+-- (professor_id determines subject - but professor_id is not a key)
+student_courses:
+student_id | subject    | professor_id
+1          | Math       | P1
+2          | Math       | P1           ← P1 always teaches Math - redundant!
+3          | Physics    | P2
+
+-- ✅ BCNF: separate the professor → subject relationship
+student_enrollment:    professor_subjects:
+student_id | prof_id   prof_id | subject
+1          | P1        P1      | Math
+2          | P1        P2      | Physics
+3          | P2
+```
+
+## Normal Forms Summary
+
+| Form | Eliminates |
+|------|-----------|
+| 1NF | Multi-valued cells, non-atomic values |
+| 2NF | Partial dependencies on composite keys |
+| 3NF | Transitive dependencies (non-key → non-key) |
+| BCNF | All anomalies where non-key determines part of key |
+
+## Fully Normalized E-Commerce Schema
+
+```sql
+-- After applying normalization:
+
+CREATE TABLE customers (id BIGSERIAL PRIMARY KEY, name VARCHAR(100), email VARCHAR(255) UNIQUE);
+CREATE TABLE addresses (id SERIAL PRIMARY KEY, customer_id BIGINT REFERENCES customers(id), city VARCHAR(100), zip CHAR(6));
+CREATE TABLE zip_cities (zip CHAR(6) PRIMARY KEY, city VARCHAR(100), state VARCHAR(50));
+CREATE TABLE categories (id SERIAL PRIMARY KEY, name VARCHAR(100));
+CREATE TABLE products (id BIGSERIAL PRIMARY KEY, name VARCHAR(200), price DECIMAL(10,2), category_id INT REFERENCES categories(id));
+CREATE TABLE orders (id BIGSERIAL PRIMARY KEY, customer_id BIGINT REFERENCES customers(id), created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE order_items (order_id BIGINT REFERENCES orders(id), product_id BIGINT REFERENCES products(id), qty INT, unit_price DECIMAL(10,2), PRIMARY KEY (order_id, product_id));
+```
+
+## When to Denormalize
+
+Normalization is ideal for write-heavy systems. For read-heavy analytics, controlled denormalization can boost query performance:
+
+```sql
+-- Denormalized for faster reporting (store category name directly)
+SELECT product_name, category_name, SUM(revenue)  -- no JOIN needed
+FROM sales_fact
+GROUP BY product_name, category_name;
+```
+
+Common in data warehouses (star schema), caching layers, and read replicas.
+
+## Summary
+
+- 1NF: atomic values, unique rows
+- 2NF: no partial dependencies (non-key fully depends on entire key)
+- 3NF: no transitive dependencies (non-key depends only on the key)
+- BCNF: every determinant is a candidate key
+- Normalize to eliminate redundancy and anomalies
+- Selectively denormalize for query performance in read-heavy analytical workloads

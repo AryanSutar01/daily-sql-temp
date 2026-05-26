@@ -1,0 +1,157 @@
+## Why Concurrency Control?
+
+When multiple transactions run simultaneously, they can conflict. Without concurrency control:
+- Two users could buy the last item in stock
+- A bank transfer could be lost if two transfers happen at the same time
+- A report could read inconsistent data mid-transaction
+
+Databases use **locks** and **MVCC** to prevent these problems.
+
+## Lock Types
+
+### Row-Level Locks
+
+```sql
+-- Exclusive row lock: only you can read or modify this row until COMMIT
+SELECT * FROM accounts WHERE id = 1 FOR UPDATE;
+
+-- Share lock: others can read but not modify
+SELECT * FROM accounts WHERE id = 1 FOR SHARE;
+
+-- Skip locked rows (great for job queues)
+SELECT * FROM jobs WHERE status = 'pending'
+ORDER BY created_at
+LIMIT 1
+FOR UPDATE SKIP LOCKED;
+-- Skips rows already locked by other workers
+```
+
+### Table-Level Locks
+
+```sql
+-- Lock entire table (blocks all reads and writes by others)
+LOCK TABLE orders IN ACCESS EXCLUSIVE MODE;
+
+-- Lock for writes only (reads still allowed)
+LOCK TABLE orders IN ROW EXCLUSIVE MODE;
+
+-- These are usually acquired implicitly by DDL commands
+-- ALTER TABLE acquires ACCESS EXCLUSIVE automatically
+```
+
+## Deadlock
+
+A deadlock occurs when two transactions each wait for a lock held by the other - a circular dependency. Neither can proceed.
+
+```
+Transaction 1: locks Row A, waits for Row B
+Transaction 2: locks Row B, waits for Row A
+→ Deadlock! Database detects and kills one transaction.
+```
+
+```sql
+-- Transaction 1 (Session 1)
+BEGIN;
+UPDATE accounts SET balance = balance - 100 WHERE id = 1;  -- locks row 1
+-- Waiting for row 2...
+UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+
+-- Transaction 2 (Session 2) - runs simultaneously
+BEGIN;
+UPDATE accounts SET balance = balance - 50 WHERE id = 2;   -- locks row 2
+-- Waiting for row 1... DEADLOCK!
+UPDATE accounts SET balance = balance + 50 WHERE id = 1;
+```
+
+**Preventing deadlocks:**
+1. Always access resources in the same order (always lock row 1 before row 2)
+2. Use `SELECT ... FOR UPDATE` to lock all rows you need at the start
+3. Keep transactions short
+
+## MVCC - Multi-Version Concurrency Control
+
+PostgreSQL uses MVCC instead of pure locking for reads. Each transaction sees a **snapshot** of the database as it was when the transaction started. Writers don't block readers; readers don't block writers.
+
+```
+Without MVCC:          With MVCC:
+Read blocks Write  →   Readers see a snapshot (old version)
+Write blocks Read  →   Writers create new versions
+                        Old versions cleaned up by VACUUM
+```
+
+```sql
+-- Session 1
+BEGIN;
+SELECT COUNT(*) FROM orders;  -- sees 1000 rows
+
+-- Session 2 (simultaneously)
+INSERT INTO orders (...);
+COMMIT;  -- adds row 1001
+
+-- Back to Session 1
+SELECT COUNT(*) FROM orders;  -- still sees 1000 rows (snapshot isolation)
+COMMIT;
+```
+
+## Optimistic vs Pessimistic Locking
+
+### Pessimistic Locking
+Lock the row when you read it - assumes conflicts are likely:
+
+```sql
+-- Lock immediately, no one else can modify while you work
+BEGIN;
+SELECT * FROM inventory WHERE product_id = 5 FOR UPDATE;
+-- ... decide whether to deduct stock ...
+UPDATE inventory SET stock = stock - 1 WHERE product_id = 5;
+COMMIT;
+```
+
+### Optimistic Locking
+Don't lock - check for conflicts when updating (assumes conflicts are rare):
+
+```sql
+-- Read with version number
+SELECT stock, version FROM inventory WHERE product_id = 5;
+-- Got: stock=10, version=42
+
+-- Update only if version hasn't changed (no one else modified it)
+UPDATE inventory
+SET stock = 9, version = 43
+WHERE product_id = 5 AND version = 42;
+-- If 0 rows affected → someone else updated it → retry
+```
+
+Optimistic locking is implemented in the application, not in SQL - but the pattern is common in ORMs (Hibernate, ActiveRecord, Prisma).
+
+## Checking Lock Activity
+
+```sql
+-- PostgreSQL: see current locks
+SELECT
+  pid,
+  relation::regclass AS table,
+  mode,
+  granted
+FROM pg_locks
+WHERE NOT granted;   -- show only waiting locks
+
+-- Find blocking and blocked queries
+SELECT
+  blocked.pid         AS blocked_pid,
+  blocked.query       AS blocked_query,
+  blocking.pid        AS blocking_pid,
+  blocking.query      AS blocking_query
+FROM pg_stat_activity blocked
+JOIN pg_stat_activity blocking
+  ON blocking.pid = ANY(pg_blocking_pids(blocked.pid));
+```
+
+## Summary
+
+- Row locks (`FOR UPDATE`) prevent two transactions from modifying the same row
+- `SKIP LOCKED` is ideal for job queue workers - skips rows locked by other workers
+- Deadlock = circular lock dependency - database kills one transaction; prevent by consistent lock ordering
+- MVCC (PostgreSQL): readers see a snapshot, never blocked by writers
+- Pessimistic locking: lock early, safe but lower concurrency
+- Optimistic locking: no lock, check version at update time, better concurrency but needs retry logic

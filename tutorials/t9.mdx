@@ -1,236 +1,221 @@
-## What is a Transaction?
+## What is NULL?
 
-A transaction is a group of SQL statements that are executed as a single unit. Either **all** of them succeed, or **none** of them do.
+NULL means **unknown**, **missing**, or **not applicable**. It is not:
+- Zero (`0`)
+- An empty string (`''`)
+- False (`FALSE`)
 
-### Classic Example: Bank Transfer
-
-```sql
--- Transfer $500 from Alice to Bob
--- Both operations must succeed or both must fail
-
-BEGIN;
-
-UPDATE accounts SET balance = balance - 500 WHERE user_id = 1;  -- Debit Alice
-UPDATE accounts SET balance = balance + 500 WHERE user_id = 2;  -- Credit Bob
-
-COMMIT;  -- Save both changes permanently
-```
-
-If the server crashes after debiting Alice but before crediting Bob — without a transaction, Alice loses $500. With a transaction, the database rolls back both changes.
-
-## Transaction Commands
+NULL is the absence of any value. A user's `phone` column being NULL means we don't know their phone number - not that their phone number is zero or empty.
 
 ```sql
-BEGIN;          -- Start a transaction (also: START TRANSACTION)
-COMMIT;         -- Save all changes permanently
-ROLLBACK;       -- Undo all changes since BEGIN
-SAVEPOINT name; -- Create a checkpoint within a transaction
-ROLLBACK TO name; -- Roll back to a savepoint
+-- These are all different:
+phone = NULL   -- unknown
+phone = ''     -- known to be empty string
+phone = '0'    -- known to be the string '0'
+phone = 0      -- type error (phone is VARCHAR)
 ```
 
-## COMMIT and ROLLBACK
+## Three-Valued Logic
+
+SQL uses **three-valued logic**: TRUE, FALSE, and UNKNOWN.
+
+Any comparison with NULL returns UNKNOWN (not TRUE, not FALSE):
 
 ```sql
-BEGIN;
-
-INSERT INTO orders (customer_id, amount) VALUES (101, 500);
-INSERT INTO order_items (order_id, product_id) VALUES (LASTVAL(), 5);
-
--- If everything looks good:
-COMMIT;
-
--- If something went wrong:
-ROLLBACK;
+NULL = NULL    → UNKNOWN (not TRUE!)
+NULL != NULL   → UNKNOWN
+NULL > 5       → UNKNOWN
+NULL = 'hello' → UNKNOWN
+1 = NULL       → UNKNOWN
 ```
 
-## SAVEPOINT
+This is why `WHERE phone = NULL` never returns any rows - it evaluates to UNKNOWN for every row, and WHERE only keeps TRUE.
 
 ```sql
-BEGIN;
+-- ❌ Never returns rows
+SELECT * FROM users WHERE phone = NULL;
 
-INSERT INTO orders (customer_id, amount) VALUES (101, 500);
-SAVEPOINT after_order;  -- checkpoint
-
-INSERT INTO order_items (order_id, product_id) VALUES (999, 5);  -- error!
-
-ROLLBACK TO after_order;  -- undo only back to savepoint
-
-INSERT INTO order_items (order_id, product_id) VALUES (LASTVAL(), 5);  -- try again
-
-COMMIT;
+-- ✅ Correct
+SELECT * FROM users WHERE phone IS NULL;
+SELECT * FROM users WHERE phone IS NOT NULL;
 ```
 
-## ACID Properties
-
-ACID is an acronym for the four properties that guarantee reliable database transactions.
-
-### A — Atomicity
-All operations in a transaction succeed completely, or none of them do. There is no partial state.
+## NULL in WHERE Conditions
 
 ```sql
-BEGIN;
-UPDATE accounts SET balance = balance - 500 WHERE id = 1;
--- If this next line fails, the previous line is also undone
-UPDATE accounts SET balance = balance + 500 WHERE id = 2;
-COMMIT;
+-- Find users without a phone number
+SELECT name, email FROM users WHERE phone IS NULL;
+
+-- Find users who have a phone number
+SELECT name, email FROM users WHERE phone IS NOT NULL;
+
+-- ❌ Common mistake: this finds NOTHING
+SELECT * FROM users WHERE phone != '9999999999';
+-- Rows where phone IS NULL are excluded! NULL != anything = UNKNOWN
+
+-- ✅ To include NULLs:
+SELECT * FROM users
+WHERE phone != '9999999999' OR phone IS NULL;
 ```
 
-> "All or nothing"
+## NULL in JOINs
 
-### C — Consistency
-A transaction brings the database from one valid state to another. All data rules (constraints, foreign keys, triggers) are enforced.
+NULL foreign keys never match any row in a JOIN:
 
 ```sql
--- This will fail if balance has a CHECK constraint (balance >= 0)
--- and Alice only has $200
-UPDATE accounts SET balance = balance - 500 WHERE id = 1;
--- ERROR: new row violates check constraint "balance >= 0"
--- Transaction is rolled back, consistency maintained
+-- If order.sales_rep_id is NULL, this order will not appear in INNER JOIN
+SELECT o.id, u.name AS sales_rep
+FROM orders o
+JOIN users u ON o.sales_rep_id = u.id;
+-- Orders with NULL sales_rep_id are excluded
+
+-- Use LEFT JOIN to include them
+SELECT o.id, COALESCE(u.name, 'Unassigned') AS sales_rep
+FROM orders o
+LEFT JOIN users u ON o.sales_rep_id = u.id;
 ```
 
-> "The database is always valid before and after"
+## NULL in Aggregations
 
-### I — Isolation
-Concurrent transactions do not interfere with each other. Each transaction executes as if it's the only one running.
+Most aggregate functions ignore NULLs:
 
 ```sql
--- Session 1
-BEGIN;
-UPDATE products SET stock = stock - 1 WHERE id = 5;
--- Not committed yet...
-
--- Session 2 (at the same time)
-SELECT stock FROM products WHERE id = 5;
--- Isolation determines whether Session 2 sees Session 1's change
+-- If 3 out of 5 salaries are NULL:
+SELECT COUNT(*)      FROM employees;  -- 5 (counts all rows)
+SELECT COUNT(salary) FROM employees;  -- 2 (counts non-NULL only)
+SELECT SUM(salary)   FROM employees;  -- sum of 2 non-NULL values
+SELECT AVG(salary)   FROM employees;  -- average of 2 non-NULL values (not 5!)
+SELECT MIN(salary)   FROM employees;  -- min of 2 non-NULL values
 ```
 
-> "Transactions don't see each other's intermediate states"
-
-### D — Durability
-Once a transaction is committed, changes are permanent — even if the server crashes immediately after.
-
-> "Committed data survives failures"
-
-## Isolation Levels
-
-Isolation levels define how much one transaction can see of another's uncommitted work. Higher isolation = more safety, less concurrency.
-
-| Level | Dirty Read | Non-Repeatable Read | Phantom Read |
-|-------|-----------|---------------------|--------------|
-| READ UNCOMMITTED | ✅ Possible | ✅ Possible | ✅ Possible |
-| READ COMMITTED | ❌ Prevented | ✅ Possible | ✅ Possible |
-| REPEATABLE READ | ❌ Prevented | ❌ Prevented | ✅ Possible |
-| SERIALIZABLE | ❌ Prevented | ❌ Prevented | ❌ Prevented |
-
-### Problems Explained
-
-**Dirty Read** — Reading uncommitted data from another transaction.
-```
-T1: UPDATE balance = 0  (not committed)
-T2: SELECT balance → sees 0  ← dirty read!
-T1: ROLLBACK  → balance is back to original
-T2 made a decision based on wrong data
-```
-
-**Non-Repeatable Read** — Same query returns different results within the same transaction.
-```
-T1: SELECT balance → 500
-T2: UPDATE balance = 200; COMMIT
-T1: SELECT balance → 200  ← different result!
-```
-
-**Phantom Read** — New rows appear in a repeated query within the same transaction.
-```
-T1: SELECT COUNT(*) FROM orders WHERE amount > 100 → 5
-T2: INSERT INTO orders (amount) VALUES (150); COMMIT
-T1: SELECT COUNT(*) FROM orders WHERE amount > 100 → 6  ← phantom row!
-```
-
-### Setting Isolation Level
+**Interview trap:** AVG ignores NULLs - it divides by the count of non-NULL values, not total rows. This can give a misleadingly high average if many values are NULL.
 
 ```sql
--- PostgreSQL
-SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
-BEGIN;
-...
-COMMIT;
+-- These give different results when salary has NULLs:
+SELECT AVG(salary) FROM employees;
+-- = SUM(salary) / COUNT(salary)  ← only non-NULL rows
 
--- MySQL
-SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+SELECT SUM(salary) / COUNT(*) FROM employees;
+-- = SUM(salary) / total_rows  ← includes NULL rows in denominator
+-- This gives a lower (more conservative) average
 ```
 
-## Locking
-
-Transactions use locks to enforce isolation.
+## NULL in NOT IN - The Most Dangerous Trap
 
 ```sql
--- Explicit row lock: lock the row for update
-SELECT * FROM accounts WHERE id = 1 FOR UPDATE;
+-- Find users who haven't placed any order
+SELECT * FROM users
+WHERE id NOT IN (SELECT customer_id FROM orders);
 
--- Share lock: others can read but not modify
-SELECT * FROM accounts WHERE id = 1 FOR SHARE;
+-- ⚠️ If ANY customer_id in orders is NULL → returns ZERO rows!
+-- Why? NOT IN with NULL:
+-- id NOT IN (1, 2, NULL)
+-- = id != 1 AND id != 2 AND id != NULL
+-- = id != 1 AND id != 2 AND UNKNOWN
+-- = UNKNOWN → row excluded
 ```
 
-### Deadlock
-
-Two transactions waiting for each other's locks.
-
-```
-T1 locks Row A, waits for Row B
-T2 locks Row B, waits for Row A
-→ Deadlock! Database kills one transaction.
-```
-
-Avoid deadlocks by always locking resources in the same order.
-
-## Autocommit
-
-In most databases, every SQL statement is automatically wrapped in a transaction (autocommit mode).
+**Always use NOT EXISTS for this pattern:**
 
 ```sql
--- In autocommit mode, this is immediately committed:
-UPDATE users SET name = 'Bob' WHERE id = 1;
-
--- To group statements, explicitly use BEGIN/COMMIT
-BEGIN;
-UPDATE users SET name = 'Bob' WHERE id = 1;
-UPDATE users SET email = 'bob@new.com' WHERE id = 1;
-COMMIT;
+-- ✅ Handles NULLs correctly
+SELECT * FROM users u
+WHERE NOT EXISTS (
+  SELECT 1 FROM orders o WHERE o.customer_id = u.id
+);
 ```
 
-## Real World Example
+## COALESCE - Replace NULL with a Default
+
+`COALESCE` returns the first non-NULL value from a list of arguments:
 
 ```sql
--- E-commerce order placement
-BEGIN;
+COALESCE(value1, value2, value3, ...)
+-- Returns the first argument that is not NULL
 
--- 1. Create the order
-INSERT INTO orders (customer_id, total_amount, status)
-VALUES (101, 1500, 'pending')
-RETURNING id INTO order_id;
+-- Replace NULL phone with 'Not provided'
+SELECT name, COALESCE(phone, 'Not provided') AS phone FROM users;
 
--- 2. Deduct from inventory
-UPDATE products SET stock = stock - 2 WHERE id = 5;
+-- Try multiple fallbacks
+SELECT name, COALESCE(phone, mobile, email, 'No contact') AS contact
+FROM users;
 
--- 3. Charge the customer
-INSERT INTO payments (order_id, amount, status)
-VALUES (order_id, 1500, 'completed');
+-- Replace NULL in calculations
+SELECT name, price - COALESCE(discount, 0) AS final_price FROM products;
+-- Without COALESCE: price - NULL = NULL ← wrong!
+-- With COALESCE: price - 0 = price ← correct for no discount
 
--- 4. Update order status
-UPDATE orders SET status = 'confirmed' WHERE id = order_id;
+-- In aggregations
+SELECT SUM(COALESCE(tip_amount, 0)) FROM orders;
+```
 
-COMMIT;
+## NULLIF - Convert a Value to NULL
 
--- If ANY step fails, all changes are rolled back
--- No partial orders, no inventory deducted without payment
+`NULLIF(a, b)` returns NULL if a equals b, otherwise returns a. Primarily used to avoid divide-by-zero errors:
+
+```sql
+-- ❌ Division by zero error
+SELECT total_revenue / total_orders FROM stats;
+
+-- ✅ Returns NULL when total_orders = 0 (no error)
+SELECT total_revenue / NULLIF(total_orders, 0) AS avg_order_value FROM stats;
+
+-- Convert 'N/A' strings to NULL
+SELECT NULLIF(country, 'N/A') AS country FROM contacts;
+
+-- Empty string to NULL
+SELECT NULLIF(phone, '') AS phone FROM users;
+```
+
+## IS DISTINCT FROM / IS NOT DISTINCT FROM
+
+These operators treat NULL as equal to NULL - useful when you need to compare values that might be NULL:
+
+```sql
+-- Standard comparison: NULL = NULL → UNKNOWN
+WHERE old_status = new_status  -- NULL columns never match
+
+-- IS NOT DISTINCT FROM: NULL = NULL → TRUE
+WHERE old_status IS NOT DISTINCT FROM new_status
+
+-- Practical: find rows where a value actually changed
+WHERE old_value IS DISTINCT FROM new_value
+-- = "they are different, even if one or both are NULL"
+```
+
+## Practical NULL Handling Patterns
+
+```sql
+-- Clean display: replace all NULLs with readable defaults
+SELECT
+  name,
+  COALESCE(phone,  'No phone')    AS phone,
+  COALESCE(city,   'Unknown')     AS city,
+  COALESCE(bio,    'No bio yet')  AS bio,
+  COALESCE(last_login::TEXT, 'Never') AS last_login
+FROM users;
+
+-- Safe percentage calculation
+SELECT
+  category,
+  COUNT(*) AS total,
+  COUNT(CASE WHEN status = 'active' THEN 1 END) AS active,
+  ROUND(
+    COUNT(CASE WHEN status = 'active' THEN 1 END) * 100.0
+    / NULLIF(COUNT(*), 0),
+    2
+  ) AS active_pct
+FROM users
+GROUP BY category;
 ```
 
 ## Summary
 
-- A transaction groups SQL statements into an all-or-nothing unit
-- `BEGIN` starts, `COMMIT` saves, `ROLLBACK` undoes
-- `SAVEPOINT` creates checkpoints within a transaction
-- **ACID**: Atomicity, Consistency, Isolation, Durability
-- Isolation levels control visibility between concurrent transactions
-- Higher isolation = more data safety, lower concurrency
-- Deadlocks occur when transactions wait for each other's locks
+- NULL means unknown/missing - not zero, not empty string
+- Any comparison with NULL returns UNKNOWN, not TRUE or FALSE
+- Always use `IS NULL` and `IS NOT NULL` - never `= NULL`
+- `NOT IN` with a nullable subquery returns zero rows - use `NOT EXISTS` instead
+- `AVG` ignores NULLs - this can skew results if many values are NULL
+- `COALESCE` returns the first non-NULL value - essential for replacing NULLs with defaults
+- `NULLIF` converts a specific value to NULL - prevents divide-by-zero errors
+- NULL foreign keys never match in JOINs - use LEFT JOIN to include them

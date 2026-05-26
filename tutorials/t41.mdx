@@ -1,0 +1,138 @@
+## What is ACID?
+
+ACID is an acronym for four properties that guarantee database transactions are processed reliably. These properties ensure that even in the face of errors, power failures, or concurrent access, your data remains correct.
+
+**A** - Atomicity
+**C** - Consistency
+**I** - Isolation
+**D** - Durability
+
+Every major RDBMS (PostgreSQL, MySQL, SQL Server, Oracle) guarantees ACID compliance.
+
+## A - Atomicity
+
+**"All or nothing."** A transaction either completes entirely or has no effect at all. There is no partial state.
+
+```sql
+-- Bank transfer: both operations must succeed or both must fail
+BEGIN;
+  UPDATE accounts SET balance = balance - 1000 WHERE id = 1;  -- debit Alice
+  UPDATE accounts SET balance = balance + 1000 WHERE id = 2;  -- credit Bob
+COMMIT;
+
+-- If the server crashes after debiting Alice but before crediting Bob:
+-- Without atomicity: Alice loses 1000, Bob gets nothing
+-- With atomicity: the transaction rolls back - neither change persists
+```
+
+**How it works:** The database writes to a transaction log (WAL - Write Ahead Log) before making changes. If the transaction doesn't complete, the log is used to undo partial changes.
+
+## C - Consistency
+
+**"The database is always in a valid state."** A transaction brings the database from one valid state to another. All constraints, rules, and triggers are enforced - a transaction that would violate them is rolled back.
+
+```sql
+-- CHECK constraint enforces consistency
+CREATE TABLE accounts (
+  id      SERIAL PRIMARY KEY,
+  balance DECIMAL(10,2) CHECK (balance >= 0)
+);
+
+BEGIN;
+  UPDATE accounts SET balance = balance - 5000 WHERE id = 1;
+  -- If Alice only has 3000, this violates CHECK (balance >= 0)
+  -- PostgreSQL raises an error → transaction rolled back → balance unchanged
+COMMIT;
+```
+
+Consistency guarantees:
+- Primary key uniqueness maintained
+- Foreign key relationships intact
+- CHECK constraints honored
+- NOT NULL enforced
+- Custom triggers fire correctly
+
+## I - Isolation
+
+**"Concurrent transactions don't interfere with each other."** Each transaction runs as if it's the only one executing. Changes made by a transaction are invisible to other transactions until committed.
+
+```sql
+-- Session 1
+BEGIN;
+UPDATE products SET stock = stock - 1 WHERE id = 5;
+-- Not committed yet...
+
+-- Session 2 (simultaneously)
+SELECT stock FROM products WHERE id = 5;
+-- What does Session 2 see? Depends on isolation level.
+```
+
+**Without isolation:** Dirty reads, phantom reads, and non-repeatable reads can corrupt data.
+
+**Isolation levels** (covered in the Transactions tutorial) control how much isolation is enforced.
+
+## D - Durability
+
+**"Committed data survives failures."** Once a transaction is committed, it remains committed - even if the server crashes immediately after.
+
+```sql
+BEGIN;
+  INSERT INTO orders (customer_id, total) VALUES (1, 5000);
+COMMIT;
+-- Server crashes 1 millisecond after COMMIT
+-- When server restarts: the order is still there
+```
+
+**How it works:** PostgreSQL uses WAL (Write Ahead Log) - changes are written to a durable log before being applied. On restart, the WAL is replayed to recover committed transactions.
+
+## ACID in Practice - The Complete Picture
+
+```sql
+-- E-commerce checkout: all four properties in action
+BEGIN;
+
+  -- 1. Insert order (Atomicity: all or nothing)
+  INSERT INTO orders (customer_id, total, status)
+  VALUES (101, 4999.00, 'confirmed')
+  RETURNING id INTO order_id;
+
+  -- 2. Deduct inventory (Consistency: CHECK (stock >= 0) enforced)
+  UPDATE products SET stock = stock - 1 WHERE id = 42;
+
+  -- 3. Record payment (Isolation: other sessions don't see this yet)
+  INSERT INTO payments (order_id, amount, method)
+  VALUES (order_id, 4999.00, 'credit_card');
+
+  -- 4. If we reach here, COMMIT makes it permanent (Durability)
+COMMIT;
+
+-- If anything fails above, ROLLBACK undoes all three changes atomically
+```
+
+## ACID vs BASE (NoSQL Trade-off)
+
+Many NoSQL databases trade ACID for scalability using BASE:
+
+| | ACID (SQL) | BASE (NoSQL) |
+|-|------------|-------------|
+| Consistency | Strong | Eventual |
+| Availability | Lower (consistency first) | Higher |
+| Partition tolerance | Lower | Higher |
+| Best for | Financial, inventory, user accounts | Social feeds, analytics, recommendations |
+
+**Eventual consistency** means: your data will be consistent *eventually*, but at any moment different nodes might show different values.
+
+## Interview: Explain ACID with an Example
+
+**Strong answer:**
+
+*"ACID describes four guarantees for database transactions. Atomicity means the entire transaction succeeds or nothing does - if a bank transfer debits one account but fails before crediting the other, the debit is rolled back. Consistency means the database moves from one valid state to another - constraints like CHECK (balance >= 0) prevent invalid data from being committed. Isolation means concurrent transactions don't see each other's uncommitted work - two people buying the last item won't both succeed if stock is properly managed with locking. Durability means once committed, data survives crashes - the WAL log ensures committed transactions are replayed on recovery."*
+
+## Summary
+
+- **Atomicity** - all or nothing; partial transactions are automatically rolled back
+- **Consistency** - constraints and rules are always enforced; invalid states can't be committed
+- **Isolation** - concurrent transactions are isolated; controlled by isolation levels
+- **Durability** - committed data survives crashes via WAL/transaction logs
+- ACID is what makes SQL databases trustworthy for financial, inventory, and user-facing systems
+- NoSQL systems often trade ACID for availability and partition tolerance (BASE model)

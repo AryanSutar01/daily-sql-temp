@@ -1,0 +1,149 @@
+## Why Outer JOINs?
+
+INNER JOIN only returns rows with matches in both tables. But often you want ALL rows from one table - even if they have no match. That's what outer JOINs are for.
+
+## LEFT JOIN (LEFT OUTER JOIN)
+
+Returns **all rows from the left table** and matching rows from the right. Where there's no match, right-side columns are NULL.
+
+```sql
+SELECT u.name, o.total
+FROM users u               -- LEFT table (all rows returned)
+LEFT JOIN orders o ON u.id = o.customer_id;
+
+-- Result:
+-- Alice   | 500
+-- Alice   | 300
+-- Bob     | 750
+-- Charlie | NULL   ← Charlie has no orders, but still appears
+```
+
+### Finding Rows with NO Match
+
+The most common use of LEFT JOIN:
+
+```sql
+-- Find users who have NEVER placed an order
+SELECT u.name, u.email
+FROM users u
+LEFT JOIN orders o ON u.id = o.customer_id
+WHERE o.id IS NULL;          -- ← NULL means no match was found
+```
+
+### ON vs WHERE with LEFT JOIN
+
+This is a critical interview concept:
+
+```sql
+-- Filter in ON: users with no completed orders still appear (with NULL amount)
+SELECT u.name, o.total
+FROM users u
+LEFT JOIN orders o ON u.id = o.customer_id
+                  AND o.status = 'completed';
+-- Alice    | 500   (completed)
+-- Bob      | NULL  (Bob has orders but none completed)
+-- Charlie  | NULL  (no orders at all)
+
+-- Filter in WHERE: turns the LEFT JOIN into an INNER JOIN effectively
+SELECT u.name, o.total
+FROM users u
+LEFT JOIN orders o ON u.id = o.customer_id
+WHERE o.status = 'completed';    -- NULL rows fail this check → excluded!
+-- Alice | 500
+-- (Bob and Charlie excluded)
+```
+
+**Rule:** To preserve NULLs in a LEFT JOIN, put conditions on the right table in `ON`, not `WHERE`.
+
+## RIGHT JOIN (RIGHT OUTER JOIN)
+
+Returns **all rows from the right table** and matching rows from the left. The mirror image of LEFT JOIN.
+
+```sql
+SELECT u.name, o.total
+FROM users u
+RIGHT JOIN orders o ON u.id = o.customer_id;
+
+-- Alice  | 500
+-- Alice  | 300
+-- Bob    | 750
+-- NULL   | 200  ← order with customer_id=99 appears with NULL user
+```
+
+> In practice, RIGHT JOIN is rarely used. You can always rewrite it as a LEFT JOIN by swapping the table order. Most teams standardize on LEFT JOIN.
+
+## FULL OUTER JOIN
+
+Returns **all rows from both tables**. NULLs fill where there's no match on either side.
+
+```sql
+SELECT u.name, o.total
+FROM users u
+FULL OUTER JOIN orders o ON u.id = o.customer_id;
+
+-- Alice   | 500
+-- Alice   | 300
+-- Bob     | 750
+-- Charlie | NULL   ← user with no orders
+-- NULL    | 200    ← order with no matching user
+```
+
+### Simulating FULL OUTER JOIN in MySQL
+
+MySQL doesn't support FULL OUTER JOIN directly:
+
+```sql
+SELECT u.name, o.total FROM users u LEFT  JOIN orders o ON u.id = o.customer_id
+UNION
+SELECT u.name, o.total FROM users u RIGHT JOIN orders o ON u.id = o.customer_id;
+```
+
+## Visual Summary
+
+```
+Table A:  1, 2, 3
+Table B:  2, 3, 4
+
+INNER JOIN:      2, 3          (only matches)
+LEFT JOIN:   1, 2, 3           (all A + matches from B)
+RIGHT JOIN:     2, 3, 4        (matches from A + all B)
+FULL OUTER: 1, 2, 3, 4        (everything)
+```
+
+| JOIN Type | Returns |
+|-----------|---------|
+| INNER | Only matching rows |
+| LEFT | All left rows + matches (NULL for no match on right) |
+| RIGHT | Matches + all right rows (NULL for no match on left) |
+| FULL OUTER | All rows from both sides |
+
+## Common Patterns
+
+```sql
+-- 1. All customers, show order count (0 for customers with no orders)
+SELECT u.name, COUNT(o.id) AS order_count
+FROM users u
+LEFT JOIN orders o ON u.id = o.customer_id
+GROUP BY u.name;
+
+-- 2. Products never ordered
+SELECT p.name FROM products p
+LEFT JOIN order_items oi ON p.id = oi.product_id
+WHERE oi.product_id IS NULL;
+
+-- 3. All dates in a range, fill 0 for days with no sales
+SELECT d.date, COALESCE(SUM(o.total), 0) AS daily_revenue
+FROM generate_series('2024-01-01'::DATE, '2024-12-31'::DATE, '1 day') d(date)
+LEFT JOIN orders o ON DATE(o.created_at) = d.date
+                  AND o.status = 'completed'
+GROUP BY d.date
+ORDER BY d.date;
+```
+
+## Summary
+
+- LEFT JOIN: all left rows, NULLs for unmatched right rows - most commonly used outer join
+- RIGHT JOIN: all right rows, NULLs for unmatched left rows - rarely used (just flip to LEFT)
+- FULL OUTER JOIN: all rows from both sides with NULLs where no match
+- `LEFT JOIN ... WHERE right.id IS NULL` = rows in left table with NO match in right
+- Filter conditions on the right table belong in `ON` not `WHERE` to preserve NULLs

@@ -1,0 +1,226 @@
+## GROUP BY
+
+`GROUP BY` groups rows that share the same value in a column, then lets you apply aggregate functions to each group.
+
+```sql
+-- Without GROUP BY: one row for the whole table
+SELECT COUNT(*) FROM orders;  -- 10,000
+
+-- With GROUP BY: one row per group
+SELECT status, COUNT(*)
+FROM orders
+GROUP BY status;
+-- pending:    1,200
+-- completed:  7,800
+-- cancelled:  1,000
+```
+
+## Basic GROUP BY
+
+```sql
+-- Count users per city
+SELECT city, COUNT(*) AS user_count
+FROM users
+GROUP BY city
+ORDER BY user_count DESC;
+
+-- Revenue per product
+SELECT product_id, SUM(quantity * unit_price) AS revenue
+FROM order_items
+GROUP BY product_id;
+
+-- Average salary per department
+SELECT department, ROUND(AVG(salary), 0) AS avg_salary
+FROM employees
+GROUP BY department;
+```
+
+## GROUP BY Multiple Columns
+
+Each unique combination of grouped columns forms its own group:
+
+```sql
+-- Revenue per product per month
+SELECT
+  product_id,
+  DATE_TRUNC('month', o.created_at) AS month,
+  SUM(oi.quantity * oi.unit_price)  AS monthly_revenue
+FROM order_items oi
+JOIN orders o ON oi.order_id = o.id
+GROUP BY product_id, DATE_TRUNC('month', o.created_at)
+ORDER BY product_id, month;
+```
+
+## Rules of GROUP BY
+
+**The SELECT rule:** Every column in SELECT must either:
+1. Be in the GROUP BY clause, OR
+2. Be wrapped in an aggregate function
+
+```sql
+-- ❌ Error: name is not in GROUP BY or aggregated
+SELECT department, name, COUNT(*)
+FROM employees
+GROUP BY department;
+
+-- ✅ Either GROUP BY name too
+SELECT department, name, COUNT(*)
+FROM employees
+GROUP BY department, name;
+
+-- ✅ Or aggregate name
+SELECT department, MAX(name) AS example_employee, COUNT(*)
+FROM employees
+GROUP BY department;
+```
+
+## HAVING
+
+`HAVING` filters groups after aggregation. It is to GROUP BY what WHERE is to FROM.
+
+```sql
+-- Cities with more than 100 users
+SELECT city, COUNT(*) AS user_count
+FROM users
+GROUP BY city
+HAVING COUNT(*) > 100
+ORDER BY user_count DESC;
+
+-- Customers who spent more than 50,000 total
+SELECT customer_id, SUM(total) AS total_spent
+FROM orders
+GROUP BY customer_id
+HAVING SUM(total) > 50000;
+
+-- Products sold in more than 3 different cities
+SELECT product_id, COUNT(DISTINCT city) AS cities
+FROM orders o
+JOIN users u ON o.customer_id = u.id
+GROUP BY product_id
+HAVING COUNT(DISTINCT city) > 3;
+```
+
+## WHERE vs HAVING - The Most Asked Interview Question
+
+```
+WHERE  → filters rows   → runs BEFORE GROUP BY
+HAVING → filters groups → runs AFTER  GROUP BY
+```
+
+```sql
+-- Real example showing both:
+SELECT
+  department,
+  COUNT(*) AS headcount,
+  AVG(salary) AS avg_salary
+FROM employees
+WHERE status = 'active'         -- Step 1: keep only active employees
+GROUP BY department             -- Step 2: group them by department
+HAVING COUNT(*) >= 5            -- Step 3: keep departments with 5+ people
+  AND AVG(salary) > 40000       -- Step 4: AND average salary above 40k
+ORDER BY avg_salary DESC;
+```
+
+**Can you use WHERE for aggregates?**
+
+```sql
+-- ❌ Error: cannot use aggregate in WHERE
+SELECT department, AVG(salary)
+FROM employees
+WHERE AVG(salary) > 50000    -- Error!
+GROUP BY department;
+
+-- ✅ Correct: use HAVING
+SELECT department, AVG(salary)
+FROM employees
+GROUP BY department
+HAVING AVG(salary) > 50000;
+```
+
+## Full Clause Execution Order
+
+```
+1. FROM          -- identify source tables
+2. JOIN          -- combine tables
+3. WHERE         -- filter rows
+4. GROUP BY      -- group remaining rows
+5. HAVING        -- filter groups
+6. SELECT        -- compute output columns
+7. ORDER BY      -- sort results
+8. LIMIT/OFFSET  -- restrict count
+```
+
+## GROUP BY with Expressions
+
+```sql
+-- Group by calculated value
+SELECT
+  EXTRACT(YEAR FROM created_at)  AS year,
+  EXTRACT(MONTH FROM created_at) AS month,
+  COUNT(*)                        AS orders,
+  SUM(total)                      AS revenue
+FROM orders
+GROUP BY
+  EXTRACT(YEAR FROM created_at),
+  EXTRACT(MONTH FROM created_at)
+ORDER BY year DESC, month DESC;
+
+-- Group by date truncated to month (cleaner)
+SELECT
+  DATE_TRUNC('month', created_at) AS month,
+  SUM(total) AS revenue
+FROM orders
+GROUP BY DATE_TRUNC('month', created_at)
+ORDER BY month;
+```
+
+## ROLLUP - Subtotals and Grand Total
+
+```sql
+-- PostgreSQL / MySQL: ROLLUP adds subtotals and a grand total
+SELECT
+  department,
+  job_title,
+  COUNT(*) AS headcount,
+  SUM(salary) AS total_salary
+FROM employees
+GROUP BY ROLLUP (department, job_title);
+-- Rows for each (department, job_title) combination
+-- + Subtotal rows for each department (job_title = NULL)
+-- + Grand total row (both = NULL)
+```
+
+## Real-World Example: Sales Report
+
+```sql
+-- Monthly sales by category with filters
+SELECT
+  c.name                                 AS category,
+  DATE_TRUNC('month', o.created_at)      AS month,
+  COUNT(DISTINCT o.id)                   AS order_count,
+  COUNT(DISTINCT o.customer_id)          AS unique_buyers,
+  SUM(oi.quantity)                       AS units_sold,
+  SUM(oi.quantity * oi.unit_price)       AS revenue
+FROM order_items oi
+JOIN orders    o ON oi.order_id    = o.id
+JOIN products  p ON oi.product_id  = p.id
+JOIN categories c ON p.category_id = c.id
+WHERE
+  o.status = 'completed'
+  AND o.created_at >= '2024-01-01'
+GROUP BY
+  c.name,
+  DATE_TRUNC('month', o.created_at)
+HAVING
+  SUM(oi.quantity * oi.unit_price) > 10000
+ORDER BY month DESC, revenue DESC;
+```
+
+## Summary
+
+- `GROUP BY` groups rows and applies aggregates to each group
+- Every SELECT column must be in GROUP BY or wrapped in an aggregate
+- `WHERE` filters rows before grouping; `HAVING` filters groups after
+- `HAVING` can use aggregate functions; `WHERE` cannot
+- Execution order: FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT
+- `ROLLUP` adds subtotals and grand totals automatically

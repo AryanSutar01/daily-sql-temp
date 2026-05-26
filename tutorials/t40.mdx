@@ -1,0 +1,208 @@
+## The Golden Rule
+
+**Measure before you optimize.** Run `EXPLAIN ANALYZE` first. Optimization without measurement leads to wasted effort and sometimes makes things worse.
+
+## 1. Filter Early - Reduce Rows Before Joining
+
+The fewer rows you JOIN, the faster it is. Push filters as early as possible.
+
+```sql
+-- ❌ Slow: join all rows, then filter
+SELECT u.name, o.total
+FROM users u
+JOIN orders o ON u.id = o.customer_id
+WHERE o.created_at >= '2024-01-01' AND u.status = 'active';
+
+-- ✅ Better: pre-filter in CTEs before joining
+WITH recent_orders AS (
+  SELECT customer_id, total FROM orders
+  WHERE created_at >= '2024-01-01'   -- filter early
+),
+active_users AS (
+  SELECT id, name FROM users
+  WHERE status = 'active'             -- filter early
+)
+SELECT u.name, o.total
+FROM active_users u
+JOIN recent_orders o ON u.id = o.customer_id;
+```
+
+## 2. Avoid Functions on Indexed Columns
+
+Applying a function to an indexed column prevents the index from being used.
+
+```sql
+-- ❌ Function on column: disables index
+WHERE UPPER(email) = 'ALICE@EMAIL.COM'
+WHERE YEAR(created_at) = 2024
+WHERE EXTRACT(MONTH FROM created_at) = 6
+
+-- ✅ Fix: use range comparisons instead
+WHERE email = 'alice@email.com'                        -- lowercase input
+WHERE created_at >= '2024-01-01' AND created_at < '2025-01-01'
+WHERE created_at >= '2024-06-01' AND created_at < '2024-07-01'
+```
+
+## 3. SELECT Only What You Need
+
+```sql
+-- ❌ Fetches every column (10+ cols) - more data transfer, prevents index-only scans
+SELECT * FROM orders WHERE customer_id = 101;
+
+-- ✅ Only what the query needs
+SELECT order_id, total, created_at FROM orders WHERE customer_id = 101;
+```
+
+## 4. Use EXISTS Instead of COUNT for Existence Checks
+
+```sql
+-- ❌ Counts all matches even though we only need to know "does any exist"
+SELECT * FROM users
+WHERE (SELECT COUNT(*) FROM orders WHERE customer_id = users.id) > 0;
+
+-- ✅ EXISTS stops at the first match
+SELECT * FROM users u
+WHERE EXISTS (SELECT 1 FROM orders WHERE customer_id = u.id);
+```
+
+## 5. Replace OR with UNION ALL
+
+OR across different columns can't use separate indexes efficiently:
+
+```sql
+-- ❌ Can't use separate indexes on customer_id and product_id
+SELECT * FROM orders WHERE customer_id = 1 OR product_id = 5;
+
+-- ✅ Each part uses its own index
+SELECT * FROM orders WHERE customer_id = 1
+UNION ALL
+SELECT * FROM orders WHERE product_id = 5 AND customer_id != 1;
+```
+
+## 6. Use NOT EXISTS Instead of NOT IN
+
+```sql
+-- ❌ NOT IN breaks with NULLs and is often slower
+SELECT * FROM users WHERE id NOT IN (SELECT customer_id FROM orders);
+
+-- ✅ NOT EXISTS is NULL-safe and often faster
+SELECT * FROM users u
+WHERE NOT EXISTS (SELECT 1 FROM orders WHERE customer_id = u.id);
+```
+
+## 7. Avoid Leading Wildcards in LIKE
+
+```sql
+-- ❌ Leading wildcard: full table scan (can't use index)
+WHERE name LIKE '%Kumar'
+
+-- ✅ Trailing wildcard: can use B-Tree index
+WHERE name LIKE 'Kumar%'
+
+-- ✅ Full-text search for "contains" queries at scale
+WHERE to_tsvector(name) @@ to_tsquery('Kumar')
+```
+
+## 8. Avoid Implicit Type Conversion
+
+```sql
+-- ❌ customer_id is INT, string comparison forces type conversion
+WHERE customer_id = '101'
+
+-- ✅ Match the column's data type
+WHERE customer_id = 101
+```
+
+## 9. Limit Large Result Sets
+
+```sql
+-- ❌ Returns 10M rows to application, then app filters
+SELECT * FROM events WHERE user_id = 42;
+
+-- ✅ Filter and paginate in SQL
+SELECT * FROM events
+WHERE user_id = 42 AND created_at >= NOW() - INTERVAL '30 days'
+ORDER BY created_at DESC
+LIMIT 100;
+```
+
+## 10. Batch Large Updates and Deletes
+
+```sql
+-- ❌ Locks the table for the entire duration on 10M rows
+DELETE FROM logs WHERE created_at < '2023-01-01';
+
+-- ✅ Batch: small locks, other queries can run between batches
+DELETE FROM logs
+WHERE id IN (
+  SELECT id FROM logs WHERE created_at < '2023-01-01' LIMIT 10000
+);
+-- Repeat until 0 rows affected
+```
+
+## 11. Use Aggregate-Then-Join Pattern
+
+Joining before aggregating multiplies rows unnecessarily:
+
+```sql
+-- ❌ Joins millions of order_items rows before aggregating
+SELECT u.name, SUM(oi.quantity * oi.unit_price) AS revenue
+FROM users u
+JOIN orders o ON u.id = o.customer_id
+JOIN order_items oi ON o.id = oi.order_id
+GROUP BY u.name;
+
+-- ✅ Aggregate first, then join (far fewer rows to join)
+WITH order_revenue AS (
+  SELECT o.customer_id, SUM(oi.quantity * oi.unit_price) AS revenue
+  FROM orders o
+  JOIN order_items oi ON o.id = oi.order_id
+  GROUP BY o.customer_id
+)
+SELECT u.name, or.revenue
+FROM users u
+JOIN order_revenue or ON u.id = or.customer_id;
+```
+
+## 12. Refresh Statistics
+
+Stale statistics = bad query plans:
+
+```sql
+-- Update statistics for one table
+ANALYZE orders;
+
+-- Update all tables
+ANALYZE;
+
+-- Check when stats were last updated
+SELECT relname, last_analyze, last_autoanalyze
+FROM pg_stat_user_tables WHERE relname = 'orders';
+```
+
+## Optimization Checklist
+
+Before going to production with a query:
+
+```
+1. Run EXPLAIN ANALYZE
+2. Check for Seq Scan on large tables → add index
+3. Check estimated vs actual rows → run ANALYZE if off
+4. Look for Sort nodes → add ORDER BY-matching index
+5. Check SELECT * → use specific columns
+6. Look for function on indexed col → rewrite with ranges
+7. Check for NOT IN → replace with NOT EXISTS
+8. Check LIKE '%...' → restructure or use full-text search
+```
+
+## Summary
+
+- Filter early - reduce rows before joining
+- Never apply functions to indexed columns in WHERE
+- Use EXISTS for existence checks, NOT EXISTS instead of NOT IN
+- Specific columns over SELECT *
+- UNION ALL instead of OR across columns
+- Trailing wildcards only in LIKE (or use full-text search)
+- Aggregate before joining when possible
+- Batch large deletes/updates
+- Always check with EXPLAIN ANALYZE - measure, don't guess

@@ -1,0 +1,160 @@
+## What is a Stored Procedure?
+
+A stored procedure is a named, reusable block of SQL code stored in the database. Unlike functions, procedures:
+- Can contain `COMMIT` and `ROLLBACK`
+- Don't have to return a value
+- Are called with `CALL`, not used in `SELECT`
+- Can perform side effects (insert, update, delete, send notifications)
+
+## Function vs Stored Procedure
+
+| Feature | Function | Stored Procedure |
+|---------|----------|-----------------|
+| Returns value | ✅ Must return | Optional |
+| Use in SELECT | ✅ Yes | ❌ No |
+| Transaction control | ❌ No | ✅ Yes |
+| Side effects | Generally no | Yes |
+| Called with | `SELECT func()` | `CALL proc()` |
+
+## Creating a Stored Procedure (PostgreSQL)
+
+```sql
+-- Simple procedure: place an order atomically
+CREATE OR REPLACE PROCEDURE place_order(
+  p_customer_id  BIGINT,
+  p_product_id   BIGINT,
+  p_quantity     INT,
+  p_unit_price   DECIMAL(10,2)
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_order_id   BIGINT;
+  v_total      DECIMAL(10,2);
+BEGIN
+  -- Calculate total
+  v_total := p_quantity * p_unit_price;
+
+  -- Create the order
+  INSERT INTO orders (customer_id, total, status)
+  VALUES (p_customer_id, v_total, 'confirmed')
+  RETURNING id INTO v_order_id;
+
+  -- Add order item
+  INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+  VALUES (v_order_id, p_product_id, p_quantity, p_unit_price);
+
+  -- Reduce inventory
+  UPDATE products SET stock = stock - p_quantity
+  WHERE id = p_product_id;
+
+  -- Verify stock didn't go negative
+  IF (SELECT stock FROM products WHERE id = p_product_id) < 0 THEN
+    RAISE EXCEPTION 'Insufficient stock for product %', p_product_id;
+  END IF;
+
+  COMMIT;
+
+EXCEPTION
+  WHEN OTHERS THEN
+    ROLLBACK;
+    RAISE;  -- re-raise the exception
+END;
+$$;
+
+-- Call it
+CALL place_order(customer_id => 1, product_id => 5, quantity => 2, unit_price => 999.00);
+```
+
+## Fund Transfer Procedure
+
+```sql
+CREATE OR REPLACE PROCEDURE transfer_funds(
+  from_id  INT,
+  to_id    INT,
+  amount   DECIMAL(10,2)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF amount <= 0 THEN
+    RAISE EXCEPTION 'Transfer amount must be positive';
+  END IF;
+
+  -- Debit
+  UPDATE accounts SET balance = balance - amount WHERE id = from_id;
+
+  -- Check sufficient funds
+  IF (SELECT balance FROM accounts WHERE id = from_id) < 0 THEN
+    RAISE EXCEPTION 'Insufficient funds in account %', from_id;
+  END IF;
+
+  -- Credit
+  UPDATE accounts SET balance = balance + amount WHERE id = to_id;
+
+  -- Log
+  INSERT INTO transfer_log (from_id, to_id, amount, transferred_at)
+  VALUES (from_id, to_id, amount, NOW());
+
+  COMMIT;
+
+EXCEPTION WHEN OTHERS THEN
+  ROLLBACK;
+  RAISE;
+END;
+$$;
+
+CALL transfer_funds(1, 2, 5000.00);
+```
+
+## Procedures in MySQL
+
+```sql
+DELIMITER $$
+
+CREATE PROCEDURE get_customer_stats(IN customer_id INT)
+BEGIN
+  SELECT
+    COUNT(*)   AS total_orders,
+    SUM(total) AS total_spent,
+    AVG(total) AS avg_order
+  FROM orders
+  WHERE customer_id = customer_id;
+END $$
+
+DELIMITER ;
+
+-- Call
+CALL get_customer_stats(42);
+```
+
+## Managing Procedures
+
+```sql
+-- List procedures (PostgreSQL)
+SELECT routine_name FROM information_schema.routines
+WHERE routine_type = 'PROCEDURE' AND routine_schema = 'public';
+
+-- Drop a procedure
+DROP PROCEDURE IF EXISTS place_order;
+DROP PROCEDURE IF EXISTS place_order(BIGINT, BIGINT, INT, DECIMAL);
+```
+
+## When to Use Stored Procedures
+
+**Use them for:**
+- Multi-step transactions that must be atomic
+- Complex business logic reused across multiple applications
+- Operations where network round trips matter (batch processing close to data)
+- Database-level audit or access control logic
+
+**Avoid them for:**
+- Simple CRUD operations
+- Logic that needs unit testing and CI/CD
+- Teams that prefer application-layer logic for transparency and version control
+
+## Summary
+
+- Stored procedures are reusable named SQL blocks stored in the database
+- Unlike functions, they support `COMMIT`/`ROLLBACK` and are called with `CALL`
+- Ideal for multi-step atomic operations (order placement, fund transfers)
+- Always use `EXCEPTION WHEN OTHERS THEN ROLLBACK; RAISE;` to ensure clean failure handling
+- Modern apps often prefer ORM + application-layer transactions - use procedures when the complexity or performance justifies them

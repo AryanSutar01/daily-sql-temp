@@ -1,233 +1,215 @@
-## What Are Window Functions?
+## ORDER BY
 
-Window functions perform calculations across a set of rows **related to the current row** — without collapsing the result into a single row like `GROUP BY` does.
+`ORDER BY` sorts the result set by one or more columns. Without it, the database returns rows in no guaranteed order - the order can change between runs.
 
 ```sql
--- GROUP BY collapses rows
-SELECT department, AVG(salary) FROM employees GROUP BY department;
--- Returns 1 row per department
+-- Sort ascending (default - A→Z, 0→9, oldest→newest)
+SELECT * FROM users ORDER BY name;
+SELECT * FROM users ORDER BY name ASC;   -- explicit
 
--- Window function keeps all rows
-SELECT name, department, salary,
-  AVG(salary) OVER (PARTITION BY department) AS dept_avg
-FROM employees;
--- Returns ALL rows, each with dept avg alongside
+-- Sort descending (Z→A, 9→0, newest→oldest)
+SELECT * FROM users ORDER BY name DESC;
+
+-- Most recent orders first
+SELECT * FROM orders ORDER BY created_at DESC;
+
+-- Highest salary first
+SELECT * FROM employees ORDER BY salary DESC;
 ```
 
-## Syntax
+## ASC vs DESC
+
+| | ASC | DESC |
+|-|-----|------|
+| Numbers | 1, 2, 3... | ...3, 2, 1 |
+| Text | A, B, C... | ...C, B, A |
+| Dates | oldest first | newest first |
+| Default? | ✅ Yes | ❌ No |
+
+## Sort by Multiple Columns
+
+The second column breaks ties in the first:
 
 ```sql
-function_name() OVER (
-  PARTITION BY column   -- optional: divide rows into groups
-  ORDER BY column       -- optional: order within partition
-  ROWS/RANGE frame      -- optional: define the window frame
-)
-```
-
-## ROW_NUMBER
-
-Assigns a unique sequential number to each row within a partition.
-
-```sql
--- Rank employees by salary within each department
-SELECT
-  name,
-  department,
-  salary,
-  ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC) AS row_num
-FROM employees;
+-- Sort by city, then by age within each city
+SELECT name, city, age
+FROM users
+ORDER BY city ASC, age DESC;
 ```
 
 Result:
 ```
-+----------+-------------+--------+---------+
-| name     | department  | salary | row_num |
-+----------+-------------+--------+---------+
-| Alice    | Engineering | 95000  | 1       |
-| Bob      | Engineering | 82000  | 2       |
-| Charlie  | Engineering | 76000  | 3       |
-| Diana    | Marketing   | 71000  | 1       |
-| Eve      | Marketing   | 65000  | 2       |
-+----------+-------------+--------+---------+
++----------+-----------+-----+
+| name     | city      | age |
++----------+-----------+-----+
+| Rahul    | Delhi     | 35  |  ← Delhi first, oldest first
+| Priya    | Delhi     | 22  |
+| Amit     | Mumbai    | 40  |  ← Mumbai second
+| Sneha    | Mumbai    | 30  |
+| Kiran    | Pune      | 28  |  ← Pune last
++----------+-----------+-----+
 ```
 
-### Common Use Case: Get the highest-paid employee per department
+## ORDER BY Column Position
+
+You can reference columns by their position number in the SELECT list - but this is fragile and should be avoided in production:
 
 ```sql
-WITH ranked AS (
-  SELECT *,
-    ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC) AS rn
-  FROM employees
-)
-SELECT name, department, salary
-FROM ranked
-WHERE rn = 1;
+-- Same as ORDER BY name ASC, age DESC
+SELECT name, age, city FROM users ORDER BY 1 ASC, 2 DESC;
 ```
 
-## RANK and DENSE_RANK
+However, using position numbers in GROUP BY is common and acceptable:
+```sql
+SELECT city, COUNT(*) FROM users GROUP BY 1 ORDER BY 2 DESC;
+```
 
-Both assign rankings, but handle ties differently.
+## ORDER BY with SELECT Alias
+
+ORDER BY runs after SELECT, so you can use aliases:
 
 ```sql
-SELECT
-  name,
-  score,
-  RANK()       OVER (ORDER BY score DESC) AS rank,
-  DENSE_RANK() OVER (ORDER BY score DESC) AS dense_rank,
-  ROW_NUMBER() OVER (ORDER BY score DESC) AS row_num
-FROM scores;
+SELECT name, salary * 12 AS annual_salary
+FROM employees
+ORDER BY annual_salary DESC;  -- ✅ alias works here
 ```
 
-Result:
-```
-+-------+-------+------+------------+---------+
-| name  | score | rank | dense_rank | row_num |
-+-------+-------+------+------------+---------+
-| Alice | 95    | 1    | 1          | 1       |
-| Bob   | 90    | 2    | 2          | 2       |
-| Carol | 90    | 2    | 2          | 3       |  ← tie
-| Dave  | 85    | 4    | 3          | 4       |  ← RANK skips 3, DENSE_RANK doesn't
-+-------+-------+------+------------+---------+
-```
+## NULL Ordering
 
-| Function | Tie Behavior | Gap After Tie |
-|----------|-------------|---------------|
-| `ROW_NUMBER()` | Arbitrary order | No ties |
-| `RANK()` | Same rank | Yes (skips numbers) |
-| `DENSE_RANK()` | Same rank | No (continuous) |
-
-## LAG and LEAD
-
-Access values from previous or next rows.
+NULLs sort to the end in ASC by default in PostgreSQL, and to the beginning in MySQL.
 
 ```sql
--- Compare each month's revenue to the previous month
-SELECT
-  month,
-  revenue,
-  LAG(revenue)  OVER (ORDER BY month) AS prev_month_revenue,
-  LEAD(revenue) OVER (ORDER BY month) AS next_month_revenue,
-  revenue - LAG(revenue) OVER (ORDER BY month) AS month_over_month_change
-FROM monthly_revenue;
+-- PostgreSQL: control NULL position
+SELECT * FROM users ORDER BY last_login DESC NULLS LAST;
+SELECT * FROM users ORDER BY last_login ASC  NULLS FIRST;
+```
+
+## LIMIT
+
+`LIMIT` restricts the number of rows returned:
+
+```sql
+-- First 10 rows
+SELECT * FROM users LIMIT 10;
+
+-- Top 5 highest-paid employees
+SELECT name, salary FROM employees
+ORDER BY salary DESC
+LIMIT 5;
+
+-- Fastest/simplest way to check a table
+SELECT * FROM orders LIMIT 3;
+```
+
+> Always use `ORDER BY` with `LIMIT` - without it, which 10 rows you get is unpredictable.
+
+## OFFSET - Pagination
+
+`OFFSET` skips a number of rows before starting to return:
+
+```sql
+-- Page 1: rows 1-10
+SELECT * FROM products ORDER BY id LIMIT 10 OFFSET 0;
+
+-- Page 2: rows 11-20
+SELECT * FROM products ORDER BY id LIMIT 10 OFFSET 10;
+
+-- Page 3: rows 21-30
+SELECT * FROM products ORDER BY id LIMIT 10 OFFSET 20;
+```
+
+**Pagination formula:**
+```
+OFFSET = (page_number - 1) × page_size
 ```
 
 ```sql
--- LAG with offset and default
-LAG(revenue, 1, 0) OVER (ORDER BY month)
--- 1 = look back 1 row, 0 = default if no previous row
+-- Dynamic pagination (replace :page and :size with values)
+SELECT * FROM products
+ORDER BY created_at DESC
+LIMIT :size OFFSET (:page - 1) * :size;
 ```
 
-## SUM, AVG, COUNT as Window Functions
+**⚠️ OFFSET at large page numbers is slow:**
+On page 1000 with 20 rows per page, the database still reads 20,000 rows and discards the first 19,980. For large datasets, use cursor-based pagination instead.
+
+## Cursor-Based Pagination (Better for Production)
 
 ```sql
--- Running total of revenue
-SELECT
-  order_date,
-  amount,
-  SUM(amount) OVER (ORDER BY order_date) AS running_total
-FROM orders;
+-- Instead of OFFSET, use the last seen ID as a cursor
+-- First page
+SELECT * FROM orders ORDER BY id DESC LIMIT 20;
 
--- Running total per customer
-SELECT
-  customer_id,
-  order_date,
-  amount,
-  SUM(amount) OVER (PARTITION BY customer_id ORDER BY order_date) AS customer_running_total
-FROM orders;
-
--- Each employee's salary vs department average
-SELECT
-  name,
-  department,
-  salary,
-  AVG(salary) OVER (PARTITION BY department) AS dept_avg,
-  salary - AVG(salary) OVER (PARTITION BY department) AS diff_from_avg
-FROM employees;
+-- Next page (pass the last id from previous page)
+SELECT * FROM orders
+WHERE id < :last_seen_id
+ORDER BY id DESC
+LIMIT 20;
 ```
 
-## NTILE
+This is always fast regardless of page number because it uses the index directly.
 
-Divides rows into N equal buckets.
+## FETCH (SQL Standard)
+
+PostgreSQL and SQL Server support the SQL standard alternative to LIMIT:
 
 ```sql
--- Divide customers into 4 quartiles by total spending
-SELECT
-  customer_id,
-  total_spent,
-  NTILE(4) OVER (ORDER BY total_spent DESC) AS spending_quartile
-FROM customer_summary;
--- 1 = top 25%, 4 = bottom 25%
+-- PostgreSQL / SQL Server
+SELECT * FROM users
+ORDER BY id
+FETCH FIRST 10 ROWS ONLY;
+
+-- With offset
+SELECT * FROM users
+ORDER BY id
+OFFSET 20 ROWS
+FETCH NEXT 10 ROWS ONLY;
 ```
 
-## FIRST_VALUE and LAST_VALUE
+## TOP (SQL Server)
 
 ```sql
--- Highest salary in the department alongside each employee
-SELECT
-  name,
-  department,
-  salary,
-  FIRST_VALUE(salary) OVER (
-    PARTITION BY department ORDER BY salary DESC
-  ) AS dept_max_salary
-FROM employees;
+-- SQL Server syntax
+SELECT TOP 10 * FROM users ORDER BY salary DESC;
+SELECT TOP 10 PERCENT * FROM users ORDER BY salary DESC;
 ```
 
-## Window Frame
-
-Controls which rows are included in the window calculation.
+## Real-World Patterns
 
 ```sql
--- 7-day moving average
-SELECT
-  order_date,
-  revenue,
-  AVG(revenue) OVER (
-    ORDER BY order_date
-    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
-  ) AS moving_avg_7d
-FROM daily_revenue;
-```
+-- Leaderboard: top 10 users by score
+SELECT name, score
+FROM game_scores
+ORDER BY score DESC
+LIMIT 10;
 
-Common frame options:
-```sql
-ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW  -- from start to current row
-ROWS BETWEEN 6 PRECEDING AND CURRENT ROW          -- last 7 rows
-ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING          -- 3-row centered window
-ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING  -- current to end
-```
+-- Most recent 5 orders for a customer
+SELECT order_id, total, status, created_at
+FROM orders
+WHERE customer_id = 101
+ORDER BY created_at DESC
+LIMIT 5;
 
-## Real World Example
+-- Latest product page (page 3, 12 per page)
+SELECT name, price, stock
+FROM products
+WHERE is_active = TRUE
+ORDER BY created_at DESC
+LIMIT 12 OFFSET 24;
 
-```sql
--- Sales dashboard: rank products, show running total, compare to prev month
-
-WITH monthly_product_sales AS (
-  SELECT
-    product_id,
-    DATE_TRUNC('month', order_date) AS month,
-    SUM(amount) AS revenue
-  FROM orders
-  GROUP BY product_id, DATE_TRUNC('month', order_date)
-)
-SELECT
-  product_id,
-  month,
-  revenue,
-  RANK()      OVER (PARTITION BY month ORDER BY revenue DESC)   AS monthly_rank,
-  LAG(revenue) OVER (PARTITION BY product_id ORDER BY month)    AS prev_month_revenue,
-  SUM(revenue) OVER (PARTITION BY product_id ORDER BY month)    AS cumulative_revenue
-FROM monthly_product_sales
-ORDER BY month DESC, monthly_rank;
+-- Find the oldest unprocessed job in the queue
+SELECT * FROM jobs
+WHERE status = 'pending'
+ORDER BY created_at ASC
+LIMIT 1;
 ```
 
 ## Summary
 
-- Window functions calculate across related rows without collapsing them
-- `ROW_NUMBER()` — unique sequential number
-- `RANK()` — ranking with gaps on ties
-- `DENSE_RANK()` — ranking without gaps on ties
-- `LAG()` / `LEAD()` — access previous / next row values
-- `SUM()`, `AVG()` over a window — running totals, moving averages
-- `PARTITION BY` — divides rows into independent groups
-- `ORDER BY` inside OVER — defines row order within the window
+- `ORDER BY col ASC` - sort ascending (default)
+- `ORDER BY col DESC` - sort descending  
+- Multiple columns - secondary column breaks ties in primary
+- Always pair `LIMIT` with `ORDER BY` - without ordering, results are non-deterministic
+- `OFFSET` enables pagination but becomes slow at large page numbers
+- For production pagination on large tables, use cursor-based pagination (WHERE id < :last_id)
+- `ORDER BY` aliases from SELECT are allowed; `WHERE` aliases are not

@@ -3,25 +3,11 @@ import { tutorials } from "@/tutorials/manifest"
 import { getTutorial } from "@/tutorials"
 import { notFound } from "next/navigation"
 import remarkGfm from "remark-gfm"
-import { BadgeCheck, Zap, Search, ArrowUpDown, BarChart3, GitMerge, Puzzle, AppWindow, Gauge, Lock, Building2 } from "lucide-react"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism"
 import { CopyButton } from "@/components/learn/copy-button"
-
-const iconMap: Record<string, React.ElementType> = {
-  Zap,
-  Search,
-  ArrowUpDown,
-  BarChart3,
-  GitMerge,
-  Puzzle,
-  AppWindow,
-  Gauge,
-  Lock,
-  Building2,
-}
 
 export async function generateStaticParams() {
   return tutorials.map((t) => ({ id: t.id }))
@@ -199,12 +185,6 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
       <article className="mx-auto max-w-4xl px-6 py-10">
         {/* Header */}
         <header className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            {iconMap[tutorial.icon] && (() => {
-              const Icon = iconMap[tutorial.icon]
-              return <Icon size={40} className="text-[#4DD4C4]" />
-            })()}
-          </div>
           <h1 className="text-3xl font-bold text-white mb-2">{tutorial.title}</h1>
           <p className="text-zinc-500">{tutorial.description}</p>
         </header>
