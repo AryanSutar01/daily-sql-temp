@@ -211,5 +211,5 @@ LIMIT 1;
 - Multiple columns - secondary column breaks ties in primary
 - Always pair `LIMIT` with `ORDER BY` - without ordering, results are non-deterministic
 - `OFFSET` enables pagination but becomes slow at large page numbers
-- For production pagination on large tables, use cursor-based pagination (WHERE id < :last_id)
+- For production pagination on large tables, use cursor-based pagination (`WHERE id < :last_id`)
 - `ORDER BY` aliases from SELECT are allowed; `WHERE` aliases are not

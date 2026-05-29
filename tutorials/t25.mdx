@@ -172,4 +172,4 @@ SELECT DISTINCT salary FROM (
 - `ROW_NUMBER()` - unique sequential numbers, no ties
 - `RANK()` - competition ranking, gaps after ties (1, 2, 2, 4)
 - `DENSE_RANK()` - consecutive ranking, no gaps (1, 2, 2, 3)
-- Top-N per group = ROW_NUMBER/RANK in a subquery, then filter by rn <= N
+- Top-N per group = ROW_NUMBER/RANK in a subquery, then filter by `rn <= N`
