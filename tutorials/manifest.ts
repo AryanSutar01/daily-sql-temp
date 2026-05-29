@@ -8,7 +8,7 @@ export interface Tutorial {
   tags: ('concept' | 'practice' | 'interview')[]
 }
 
-export const tutorials: Tutorial[] = [
+export const tutorials = ([
   
   {
     id: "what-is-sql-and-rdbms",
@@ -486,7 +486,7 @@ export const tutorials: Tutorial[] = [
     category: 'bonus',
     tags: ['concept']
   },
-].sort((a, b) => a.order - b.order)
+] satisfies Tutorial[]).sort((a, b) => a.order - b.order)
 
 // Helper function to group tutorials by category
 export function getTutorialsByCategory(){
