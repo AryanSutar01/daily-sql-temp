@@ -4,6 +4,7 @@ import "./globals.css";
 import { ConditionalNavbar } from "@/components/layout/conditional-navbar";
 import { ConditionalFooter } from "@/components/layout/conditional-footer";
 import { OnboardingCheck } from "@/components/auth/onboarding-check";
+import Script from "next/script";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -30,6 +31,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-93XK08X7L0"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+
+            gtag('config', 'G-93XK08X7L0');
+          `}
+        </Script>
+      </head>
       <body
         className={`${inter.variable} font-sans antialiased`}
       >
