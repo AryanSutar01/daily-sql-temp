@@ -125,7 +125,7 @@ SELECT * FROM products WHERE tags @> ARRAY['wireless'];
 
 **Bad candidates:**
 - Low-cardinality columns (e.g., `status` with only 2 values - full scan may be faster)
-- Very small tables (< a few thousand rows - full scan is negligible)
+- Very small tables (less than a few thousand rows - full scan is negligible)
 - Columns that are rarely queried
 - Tables with extremely high write rates (every write must update all indexes)
 
