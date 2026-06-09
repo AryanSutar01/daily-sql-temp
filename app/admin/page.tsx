@@ -73,6 +73,7 @@ interface Problem {
     description: string;
     estimated_time_minutes: number;
     is_active: boolean;
+    challenge_type?: string;
     created_at?: string;
 }
 
@@ -81,6 +82,12 @@ interface ScheduleEntry {
     easy: { id: string; title: string } | null;
     medium: { id: string; title: string } | null;
     advanced: { id: string; title: string } | null;
+    python_easy?: { id: string; title: string } | null;
+    python_medium?: { id: string; title: string } | null;
+    python_advanced?: { id: string; title: string } | null;
+    pyspark_easy?: { id: string; title: string } | null;
+    pyspark_medium?: { id: string; title: string } | null;
+    pyspark_advanced?: { id: string; title: string } | null;
 }
 
 type Tab = 'problems' | 'create' | 'schedule' | 'feedback' | 'members' | 'analytics';
@@ -140,18 +147,26 @@ export default function AdminDashboard() {
 
     // Form States
     const [problemForm, setProblemForm] = useState({
-        title: "", difficulty: "easy", description: "", estimated_time_minutes: 15
+        title: "", difficulty: "easy", description: "", estimated_time_minutes: 15, challenge_type: "sql"
     });
     const [datasetForm, setDatasetForm] = useState({
-        table_name: "", schema_sql: "", seed_sql: "", column_types: ""
+        table_name: "", schema_sql: "", seed_sql: "", column_types: "", seed_data_json: ""
     });
     const [solutionForm, setSolutionForm] = useState({
-        reference_query: "", order_sensitive: false, notes: ""
+        reference_query: "", reference_code: "", order_sensitive: false, notes: ""
     });
     const [wizardDatasets, setWizardDatasets] = useState<any[]>([]);
     const [scheduleForm, setScheduleForm] = useState({
         date: new Date().toISOString().split('T')[0],
-        easy_problem_id: "", medium_problem_id: "", advanced_problem_id: ""
+        easy_problem_id: "",
+        medium_problem_id: "",
+        advanced_problem_id: "",
+        python_easy_problem_id: "",
+        python_medium_problem_id: "",
+        python_advanced_problem_id: "",
+        pyspark_easy_problem_id: "",
+        pyspark_medium_problem_id: "",
+        pyspark_advanced_problem_id: ""
     });
 
     // Feedback
@@ -377,13 +392,19 @@ export default function AdminDashboard() {
     const handleUpdateSolution = async () => {
         if (!selectedProblem || !editForm?.solution) return;
         try {
+            const bodyPayload: any = {
+                order_sensitive: editForm.solution.order_sensitive,
+                notes: editForm.solution.notes,
+            };
+            if (editForm.challenge_type === 'sql') {
+                bodyPayload.reference_query = editForm.solution.reference_query;
+            } else {
+                bodyPayload.reference_code = editForm.solution.reference_code;
+            }
+
             const res = await fetchWithAuth(`${API_URL}/admin/problems/${selectedProblem.id}/solution`, {
                 method: 'PATCH',
-                body: JSON.stringify({
-                    reference_query: editForm.solution.reference_query,
-                    order_sensitive: editForm.solution.order_sensitive,
-                    notes: editForm.solution.notes,
-                })
+                body: JSON.stringify(bodyPayload)
             });
             if (res.ok) {
                 showToast('success', 'Solution updated!');
@@ -471,13 +492,28 @@ export default function AdminDashboard() {
     const handleUpdateDataset = async (ds: any) => {
         if (!selectedProblem) return;
         try {
+            const bodyPayload: any = {
+                table_name: ds.table_name,
+            };
+            if (selectedProblem.challenge_type === 'sql') {
+                bodyPayload.schema_sql = ds.schema_sql;
+                bodyPayload.seed_sql = ds.seed_sql;
+            } else {
+                let parsedJson = ds.seed_data_json;
+                if (typeof parsedJson === 'string') {
+                    try {
+                        parsedJson = JSON.parse(parsedJson);
+                    } catch (e) {
+                        showToast('error', 'Invalid Seed Data JSON format');
+                        return;
+                    }
+                }
+                bodyPayload.seed_data_json = parsedJson;
+            }
+
             const res = await fetchWithAuth(`${API_URL}/admin/problems/${selectedProblem.id}/datasets/${ds.id}`, {
                 method: 'PATCH',
-                body: JSON.stringify({
-                    table_name: ds.table_name,
-                    schema_sql: ds.schema_sql,
-                    seed_sql: ds.seed_sql,
-                })
+                body: JSON.stringify(bodyPayload)
             });
             if (res.ok) {
                 showToast('success', `Table "${ds.table_name}" updated!`);
@@ -632,25 +668,36 @@ export default function AdminDashboard() {
         if (!createdProblemId) return;
         setLoading(true);
         try {
-            // Parse column_types (e.g. "id: int \n name: varchar") into JSON object
-            const colTypesObj: Record<string, string> = {};
-            if (datasetForm.column_types.trim()) {
-                const lines = datasetForm.column_types.split('\n');
-                for (const line of lines) {
-                    if (line.includes(':')) {
-                        const [key, val] = line.split(':');
-                        colTypesObj[key.trim()] = val.trim();
+            let bodyPayload: any = {
+                table_name: datasetForm.table_name
+            };
+
+            if (problemForm.challenge_type === 'sql') {
+                // Parse column_types (e.g. "id: int \n name: varchar") into JSON object
+                const colTypesObj: Record<string, string> = {};
+                if (datasetForm.column_types.trim()) {
+                    const lines = datasetForm.column_types.split('\n');
+                    for (const line of lines) {
+                        if (line.includes(':')) {
+                            const [key, val] = line.split(':');
+                            colTypesObj[key.trim()] = val.trim();
+                        }
                     }
                 }
+                bodyPayload.schema_sql = datasetForm.schema_sql;
+                bodyPayload.seed_sql = datasetForm.seed_sql;
+                bodyPayload.column_types = colTypesObj;
+            } else {
+                bodyPayload.seed_data_json = JSON.parse(datasetForm.seed_data_json);
             }
 
             const res = await fetchWithAuth(`${API_URL}/admin/problems/${createdProblemId}/datasets`, {
                 method: 'POST',
-                body: JSON.stringify({ ...datasetForm, column_types: colTypesObj })
+                body: JSON.stringify(bodyPayload)
             });
             if (res.ok) {
                 showToast('success', `Dataset "${datasetForm.table_name}" added!`);
-                setDatasetForm({ table_name: "", schema_sql: "", seed_sql: "", column_types: "" });
+                setDatasetForm({ table_name: "", schema_sql: "", seed_sql: "", column_types: "", seed_data_json: "" });
             } else {
                 const data = await res.json();
                 showToast('error', data.detail || 'Failed to add dataset');
@@ -664,9 +711,20 @@ export default function AdminDashboard() {
         if (!createdProblemId) return;
         setLoading(true);
         try {
+            const bodyPayload: any = {
+                order_sensitive: solutionForm.order_sensitive,
+                notes: solutionForm.notes
+            };
+
+            if (problemForm.challenge_type === 'sql') {
+                bodyPayload.reference_query = solutionForm.reference_query;
+            } else {
+                bodyPayload.reference_code = solutionForm.reference_code;
+            }
+
             const res = await fetchWithAuth(`${API_URL}/admin/problems/${createdProblemId}/solution`, {
                 method: 'POST',
-                body: JSON.stringify(solutionForm)
+                body: JSON.stringify(bodyPayload)
             });
             if (res.ok) {
                 showToast('success', 'Solution saved!');
@@ -683,9 +741,21 @@ export default function AdminDashboard() {
     const handleSchedule = async () => {
         setLoading(true);
         try {
+            const payload = {
+                date: scheduleForm.date,
+                easy_problem_id: scheduleForm.easy_problem_id || null,
+                medium_problem_id: scheduleForm.medium_problem_id || null,
+                advanced_problem_id: scheduleForm.advanced_problem_id || null,
+                python_easy_problem_id: scheduleForm.python_easy_problem_id || null,
+                python_medium_problem_id: scheduleForm.python_medium_problem_id || null,
+                python_advanced_problem_id: scheduleForm.python_advanced_problem_id || null,
+                pyspark_easy_problem_id: scheduleForm.pyspark_easy_problem_id || null,
+                pyspark_medium_problem_id: scheduleForm.pyspark_medium_problem_id || null,
+                pyspark_advanced_problem_id: scheduleForm.pyspark_advanced_problem_id || null,
+            };
             const res = await fetchWithAuth(`${API_URL}/admin/daily-practice`, {
                 method: 'POST',
-                body: JSON.stringify(scheduleForm)
+                body: JSON.stringify(payload)
             });
             if (res.ok) {
                 showToast('success', `Schedule saved for ${scheduleForm.date}!`);
@@ -701,9 +771,9 @@ export default function AdminDashboard() {
     const resetCreateWizard = () => {
         setCreateStep('problem');
         setCreatedProblemId(null);
-        setProblemForm({ title: "", difficulty: "easy", description: "", estimated_time_minutes: 15 });
-        setDatasetForm({ table_name: "", schema_sql: "", seed_sql: "", column_types: "" });
-        setSolutionForm({ reference_query: "", order_sensitive: false, notes: "" });
+        setProblemForm({ title: "", difficulty: "easy", description: "", estimated_time_minutes: 15, challenge_type: "sql" });
+        setDatasetForm({ table_name: "", schema_sql: "", seed_sql: "", column_types: "", seed_data_json: "" });
+        setSolutionForm({ reference_query: "", reference_code: "", order_sensitive: false, notes: "" });
     };
 
     const handleAddMember = async () => {
@@ -1081,14 +1151,23 @@ export default function AdminDashboard() {
                                                         <button onClick={() => handleDeleteDataset(ds.id)} className="text-zinc-600 hover:text-red-400 transition-colors" title="Delete Dataset"><Trash2 size={14} /></button>
                                                     </div>
                                                     <input className="w-full bg-[#080c16] border border-[#202736] p-2 rounded text-sm text-white font-mono focus:border-[#4DD4C4] focus:outline-none" value={ds.table_name} onChange={e => { const copy = [...editingDatasets]; copy[idx] = { ...copy[idx], table_name: e.target.value }; setEditingDatasets(copy); }} />
-                                                    <div>
-                                                        <label className="block text-xs text-zinc-500 mb-1">Schema SQL (CREATE TABLE)</label>
-                                                        <textarea className="w-full bg-[#080c16] border border-[#202736] p-2 rounded h-24 font-mono text-xs text-white focus:border-[#4DD4C4] focus:outline-none" value={ds.schema_sql} onChange={e => { const copy = [...editingDatasets]; copy[idx] = { ...copy[idx], schema_sql: e.target.value }; setEditingDatasets(copy); }} />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs text-zinc-500 mb-1">Seed SQL (INSERT INTO)</label>
-                                                        <textarea className="w-full bg-[#080c16] border border-[#202736] p-2 rounded h-24 font-mono text-xs text-white focus:border-[#4DD4C4] focus:outline-none" value={ds.seed_sql} onChange={e => { const copy = [...editingDatasets]; copy[idx] = { ...copy[idx], seed_sql: e.target.value }; setEditingDatasets(copy); }} />
-                                                    </div>
+                                                    {editForm?.challenge_type === 'sql' ? (
+                                                        <>
+                                                            <div>
+                                                                <label className="block text-xs text-zinc-500 mb-1">Schema SQL (CREATE TABLE)</label>
+                                                                <textarea className="w-full bg-[#080c16] border border-[#202736] p-2 rounded h-24 font-mono text-xs text-white focus:border-[#4DD4C4] focus:outline-none" value={ds.schema_sql} onChange={e => { const copy = [...editingDatasets]; copy[idx] = { ...copy[idx], schema_sql: e.target.value }; setEditingDatasets(copy); }} />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs text-zinc-500 mb-1">Seed SQL (INSERT INTO)</label>
+                                                                <textarea className="w-full bg-[#080c16] border border-[#202736] p-2 rounded h-24 font-mono text-xs text-white focus:border-[#4DD4C4] focus:outline-none" value={ds.seed_sql} onChange={e => { const copy = [...editingDatasets]; copy[idx] = { ...copy[idx], seed_sql: e.target.value }; setEditingDatasets(copy); }} />
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <div>
+                                                            <label className="block text-xs text-zinc-500 mb-1">Seed Data JSON</label>
+                                                            <textarea className="w-full bg-[#080c16] border border-[#202736] p-2 rounded h-48 font-mono text-xs text-white focus:border-[#4DD4C4] focus:outline-none" value={typeof ds.seed_data_json === 'object' ? JSON.stringify(ds.seed_data_json, null, 2) : ds.seed_data_json || ''} onChange={e => { const copy = [...editingDatasets]; copy[idx] = { ...copy[idx], seed_data_json: e.target.value }; setEditingDatasets(copy); }} />
+                                                        </div>
+                                                    )}
                                                     <Button onClick={() => handleUpdateDataset(editingDatasets[idx])} className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold text-xs">
                                                         <Save size={14} className="mr-2" /> Save Table "{ds.table_name}"
                                                     </Button>
@@ -1105,15 +1184,27 @@ export default function AdminDashboard() {
                                                 )}
                                             </div>
                                             <div className="space-y-3">
-                                                <div>
-                                                    <label className="block text-xs text-zinc-500 mb-1">Reference Query (SQL)</label>
-                                                    <textarea
-                                                        className="w-full bg-[#080c16] border border-[#202736] p-2 rounded h-32 font-mono text-xs text-white focus:border-[#4DD4C4] focus:outline-none"
-                                                        placeholder="SELECT ... FROM ..."
-                                                        value={editForm?.solution?.reference_query || ''}
-                                                        onChange={e => setEditForm({ ...editForm, solution: { ...editForm.solution, reference_query: e.target.value } })}
-                                                    />
-                                                </div>
+                                                {editForm.challenge_type === 'sql' ? (
+                                                    <div>
+                                                        <label className="block text-xs text-zinc-500 mb-1">Reference Query (SQL)</label>
+                                                        <textarea
+                                                            className="w-full bg-[#080c16] border border-[#202736] p-2 rounded h-32 font-mono text-xs text-white focus:border-[#4DD4C4] focus:outline-none"
+                                                            placeholder="SELECT ... FROM ..."
+                                                            value={editForm?.solution?.reference_query || ''}
+                                                            onChange={e => setEditForm({ ...editForm, solution: { ...editForm.solution, reference_query: e.target.value } })}
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <label className="block text-xs text-zinc-500 mb-1">Reference Code (Python/PySpark)</label>
+                                                        <textarea
+                                                            className="w-full bg-[#080c16] border border-[#202736] p-2 rounded h-32 font-mono text-xs text-white focus:border-[#4DD4C4] focus:outline-none"
+                                                            placeholder="# Write reference solution here..."
+                                                            value={editForm?.solution?.reference_code || ''}
+                                                            onChange={e => setEditForm({ ...editForm, solution: { ...editForm.solution, reference_code: e.target.value } })}
+                                                        />
+                                                    </div>
+                                                )}
                                                 <label className="flex items-center gap-3 text-xs text-zinc-400 cursor-pointer select-none">
                                                     <input
                                                         type="checkbox"
@@ -1134,7 +1225,7 @@ export default function AdminDashboard() {
                                                 </div>
                                                 <Button
                                                     onClick={handleUpdateSolution}
-                                                    disabled={!editForm?.solution?.reference_query}
+                                                    disabled={!(editForm.challenge_type === 'sql' ? editForm?.solution?.reference_query : editForm?.solution?.reference_code)}
                                                     className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold text-xs disabled:opacity-50"
                                                 >
                                                     <Save size={14} className="mr-2" /> Save Solution
@@ -1216,6 +1307,11 @@ export default function AdminDashboard() {
                                     <option value="medium">Medium</option>
                                     <option value="advanced">Advanced</option>
                                 </select>
+                                <select className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-zinc-300 focus:border-[#4DD4C4] focus:outline-none" value={problemForm.challenge_type} onChange={e => setProblemForm({ ...problemForm, challenge_type: e.target.value })}>
+                                    <option value="sql">SQL Challenge</option>
+                                    <option value="python">Python (Pandas) Challenge</option>
+                                    <option value="pyspark">PySpark Challenge</option>
+                                </select>
                                 <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-32 text-white focus:border-[#4DD4C4] focus:outline-none" placeholder="Problem description (supports Markdown)..." value={problemForm.description} onChange={e => setProblemForm({ ...problemForm, description: e.target.value })} />
                                 <div className="flex gap-4">
                                     <input type="number" className="w-24 bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white" placeholder="Minutes" value={problemForm.estimated_time_minutes} onChange={e => setProblemForm({ ...problemForm, estimated_time_minutes: parseInt(e.target.value) || 0 })} />
@@ -1234,9 +1330,15 @@ export default function AdminDashboard() {
                                 <h2 className="text-xl font-bold flex items-center gap-2"><Database size={20} className="text-[#4DD4C4]" /> Add Dataset</h2>
                                 <p className="text-sm text-zinc-500">Add table schemas for this problem. You can add multiple tables.</p>
                                 <input className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white" placeholder="Table Name (e.g. users, orders)" value={datasetForm.table_name} onChange={e => setDatasetForm({ ...datasetForm, table_name: e.target.value })} />
-                                <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-24 font-mono text-xs text-white" placeholder="CREATE TABLE SQL..." value={datasetForm.schema_sql} onChange={e => setDatasetForm({ ...datasetForm, schema_sql: e.target.value })} />
-                                <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-24 font-mono text-xs text-white" placeholder="INSERT INTO SQL (seed data)..." value={datasetForm.seed_sql} onChange={e => setDatasetForm({ ...datasetForm, seed_sql: e.target.value })} />
-                                <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-20 font-mono text-xs text-white" placeholder="Column Types (e.g. id: int \n name: varchar)" value={datasetForm.column_types} onChange={e => setDatasetForm({ ...datasetForm, column_types: e.target.value })} />
+                                {problemForm.challenge_type === 'sql' ? (
+                                    <>
+                                        <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-24 font-mono text-xs text-white" placeholder="CREATE TABLE SQL..." value={datasetForm.schema_sql} onChange={e => setDatasetForm({ ...datasetForm, schema_sql: e.target.value })} />
+                                        <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-24 font-mono text-xs text-white" placeholder="INSERT INTO SQL (seed data)..." value={datasetForm.seed_sql} onChange={e => setDatasetForm({ ...datasetForm, seed_sql: e.target.value })} />
+                                        <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-20 font-mono text-xs text-white" placeholder="Column Types (e.g. id: int \n name: varchar)" value={datasetForm.column_types} onChange={e => setDatasetForm({ ...datasetForm, column_types: e.target.value })} />
+                                    </>
+                                ) : (
+                                    <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-48 font-mono text-xs text-white" placeholder={`Seed Data JSON, e.g.:\n{\n  "columns": [\n    {"name": "id", "type": "integer"},\n    {"name": "name", "type": "text"}\n  ],\n  "rows": [\n    [1, "Alice"],\n    [2, "Bob"]\n  ]\n}`} value={datasetForm.seed_data_json} onChange={e => setDatasetForm({ ...datasetForm, seed_data_json: e.target.value })} />
+                                )}
                                 <div className="flex gap-3">
                                     <Button onClick={handleAddDataset} disabled={!datasetForm.table_name || loading} className="flex-1 bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold">
                                         {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : <Plus size={16} className="mr-2" />}
@@ -1253,15 +1355,19 @@ export default function AdminDashboard() {
                         {createStep === 'solution' && (
                             <div className="bg-[#121826] p-6 rounded-xl border border-[#202736] space-y-4">
                                 <h2 className="text-xl font-bold flex items-center gap-2"><Code size={20} className="text-[#4DD4C4]" /> Expected Solution</h2>
-                                <p className="text-sm text-zinc-500">Enter the reference SQL query that produces the correct result.</p>
-                                <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-40 font-mono text-sm text-white" placeholder="SELECT ... FROM ... WHERE ..." value={solutionForm.reference_query} onChange={e => setSolutionForm({ ...solutionForm, reference_query: e.target.value })} />
+                                <p className="text-sm text-zinc-500">Enter the reference query or code that produces the correct result.</p>
+                                {problemForm.challenge_type === 'sql' ? (
+                                    <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-40 font-mono text-sm text-white" placeholder="SELECT ... FROM ... WHERE ..." value={solutionForm.reference_query} onChange={e => setSolutionForm({ ...solutionForm, reference_query: e.target.value })} />
+                                ) : (
+                                    <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-40 font-mono text-sm text-white" placeholder={`# Write reference solution\n# Assign your final DataFrame to 'result'\n\nresult = ...`} value={solutionForm.reference_code} onChange={e => setSolutionForm({ ...solutionForm, reference_code: e.target.value })} />
+                                )}
                                 <label className="flex items-center gap-3 text-zinc-400 cursor-pointer">
                                     <input type="checkbox" checked={solutionForm.order_sensitive} onChange={e => setSolutionForm({ ...solutionForm, order_sensitive: e.target.checked })} className="w-4 h-4 rounded" />
                                     Order Sensitive (row order must match exactly)
                                 </label>
                                 <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-20 text-white" placeholder="Notes (optional hints, edge cases...)" value={solutionForm.notes} onChange={e => setSolutionForm({ ...solutionForm, notes: e.target.value })} />
                                 <div className="flex gap-3">
-                                    <Button onClick={handleAddSolution} disabled={!solutionForm.reference_query || loading} className="flex-1 bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold">
+                                    <Button onClick={handleAddSolution} disabled={!(problemForm.challenge_type === 'sql' ? solutionForm.reference_query : solutionForm.reference_code) || loading} className="flex-1 bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold">
                                         {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : <ChevronRight size={16} className="mr-2" />}
                                         Preview Problem
                                     </Button>
@@ -1430,7 +1536,13 @@ export default function AdminDashboard() {
                                 </div>
 
                                 <div className="flex flex-col gap-3 max-w-xs mx-auto pt-4">
-                                    <Button onClick={() => { setActiveTab('schedule'); setScheduleForm({ ...scheduleForm, [problemForm.difficulty === 'easy' ? 'easy_problem_id' : problemForm.difficulty === 'medium' ? 'medium_problem_id' : 'advanced_problem_id']: createdProblemId || '' }); }} className="bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold h-11">
+                                    <Button onClick={() => { 
+                                        setActiveTab('schedule'); 
+                                        const typePrefix = problemForm.challenge_type === 'sql' ? '' : `${problemForm.challenge_type}_`;
+                                        const diffKey = problemForm.difficulty === 'easy' ? 'easy' : problemForm.difficulty === 'medium' ? 'medium' : 'advanced';
+                                        const key = `${typePrefix}${diffKey}_problem_id`;
+                                        setScheduleForm({ ...scheduleForm, [key]: createdProblemId || '' }); 
+                                    }} className="bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold h-11">
                                         <Calendar size={18} className="mr-2" /> Schedule for Practice
                                     </Button>
                                     <Button onClick={resetCreateWizard} variant="outline" className="border-[#202736] text-zinc-400 hover:text-white h-11 bg-white/5">
@@ -1457,22 +1569,86 @@ export default function AdminDashboard() {
                                 <input type="date" className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white" value={scheduleForm.date} onChange={e => setScheduleForm({ ...scheduleForm, date: e.target.value })} />
                             </div>
 
-                            {/* Problem Selectors — only show published problems */}
-                            {(['easy', 'medium', 'advanced'] as const).map(diff => (
-                                <div key={diff}>
-                                    <label className="block text-sm text-zinc-500 mb-1 capitalize">{diff} Problem</label>
-                                    <select
-                                        className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white focus:border-[#4DD4C4] focus:outline-none"
-                                        value={scheduleForm[`${diff}_problem_id`]}
-                                        onChange={e => setScheduleForm({ ...scheduleForm, [`${diff}_problem_id`]: e.target.value })}
-                                    >
-                                        <option value="">Select a {diff} problem...</option>
-                                        {problems.filter(p => p.difficulty === diff).map(p => (
-                                            <option key={p.id} value={p.id}>{p.title} {!p.is_active ? '(DRAFT)' : ''}</option>
-                                        ))}
-                                    </select>
+                            {/* SQL Section */}
+                            <div className="space-y-4 pt-2 border-t border-[#202736]/40">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                        <Database size={16} className="text-[#4DD4C4]" /> SQL Challenges
+                                    </h3>
+                                    <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 font-bold uppercase">Required</span>
                                 </div>
-                            ))}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {(['easy', 'medium', 'advanced'] as const).map(diff => (
+                                        <div key={diff} className="space-y-1">
+                                            <label className="block text-xs text-zinc-400 capitalize">{diff}</label>
+                                            <select
+                                                className="w-full bg-[#0b101c] border border-[#202736] p-2 rounded-lg text-xs text-white focus:border-[#4DD4C4] focus:outline-none"
+                                                value={scheduleForm[`${diff}_problem_id` as keyof typeof scheduleForm]}
+                                                onChange={e => setScheduleForm({ ...scheduleForm, [`${diff}_problem_id`]: e.target.value })}
+                                            >
+                                                <option value="">Select...</option>
+                                                {problems.filter(p => p.difficulty === diff && (p.challenge_type === 'sql' || !p.challenge_type)).map(p => (
+                                                    <option key={p.id} value={p.id}>{p.title} {!p.is_active ? '(DRAFT)' : ''}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Python Section */}
+                            <div className="space-y-4 pt-4 border-t border-[#202736]/40">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                        <Code size={16} className="text-[#4DD4C4]" /> Python (Pandas)
+                                    </h3>
+                                    <span className="text-[10px] bg-zinc-500/10 text-zinc-400 px-2 py-0.5 rounded border border-zinc-500/20 font-bold uppercase font-mono">Optional</span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {(['easy', 'medium', 'advanced'] as const).map(diff => (
+                                        <div key={diff} className="space-y-1">
+                                            <label className="block text-xs text-zinc-400 capitalize">{diff}</label>
+                                            <select
+                                                className="w-full bg-[#0b101c] border border-[#202736] p-2 rounded-lg text-xs text-white focus:border-[#4DD4C4] focus:outline-none"
+                                                value={scheduleForm[`python_${diff}_problem_id` as keyof typeof scheduleForm] || ""}
+                                                onChange={e => setScheduleForm({ ...scheduleForm, [`python_${diff}_problem_id`]: e.target.value })}
+                                            >
+                                                <option value="">Select...</option>
+                                                {problems.filter(p => p.difficulty === diff && p.challenge_type === 'python').map(p => (
+                                                    <option key={p.id} value={p.id}>{p.title} {!p.is_active ? '(DRAFT)' : ''}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* PySpark Section */}
+                            <div className="space-y-4 pt-4 border-t border-[#202736]/40">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                        <Zap size={16} className="text-[#4DD4C4]" /> PySpark
+                                    </h3>
+                                    <span className="text-[10px] bg-zinc-500/10 text-zinc-400 px-2 py-0.5 rounded border border-zinc-500/20 font-bold uppercase font-mono">Optional</span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {(['easy', 'medium', 'advanced'] as const).map(diff => (
+                                        <div key={diff} className="space-y-1">
+                                            <label className="block text-xs text-zinc-400 capitalize">{diff}</label>
+                                            <select
+                                                className="w-full bg-[#0b101c] border border-[#202736] p-2 rounded-lg text-xs text-white focus:border-[#4DD4C4] focus:outline-none"
+                                                value={scheduleForm[`pyspark_${diff}_problem_id` as keyof typeof scheduleForm] || ""}
+                                                onChange={e => setScheduleForm({ ...scheduleForm, [`pyspark_${diff}_problem_id`]: e.target.value })}
+                                            >
+                                                <option value="">Select...</option>
+                                                {problems.filter(p => p.difficulty === diff && p.challenge_type === 'pyspark').map(p => (
+                                                    <option key={p.id} value={p.id}>{p.title} {!p.is_active ? '(DRAFT)' : ''}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
 
                             <Button onClick={handleSchedule} disabled={loading || !scheduleForm.easy_problem_id || !scheduleForm.medium_problem_id || !scheduleForm.advanced_problem_id} className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold disabled:opacity-50">
                                 {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : <CheckCircle2 size={16} className="mr-2" />}
@@ -1487,12 +1663,45 @@ export default function AdminDashboard() {
                             </div>
                             <div className="p-4 space-y-3 overflow-y-auto flex-1">
                                 {schedule.map(s => (
-                                    <div key={s.date} className="bg-[#0b101c] p-4 rounded-lg border border-[#202736] shrink-0">
-                                        <div className="font-mono text-sm text-[#4DD4C4] mb-2">{s.date}</div>
-                                        <div className="grid grid-cols-3 gap-2 text-xs">
-                                            <div className="text-green-400">Easy: <span className="text-zinc-400">{s.easy?.title || '—'}</span></div>
-                                            <div className="text-yellow-400">Med: <span className="text-zinc-400">{s.medium?.title || '—'}</span></div>
-                                            <div className="text-red-400">Adv: <span className="text-zinc-400">{s.advanced?.title || '—'}</span></div>
+                                    <div key={s.date} className="bg-[#0b101c] p-4 rounded-lg border border-[#202736] shrink-0 space-y-3">
+                                        <div className="flex justify-between items-center pb-2 border-b border-[#202736]/40">
+                                            <span className="font-mono text-sm text-[#4DD4C4] font-bold">{s.date}</span>
+                                        </div>
+                                        
+                                        <div className="space-y-2 text-xs">
+                                            {/* SQL Row */}
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-[10px] bg-sky-500/10 text-sky-400 px-1 rounded font-bold uppercase w-12 text-center shrink-0 border border-sky-500/20">SQL</span>
+                                                <div className="grid grid-cols-3 gap-2 flex-1">
+                                                    <span className="truncate text-zinc-400" title={s.easy?.title || undefined}><span className="text-green-400/80">E:</span> {s.easy?.title || '—'}</span>
+                                                    <span className="truncate text-zinc-400" title={s.medium?.title || undefined}><span className="text-yellow-400/80">M:</span> {s.medium?.title || '—'}</span>
+                                                    <span className="truncate text-zinc-400" title={s.advanced?.title || undefined}><span className="text-red-400/80">A:</span> {s.advanced?.title || '—'}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Python Row */}
+                                            {(s.python_easy || s.python_medium || s.python_advanced) ? (
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-[10px] bg-yellow-500/10 text-yellow-400 px-1 rounded font-bold uppercase w-12 text-center shrink-0 border border-yellow-500/20">Py</span>
+                                                    <div className="grid grid-cols-3 gap-2 flex-1">
+                                                        <span className="truncate text-zinc-400" title={s.python_easy?.title || undefined}><span className="text-green-400/80">E:</span> {s.python_easy?.title || '—'}</span>
+                                                        <span className="truncate text-zinc-400" title={s.python_medium?.title || undefined}><span className="text-yellow-400/80">M:</span> {s.python_medium?.title || '—'}</span>
+                                                        <span className="truncate text-zinc-400" title={s.python_advanced?.title || undefined}><span className="text-red-400/80">A:</span> {s.python_advanced?.title || '—'}</span>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+
+                                            {/* PySpark Row */}
+                                            {(s.pyspark_easy || s.pyspark_medium || s.pyspark_advanced) ? (
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-[10px] bg-purple-500/10 text-purple-400 px-1 rounded font-bold uppercase w-12 text-center shrink-0 border border-purple-500/20">Spark</span>
+                                                    <div className="grid grid-cols-3 gap-2 flex-1">
+                                                        <span className="truncate text-zinc-400" title={s.pyspark_easy?.title || undefined}><span className="text-green-400/80">E:</span> {s.pyspark_easy?.title || '—'}</span>
+                                                        <span className="truncate text-zinc-400" title={s.pyspark_medium?.title || undefined}><span className="text-yellow-400/80">M:</span> {s.pyspark_medium?.title || '—'}</span>
+                                                        <span className="truncate text-zinc-400" title={s.pyspark_advanced?.title || undefined}><span className="text-red-400/80">A:</span> {s.pyspark_advanced?.title || '—'}</span>
+                                                    </div>
+                                                </div>
+                                            ) : null}
                                         </div>
                                     </div>
                                 ))}

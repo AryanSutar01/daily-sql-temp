@@ -53,23 +53,23 @@ export default function PublicProfileClient({ profile: initialProfile }: { profi
     const stats = {
         easy: { solved: profile.stats.easy.solved || 0, total: profile.stats.easy.total || 1, color: "#00b8a3" },
         medium: { solved: profile.stats.medium.solved || 0, total: profile.stats.medium.total || 1, color: "#ffc01e" },
-        hard: { solved: profile.stats.advanced.solved || 0, total: profile.stats.advanced.total || 1, color: "#ff375f" },
+        advanced: { solved: profile.stats.advanced.solved || 0, total: profile.stats.advanced.total || 1, color: "#ff375f" },
     };
 
-    const totalQuestions = stats.easy.total + stats.medium.total + stats.hard.total;
-    const totalSolved = stats.easy.solved + stats.medium.solved + stats.hard.solved;
+    const totalQuestions = stats.easy.total + stats.medium.total + stats.advanced.total;
+    const totalSolved = stats.easy.solved + stats.medium.solved + stats.advanced.solved;
 
     const gap = 16;
     const availableAngle = 360 - gap * 3;
 
     const easyAngle = (stats.easy.total / (totalQuestions || 1)) * availableAngle;
     const mediumAngle = (stats.medium.total / (totalQuestions || 1)) * availableAngle;
-    const hardAngle = (stats.hard.total / (totalQuestions || 1)) * availableAngle;
+    const advancedAngle = (stats.advanced.total / (totalQuestions || 1)) * availableAngle;
 
     const segments = [
         { id: 'easy', start: 0, end: easyAngle, solved: stats.easy.solved, total: stats.easy.total, color: stats.easy.color },
         { id: 'medium', start: easyAngle + gap, end: easyAngle + gap + mediumAngle, solved: stats.medium.solved, total: stats.medium.total, color: stats.medium.color },
-        { id: 'hard', start: easyAngle + mediumAngle + gap * 2, end: easyAngle + mediumAngle + hardAngle + gap * 2, solved: stats.hard.solved, total: stats.hard.total, color: stats.hard.color }
+        { id: 'advanced', start: easyAngle + mediumAngle + gap * 2, end: easyAngle + mediumAngle + advancedAngle + gap * 2, solved: stats.advanced.solved, total: stats.advanced.total, color: stats.advanced.color }
     ];
 
     const submissions = profile.submissions || [];
@@ -381,7 +381,7 @@ export default function PublicProfileClient({ profile: initialProfile }: { profi
                                 {[
                                     { id: 'EASY', key: 'easy', val: stats.easy.solved, max: stats.easy.total, color: stats.easy.color },
                                     { id: 'MEDIUM', key: 'medium', val: stats.medium.solved, max: stats.medium.total, color: stats.medium.color },
-                                    { id: 'HARD', key: 'hard', val: stats.hard.solved, max: stats.hard.total, color: stats.hard.color }
+                                    { id: 'ADVANCED', key: 'advanced', val: stats.advanced.solved, max: stats.advanced.total, color: stats.advanced.color }
                                 ].map(s => (
                                     <div key={s.id} 
                                          className="relative w-full cursor-pointer flex flex-col"
