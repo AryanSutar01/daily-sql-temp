@@ -596,7 +596,10 @@ export function DailySetClient() {
      * Extracts column names in declaration order from a CREATE TABLE ... SQL string.
      * Falls back to Object.keys(row) (which may be alphabetical due to JSONB) if parsing fails.
      */
-    const getColumnOrder = (schemaSql: string, fallbackRow?: Record<string, any>): string[] => {
+    const getColumnOrder = (schemaSql: string, fallbackRow?: Record<string, any>, seedDataJson?: any): string[] => {
+        if (seedDataJson?.columns && Array.isArray(seedDataJson.columns)) {
+            return seedDataJson.columns.map((c: any) => typeof c === 'string' ? c : (c.name || ''));
+        }
         try {
             // Match the body between the first '(' and the matching last ')'
             const bodyMatch = schemaSql.replace(/\n/g, ' ').match(/CREATE\s+TABLE\s+[\w"`.]+\s*\((.+)\)/i);
@@ -1653,7 +1656,7 @@ export function DailySetClient() {
                                             </h3>
                                             <div className="h-px w-full bg-[#202736] mb-3" />
                                             {activeDatasets.map((ds, idx) => {
-                                                const colOrder = getColumnOrder(ds.schema_sql, ds.sample_rows[0]);
+                                                const colOrder = getColumnOrder(ds.schema_sql, ds.sample_rows[0], ds.seed_data_json);
                                                 return (
                                                     <div key={idx} className="mb-6 last:mb-0 space-y-3">
                                                         <div className="flex items-center gap-2">

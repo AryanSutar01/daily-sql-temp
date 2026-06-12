@@ -415,7 +415,10 @@ export default function AdminDashboard() {
         } catch (e) { console.error(e); }
     };
 
-    const getColumnOrder = (schemaSql: string, fallbackRow?: Record<string, any>): string[] => {
+    const getColumnOrder = (schemaSql: string, fallbackRow?: Record<string, any>, seedDataJson?: any): string[] => {
+        if (seedDataJson?.columns && Array.isArray(seedDataJson.columns)) {
+            return seedDataJson.columns.map((c: any) => typeof c === 'string' ? c : (c.name || ''));
+        }
         try {
             // Match the body between the first '(' and the matching last ')'
             const bodyMatch = schemaSql.replace(/\n/g, ' ').match(/CREATE\s+TABLE\s+[\w"`.]+\s*\((.+)\)/i);
@@ -1048,6 +1051,15 @@ export default function AdminDashboard() {
                                                         <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${getDiffStyle(p.difficulty).color} ${getDiffStyle(p.difficulty).bg} ${getDiffStyle(p.difficulty).border}`}>
                                                             {getDiffStyle(p.difficulty).label}
                                                         </span>
+                                                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${
+                                                            p.challenge_type === 'python' 
+                                                                ? 'border-blue-400/40 text-blue-400 bg-blue-400/10' 
+                                                                : p.challenge_type === 'pyspark' 
+                                                                ? 'border-orange-400/40 text-orange-400 bg-orange-400/10' 
+                                                                : 'border-[#4DD4C4]/40 text-[#4DD4C4]/90 bg-[#4DD4C4]/5'
+                                                        }`}>
+                                                            {p.challenge_type?.toUpperCase() || 'SQL'}
+                                                        </span>
                                                         {!p.is_active && (
                                                             <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border border-zinc-600 text-zinc-400 bg-zinc-800/50">
                                                                 DRAFT
@@ -1179,7 +1191,7 @@ export default function AdminDashboard() {
                                         <div className="bg-[#121826] border border-[#202736] rounded-xl p-6 space-y-4">
                                             <div className="flex items-center justify-between pb-4 border-b border-[#202736]">
                                                 <h3 className="text-lg font-bold flex items-center gap-2"><Code size={18} className="text-[#4DD4C4]" /> Reference Solution</h3>
-                                                {!editForm?.solution?.reference_query && (
+                                                {!(editForm.challenge_type === 'sql' ? editForm?.solution?.reference_query : editForm?.solution?.reference_code) && (
                                                     <span className="text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded font-bold">NO SOLUTION YET</span>
                                                 )}
                                             </div>
@@ -1397,7 +1409,9 @@ export default function AdminDashboard() {
                                             <div className="h-3 w-px bg-zinc-800" />
                                             <span className="text-xs text-zinc-500 font-medium flex items-center gap-1.5"><Clock size={12} className="text-zinc-600" /> {problemForm.estimated_time_minutes} min</span>
                                             <div className="h-3 w-px bg-zinc-800" />
-                                            <span className="text-xs text-zinc-500 font-medium">PostgreSQL</span>
+                                            <span className="text-xs text-zinc-500 font-medium">
+                                                {problemForm.challenge_type === 'sql' ? 'PostgreSQL' : problemForm.challenge_type === 'python' ? 'Python (Pandas)' : 'PySpark'}
+                                            </span>
                                         </div>
 
                                         <h1 className="text-2xl font-bold text-white tracking-tight leading-tight">{problemForm.title || "Untitled Problem"}</h1>
@@ -1438,7 +1452,7 @@ export default function AdminDashboard() {
                                                 </h3>
                                                 <div className="h-px w-full bg-[#181f2b]" />
                                                 {wizardDatasets.map((ds, idx) => {
-                                                    const colOrder = getColumnOrder(ds.schema_sql, ds.sample_rows[0]);
+                                                    const colOrder = getColumnOrder(ds.schema_sql, ds.sample_rows[0], ds.seed_data_json);
                                                     return (
                                                         <div key={idx} className="mb-6 last:mb-0 space-y-3">
                                                             <div className="flex items-center gap-2">
@@ -1505,9 +1519,15 @@ export default function AdminDashboard() {
                                             <Button onClick={() => setCreateStep('solution')} variant="ghost" size="sm" className="text-zinc-500 hover:text-white h-7 text-[10px]"><Edit3 size={12} className="mr-2" /> EDIT</Button>
                                         </div>
                                         <div className="bg-[#0b101c] border border-[#202736] rounded-lg overflow-hidden">
-                                            <SyntaxHighlighter style={vscDarkPlus as any} language="sql" customStyle={{ margin: 0, padding: '1rem', fontSize: '12px' }}>
-                                                {solutionForm.reference_query || "-- No solution query provided"}
-                                            </SyntaxHighlighter>
+                                            {problemForm.challenge_type === 'sql' ? (
+                                                <SyntaxHighlighter style={vscDarkPlus as any} language="sql" customStyle={{ margin: 0, padding: '1rem', fontSize: '12px' }}>
+                                                    {solutionForm.reference_query || "-- No solution query provided"}
+                                                </SyntaxHighlighter>
+                                            ) : (
+                                                <SyntaxHighlighter style={vscDarkPlus as any} language="python" customStyle={{ margin: 0, padding: '1rem', fontSize: '12px' }}>
+                                                    {solutionForm.reference_code || "# No solution code provided"}
+                                                </SyntaxHighlighter>
+                                            )}
                                         </div>
                                         {solutionForm.order_sensitive && <div className="text-[10px] text-zinc-500 flex items-center gap-1"><CheckCircle2 size={10} /> Results must match order exactly</div>}
                                     </div>

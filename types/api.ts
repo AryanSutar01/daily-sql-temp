@@ -26,6 +26,7 @@ export interface Dataset {
     schema_sql: string;
     sample_rows: Record<string, any>[];
     column_types?: Record<string, string>;
+    seed_data_json?: any;
 }
 
 export interface DailyPractice {
