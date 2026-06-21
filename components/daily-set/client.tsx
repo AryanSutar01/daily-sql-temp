@@ -244,6 +244,7 @@ export function DailySetClient() {
     const sidebarDropdownRef = useRef<HTMLDivElement>(null);
     const profileDropdownRef = useRef<HTMLDivElement>(null);
     const shareDropdownRef = useRef<HTMLDivElement>(null);
+    const sidebarScrollRef = useRef<HTMLDivElement>(null);
 
 
     // ── Output Panel Resize ──────────────────────────────
@@ -317,6 +318,9 @@ export function DailySetClient() {
 
     // ── Handlers ─────────────────────────────────────────
     const handleProblemSelect = async (id: string) => {
+        if (sidebarScrollRef.current) {
+            sessionStorage.setItem('sidebar_scroll_top', String(sidebarScrollRef.current.scrollTop));
+        }
         router.push(`/practice/daily/${id}?tab=${activeSidebarTab}${sidebarCollapsed ? '&collapsed=true' : ''}`);
     };
 
@@ -540,6 +544,24 @@ export function DailySetClient() {
             }
         }
     }, [sidebarCollapsed, difficultyFilter, searchQuery, sidebarLoaded]);
+
+    // Restore sidebar scroll position
+    useEffect(() => {
+        if (!isLoading && !sidebarCollapsed && sidebarScrollRef.current) {
+            const savedScrollTop = sessionStorage.getItem('sidebar_scroll_top');
+            if (savedScrollTop) {
+                const scrollTop = parseFloat(savedScrollTop);
+                if (!isNaN(scrollTop)) {
+                    const timer = setTimeout(() => {
+                        if (sidebarScrollRef.current) {
+                            sidebarScrollRef.current.scrollTop = scrollTop;
+                        }
+                    }, 50);
+                    return () => clearTimeout(timer);
+                }
+            }
+        }
+    }, [isLoading, sidebarCollapsed, activeSidebarTab, activeProblemId]);
 
     // ── Helpers ──────────────────────────────────────────
     /**
@@ -1234,7 +1256,16 @@ export function DailySetClient() {
                         </div>
 
                         {/* List Content */}
-                        <div className={`flex-1 ${sidebarCollapsed ? 'py-6 overflow-visible' : 'overflow-y-auto p-3'} space-y-3`}>
+                        <div
+                            ref={sidebarScrollRef}
+                            onScroll={(e) => {
+                                if (sidebarLoaded && !sidebarCollapsed) {
+                                    const target = e.currentTarget;
+                                    sessionStorage.setItem('sidebar_scroll_top', String(target.scrollTop));
+                                }
+                            }}
+                            className={`flex-1 ${sidebarCollapsed ? 'py-6 overflow-visible' : 'overflow-y-auto p-3'} space-y-3`}
+                        >
                             {activeSidebarTab === 'today' ? (
                                 sidebarCollapsed ? (
                                     <div className="flex flex-col items-center gap-6 overflow-visible">
