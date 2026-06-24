@@ -181,7 +181,9 @@ export function DailySetClient() {
     const [stats, setStats] = useState<any>(null);
     const [solvedIds, setSolvedIds] = useState<Set<string>>(new Set());
     const [difficultyFilter, setDifficultyFilter] = useState<string>('all');
-    const [showDifficultyFilter, setShowDifficultyFilter] = useState(false);
+    const [typeFilter, setTypeFilter] = useState<string>('all');
+    const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
     const [toast, setToast] = useState<{ message: string; subMessage?: string; visible: boolean } | null>(null);
 
     // ── Drill-down State ─────────────────────────────────
@@ -244,6 +246,7 @@ export function DailySetClient() {
     const sidebarDropdownRef = useRef<HTMLDivElement>(null);
     const profileDropdownRef = useRef<HTMLDivElement>(null);
     const shareDropdownRef = useRef<HTMLDivElement>(null);
+    const filterDropdownRef = useRef<HTMLDivElement>(null);
     const sidebarScrollRef = useRef<HTMLDivElement>(null);
 
 
@@ -357,8 +360,23 @@ export function DailySetClient() {
                 setCode(savedSol.submitted_query);
             } else {
                 const p = problems.find(x => x.id === id);
-                const dsName = datasets[0]?.table_name || 'table_name';
-                setCode(`-- Write your query for: ${p?.title}\nSELECT * FROM ${dsName};\n`);
+                const firstDsName = datasets[0]?.table_name || 'table_name';
+                if (p?.challenge_type === 'python') {
+                    const dfList = datasets.map(d => `'${d.table_name}_df'`).join(', ');
+                    const dfLabel = datasets.length > 1
+                        ? `DataFrames are available as: ${dfList}`
+                        : `DataFrame is available as '${firstDsName}_df'`;
+                    setCode(`# Write your Python (Pandas) code for: ${p?.title}\n# The input ${dfLabel}.\n# Assign your final DataFrame to the 'result' variable.\n\nresult = ${firstDsName}_df\n`);
+                } else if (p?.challenge_type === 'pyspark') {
+                    const dfList = datasets.map(d => `'${d.table_name}_df'`).join(', ');
+                    const viewList = datasets.map(d => `'${d.table_name}'`).join(', ');
+                    const dfLabel = datasets.length > 1
+                        ? `DataFrames are available as: ${dfList} (or as temp views: ${viewList})`
+                        : `DataFrame is available as '${firstDsName}_df' or as a temp view '${firstDsName}'`;
+                    setCode(`# Write your PySpark code for: ${p?.title}\n# The input ${dfLabel}.\n# Assign your final DataFrame to the 'result' variable.\n\nresult = ${firstDsName}_df\n`);
+                } else {
+                    setCode(`-- Write your query for: ${p?.title}\nSELECT * FROM ${firstDsName};\n`);
+                }
             }
             api.getExpectedOutput(id)
                 .then(data => setExpectedOutput(data))
@@ -500,6 +518,16 @@ export function DailySetClient() {
         return () => document.removeEventListener('mousedown', h);
     }, []);
 
+    // Outside-click: filter dropdown
+    useEffect(() => {
+        const h = (e: MouseEvent) => {
+            if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target as Node))
+                setShowFilterDropdown(false);
+        };
+        document.addEventListener('mousedown', h);
+        return () => document.removeEventListener('mousedown', h);
+    }, []);
+
     // Fullscreen change
     useEffect(() => {
         const onChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -517,6 +545,16 @@ export function DailySetClient() {
         const savedDifficulty = sessionStorage.getItem('difficulty_filter');
         if (savedDifficulty) {
             setDifficultyFilter(savedDifficulty);
+        }
+
+        const savedType = sessionStorage.getItem('type_filter');
+        if (savedType) {
+            setTypeFilter(savedType);
+        }
+
+        const savedStatus = sessionStorage.getItem('status_filter');
+        if (savedStatus) {
+            setStatusFilter(savedStatus);
         }
 
         const savedSearch = sessionStorage.getItem('search_query');
@@ -537,13 +575,25 @@ export function DailySetClient() {
                 sessionStorage.setItem('difficulty_filter', difficultyFilter);
             }
 
+            if (typeFilter === 'all') {
+                sessionStorage.removeItem('type_filter');
+            } else {
+                sessionStorage.setItem('type_filter', typeFilter);
+            }
+
+            if (statusFilter === 'all') {
+                sessionStorage.removeItem('status_filter');
+            } else {
+                sessionStorage.setItem('status_filter', statusFilter);
+            }
+
             if (searchQuery.trim() === '') {
                 sessionStorage.removeItem('search_query');
             } else {
                 sessionStorage.setItem('search_query', searchQuery);
             }
         }
-    }, [sidebarCollapsed, difficultyFilter, searchQuery, sidebarLoaded]);
+    }, [sidebarCollapsed, difficultyFilter, typeFilter, statusFilter, searchQuery, sidebarLoaded]);
 
     // Restore sidebar scroll position
     useEffect(() => {
@@ -568,7 +618,10 @@ export function DailySetClient() {
      * Extracts column names in declaration order from a CREATE TABLE ... SQL string.
      * Falls back to Object.keys(row) (which may be alphabetical due to JSONB) if parsing fails.
      */
-    const getColumnOrder = (schemaSql: string, fallbackRow?: Record<string, any>): string[] => {
+    const getColumnOrder = (schemaSql: string, fallbackRow?: Record<string, any>, seedDataJson?: any): string[] => {
+        if (seedDataJson?.columns && Array.isArray(seedDataJson.columns)) {
+            return seedDataJson.columns.map((c: any) => typeof c === 'string' ? c : (c.name || ''));
+        }
         try {
             // Match the body between the first '(' and the matching last ')'
             const bodyMatch = schemaSql.replace(/\n/g, ' ').match(/CREATE\s+TABLE\s+[\w"`.]+\s*\((.+)\)/i);
@@ -623,7 +676,16 @@ export function DailySetClient() {
     const filteredProblems = problems.filter(p => {
         const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesDifficulty = difficultyFilter === 'all' || p.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
-        return matchesSearch && matchesDifficulty;
+        
+        const pType = p.challenge_type || 'sql';
+        const matchesType = typeFilter === 'all' || pType.toLowerCase() === typeFilter.toLowerCase();
+        
+        const isSolved = solvedIds.has(p.id);
+        const matchesStatus = statusFilter === 'all' || 
+            (statusFilter === 'solved' && isSolved) || 
+            (statusFilter === 'unsolved' && !isSolved);
+            
+        return matchesSearch && matchesDifficulty && matchesType && matchesStatus;
     });
     const descriptionText = activeProblem?.description || '';
     const descParts = descriptionText.split('### Hint');
@@ -700,8 +762,12 @@ export function DailySetClient() {
 
 
     // ── Today's Set ordered list for navigation ──────────────
-    const todaysProblemIds = (['easy', 'medium', 'advanced'] as const)
-        .map(level => dailySet?.[level as keyof DailyPractice] as string | undefined)
+    const todaysProblemIds = ([
+        'easy', 'medium', 'advanced',
+        'python_easy', 'python_medium', 'python_advanced',
+        'pyspark_easy', 'pyspark_medium', 'pyspark_advanced'
+    ] as const)
+        .map(level => dailySet?.[level] as string | undefined)
         .filter((id): id is string => !!id && problems.some(p => p.id === id));
 
     const navigationList = activeSidebarTab === 'today' ? todaysProblemIds : filteredProblems.map(p => p.id);
@@ -1269,7 +1335,11 @@ export function DailySetClient() {
                             {activeSidebarTab === 'today' ? (
                                 sidebarCollapsed ? (
                                     <div className="flex flex-col items-center gap-6 overflow-visible">
-                                        {(['easy', 'medium', 'advanced'] as const).map((dLevel) => {
+                                        {([
+                                            'easy', 'medium', 'advanced',
+                                            'python_easy', 'python_medium', 'python_advanced',
+                                            'pyspark_easy', 'pyspark_medium', 'pyspark_advanced'
+                                        ] as const).map((dLevel) => {
                                             const pId = dailySet?.[dLevel];
                                             if (!pId) return null;
                                             const pInfo = problems.find(p => p.id === pId);
@@ -1305,28 +1375,47 @@ export function DailySetClient() {
                                         })}
                                     </div>
                                 ) : (
-                                    <div className="space-y-3">
-                                        {dailySet ? (['easy', 'medium', 'advanced'] as const).map((dLevel) => {
-                                            const pId = dailySet[dLevel as keyof DailyPractice];
-                                            if (!pId) return null;
-                                            const pInfo = problems.find(p => p.id === pId);
-                                            if (!pInfo) return null;
-                                            const dStyle = getDiffStyle(pInfo.difficulty);
-                                            const isSolved = solvedIds.has(pId);
-                                            const isActive = activeProblemId === pId;
-                                            return (
-                                                <div key={dLevel}
-                                                    onClick={() => handleProblemSelect(pId)}
-                                                    className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${isActive ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40' : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'}`}
-                                                >
-                                                    <div className="flex justify-between items-center">
-                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>{dStyle.label}</span>
-                                                        <CheckCircle2 size={14} className={isSolved ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
+                                    <div className="space-y-4">
+                                        {dailySet ? (
+                                            ([
+                                                { label: 'SQL Challenges', keys: ['easy', 'medium', 'advanced'] },
+                                                { label: 'Python Challenges', keys: ['python_easy', 'python_medium', 'python_advanced'] },
+                                                { label: 'PySpark Challenges', keys: ['pyspark_easy', 'pyspark_medium', 'pyspark_advanced'] }
+                                            ] as const).map((category) => {
+                                                const catProblems = category.keys
+                                                    .map(k => ({ key: k, id: dailySet[k as keyof DailyPractice] }))
+                                                    .filter(item => !!item.id && problems.some(p => p.id === item.id));
+
+                                                if (catProblems.length === 0) return null;
+
+                                                return (
+                                                    <div key={category.label} className="space-y-2">
+                                                        <div className="text-[10px] font-bold text-[#4DD4C4]/70 uppercase tracking-wider px-1">
+                                                            {category.label}
+                                                        </div>
+                                                        {catProblems.map(({ key, id }) => {
+                                                            const pInfo = problems.find(p => p.id === id);
+                                                            if (!pInfo) return null;
+                                                            const dStyle = getDiffStyle(pInfo.difficulty);
+                                                            const isSolved = solvedIds.has(id!);
+                                                            const isActive = activeProblemId === id;
+                                                            return (
+                                                                <div key={id}
+                                                                    onClick={() => handleProblemSelect(id!)}
+                                                                    className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${isActive ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40' : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'}`}
+                                                                >
+                                                                    <div className="flex justify-between items-center">
+                                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>{dStyle.label}</span>
+                                                                        <CheckCircle2 size={14} className={isSolved ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
+                                                                    </div>
+                                                                    <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'}`}>{pInfo.title}</div>
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
-                                                    <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'}`}>{pInfo.title}</div>
-                                                </div>
-                                            );
-                                        }) : (
+                                                );
+                                            })
+                                        ) : (
                                             <div className="text-xs text-zinc-500 italic p-4 text-center border border-[#202736] rounded bg-[#131924]">No daily set found.</div>
                                         )}
                                     </div>
@@ -1346,24 +1435,58 @@ export function DailySetClient() {
                                                     className="w-full bg-[#131924] border border-[#202736] rounded text-[11px] py-1.5 pl-8 pr-2 text-zinc-300 outline-none focus:border-[#4DD4C4]/50 transition-colors"
                                                 />
                                             </div>
-                                            <div className="relative">
+                                            <div className="relative" ref={filterDropdownRef}>
                                                 <button
-                                                    onClick={() => setShowDifficultyFilter(!showDifficultyFilter)}
-                                                    className={`p-1.5 border rounded transition-colors ${difficultyFilter !== 'all' ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/30 text-[#4DD4C4]' : 'bg-[#131924] border-[#202736] text-[#4DD4C4] hover:bg-[#1a2230]'}`}
+                                                    onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                                                    className={`p-1.5 border rounded transition-colors ${(difficultyFilter !== 'all' || typeFilter !== 'all' || statusFilter !== 'all') ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/30 text-[#4DD4C4]' : 'bg-[#131924] border-[#202736] text-[#4DD4C4] hover:bg-[#1a2230]'}`}
+                                                    title="Filters"
                                                 >
                                                     <Filter size={12} />
                                                 </button>
-                                                {showDifficultyFilter && (
-                                                    <div className="absolute top-full right-0 mt-1.5 w-28 bg-[#131924] border border-[#202736] rounded-lg overflow-hidden py-1 z-[300] shadow-xl">
-                                                        {['all', 'easy', 'medium', 'advanced'].map((lvl) => (
-                                                            <button
-                                                                key={lvl}
-                                                                onClick={() => { setDifficultyFilter(lvl); setShowDifficultyFilter(false); }}
-                                                                className={`w-full text-left px-3 py-1.5 text-[10px] font-bold uppercase transition-colors ${difficultyFilter === lvl ? 'text-[#4DD4C4] bg-[#4DD4C4]/5' : 'text-zinc-400 hover:text-white hover:bg-[#202736]'}`}
-                                                            >
-                                                                {lvl}
-                                                            </button>
-                                                        ))}
+                                                {showFilterDropdown && (
+                                                    <div className="absolute top-full right-0 mt-1.5 w-48 bg-[#131924] border border-[#202736] rounded-lg overflow-hidden p-3 z-[300] shadow-xl space-y-3">
+                                                        <div>
+                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Difficulty</div>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {['all', 'easy', 'medium', 'advanced'].map((lvl) => (
+                                                                    <button
+                                                                        key={lvl}
+                                                                        onClick={() => setDifficultyFilter(lvl)}
+                                                                        className={`px-2 py-1 text-[9px] font-bold rounded uppercase transition-colors ${difficultyFilter === lvl ? 'text-[#080c16] bg-[#4DD4C4]' : 'text-zinc-400 bg-[#080c16] border border-[#202736] hover:text-white hover:bg-[#202736]'}`}
+                                                                    >
+                                                                        {lvl === 'advanced' ? 'hard' : lvl}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        <div className="border-t border-[#202736]/50 pt-2">
+                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Category</div>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {['all', 'sql', 'python', 'pyspark'].map((cat) => (
+                                                                    <button
+                                                                        key={cat}
+                                                                        onClick={() => setTypeFilter(cat)}
+                                                                        className={`px-2 py-1 text-[9px] font-bold rounded uppercase transition-colors ${typeFilter === cat ? 'text-[#080c16] bg-[#4DD4C4]' : 'text-zinc-400 bg-[#080c16] border border-[#202736] hover:text-white hover:bg-[#202736]'}`}
+                                                                    >
+                                                                        {cat}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        <div className="border-t border-[#202736]/50 pt-2">
+                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Status</div>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {['all', 'solved', 'unsolved'].map((stat) => (
+                                                                    <button
+                                                                        key={stat}
+                                                                        onClick={() => setStatusFilter(stat)}
+                                                                        className={`px-2 py-1 text-[9px] font-bold rounded uppercase transition-colors ${statusFilter === stat ? 'text-[#080c16] bg-[#4DD4C4]' : 'text-zinc-400 bg-[#080c16] border border-[#202736] hover:text-white hover:bg-[#202736]'}`}
+                                                                    >
+                                                                        {stat}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
@@ -1564,7 +1687,7 @@ export function DailySetClient() {
                                             </h3>
                                             <div className="h-px w-full bg-[#202736] mb-3" />
                                             {activeDatasets.map((ds, idx) => {
-                                                const colOrder = getColumnOrder(ds.schema_sql, ds.sample_rows[0]);
+                                                const colOrder = getColumnOrder(ds.schema_sql, ds.sample_rows[0], ds.seed_data_json);
                                                 return (
                                                     <div key={idx} className="mb-6 last:mb-0 space-y-3">
                                                         <div className="flex items-center gap-2">
@@ -1899,7 +2022,7 @@ export function DailySetClient() {
                         {/* Editor toolbar */}
                         <div className="h-[52px] border-b border-[#202736] bg-[#131924] flex items-center justify-between px-4 shrink-0">
                             <span className="text-xs font-mono font-medium text-[#4DD4C4] flex items-center gap-2">
-                                <span className="text-zinc-500">&gt;_</span> PostgreSQL
+                                <span className="text-zinc-500">&gt;_</span> {activeProblem?.challenge_type === 'python' ? 'Python (Pandas)' : activeProblem?.challenge_type === 'pyspark' ? 'PySpark' : 'PostgreSQL'}
                             </span>
                             <div className="flex items-center gap-3 text-zinc-400">
                                 <button
@@ -1921,7 +2044,7 @@ export function DailySetClient() {
                         <div className="flex-1 relative overflow-hidden bg-[#0b101c]">
                             <Editor
                                 height="100%"
-                                language="sql"
+                                language={activeProblem?.challenge_type === 'sql' ? 'sql' : 'python'}
                                 theme="dailySqlTheme"
                                 value={code}
                                 onChange={(val) => {

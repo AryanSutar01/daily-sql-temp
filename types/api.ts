@@ -15,9 +15,10 @@ export interface ExecutionResponse {
 export interface Problem {
     id: string;
     title: string;
-    difficulty: 'easy' | 'medium' | 'hard';
+    difficulty: 'easy' | 'medium' | 'advanced';
     description: string;
     estimated_time_minutes: number;
+    challenge_type?: string;
 }
 
 export interface Dataset {
@@ -25,13 +26,20 @@ export interface Dataset {
     schema_sql: string;
     sample_rows: Record<string, any>[];
     column_types?: Record<string, string>;
+    seed_data_json?: any;
 }
 
 export interface DailyPractice {
     date: string;
-    easy: string;
-    medium: string;
-    advanced: string;
+    easy?: string | null;
+    medium?: string | null;
+    advanced?: string | null;
+    python_easy?: string | null;
+    python_medium?: string | null;
+    python_advanced?: string | null;
+    pyspark_easy?: string | null;
+    pyspark_medium?: string | null;
+    pyspark_advanced?: string | null;
 }
 
 export interface Streak {
