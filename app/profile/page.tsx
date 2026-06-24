@@ -54,7 +54,8 @@ function ProfileContent() {
     const [isEditing, setIsEditing] = useState(false);
     const [viewingCode, setViewingCode] = useState<{ title: string; query: string } | null>(null);
     const [loadingCode, setLoadingCode] = useState(false);
-    const [selectedYear, setSelectedYear] = useState<string>('last_12');
+    const currentYear = new Date().getFullYear();
+    const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
     const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
     const [formData, setFormData] = useState({
@@ -948,8 +949,8 @@ function ProfileContent() {
                                     onChange={(e) => setSelectedYear(e.target.value)}
                                 >
                                     <option value="last_12">LAST YEAR</option>
-                                    <option value="2026">2026</option>
-                                    <option value="2025">2025</option>
+                                    <option value={String(currentYear)}>{currentYear}</option>
+                                    <option value={String(currentYear - 1)}>{currentYear - 1}</option>
                                 </select>
                             </div>
                         </div>
