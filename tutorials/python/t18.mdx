@@ -1,0 +1,272 @@
+## The Problem: Doing Multiple Things at Once
+
+Python programs are single-threaded by default - they execute one instruction at a time. When tasks are slow (waiting for I/O, doing heavy computation), you want to run them concurrently or in parallel.
+
+Python gives you two main tools:
+- **`threading`** - multiple threads in one process (concurrent, not truly parallel due to the GIL)
+- **`multiprocessing`** - multiple processes with separate memory (truly parallel)
+
+## Threads vs Processes
+
+```
+Thread                          Process
+------                          -------
+Shared memory                   Separate memory
+Lightweight                     Heavier (more overhead)
+Limited by GIL (Python)         No GIL limitation
+Good for I/O-bound tasks        Good for CPU-bound tasks
+```
+
+## Multithreading
+
+Threads share the same memory space and run within one process.
+
+```python
+import threading
+import time
+
+def download_file(filename):
+    print(f"Downloading {filename}...")
+    time.sleep(2)  # simulate network wait
+    print(f"Done: {filename}")
+
+# Without threading: runs sequentially - takes 6 seconds
+download_file("a.zip")
+download_file("b.zip")
+download_file("c.zip")
+
+# With threading: runs concurrently - takes ~2 seconds
+threads = []
+for name in ["a.zip", "b.zip", "c.zip"]:
+    t = threading.Thread(target=download_file, args=(name,))
+    threads.append(t)
+    t.start()
+
+for t in threads:
+    t.join()  # wait for all threads to finish
+```
+
+### Thread with a Class
+
+```python
+class Worker(threading.Thread):
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+
+    def run(self):
+        print(f"{self.name} started")
+        time.sleep(1)
+        print(f"{self.name} finished")
+
+w1 = Worker("Worker-1")
+w2 = Worker("Worker-2")
+w1.start()
+w2.start()
+w1.join()
+w2.join()
+```
+
+### Thread Safety - Race Conditions
+
+Threads share memory, so they can conflict when writing to the same variable.
+
+```python
+import threading
+
+counter = 0
+
+def increment():
+    global counter
+    for _ in range(100000):
+        counter += 1  # NOT thread-safe - read-modify-write is not atomic
+
+t1 = threading.Thread(target=increment)
+t2 = threading.Thread(target=increment)
+t1.start(); t2.start()
+t1.join(); t2.join()
+
+print(counter)  # Expected: 200000 - Actual: something less, unpredictable
+```
+
+**Fix with a Lock:**
+
+```python
+counter = 0
+lock = threading.Lock()
+
+def increment():
+    global counter
+    for _ in range(100000):
+        with lock:       # only one thread can enter this block at a time
+            counter += 1
+
+t1 = threading.Thread(target=increment)
+t2 = threading.Thread(target=increment)
+t1.start(); t2.start()
+t1.join(); t2.join()
+
+print(counter)  # Always 200000
+```
+
+## Multiprocessing
+
+Each process runs in its own memory space with its own Python interpreter - bypassing the GIL entirely.
+
+```python
+from multiprocessing import Process
+import time
+
+def compute(n):
+    print(f"Computing {n}...")
+    result = sum(i * i for i in range(n))  # CPU-heavy work
+    print(f"Done {n}: {result}")
+
+if __name__ == "__main__":   # required guard for multiprocessing
+    processes = []
+    for n in [1_000_000, 2_000_000, 3_000_000]:
+        p = Process(target=compute, args=(n,))
+        processes.append(p)
+        p.start()
+
+    for p in processes:
+        p.join()
+```
+
+### Process Pool - Distribute Work Across CPU Cores
+
+```python
+from multiprocessing import Pool
+
+def square(n):
+    return n * n
+
+if __name__ == "__main__":
+    with Pool(processes=4) as pool:       # 4 worker processes
+        results = pool.map(square, range(10))
+    print(results)
+    # [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+```
+
+### Sharing Data Between Processes
+
+Processes don't share memory, so you need special objects:
+
+```python
+from multiprocessing import Process, Value, Array
+
+def increment(counter):
+    for _ in range(1000):
+        with counter.get_lock():
+            counter.value += 1
+
+if __name__ == "__main__":
+    counter = Value('i', 0)  # shared integer
+    processes = [Process(target=increment, args=(counter,)) for _ in range(4)]
+    for p in processes: p.start()
+    for p in processes: p.join()
+    print(counter.value)  # 4000
+```
+
+## ThreadPoolExecutor & ProcessPoolExecutor (Modern Way)
+
+The `concurrent.futures` module gives a cleaner, higher-level API:
+
+```python
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+import time
+
+def fetch(url):
+    time.sleep(1)  # simulate I/O
+    return f"Response from {url}"
+
+urls = ["https://a.com", "https://b.com", "https://c.com"]
+
+# ThreadPoolExecutor - for I/O-bound
+with ThreadPoolExecutor(max_workers=3) as executor:
+    futures = {executor.submit(fetch, url): url for url in urls}
+    for future in as_completed(futures):
+        print(future.result())
+
+# ProcessPoolExecutor - for CPU-bound
+def heavy(n):
+    return sum(i**2 for i in range(n))
+
+with ProcessPoolExecutor(max_workers=4) as executor:
+    results = list(executor.map(heavy, [1_000_000, 2_000_000, 3_000_000]))
+    print(results)
+```
+
+## I/O-bound vs CPU-bound - Choosing the Right Tool
+
+```
+Task Type       Example                     Best Tool
+---------       -------                     ---------
+I/O-bound       API calls, DB queries,      threading or asyncio
+                file reads, web scraping
+CPU-bound       Image processing,           multiprocessing
+                data crunching, ML training
+Mixed           Scrape + parse HTML         asyncio + ProcessPool
+```
+
+```python
+# Quick rule of thumb:
+# - Task spends time waiting?     → threading / asyncio
+# - Task spends time computing?   → multiprocessing
+# - Python GIL blocks you?        → multiprocessing
+```
+
+## Common Pitfalls
+
+```python
+# 1. Forgetting if __name__ == "__main__" in multiprocessing
+#    Without it, each new process re-imports the module and spawns more processes - infinite loop on Windows
+
+# 2. Sharing mutable state between threads without a lock
+#    Results in race conditions and unpredictable output
+
+# 3. Using multiprocessing for I/O-bound tasks
+#    High overhead of spawning processes outweighs any gain - use threading instead
+
+# 4. Deadlocks - two threads waiting on each other's lock
+lock_a = threading.Lock()
+lock_b = threading.Lock()
+
+def thread_1():
+    with lock_a:
+        time.sleep(0.1)
+        with lock_b:     # waiting for lock_b
+            print("Thread 1 done")
+
+def thread_2():
+    with lock_b:
+        time.sleep(0.1)
+        with lock_a:     # waiting for lock_a - DEADLOCK
+            print("Thread 2 done")
+```
+
+## Interview Questions
+
+**Q: What is the GIL and how does it affect multithreading?**
+The Global Interpreter Lock (GIL) is a mutex in CPython that allows only one thread to execute Python bytecode at a time. This means threads don't achieve true parallelism for CPU-bound tasks. For I/O-bound tasks, the GIL is released while waiting, so threading still provides a speedup.
+
+**Q: When would you use multiprocessing over threading?**
+Use multiprocessing for CPU-bound tasks (heavy computation) where you need true parallelism across CPU cores. Use threading for I/O-bound tasks (network calls, file reads) where threads spend most of their time waiting.
+
+**Q: What is a race condition? How do you prevent it?**
+A race condition occurs when two threads read and modify shared data at the same time, producing unpredictable results. Prevent it using `threading.Lock()` to ensure only one thread accesses the critical section at a time.
+
+**Q: What is a deadlock?**
+A deadlock occurs when two or more threads are each waiting for a lock held by the other, causing all of them to block forever. Avoid deadlocks by always acquiring locks in the same order, or using `threading.RLock` (reentrant lock).
+
+**Q: What is `join()` and why is it important?**
+`t.join()` makes the main thread wait until thread `t` finishes. Without it, the main program may exit before threads complete their work.
+
+## Summary
+
+- **Threading** - concurrent execution in one process; good for I/O-bound tasks; limited by the GIL for CPU work
+- **Multiprocessing** - true parallelism across CPU cores; separate memory per process; good for CPU-bound tasks
+- **Lock** - prevents race conditions when threads share state
+- **Deadlock** - threads waiting on each other's locks; avoid by consistent lock ordering
+- **`concurrent.futures`** - modern high-level API for both thread and process pools
+- Rule of thumb: I/O-bound → threads; CPU-bound → processes

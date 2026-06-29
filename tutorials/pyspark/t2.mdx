@@ -1,0 +1,222 @@
+---
+title: "Spark Architecture (Driver, Executor, Cluster)"
+description: "Understand how Spark distributes work across a cluster - the roles of the Driver, Executors, Cluster Manager, and how they coordinate."
+section: "Spark Foundations"
+level: "Foundation"
+tags: ["Interview", "Concept"]
+order: 2
+---
+
+## The Big Picture
+
+When you submit a Spark job, it doesn't run on one machine - it distributes work across a **cluster** of machines. Understanding who does what is critical for writing efficient PySpark code and debugging failures.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        CLUSTER                               │
+│                                                             │
+│  ┌───────────────┐         ┌─────────────────────────────┐  │
+│  │  Driver Node  │         │       Worker Nodes          │  │
+│  │               │  Tasks  │  ┌──────────┐ ┌──────────┐  │  │
+│  │  SparkContext ├────────►│  │Executor 1│ │Executor 2│  │  │
+│  │  DAG Scheduler│         │  │ (Task)(T)│ │ (Task)(T)│  │  │
+│  │  Task Scheduler│        │  └──────────┘ └──────────┘  │  │
+│  └───────┬───────┘         └─────────────────────────────┘  │
+│          │                                                   │
+│          ▼                                                   │
+│  ┌───────────────┐                                          │
+│  │Cluster Manager│  (YARN / Kubernetes / Standalone)        │
+│  └───────────────┘                                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## The Three Core Components
+
+### 1. Driver
+
+The Driver is the **brain** of a Spark application. It runs on the machine where you launch your PySpark script or notebook.
+
+**Responsibilities:**
+- Parses your PySpark code and builds the logical plan
+- Converts the logical plan into a DAG (Directed Acyclic Graph) of stages
+- Negotiates resources with the Cluster Manager
+- Schedules tasks on Executors
+- Tracks the status of all tasks
+- Collects results when actions are called
+
+```python
+# This code runs on the DRIVER
+spark = SparkSession.builder.appName("MyApp").getOrCreate()
+
+df = spark.read.csv("data.csv")          # driver builds plan
+df_filtered = df.filter(df.age > 25)    # driver adds to DAG (lazy)
+df_filtered.show()                       # driver triggers execution, collects to display
+#              ↑ only here does work actually happen on executors
+```
+
+> ⚠️ **Key Rule:** Never collect large DataFrames to the driver. `df.collect()` brings ALL data to the driver's RAM - this can crash your application.
+
+### 2. Executors
+
+Executors are **worker processes** that run on nodes in the cluster. They do the actual data processing.
+
+**Responsibilities:**
+- Execute tasks assigned by the Driver
+- Store data in memory (cache) for faster access
+- Read from and write to storage (HDFS, S3, etc.)
+- Report task status back to the Driver
+
+```
+Each Executor:
+┌─────────────────────────────┐
+│         Executor            │
+│  ┌──────┐ ┌──────┐ ┌──────┐ │
+│  │ Core │ │ Core │ │ Core │ │  ← Cores run tasks in parallel
+│  │(Task)│ │(Task)│ │(Task)│ │
+│  └──────┘ └──────┘ └──────┘ │
+│                             │
+│  ┌─────────────────────────┐ │
+│  │    JVM Heap Memory      │ │  ← Stores RDD partitions, shuffle data
+│  │  (Execution + Storage)  │ │
+│  └─────────────────────────┘ │
+└─────────────────────────────┘
+```
+
+Key Executor configurations:
+```python
+spark = SparkSession.builder \
+    .config("spark.executor.memory", "4g")   # RAM per executor
+    .config("spark.executor.cores", "4")     # cores per executor
+    .config("spark.executor.instances", "10") # number of executors
+    .getOrCreate()
+```
+
+### 3. Cluster Manager
+
+The Cluster Manager is the **resource allocator**. It manages the machines in the cluster and decides where to launch Executors.
+
+| Cluster Manager | When to Use |
+|---|---|
+| **Standalone** | Simple Spark-only clusters; easiest to set up |
+| **YARN** | When running alongside Hadoop; most common on-prem |
+| **Kubernetes** | Containerized environments; modern cloud-native setups |
+| **Mesos** | Legacy; being phased out |
+| **Databricks** | Managed; no manual cluster manager needed |
+
+## Job Execution Flow - Step by Step
+
+```
+1. You call an action (e.g., df.count())
+        │
+        ▼
+2. Driver converts transformations into a DAG
+        │
+        ▼
+3. DAG Scheduler splits DAG into Stages
+   (stage boundaries = shuffle operations)
+        │
+        ▼
+4. Task Scheduler assigns Tasks to Executors
+   (one task per partition per stage)
+        │
+        ▼
+5. Executors process tasks, return results
+        │
+        ▼
+6. Driver aggregates results, returns to user
+```
+
+### What is a Stage?
+
+A stage is a set of tasks that can run **without shuffling data** across the network. Stage boundaries are created wherever a shuffle is required (e.g., groupBy, join, repartition).
+
+```python
+# Example: this triggers 2 stages
+df = spark.read.csv("sales.csv")          # Stage 1 starts
+df_filtered = df.filter(df.amount > 100)  # Still Stage 1 (no shuffle)
+df_grouped = df_filtered.groupBy("city")  # SHUFFLE → new Stage 2 begins
+result = df_grouped.count()               # Stage 2 continues
+result.show()                             # Action triggers everything
+```
+
+### What is a Task?
+
+A task is the **smallest unit of work** - it processes one partition of data. If your DataFrame has 200 partitions, Spark creates 200 tasks per stage.
+
+## Deploy Modes
+
+Spark jobs can run in two modes:
+
+```
+Client Mode (default for interactive):
+┌──────────────────┐        ┌──────────────────────┐
+│  Your Machine    │        │      Cluster          │
+│  [Driver Process]├───────►│  [Executors]          │
+│  (runs locally)  │        │                      │
+└──────────────────┘        └──────────────────────┘
+ ↑ Driver stays on your machine; if you disconnect, job dies
+
+Cluster Mode (production):
+┌──────────────────┐        ┌──────────────────────┐
+│  Submit Machine  │        │      Cluster          │
+│  (just submits) ├───────►│  [Driver + Executors] │
+└──────────────────┘        └──────────────────────┘
+ ↑ Driver runs inside the cluster; you can disconnect safely
+```
+
+```bash
+# Submit in cluster mode
+spark-submit \
+  --master yarn \
+  --deploy-mode cluster \
+  --executor-memory 4G \
+  --num-executors 10 \
+  my_job.py
+```
+
+## Memory Architecture Inside an Executor
+
+Spark 2.0+ uses **Unified Memory Management**:
+
+```
+Executor JVM Heap
+┌──────────────────────────────────────────────────┐
+│  Reserved Memory (300MB fixed)                    │
+├──────────────────────────────────────────────────┤
+│  User Memory (25% of remaining)                   │
+│  → Your UDFs, data structures                     │
+├──────────────────────────────────────────────────┤
+│  Spark Memory (75% of remaining)                  │
+│  ┌────────────────────┬──────────────────────┐   │
+│  │  Execution Memory  │  Storage Memory       │   │
+│  │  (shuffle, sort,   │  (cached RDDs,        │   │
+│  │   join, aggregation│   DataFrames)         │   │
+│  │  → can borrow ←────┼──→ can borrow)        │   │
+│  └────────────────────┴──────────────────────┘   │
+└──────────────────────────────────────────────────┘
+```
+
+The execution and storage halves can **borrow from each other**, which is why Spark handles memory pressure more gracefully than earlier systems.
+
+## Common Interview Questions
+
+**Q: What happens if the Driver crashes?**
+The entire Spark application fails. All executor processes are terminated. This is why Driver high-availability is important in production (YARN supports Driver HA).
+
+**Q: What happens if an Executor crashes?**
+Only the tasks running on that executor fail. Spark automatically re-schedules those tasks on other executors. The job continues. This is fault tolerance via RDD lineage.
+
+**Q: How many tasks run in parallel?**
+Total parallelism = number of executors × cores per executor. E.g., 10 executors × 4 cores = 40 tasks running simultaneously.
+
+**Q: Difference between Driver memory and Executor memory?**
+Driver memory (`spark.driver.memory`) is for the Driver process - building plans, collecting results. Executor memory (`spark.executor.memory`) is for data processing. The Driver needs more memory if you're using `collect()` on large datasets.
+
+## Summary
+
+- **Driver** - the brain: plans, schedules, coordinates, collects results
+- **Executor** - the muscles: runs tasks, processes data, caches partitions
+- **Cluster Manager** - the resource allocator: launches and tracks executors
+- A **Job** breaks into **Stages** (at shuffle boundaries), which break into **Tasks** (one per partition)
+- **Client mode** runs the Driver locally; **Cluster mode** runs it inside the cluster
+- Spark's unified memory model lets execution and storage memory borrow from each other

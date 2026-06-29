@@ -1,0 +1,263 @@
+## groupby - Aggregate by Groups
+
+`groupby` splits a DataFrame into groups, applies an aggregation, and combines the results - just like SQL's `GROUP BY`.
+
+```python
+import pandas as pd
+
+df = pd.DataFrame({
+    "department": ["Engineering", "Marketing", "Engineering", "HR", "Marketing", "Engineering"],
+    "employee": ["Alice", "Bob", "Carol", "Dave", "Eve", "Frank"],
+    "salary": [90000, 75000, 85000, 65000, 70000, 95000],
+    "age": [28, 32, 35, 29, 26, 40],
+})
+
+# Single aggregation
+df.groupby("department")["salary"].mean()
+# department
+# Engineering    90000.0
+# HR             65000.0
+# Marketing      72500.0
+
+df.groupby("department")["salary"].sum()
+df.groupby("department")["salary"].max()
+df.groupby("department").size()   # count rows per group
+```
+
+### Multiple Aggregations
+
+```python
+# Multiple functions on one column
+df.groupby("department")["salary"].agg(["mean", "min", "max", "count"])
+
+# Different aggregations per column
+df.groupby("department").agg(
+    avg_salary=("salary", "mean"),
+    max_salary=("salary", "max"),
+    avg_age=("age", "mean"),
+    headcount=("employee", "count"),
+)
+#              avg_salary  max_salary  avg_age  headcount
+# Engineering     90000.0       95000       34          3
+# HR              65000.0       65000       29          1
+# Marketing       72500.0       75000       29          2
+```
+
+### groupby with Custom Functions
+
+```python
+# Custom aggregation
+df.groupby("department")["salary"].agg(lambda x: x.max() - x.min())
+
+# Apply a function to each group's DataFrame
+def top_earner(group):
+    return group.nlargest(1, "salary")
+
+df.groupby("department").apply(top_earner).reset_index(drop=True)
+```
+
+### Group + Filter (having equivalent)
+
+```python
+# Departments with average salary > 75000 - equivalent to SQL HAVING
+dept_avg = df.groupby("department")["salary"].mean()
+dept_avg[dept_avg > 75000]
+
+# Or with filter
+df.groupby("department").filter(lambda g: g["salary"].mean() > 75000)
+```
+
+## merge - Combining DataFrames (SQL Joins)
+
+```python
+employees = pd.DataFrame({
+    "emp_id": [1, 2, 3, 4],
+    "name": ["Alice", "Bob", "Carol", "Dave"],
+    "dept_id": [10, 20, 10, 30],
+})
+
+departments = pd.DataFrame({
+    "dept_id": [10, 20, 40],
+    "dept_name": ["Engineering", "Marketing", "Finance"],
+})
+```
+
+### Join Types
+
+```python
+# INNER JOIN - only matching rows
+pd.merge(employees, departments, on="dept_id")
+#    emp_id   name  dept_id    dept_name
+# 0       1  Alice       10  Engineering
+# 1       3  Carol       10  Engineering
+# 2       2    Bob       20    Marketing
+
+# LEFT JOIN - all employees, NaN if no matching dept
+pd.merge(employees, departments, on="dept_id", how="left")
+#    emp_id   name  dept_id    dept_name
+# 0       1  Alice       10  Engineering
+# 1       2    Bob       20    Marketing
+# 2       3  Carol       10  Engineering
+# 3       4   Dave       30          NaN   ← dept 30 not in departments
+
+# RIGHT JOIN
+pd.merge(employees, departments, on="dept_id", how="right")
+
+# FULL OUTER JOIN
+pd.merge(employees, departments, on="dept_id", how="outer")
+```
+
+### Merge on Different Column Names
+
+```python
+orders = pd.DataFrame({
+    "order_id": [1, 2, 3],
+    "customer_id": [101, 102, 101],
+    "amount": [500, 1200, 750],
+})
+
+customers = pd.DataFrame({
+    "id": [101, 102, 103],
+    "name": ["Alice", "Bob", "Carol"],
+})
+
+pd.merge(orders, customers, left_on="customer_id", right_on="id")
+```
+
+### Multiple Keys
+
+```python
+pd.merge(df1, df2, on=["year", "month"])   # join on both columns
+```
+
+## concat - Stack DataFrames
+
+```python
+df1 = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
+df2 = pd.DataFrame({"A": [5, 6], "B": [7, 8]})
+
+# Stack vertically (rows) - like UNION ALL
+pd.concat([df1, df2], ignore_index=True)
+#    A  B
+# 0  1  3
+# 1  2  4
+# 2  5  7
+# 3  6  8
+
+# Stack horizontally (columns)
+pd.concat([df1, df2], axis=1)
+```
+
+## pivot_table - Reshape Data
+
+`pivot_table` reshapes data from long to wide format and aggregates - like a spreadsheet pivot table.
+
+```python
+sales = pd.DataFrame({
+    "month": ["Jan", "Jan", "Feb", "Feb", "Mar", "Mar"],
+    "product": ["Laptop", "Phone", "Laptop", "Phone", "Laptop", "Phone"],
+    "revenue": [50000, 30000, 55000, 28000, 60000, 32000],
+    "units": [10, 30, 11, 28, 12, 32],
+})
+
+# Total revenue per product per month
+pd.pivot_table(
+    sales,
+    values="revenue",
+    index="month",
+    columns="product",
+    aggfunc="sum",
+)
+# product  Laptop  Phone
+# month
+# Feb       55000  28000
+# Jan       50000  30000
+# Mar       60000  32000
+
+# Multiple aggregations
+pd.pivot_table(
+    sales,
+    values=["revenue", "units"],
+    index="month",
+    columns="product",
+    aggfunc={"revenue": "sum", "units": "mean"},
+    fill_value=0,
+)
+```
+
+## melt - Wide to Long (Unpivot)
+
+```python
+wide = pd.DataFrame({
+    "name": ["Alice", "Bob"],
+    "math": [90, 75],
+    "english": [85, 88],
+    "science": [92, 70],
+})
+
+# Wide → Long
+pd.melt(wide, id_vars=["name"], var_name="subject", value_name="score")
+#     name  subject  score
+# 0  Alice     math     90
+# 1    Bob     math     75
+# 2  Alice  english     85
+# 3    Bob  english     88
+# 4  Alice  science     92
+# 5    Bob  science     70
+```
+
+## Window Functions - cumsum, rolling, shift
+
+```python
+df = pd.DataFrame({
+    "date": pd.date_range("2024-01-01", periods=6),
+    "revenue": [100, 150, 120, 180, 200, 160],
+})
+
+# Running total
+df["cumulative"] = df["revenue"].cumsum()
+
+# Rolling average (moving average)
+df["rolling_3d"] = df["revenue"].rolling(window=3).mean()
+
+# Shift - previous value (LAG in SQL)
+df["prev_revenue"] = df["revenue"].shift(1)
+
+# Lead
+df["next_revenue"] = df["revenue"].shift(-1)
+
+# % change from previous
+df["pct_change"] = df["revenue"].pct_change() * 100
+```
+
+## Interview Questions
+
+**Q: What is the difference between `merge` and `concat`?**
+`merge` joins DataFrames based on matching key columns - like a SQL JOIN. `concat` stacks DataFrames along an axis - like SQL UNION ALL (axis=0) or adding columns side by side (axis=1). Use merge for relational joins, concat for stacking/appending.
+
+**Q: What is the difference between `groupby().agg()` and `groupby().apply()`?**
+`agg()` applies named aggregation functions (sum, mean, count) per column and is highly optimized. `apply()` passes each group's DataFrame to a custom Python function - more flexible but slower. Prefer `agg()` when possible.
+
+**Q: How do you get the top N rows per group in pandas?**
+Use `groupby` + `apply` with `nlargest`:
+```python
+df.groupby("department").apply(lambda g: g.nlargest(2, "salary")).reset_index(drop=True)
+```
+Or use `rank()` / `cumcount()` + filter.
+
+**Q: What is the difference between `pivot` and `pivot_table`?**
+`pivot` reshapes data without aggregation - each combination of index and column must be unique, or it raises an error. `pivot_table` allows duplicate combinations and aggregates them (default: mean). `pivot_table` is more flexible and commonly used.
+
+**Q: What does `melt` do?**
+`melt` converts wide-format data to long-format - it turns multiple value columns into rows with a variable name column and a value column. This is the inverse of `pivot`. Useful for normalizing data for analysis or plotting.
+
+## Summary
+
+- `groupby("col")["val"].agg(...)` - split-apply-combine; equivalent to SQL GROUP BY + aggregate
+- `agg(name=("col", "func"))` - named aggregations with multiple functions per column
+- `filter(lambda g: ...)` - keep only groups that satisfy a condition (SQL HAVING equivalent)
+- `pd.merge(df1, df2, on="key", how="inner/left/right/outer")` - SQL-style joins
+- `pd.concat([df1, df2])` - stack DataFrames vertically (UNION ALL) or horizontally
+- `pivot_table(values, index, columns, aggfunc)` - reshape long to wide with aggregation
+- `melt(id_vars, var_name, value_name)` - reshape wide to long (unpivot)
+- `cumsum()`, `rolling(n).mean()`, `shift(1)` - running totals, moving averages, lag/lead

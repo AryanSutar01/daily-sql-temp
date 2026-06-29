@@ -1,0 +1,296 @@
+## What Is a REST API?
+
+A REST API lets programs communicate over HTTP. You send a request to a URL and get data back - usually JSON.
+
+```
+HTTP Methods:
+GET     - retrieve data
+POST    - create new data
+PUT     - replace existing data
+PATCH   - partially update data
+DELETE  - remove data
+```
+
+```bash
+pip install requests
+```
+
+## Basic GET Request
+
+```python
+import requests
+
+response = requests.get("https://jsonplaceholder.typicode.com/posts/1")
+
+print(response.status_code)   # 200
+print(response.json())        # dict from JSON response
+print(response.text)          # raw string response
+print(response.headers)       # response headers
+```
+
+## Query Parameters
+
+```python
+# Pass params as a dict - requests builds the URL query string
+params = {
+    "userId": 1,
+    "completed": True,
+}
+response = requests.get(
+    "https://jsonplaceholder.typicode.com/todos",
+    params=params
+)
+# Equivalent URL: /todos?userId=1&completed=True
+
+todos = response.json()
+print(f"Found {len(todos)} todos")
+```
+
+## POST Request - Send Data
+
+```python
+import requests
+import json
+
+# Send JSON body
+payload = {
+    "title": "Learn Python",
+    "body": "Practice every day",
+    "userId": 1,
+}
+
+response = requests.post(
+    "https://jsonplaceholder.typicode.com/posts",
+    json=payload,   # automatically sets Content-Type: application/json
+)
+
+print(response.status_code)   # 201 Created
+print(response.json())        # {'id': 101, 'title': 'Learn Python', ...}
+```
+
+## PUT and PATCH
+
+```python
+# PUT - replace entire resource
+response = requests.put(
+    "https://jsonplaceholder.typicode.com/posts/1",
+    json={"title": "Updated Title", "body": "New body", "userId": 1},
+)
+
+# PATCH - partial update
+response = requests.patch(
+    "https://jsonplaceholder.typicode.com/posts/1",
+    json={"title": "Only title updated"},
+)
+```
+
+## DELETE
+
+```python
+response = requests.delete("https://jsonplaceholder.typicode.com/posts/1")
+print(response.status_code)   # 200 or 204 No Content
+```
+
+## Headers & Authentication
+
+```python
+# Custom headers
+headers = {
+    "Authorization": "Bearer YOUR_TOKEN_HERE",
+    "Accept": "application/json",
+    "X-API-Key": "your-api-key",
+}
+
+response = requests.get("https://api.example.com/data", headers=headers)
+
+# Basic Auth
+from requests.auth import HTTPBasicAuth
+
+response = requests.get(
+    "https://api.example.com/secure",
+    auth=HTTPBasicAuth("username", "password"),
+)
+# or shorthand:
+response = requests.get(url, auth=("username", "password"))
+```
+
+## Using a Session - Reuse Connections & Headers
+
+```python
+# Session reuses TCP connections and persists headers/cookies across requests
+with requests.Session() as session:
+    session.headers.update({
+        "Authorization": "Bearer TOKEN",
+        "Content-Type": "application/json",
+    })
+
+    # All requests in this session include the headers automatically
+    r1 = session.get("https://api.example.com/users")
+    r2 = session.get("https://api.example.com/orders")
+    r3 = session.post("https://api.example.com/items", json={"name": "Widget"})
+```
+
+## Error Handling
+
+```python
+import requests
+from requests.exceptions import HTTPError, ConnectionError, Timeout, RequestException
+
+def fetch_user(user_id: int) -> dict:
+    try:
+        response = requests.get(
+            f"https://api.example.com/users/{user_id}",
+            timeout=5,   # seconds - raises Timeout if exceeded
+        )
+        response.raise_for_status()   # raises HTTPError for 4xx/5xx responses
+        return response.json()
+
+    except Timeout:
+        print("Request timed out")
+        return {}
+    except HTTPError as e:
+        print(f"HTTP error: {e.response.status_code} - {e}")
+        return {}
+    except ConnectionError:
+        print("Failed to connect to server")
+        return {}
+    except RequestException as e:
+        print(f"Unexpected error: {e}")
+        return {}
+
+# Status code checks
+response = requests.get(url)
+if response.status_code == 200:
+    data = response.json()
+elif response.status_code == 404:
+    print("Resource not found")
+elif response.status_code == 429:
+    print("Rate limited - slow down")
+```
+
+## Retry Logic
+
+```python
+import time
+import requests
+
+def get_with_retry(url: str, max_retries: int = 3, delay: float = 1.0) -> dict:
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url, timeout=5)
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            if attempt == max_retries - 1:
+                raise
+            print(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+            time.sleep(delay * (2 ** attempt))   # exponential backoff
+    return {}
+
+# Using urllib3 Retry adapter (more robust)
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+session = requests.Session()
+retry = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503])
+adapter = HTTPAdapter(max_retries=retry)
+session.mount("https://", adapter)
+```
+
+## Paginated API - Fetch All Pages
+
+```python
+import requests
+
+def fetch_all_pages(base_url: str, params: dict = None) -> list:
+    results = []
+    page = 1
+
+    while True:
+        response = requests.get(
+            base_url,
+            params={**(params or {}), "page": page, "per_page": 100},
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        if not data:   # empty page = we're done
+            break
+
+        results.extend(data)
+        page += 1
+
+    return results
+
+all_posts = fetch_all_pages("https://jsonplaceholder.typicode.com/posts")
+print(f"Total: {len(all_posts)} posts")
+```
+
+## Real Example - GitHub API
+
+```python
+import requests
+import os
+
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+
+def get_github_repos(username: str) -> list:
+    session = requests.Session()
+    session.headers.update({
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
+    })
+
+    repos = []
+    page = 1
+
+    while True:
+        response = session.get(
+            f"https://api.github.com/users/{username}/repos",
+            params={"page": page, "per_page": 30, "sort": "updated"},
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        if not data:
+            break
+
+        repos.extend(data)
+        page += 1
+
+    return repos
+
+repos = get_github_repos("torvalds")
+for repo in repos[:5]:
+    print(f"{repo['name']:30} ⭐ {repo['stargazers_count']}")
+```
+
+## Interview Questions
+
+**Q: What is `response.raise_for_status()` and why use it?**
+It raises an `HTTPError` exception if the response status code indicates an error (4xx client error or 5xx server error). Without it, `requests` won't raise exceptions for bad status codes - your code would silently proceed with an error response. It's the cleanest way to check for HTTP errors.
+
+**Q: What is the difference between `requests.get()` and using a `Session`?**
+`requests.get()` opens a new TCP connection for each request. A `Session` reuses connections (connection pooling), persists headers, cookies, and auth across all requests, and is more efficient when making multiple requests to the same host.
+
+**Q: How do you set a timeout in requests and why is it important?**
+Pass `timeout=5` (seconds) to any request. Without a timeout, a request can hang indefinitely if the server doesn't respond. Always set a timeout in production code.
+
+**Q: What is exponential backoff and when do you use it?**
+Exponential backoff is a retry strategy where the wait time doubles after each failure: 1s, 2s, 4s, 8s. Use it when an API is rate-limiting you (429) or temporarily unavailable (503). It reduces load on the server and avoids hammering a struggling service.
+
+**Q: How do you handle pagination when calling an API?**
+Loop through pages, making a request for each page with an incrementing `page` parameter. Stop when the response returns an empty list or a `next` link is absent. Collect all results in a list and return it after all pages are fetched.
+
+## Summary
+
+- `requests.get/post/put/patch/delete(url)` - HTTP methods
+- `params={}` - query string parameters; `json={}` - JSON request body
+- `response.raise_for_status()` - raise exception for 4xx/5xx responses
+- `timeout=5` - always set a timeout; prevents indefinite hangs
+- `requests.Session()` - reuse connections, persist headers/auth across requests
+- Retry with exponential backoff for transient failures (429, 500, 502, 503)
+- Paginated APIs: loop until empty response, collect all pages into one list
+- Store API keys in environment variables - never hardcode them

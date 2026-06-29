@@ -1,0 +1,224 @@
+## The Core Distinction
+
+```
+Immutable - cannot be changed after creation
+  int, float, bool, str, tuple, frozenset, bytes
+
+Mutable - can be changed in place
+  list, dict, set, bytearray, custom objects (usually)
+```
+
+```python
+# Immutable - "changing" creates a NEW object
+x = 10
+id(x)       # e.g. 9785600
+x = x + 1
+id(x)       # DIFFERENT address - new int object
+
+# Mutable - changes happen IN PLACE
+lst = [1, 2, 3]
+id(lst)         # e.g. 140234567
+lst.append(4)
+id(lst)         # SAME address - same object, modified
+```
+
+## Immutable Types in Detail
+
+### Integers, Floats, Booleans
+
+```python
+a = 42
+b = a      # b points to the SAME object as a
+b = b + 1  # creates a NEW int, b now points to 43
+print(a)   # 42 - unchanged
+print(b)   # 43
+```
+
+### Strings
+
+```python
+s = "hello"
+s[0] = "H"       # TypeError - strings are immutable
+
+# Any string operation returns a NEW string
+s2 = s.upper()   # "HELLO" - new string, s unchanged
+s3 = s + " world"  # new string
+
+# Concatenation in a loop is inefficient - creates a new string each time
+result = ""
+for word in words:
+    result += word   # O(n²) - use "".join(words) instead
+```
+
+### Tuples
+
+```python
+t = (1, 2, 3)
+t[0] = 99    # TypeError - tuples are immutable
+
+# But a tuple CAN contain mutable objects
+t = ([1, 2], [3, 4])
+t[0].append(99)   # works! - modifying the list inside the tuple
+print(t)          # ([1, 2, 99], [3, 4]) - tuple unchanged, list changed
+t[0] = []         # TypeError - can't reassign the tuple element
+```
+
+## Mutable Types in Detail
+
+### Lists
+
+```python
+a = [1, 2, 3]
+b = a          # alias - both point to same list
+
+b.append(4)
+print(a)       # [1, 2, 3, 4] - a sees the change too
+
+# To get an independent copy:
+b = a.copy()       # shallow copy
+b = a[:]           # shallow copy
+b = list(a)        # shallow copy
+import copy
+b = copy.deepcopy(a)   # deep copy - fully independent
+```
+
+### Dicts and Sets
+
+```python
+d1 = {"a": 1, "b": 2}
+d2 = d1         # alias
+
+d2["c"] = 3
+print(d1)       # {"a": 1, "b": 2, "c": 3} - d1 also changed
+
+# Copy
+d2 = d1.copy()       # shallow copy
+d2 = dict(d1)        # shallow copy
+import copy
+d2 = copy.deepcopy(d1)   # deep copy
+```
+
+## Why It Matters - Function Arguments
+
+Python passes object references - not copies:
+
+```python
+# Immutable - function cannot change the caller's variable
+def increment(n):
+    n += 1       # creates a new int, local n rebinds
+    return n
+
+x = 10
+increment(x)
+print(x)   # 10 - unchanged
+
+# Mutable - function CAN change the caller's object
+def append_item(lst, item):
+    lst.append(item)   # modifies the same list object
+
+items = [1, 2, 3]
+append_item(items, 4)
+print(items)   # [1, 2, 3, 4] - modified!
+
+# Safe version - work on a copy
+def append_item_safe(lst, item):
+    lst = lst.copy()
+    lst.append(item)
+    return lst
+
+items = [1, 2, 3]
+new_items = append_item_safe(items, 4)
+print(items)      # [1, 2, 3] - unchanged
+print(new_items)  # [1, 2, 3, 4]
+```
+
+## Hashability - Dicts and Sets
+
+Only **immutable (hashable)** objects can be used as dict keys or set members:
+
+```python
+# Hashable - can be dict keys or set members
+d = {1: "one", 3.14: "pi", True: "yes", "str": "s", (1,2): "tuple"}
+s = {1, 2.5, "hello", (3, 4)}
+
+# Unhashable - cannot be dict keys or set members
+d = {[1,2]: "list"}   # TypeError: unhashable type: 'list'
+d = {{}: "dict"}      # TypeError: unhashable type: 'dict'
+
+# Tuples are hashable ONLY if all their elements are hashable
+hash((1, 2, 3))       # works
+hash((1, [2, 3]))     # TypeError - contains a list
+```
+
+## frozenset - Immutable Set
+
+```python
+# frozenset is the immutable, hashable version of set
+fs = frozenset([1, 2, 3])
+fs.add(4)   # AttributeError - frozenset is immutable
+
+# Can be used as a dict key or set member
+d = {frozenset([1,2]): "key"}
+s = {frozenset([1,2]), frozenset([3,4])}
+```
+
+## Common Pitfalls
+
+```python
+# Pitfall 1 - mutable default argument
+def add_item(item, lst=[]):   # WRONG - list shared across calls
+    lst.append(item)
+    return lst
+
+add_item(1)   # [1]
+add_item(2)   # [1, 2] - not [2]!
+
+def add_item(item, lst=None):   # CORRECT
+    if lst is None:
+        lst = []
+    lst.append(item)
+    return lst
+
+# Pitfall 2 - copying a list of lists
+matrix = [[1,2,3], [4,5,6]]
+copy = matrix.copy()     # shallow - inner lists still shared
+copy[0].append(99)
+print(matrix[0])         # [1, 2, 3, 99] - affected!
+
+import copy
+deep = copy.deepcopy(matrix)
+deep[0].append(99)
+print(matrix[0])         # [1, 2, 3] - safe
+
+# Pitfall 3 - tuple with mutable element looks immutable but isn't
+t = ([1,2], [3,4])
+t[0].append(99)          # works - modifies the list inside
+```
+
+## Interview Questions
+
+**Q: What is the difference between mutable and immutable objects in Python?**
+Immutable objects (int, str, tuple, frozenset) cannot be changed after creation - any operation that appears to modify them creates a new object. Mutable objects (list, dict, set) can be changed in place - all variables pointing to the same object see the change.
+
+**Q: Are tuples always immutable?**
+The tuple itself is immutable - you can't add, remove, or replace elements. But if a tuple contains mutable objects (like lists), those inner objects can still be modified. The tuple's references are fixed, but the referenced objects can change.
+
+**Q: Why can't you use a list as a dictionary key?**
+Dictionary keys must be hashable - their hash value must never change. Lists are mutable, so their contents (and thus their hash) could change after being inserted as a key, breaking the dict's internal structure. Only immutable types are hashable by default.
+
+**Q: What is the difference between `copy()` and `deepcopy()`?**
+`copy()` creates a shallow copy - a new container, but inner objects are still shared. Modifying a nested mutable object affects both the original and the copy. `deepcopy()` recursively copies everything - the result is fully independent.
+
+**Q: Why does passing a list to a function allow the function to modify the original?**
+Python passes object references. When you pass a list, the function receives a reference to the same list object - not a copy. Calling `.append()` on it modifies the original. Passing an integer doesn't have this issue because integers are immutable - any "modification" inside the function creates a new local object.
+
+## Summary
+
+- **Immutable**: int, float, bool, str, tuple, frozenset - cannot change after creation
+- **Mutable**: list, dict, set - can change in place; all aliases see the change
+- Immutable objects are **hashable** - can be dict keys and set members
+- Mutable objects are **not hashable** - cannot be dict keys or set members
+- `=` on mutable types creates an **alias**, not a copy - use `.copy()` or `copy.deepcopy()`
+- Function arguments are passed by reference - mutable args can be modified inside functions
+- Mutable defaults in functions are shared across calls - use `None` as default instead
+- Tuple is immutable at the reference level but inner mutable objects can still change

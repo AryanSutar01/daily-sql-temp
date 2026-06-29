@@ -1,0 +1,224 @@
+## The Problem - Assignment Creates Aliases
+
+```python
+original = [1, 2, 3]
+alias = original       # NOT a copy - same object
+
+alias.append(4)
+print(original)   # [1, 2, 3, 4] - original changed too!
+print(alias is original)   # True - same object
+```
+
+## Shallow Copy - New Container, Shared Contents
+
+A shallow copy creates a **new container** but the elements inside still reference the **same objects**.
+
+```python
+import copy
+
+original = [1, 2, 3]
+shallow = copy.copy(original)   # new list, same elements
+
+shallow.append(4)
+print(original)   # [1, 2, 3] - outer list unaffected ✅
+
+# But nested mutable objects are still shared
+nested = [[1, 2], [3, 4], [5, 6]]
+shallow = copy.copy(nested)
+
+shallow[0].append(99)       # modifies the inner list
+print(nested[0])            # [1, 2, 99] - affected! ❌
+print(shallow[0])           # [1, 2, 99] - same object
+print(shallow is nested)    # False - different containers
+print(shallow[0] is nested[0])  # True - same inner list
+```
+
+### Ways to Make a Shallow Copy
+
+```python
+lst = [1, [2, 3], 4]
+
+# All equivalent shallow copies
+import copy
+a = copy.copy(lst)
+b = lst.copy()           # list method
+c = lst[:]               # slice
+d = list(lst)            # constructor
+
+# For dicts
+d = {"a": [1, 2], "b": [3, 4]}
+shallow_d = d.copy()
+shallow_d2 = dict(d)
+shallow_d3 = {**d}       # unpacking
+```
+
+## Deep Copy - Full Independent Duplicate
+
+A deep copy **recursively copies everything** - the new object is completely independent.
+
+```python
+import copy
+
+nested = [[1, 2], [3, 4], [5, 6]]
+deep = copy.deepcopy(nested)
+
+deep[0].append(99)       # modifies only the copy's inner list
+print(nested[0])         # [1, 2] - unaffected ✅
+print(deep[0])           # [1, 2, 99]
+print(deep[0] is nested[0])  # False - different objects
+```
+
+## Visual Comparison
+
+```
+Original:  [  •  ,  •  ,  •  ]
+            |     |     |
+           [1,2] [3,4] [5,6]
+
+Shallow:   [  •  ,  •  ,  •  ]   ← new list
+            |     |     |
+           [1,2] [3,4] [5,6]     ← same inner lists!
+
+Deep:      [  •  ,  •  ,  •  ]   ← new list
+            |     |     |
+           [1,2] [3,4] [5,6]     ← new inner lists!
+```
+
+## Comparing All Three
+
+```python
+import copy
+
+original = [[1, 2], [3, 4]]
+
+alias   = original           # same object
+shallow = copy.copy(original)
+deep    = copy.deepcopy(original)
+
+# Append to outer list
+alias.append([5, 6])
+shallow.append([7, 8])
+deep.append([9, 10])
+
+print(original)  # [[1,2],[3,4],[5,6]] - alias modified it
+# shallow and deep append did NOT affect original ✅
+
+# Modify inner list
+alias[0].append(99)
+print(original[0])   # [1, 2, 99] - alias shares inner list
+
+shallow[0].append(88)
+print(original[0])   # [1, 2, 99, 88] - shallow shares inner list too! ❌
+
+deep[0].append(77)
+print(original[0])   # [1, 2, 99, 88] - deep copy unaffected ✅
+```
+
+## Deep Copy with Custom Objects
+
+```python
+import copy
+
+class Node:
+    def __init__(self, value, children=None):
+        self.value = value
+        self.children = children or []
+
+    def __repr__(self):
+        return f"Node({self.value}, {self.children})"
+
+root = Node(1, [Node(2), Node(3, [Node(4)])])
+
+shallow = copy.copy(root)
+deep    = copy.deepcopy(root)
+
+# Modifying a nested node
+root.children[0].value = 99
+print(shallow.children[0].value)  # 99 - shallow shares nested nodes
+print(deep.children[0].value)     # 2  - deep copy has its own nodes
+```
+
+## Controlling deepcopy with `__deepcopy__`
+
+```python
+import copy
+
+class Config:
+    def __init__(self, settings, db_connection):
+        self.settings = settings
+        self.db_connection = db_connection   # should NOT be deep copied
+
+    def __deepcopy__(self, memo):
+        # Custom deepcopy - copy settings but reuse connection
+        new_obj = Config.__new__(Config)
+        memo[id(self)] = new_obj
+        new_obj.settings = copy.deepcopy(self.settings, memo)
+        new_obj.db_connection = self.db_connection   # reuse, don't copy
+        return new_obj
+```
+
+## When to Use Each
+
+```python
+# Assignment (=) - when you WANT a shared reference
+cache = {}
+result = cache   # intentional alias
+
+# Shallow copy - when:
+# - flat structure (no nested mutables)
+# - you only need the outer container to be independent
+flat = [1, 2, 3, 4, 5]
+backup = flat.copy()   # sufficient - no nesting
+
+# Deep copy - when:
+# - nested mutable objects exist
+# - you need a completely independent duplicate
+config = {"db": {"host": "localhost", "port": 5432}, "debug": True}
+test_config = copy.deepcopy(config)   # safe to modify test_config
+test_config["db"]["host"] = "testdb"
+print(config["db"]["host"])  # "localhost" - unaffected
+```
+
+## Performance Note
+
+```python
+import copy, timeit
+
+data = list(range(1000))
+
+# Shallow is much faster
+t_shallow = timeit.timeit(lambda: copy.copy(data), number=10000)
+t_deep    = timeit.timeit(lambda: copy.deepcopy(data), number=10000)
+
+print(f"Shallow: {t_shallow:.3f}s")
+print(f"Deep:    {t_deep:.3f}s")
+# Deep is typically 10-50x slower for nested structures
+```
+
+## Interview Questions
+
+**Q: What is the difference between shallow copy and deep copy?**
+A shallow copy creates a new container but its elements still reference the same objects as the original. Modifying a nested mutable object affects both. A deep copy recursively duplicates everything - the copy is fully independent. Use shallow for flat structures; deep for nested ones.
+
+**Q: What are the different ways to make a shallow copy of a list?**
+`lst.copy()`, `lst[:]`, `list(lst)`, and `copy.copy(lst)` are all equivalent shallow copies. For dicts: `d.copy()`, `dict(d)`, and `{**d}`.
+
+**Q: When would `copy.copy()` give the wrong result?**
+When the object contains nested mutable objects (list of lists, dict of lists, etc.). The outer container is new but the inner objects are shared - modifying a nested object in the copy also modifies the original. Use `copy.deepcopy()` in this case.
+
+**Q: Is `a = b` a copy?**
+No. `a = b` makes `a` an alias for the same object as `b`. They reference the same memory. Any mutation through either name affects both.
+
+**Q: Can you deepcopy everything?**
+Not always. Objects like file handles, database connections, sockets, and threads cannot be deep copied - they represent system resources. Use `__deepcopy__` to customize how `deepcopy` handles your class and skip uncopyable attributes.
+
+## Summary
+
+- `a = b` - alias; both names point to the same object; mutations affect both
+- **Shallow copy** - new container, shared inner objects; use for flat structures
+  - `lst.copy()`, `lst[:]`, `list(lst)`, `copy.copy(lst)`
+- **Deep copy** - fully independent duplicate; use for nested structures
+  - `copy.deepcopy(obj)`
+- Shallow is fast; deep can be 10-50x slower for complex nested structures
+- Nested mutable objects are the trap - shallow is NOT safe for `[[1,2],[3,4]]`
+- Customize deep copy behaviour with `__deepcopy__` to skip uncopyable attributes

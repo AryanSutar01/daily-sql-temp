@@ -1,0 +1,146 @@
+## union - Stack DataFrames by Position
+
+`union()` combines two DataFrames with the **same number of columns**, matching by **position** (not column name).
+
+```python
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("UnionDemo").getOrCreate()
+
+df1 = spark.createDataFrame([
+    (1, "Alice", "Engineering"),
+    (2, "Bob",   "Marketing"),
+], ["id", "name", "dept"])
+
+df2 = spark.createDataFrame([
+    (3, "Carol", "HR"),
+    (4, "David", "Engineering"),
+], ["id", "name", "dept"])
+
+# Stack df1 and df2 vertically
+result = df1.union(df2)
+result.show()
+# +---+-----+-----------+
+# | id| name|       dept|
+# +---+-----+-----------+
+# |  1|Alice|Engineering|
+# |  2|  Bob|  Marketing|
+# |  3|Carol|         HR|
+# |  4|David|Engineering|
+# +---+-----+-----------+
+```
+
+### union() Matches by Position - Not Name
+
+```python
+# ❌ Dangerous: different column order - union matches by position!
+df_a = spark.createDataFrame([(1, "Alice")], ["id", "name"])
+df_b = spark.createDataFrame([("Bob", 2)],  ["name", "id"])  # swapped!
+
+df_a.union(df_b).show()
+# +---+-----+
+# | id| name|
+# +---+-----+
+# |  1|Alice|
+# |Bob|    2|   ← wrong! "Bob" went into 'id', 2 went into 'name'
+# +---+-----+
+```
+
+## unionByName - Stack by Column Name (Safer)
+
+`unionByName()` matches columns by name - safer when schemas might differ.
+
+```python
+# Safe: unionByName matches by column name regardless of order
+df_a = spark.createDataFrame([(1, "Alice")], ["id", "name"])
+df_b = spark.createDataFrame([("Bob", 2)],  ["name", "id"])  # different order
+
+df_a.unionByName(df_b).show()
+# +---+----+
+# | id|name|
+# +---+----+
+# |  1|Alice|
+# |  2| Bob|   ← correct!
+# +---+----+
+```
+
+### allowMissingColumns (Spark 3.1+)
+
+When DataFrames have different columns, fill missing ones with null:
+
+```python
+df_a = spark.createDataFrame([(1, "Alice", 95000)], ["id", "name", "salary"])
+df_b = spark.createDataFrame([(2, "Bob")],           ["id", "name"])          # no salary
+
+result = df_a.unionByName(df_b, allowMissingColumns=True)
+result.show()
+# +---+-----+------+
+# | id| name|salary|
+# +---+-----+------+
+# |  1|Alice| 95000|
+# |  2|  Bob|  null|   ← null for missing column
+# +---+-----+------+
+```
+
+## Deduplication After Union
+
+`union()` keeps all rows including duplicates. Use `distinct()` to deduplicate:
+
+```python
+df1 = spark.createDataFrame([(1, "Alice"), (2, "Bob")],   ["id", "name"])
+df2 = spark.createDataFrame([(2, "Bob"),   (3, "Carol")], ["id", "name"])
+
+# With duplicates (Bob appears twice)
+df1.union(df2).show()
+# +---+-----+
+# | id| name|
+# +---+-----+
+# |  1|Alice|
+# |  2|  Bob|
+# |  2|  Bob|   ← duplicate
+# |  3|Carol|
+# +---+-----+
+
+# Remove duplicates
+df1.union(df2).distinct().show()
+# +---+-----+
+# | id| name|
+# +---+-----+
+# |  1|Alice|
+# |  2|  Bob|
+# |  3|Carol|
+# +---+-----+
+```
+
+## Unioning Many DataFrames
+
+```python
+from functools import reduce
+from pyspark.sql import DataFrame
+
+# Union a list of DataFrames
+dfs = [df1, df2, df3, df4]
+result = reduce(DataFrame.union, dfs)
+
+# Or use unionByName with reduce
+result = reduce(lambda a, b: a.unionByName(b, allowMissingColumns=True), dfs)
+
+# With a loop
+result = dfs[0]
+for df in dfs[1:]:
+    result = result.unionByName(df, allowMissingColumns=True)
+```
+
+## Summary
+
+| Feature | `union()` | `unionByName()` |
+|---|---|---|
+| Match by | Position | Name |
+| Safe for reordered schemas | ❌ No | ✅ Yes |
+| Missing columns | Error | Optional (allowMissingColumns) |
+| Deduplicate | Use .distinct() | Use .distinct() |
+
+- Use `unionByName()` in production - it's safer
+- Use `allowMissingColumns=True` when DataFrames have different schema subsets
+- Use `distinct()` after union if you want SQL `UNION` semantics (deduplication)
+- `union()` = SQL `UNION ALL`; `union().distinct()` = SQL `UNION`

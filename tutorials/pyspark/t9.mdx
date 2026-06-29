@@ -1,0 +1,235 @@
+## What is Lazy Evaluation?
+
+**Lazy evaluation** means Spark does not execute your transformations immediately when you write them. Instead, it builds up a **logical plan** (a recipe) and only executes it when you call an **action**.
+
+Think of it like writing a recipe vs actually cooking:
+- **Transformations** = writing steps in a recipe (no food made yet)
+- **Action** = deciding to cook (now everything executes)
+
+```python
+# Step 1 - Read data (lazy - nothing read yet, just a plan)
+df = spark.read.parquet("s3://bucket/sales/")
+
+# Step 2 - Filter (lazy - just adds to plan)
+df_2024 = df.filter(df.year == 2024)
+
+# Step 3 - Select columns (lazy - adds to plan)
+df_small = df_2024.select("region", "amount")
+
+# Step 4 - Group and aggregate (lazy - adds to plan)
+df_agg = df_small.groupBy("region").sum("amount")
+
+# All of the above runs NOW - when show() is called
+df_agg.show()  # ← ACTION: triggers execution of everything above
+```
+
+Spark spends zero time reading or processing data until `show()` is called. Only then does it:
+1. Optimize the complete plan
+2. Generate physical execution tasks
+3. Submit tasks to executors
+4. Return results
+
+## The DAG - Directed Acyclic Graph
+
+When you chain transformations, Spark builds a **DAG** - a graph of operations where each node is a transformation and edges represent data flow.
+
+```
+DAG for the example above:
+
+ParquetScan("s3://bucket/sales/")
+        │
+        ▼
+  Filter(year == 2024)
+        │
+        ▼
+  Project(region, amount)
+        │
+        ▼
+  HashAggregate(groupBy=region, sum=amount)
+        │
+        ▼
+  [ACTION: show()]
+```
+
+"Acyclic" means the graph has no cycles - data flows in one direction only.
+
+## Why is Lazy Evaluation Beneficial?
+
+### 1. Query Optimization Before Execution
+
+Because Spark knows the entire plan before executing, it can reorganize operations for efficiency:
+
+```python
+# What you write:
+df = spark.read.parquet("huge_100_column_table.parquet")
+df = df.filter(df.status == "active")
+df = df.filter(df.age > 25)
+df = df.select("id", "name")
+df.count()
+
+# What Spark actually executes (after Catalyst optimization):
+# 1. Combine both filters into one: status == "active" AND age > 25
+# 2. Push filters down to file scan (read only matching rows)
+# 3. Push column selection down to file scan (read only id, name, status, age)
+# 4. Count result
+# → Instead of reading 100 columns and all rows, Spark reads 4 columns + filtered rows only
+```
+
+### 2. Column Pruning - Don't Read What You Don't Need
+
+```python
+# Your table has 50 columns but you only need 2
+df = spark.read.parquet("wide_table.parquet")  # 50 columns
+result = df.select("user_id", "revenue").groupBy("user_id").sum("revenue")
+result.show()
+
+# Catalyst pushes the select() all the way down to the Parquet reader
+# Parquet only reads user_id and revenue columns from disk
+# The other 48 columns are never read - massive I/O savings
+```
+
+### 3. Predicate Pushdown - Filter at the Source
+
+```python
+# Parquet stores min/max statistics per row group
+# Spark uses these to skip row groups that can't match the filter
+df = spark.read.parquet("events.parquet")
+df.filter(df.event_date == "2024-01-15").count()
+
+# Physical execution:
+# 1. Scan Parquet metadata - find row groups where event_date might be 2024-01-15
+# 2. Skip all row groups where max(event_date) < 2024-01-15
+# 3. Read only candidate row groups, apply filter
+# → Could skip 95%+ of the file if data is sorted/clustered by date
+```
+
+### 4. Partition Pruning - Skip Irrelevant Directories
+
+```python
+# Data partitioned on disk by year/month
+# output/year=2024/month=01/part-....parquet
+# output/year=2024/month=02/part-....parquet
+# ...
+
+df = spark.read.parquet("output/")
+df.filter(df.year == 2024).filter(df.month == 3).count()
+
+# Lazy evaluation lets Catalyst push the filter to the directory scan
+# Spark only reads: output/year=2024/month=3/
+# All other year/month directories are completely skipped
+```
+
+### 5. Fault Tolerance - Recompute Only What's Lost
+
+```python
+# Because Spark tracks the full lineage (DAG) of every RDD/DataFrame,
+# if an executor fails mid-execution:
+# → Spark doesn't rerun the whole job
+# → It only recomputes the LOST partitions by replaying their lineage
+
+logs = sc.textFile("hdfs:///logs/*.txt")
+errors = logs.filter(lambda l: "ERROR" in l)
+counts = errors.map(lambda l: (l.split()[0], 1)).reduceByKey(lambda a, b: a + b)
+
+# If partition 5 of 'counts' is lost due to executor crash:
+# Spark recomputes: textFile → filter → map → reduceByKey, but ONLY for partition 5
+# The other partitions are unaffected
+```
+
+## Viewing the Execution Plan
+
+```python
+df = spark.read.parquet("sales.parquet")
+result = df.filter(df.amount > 100).select("region", "amount").groupBy("region").sum("amount")
+
+# Simple physical plan
+result.explain()
+
+# All 4 plans: Parsed → Analyzed → Optimized → Physical
+result.explain(True)
+
+# Output shows:
+# == Parsed Logical Plan ==   ← what you wrote
+# == Analyzed Logical Plan == ← types resolved
+# == Optimized Logical Plan == ← Catalyst rewrote it
+# == Physical Plan ==         ← actual execution strategy
+```
+
+Example output showing filter pushdown:
+```
+== Physical Plan ==
+AdaptiveSparkPlan isFinalPlan=false
++- HashAggregate(keys=[region#12], functions=[sum(amount#34)])
+   +- Exchange hashpartitioning(region#12, 200)
+      +- HashAggregate(keys=[region#12], functions=[partial_sum(amount#34)])
+         +- Project [region#12, amount#34]
+            +- Filter (isnotnull(amount#34) AND (amount#34 > 100))  ← pushed down!
+               +- FileScan parquet [...] PushedFilters: [IsNotNull(amount), GreaterThan(amount,100.0)]
+```
+
+Notice `PushedFilters` - the filter went all the way into the file scan!
+
+## Lazy Evaluation vs Eager Evaluation
+
+```python
+# In pandas (eager) - executes immediately, one step at a time
+import pandas as pd
+df = pd.read_csv("sales.csv")        # reads entire file NOW
+df = df[df.amount > 100]             # filters NOW (already read all data)
+df = df[["region", "amount"]]        # selects NOW
+result = df.groupby("region").sum()  # aggregates NOW
+
+# In PySpark (lazy) - builds plan, executes all at once
+df = spark.read.csv("sales.csv")     # builds plan (nothing read)
+df = df.filter(df.amount > 100)      # adds to plan
+df = df.select("region", "amount")  # adds to plan
+result = df.groupBy("region").sum()  # adds to plan
+result.show()                        # NOW: optimized plan → single execution
+```
+
+## Cache - "Memoize" a DataFrame Mid-Pipeline
+
+If you need to use an intermediate result multiple times, **cache** it to avoid recomputing:
+
+```python
+df = spark.read.parquet("large_file.parquet")
+df_filtered = df.filter(df.year == 2024).cache()  # mark for caching
+
+# First action - triggers computation AND caches in memory
+count = df_filtered.count()  # computed + stored in memory
+
+# Second action - uses cached result, no recomputation
+sample = df_filtered.take(10)  # instant - served from cache
+
+# Third action - still from cache
+df_filtered.show()
+
+# Release cache when done
+df_filtered.unpersist()
+```
+
+Without `.cache()`, each action would re-execute the full lineage from scratch.
+
+## Common Interview Questions
+
+**Q: What is lazy evaluation in Spark?**
+Transformations are not executed immediately - Spark builds a DAG of operations and executes them only when an action is called. This allows the Catalyst optimizer to see the full computation and generate an optimal physical plan.
+
+**Q: What is the advantage of lazy evaluation?**
+Four main benefits: (1) Query optimization - Catalyst can push filters/columns to the source. (2) Column pruning - only necessary columns are read from disk. (3) Predicate pushdown - filters applied at the file level skip entire row groups. (4) Fault tolerance - DAG lineage enables recomputation of only lost partitions.
+
+**Q: When does Spark actually execute my code?**
+When you call an action: `show()`, `count()`, `collect()`, `take()`, `write.*`, `first()`, `save*()`.
+
+**Q: If I call count() twice, does Spark run the whole job twice?**
+Yes - unless you've cached the DataFrame. Each action triggers a full re-execution of the lineage. Use `.cache()` to prevent this.
+
+## Summary
+
+- **Lazy evaluation** defers all transformation execution until an action is called
+- Spark builds a **DAG** of transformations - the execution plan
+- The **Catalyst optimizer** rewrites the plan for efficiency: combining filters, pushing predicates, pruning columns
+- **Predicate pushdown** filters data at the file reader level - skip scanning irrelevant rows
+- **Partition pruning** skips entire directories when reading partitioned data
+- Use `.cache()` to persist intermediate results and avoid recomputation
+- Use `.explain()` to see how Catalyst transformed your plan before execution

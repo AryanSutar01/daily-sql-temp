@@ -1,0 +1,223 @@
+## What Are Window Functions?
+
+Window functions compute a value for each row **based on a group of related rows** (the "window") - without collapsing those rows into one like `groupBy` does.
+
+```
+groupBy + agg:                     Window function:
+  dept  | avg_salary                 emp | dept | salary | rank_in_dept
+  ------+-----------                 ----+------+--------+-------------
+  Eng   |   100000     → loses rows  Alice| Eng  | 110000 |     1
+  Mkt   |    75000                   Carol| Eng  | 105000 |     2
+                                     Bob  | Eng  |  95000 |     3
+                                     Dave | Mkt  |  80000 |     1
+                                     Eve  | Mkt  |  70000 |     2
+```
+
+## Setup
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, rank, dense_rank, row_number
+from pyspark.sql.window import Window
+
+spark = SparkSession.builder.appName("WindowDemo").getOrCreate()
+
+df = spark.createDataFrame([
+    ("Alice", "Engineering", 110000),
+    ("Bob",   "Engineering",  95000),
+    ("Carol", "Engineering", 105000),
+    ("Dave",  "Marketing",    80000),
+    ("Eve",   "Marketing",    70000),
+    ("Frank", "Marketing",    80000),   # same salary as Dave
+    ("Grace", "HR",           65000),
+], ["name", "dept", "salary"])
+```
+
+## Defining a Window Spec
+
+A `WindowSpec` defines:
+1. **partitionBy** - which group each row belongs to (like GROUP BY)
+2. **orderBy** - how rows are ordered within each partition
+
+```python
+from pyspark.sql.window import Window
+
+# Partition by dept, order by salary descending within each dept
+window_spec = Window.partitionBy("dept").orderBy(col("salary").desc())
+```
+
+## row_number - Unique Sequential Number
+
+Assigns a unique integer to each row within the partition, starting at 1. No ties - every row gets a distinct number.
+
+```python
+df.withColumn("row_num",
+    row_number().over(window_spec)
+).show()
+# +-----+-----------+------+-------+
+# | name|       dept|salary|row_num|
+# +-----+-----------+------+-------+
+# |Alice|Engineering|110000|      1|
+# |Carol|Engineering|105000|      2|
+# |  Bob|Engineering| 95000|      3|
+# | Dave|  Marketing| 80000|      1|   ← Dave and Frank tie at 80000
+# |Frank|  Marketing| 80000|      2|   ← row_number breaks ties arbitrarily
+# |  Eve|  Marketing| 70000|      3|
+# |Grace|         HR| 65000|      1|
+# +-----+-----------+------+-------+
+```
+
+**Use case:** Pick exactly one row per group - e.g., deduplication, latest record per user.
+
+## rank - Ranking with Gaps
+
+Assigns the same rank to tied rows, but **skips ranks** after a tie.
+
+```python
+df.withColumn("rnk",
+    rank().over(window_spec)
+).show()
+# +-----+-----------+------+---+
+# | name|       dept|salary|rnk|
+# +-----+-----------+------+---+
+# |Alice|Engineering|110000|  1|
+# |Carol|Engineering|105000|  2|
+# |  Bob|Engineering| 95000|  3|
+# | Dave|  Marketing| 80000|  1|   ← Dave and Frank both rank 1
+# |Frank|  Marketing| 80000|  1|   ← same rank
+# |  Eve|  Marketing| 70000|  3|   ← rank 2 is SKIPPED
+# |Grace|         HR| 65000|  1|
+# +-----+-----------+------+---+
+```
+
+**Use case:** Olympic-style ranking - 2nd place doesn't exist when two people tie for 1st.
+
+## dense_rank - Ranking without Gaps
+
+Assigns the same rank to tied rows, but **does not skip ranks** after a tie.
+
+```python
+df.withColumn("dense_rnk",
+    dense_rank().over(window_spec)
+).show()
+# +-----+-----------+------+---------+
+# | name|       dept|salary|dense_rnk|
+# +-----+-----------+------+---------+
+# |Alice|Engineering|110000|        1|
+# |Carol|Engineering|105000|        2|
+# |  Bob|Engineering| 95000|        3|
+# | Dave|  Marketing| 80000|        1|   ← Dave and Frank both rank 1
+# |Frank|  Marketing| 80000|        1|   ← same rank
+# |  Eve|  Marketing| 70000|        2|   ← rank 2 (no gap!)
+# |Grace|         HR| 65000|        1|
+# +-​----+-----------+------+---------+
+```
+
+**Use case:** Leaderboards, grades - where you want "2nd place" even after a tie for 1st.
+
+## Side-by-Side Comparison
+
+```python
+from pyspark.sql.functions import row_number, rank, dense_rank
+
+df.withColumn("row_num",    row_number().over(window_spec)) \
+  .withColumn("rnk",        rank().over(window_spec)) \
+  .withColumn("dense_rnk",  dense_rank().over(window_spec)) \
+  .select("name", "dept", "salary", "row_num", "rnk", "dense_rnk") \
+  .show()
+
+# Marketing dept (Frank and Dave both 80000):
+# +-----+----------+------+-------+---+---------+
+# | name|      dept|salary|row_num|rnk|dense_rnk|
+# +-----+----------+------+-------+---+---------+
+# | Dave| Marketing| 80000|      1|  1|        1|
+# |Frank| Marketing| 80000|      2|  1|        1|  ← row_num differs, rank same
+# |  Eve| Marketing| 70000|      3|  3|        2|  ← rank skips to 3, dense stays 2
+# +-----+----------+------+-------+---+---------+
+```
+
+| Function | Ties get same rank? | Gaps after tie? | Unique per row? |
+|---|---|---|---|
+| `row_number` | ❌ No | N/A | ✅ Always unique |
+| `rank` | ✅ Yes | ✅ Yes | ❌ |
+| `dense_rank` | ✅ Yes | ❌ No | ❌ |
+
+## Real-World Pattern: Top-N Per Group
+
+The most common window function interview question:
+
+```python
+# Get the top 2 highest-paid employees per department
+window_spec = Window.partitionBy("dept").orderBy(col("salary").desc())
+
+df.withColumn("rnk", dense_rank().over(window_spec)) \
+  .filter(col("rnk") <= 2) \
+  .select("name", "dept", "salary", "rnk") \
+  .show()
+# +-----+-----------+------+---+
+# | name|       dept|salary|rnk|
+# +-----+-----------+------+---+
+# |Alice|Engineering|110000|  1|
+# |Carol|Engineering|105000|  2|
+# | Dave|  Marketing| 80000|  1|
+# |Frank|  Marketing| 80000|  1|   ← both rank 1 (tie), both included
+# |Grace|         HR| 65000|  1|
+# +-----+-----------+------+---+
+
+# If you want exactly 2 rows per dept (no ties considered), use row_number
+df.withColumn("rn", row_number().over(window_spec)) \
+  .filter(col("rn") <= 2) \
+  .show()
+```
+
+## Pattern: Latest Record Per User (Deduplication)
+
+```python
+events = spark.createDataFrame([
+    (1, "Alice", "2024-01-01", "login"),
+    (2, "Alice", "2024-01-03", "purchase"),
+    (3, "Alice", "2024-01-05", "logout"),
+    (4, "Bob",   "2024-01-02", "login"),
+    (5, "Bob",   "2024-01-04", "purchase"),
+], ["event_id", "user", "event_date", "action"])
+
+# Keep only the latest event per user
+latest_window = Window.partitionBy("user").orderBy(col("event_date").desc())
+
+latest_events = events \
+    .withColumn("rn", row_number().over(latest_window)) \
+    .filter(col("rn") == 1) \
+    .drop("rn")
+
+latest_events.show()
+# +--------+-----+----------+--------+
+# |event_id| user|event_date|  action|
+# +--------+-----+----------+--------+
+# |       3|Alice|2024-01-05|  logout|
+# |       5|  Bob|2024-01-04|purchase|
+# +--------+-----+----------+--------+
+```
+
+## SQL Equivalent
+
+```python
+df.createOrReplaceTempView("employees")
+
+spark.sql("""
+    SELECT name, dept, salary,
+           ROW_NUMBER() OVER (PARTITION BY dept ORDER BY salary DESC) AS row_num,
+           RANK()       OVER (PARTITION BY dept ORDER BY salary DESC) AS rnk,
+           DENSE_RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS dense_rnk
+    FROM employees
+""").show()
+```
+
+## Summary
+
+- Window functions operate **over a group of rows** without reducing them - unlike `groupBy`
+- Define a `WindowSpec` with `partitionBy()` and `orderBy()` using `Window`
+- Apply window functions with `.over(window_spec)`
+- `row_number()` - always unique, breaks ties arbitrarily
+- `rank()` - ties share rank, gaps appear after ties (1, 1, 3)
+- `dense_rank()` - ties share rank, no gaps (1, 1, 2)
+- **Top-N per group** pattern: add rank column → filter `rnk <= N` - one of the most common interview problems

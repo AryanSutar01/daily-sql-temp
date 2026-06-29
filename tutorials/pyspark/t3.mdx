@@ -1,0 +1,206 @@
+## The Entry Points to Spark
+
+Before you can read data, run queries, or do anything in PySpark, you need an **entry point** - an object that connects your code to the Spark runtime.
+
+| Object | Introduced | Purpose |
+|---|---|---|
+| `SparkContext` | Spark 1.x | Low-level entry point; works with RDDs |
+| `SparkSession` | Spark 2.0+ | Unified entry point; wraps SparkContext; works with DataFrames, SQL, Streaming |
+
+In modern PySpark (Spark 2.0+), you almost always start with `SparkSession`. It contains a `SparkContext` inside it.
+
+## SparkSession - The Modern Way
+
+```python
+from pyspark.sql import SparkSession
+
+# Minimal - works for local development
+spark = SparkSession.builder \
+    .appName("MyPySparkApp") \
+    .getOrCreate()
+
+# Full configuration - production-style
+spark = SparkSession.builder \
+    .appName("SalesAnalysis") \
+    .master("yarn") \
+    .config("spark.executor.memory", "4g") \
+    .config("spark.executor.cores", "4") \
+    .config("spark.executor.instances", "10") \
+    .config("spark.sql.shuffle.partitions", "200") \
+    .enableHiveSupport() \         # if you need Hive metastore
+    .getOrCreate()
+```
+
+### What `.getOrCreate()` does
+
+- If a SparkSession already exists in the JVM, **return it** (prevents creating duplicates)
+- If none exists, **create a new one** with the given config
+
+This is why you'll often see this at the top of every PySpark script - it's safe to call multiple times.
+
+## SparkSession on Databricks / Notebooks
+
+On managed platforms like Databricks, a SparkSession named `spark` is **already created for you**:
+
+```python
+# On Databricks - spark is pre-built, just use it:
+df = spark.read.csv("/data/sales.csv", header=True)
+df.show()
+
+# No need to create one - but you CAN check it exists:
+print(spark)
+# <pyspark.sql.session.SparkSession object at 0x...>
+```
+
+## Local Mode - For Development & Testing
+
+```python
+# Run Spark on your laptop - uses all local cores
+spark = SparkSession.builder \
+    .appName("LocalTest") \
+    .master("local[*]") \   # [*] = use all available CPU cores
+    .getOrCreate()
+
+# Use a specific number of cores
+spark = SparkSession.builder \
+    .master("local[4]") \   # use exactly 4 cores
+    .getOrCreate()
+
+# Single-threaded (slowest, easiest to debug)
+spark = SparkSession.builder \
+    .master("local[1]") \
+    .getOrCreate()
+```
+
+## Accessing SparkContext from SparkSession
+
+```python
+spark = SparkSession.builder.appName("Demo").getOrCreate()
+
+# Access the underlying SparkContext
+sc = spark.sparkContext
+
+print(sc.version)          # "3.5.0"
+print(sc.master)           # "local[*]" or "yarn" etc.
+print(sc.appName)          # "Demo"
+print(sc.defaultParallelism)  # number of default partitions
+
+# Use SparkContext for RDD operations
+rdd = sc.parallelize([1, 2, 3, 4, 5])
+print(rdd.collect())  # [1, 2, 3, 4, 5]
+```
+
+## SparkContext - The Old-School Way
+
+Before Spark 2.0, you'd create a `SparkContext` and `SQLContext` separately:
+
+```python
+# ❌ Old Spark 1.x style - don't write this today
+from pyspark import SparkConf, SparkContext
+from pyspark.sql import SQLContext
+
+conf = SparkConf().setAppName("OldApp").setMaster("local")
+sc = SparkContext(conf=conf)
+sqlContext = SQLContext(sc)
+
+# ✅ Modern equivalent - SparkSession does all of this
+spark = SparkSession.builder.appName("ModernApp").getOrCreate()
+sc = spark.sparkContext
+```
+
+> You'll still encounter SparkContext in code that uses RDDs directly (e.g., reading text files, creating RDDs from Python lists).
+
+## SparkSession Configuration Options
+
+```python
+spark = SparkSession.builder \
+    .appName("ConfigDemo") \
+    .config("spark.sql.shuffle.partitions", "100")    # default 200; reduce for small data
+    .config("spark.default.parallelism", "100")       # parallelism for RDD operations
+    .config("spark.sql.autoBroadcastJoinThreshold", "10m")  # auto-broadcast tables < 10MB
+    .config("spark.memory.fraction", "0.8")           # fraction of heap for Spark memory
+    .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")  # faster serialization
+    .getOrCreate()
+
+# You can also change configs after session creation
+spark.conf.set("spark.sql.shuffle.partitions", "50")
+
+# Read a config
+print(spark.conf.get("spark.sql.shuffle.partitions"))  # "50"
+```
+
+## Useful SparkSession Properties and Methods
+
+```python
+spark = SparkSession.builder.appName("Demo").getOrCreate()
+
+# Version info
+print(spark.version)           # "3.5.0"
+
+# Access catalog (tables, databases, functions)
+spark.catalog.listDatabases()
+spark.catalog.listTables()
+spark.catalog.listColumns("my_table")
+
+# Run raw SQL
+spark.sql("SELECT 1 + 1").show()
+
+# Create DataFrame from Python list
+df = spark.createDataFrame(
+    [(1, "Alice", 30), (2, "Bob", 25)],
+    schema=["id", "name", "age"]
+)
+df.show()
+
+# Read from file
+df = spark.read.csv("data.csv", header=True, inferSchema=True)
+
+# Access the underlying SparkContext
+sc = spark.sparkContext
+```
+
+## Stopping the Session
+
+```python
+# Always stop the session when done - especially in scripts
+spark.stop()
+
+# After stopping, you need to create a new session to continue
+```
+
+In notebooks and Databricks, you typically don't call `spark.stop()` - the platform manages the lifecycle.
+
+## Multiple Sessions (Advanced)
+
+In Spark 3.0+, you can create multiple isolated SparkSessions sharing the same SparkContext:
+
+```python
+spark1 = SparkSession.builder.appName("App1").getOrCreate()
+
+# Create a new session with different config, but same underlying SparkContext
+spark2 = spark1.newSession()
+spark2.conf.set("spark.sql.shuffle.partitions", "50")
+
+# spark1 and spark2 share the same SparkContext but have isolated SQL configs
+print(spark1.sparkContext is spark2.sparkContext)  # True
+```
+
+## Common Interview Questions
+
+**Q: What is the difference between SparkContext and SparkSession?**
+`SparkContext` is the original low-level entry point for RDD-based operations. `SparkSession` is the unified modern entry point introduced in Spark 2.0 - it wraps SparkContext and also provides DataFrame, SQL, and streaming APIs. Use SparkSession in all modern code.
+
+**Q: Can you have multiple SparkContexts in one application?**
+No. Only one SparkContext can be active per JVM at a time. Trying to create a second one throws an error unless you stop the first. SparkSession's `.getOrCreate()` handles this safely.
+
+**Q: What is `local[*]` in the master URL?**
+It means run Spark locally (on your machine) using all available CPU cores. `local[4]` uses 4 cores, `local[1]` uses 1 core. This mode is for development and testing only - no actual cluster involved.
+
+## Summary
+
+- `SparkSession` is the **unified entry point** for all modern PySpark - DataFrames, SQL, streaming
+- Use `.builder.appName(...).getOrCreate()` to create or retrieve a session
+- `SparkContext` is accessible via `spark.sparkContext` - needed for RDD operations
+- On Databricks and notebooks, `spark` is pre-created for you
+- Use `local[*]` master for local development; `yarn` or `k8s` for cluster deployments
+- Call `spark.stop()` at the end of batch scripts; skip it in notebooks

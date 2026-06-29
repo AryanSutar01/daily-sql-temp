@@ -1,0 +1,280 @@
+## Setup
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, lit
+
+spark = SparkSession.builder.appName("Demo").getOrCreate()
+
+df = spark.createDataFrame([
+    (1, "Alice",  "Engineering", 95000, "IN"),
+    (2, "Bob",    "Marketing",   72000, "US"),
+    (3, "Carol",  "Engineering", 110000, "US"),
+    (4, "David",  "HR",          60000, "IN"),
+    (5, "Eve",    "Engineering", 105000, "GB"),
+    (6, "Frank",  "Marketing",   None,  "US"),
+], ["id", "name", "dept", "salary", "country"])
+
+df.show()
+# +---+-----+-----------+------+-------+
+# | id| name|       dept|salary|country|
+# +---+-----+-----------+------+-------+
+# |  1|Alice|Engineering| 95000|     IN|
+# |  2|  Bob|  Marketing| 72000|     US|
+# |  3|Carol|Engineering|110000|     US|
+# |  4|David|         HR| 60000|     IN|
+# |  5|  Eve|Engineering|105000|     GB|
+# |  6|Frank|  Marketing|  null|     US|
+# +---+-----+-----------+------+-------+
+```
+
+## select - Choose Columns
+
+`select()` returns a new DataFrame with only the specified columns.
+
+```python
+# Select by column name (string)
+df.select("name", "dept").show()
+
+# Select using col() - preferred in expressions
+df.select(col("name"), col("salary")).show()
+
+# Mix of styles
+df.select("name", col("salary"), "country").show()
+
+# Select all columns
+df.select("*").show()
+
+# Rename during select using alias()
+df.select(
+    col("name").alias("employee_name"),
+    col("salary").alias("annual_salary")
+).show()
+
+# Compute new column during select
+df.select(
+    "name",
+    "salary",
+    (col("salary") * 1.10).alias("salary_with_raise")
+).show()
+
+# Select column by index position
+df.select(df.columns[0], df.columns[1]).show()
+
+# Select using list of column names
+cols = ["name", "dept", "salary"]
+df.select(cols).show()
+# Or unpack the list
+df.select(*cols).show()
+```
+
+### selectExpr - SQL Expressions in select
+
+```python
+# Use SQL expression strings inside select
+df.selectExpr(
+    "name",
+    "salary",
+    "salary * 1.10 as salary_raised",
+    "upper(name) as name_upper",
+    "salary > 90000 as is_senior"
+).show()
+
+# Handy for quick transformations without importing functions
+df.selectExpr("*", "salary / 12 as monthly_salary").show()
+```
+
+## filter / where - Filter Rows
+
+`filter()` and `where()` are **identical** - they're aliases of each other. Both keep only rows matching the condition.
+
+```python
+# Style 1: column expression with col()
+df.filter(col("salary") > 90000).show()
+
+# Style 2: column attribute on df
+df.filter(df.salary > 90000).show()
+
+# Style 3: SQL string (where style preferred here)
+df.where("salary > 90000").show()
+
+# Style 4: using where() - same as filter()
+df.where(col("dept") == "Engineering").show()
+```
+
+### Comparison Operators
+
+```python
+df.filter(col("salary") == 95000)   # equal
+df.filter(col("salary") != 95000)   # not equal
+df.filter(col("salary") > 90000)    # greater than
+df.filter(col("salary") >= 90000)   # greater or equal
+df.filter(col("salary") < 75000)    # less than
+df.filter(col("salary") <= 75000)   # less or equal
+```
+
+### Combining Conditions
+
+```python
+from pyspark.sql.functions import col
+
+# AND - use & (not Python 'and')
+df.filter((col("dept") == "Engineering") & (col("salary") > 100000)).show()
+
+# OR - use | (not Python 'or')
+df.filter((col("country") == "IN") | (col("country") == "US")).show()
+
+# NOT - use ~ (not Python 'not')
+df.filter(~(col("dept") == "HR")).show()
+
+# ❌ Wrong - Python 'and'/'or' don't work on Column objects!
+# df.filter(col("dept") == "Engineering" and col("salary") > 100000)  # ERROR
+
+# Multiple chained filters (equivalent to AND)
+df.filter(col("dept") == "Engineering") \
+  .filter(col("salary") > 100000) \
+  .show()
+```
+
+### Filtering on Strings
+
+```python
+# Exact match
+df.filter(col("dept") == "Engineering").show()
+
+# IN - match any value in list
+df.filter(col("country").isin("IN", "US")).show()
+
+# NOT IN
+df.filter(~col("country").isin("IN", "US")).show()
+
+# LIKE - SQL wildcard pattern
+df.filter(col("name").like("A%")).show()     # starts with A
+df.filter(col("name").like("%e%")).show()    # contains e
+df.filter(col("name").rlike("^[A-E]")).show()  # regex: starts with A-E
+
+# String contains, startswith, endswith
+df.filter(col("name").contains("li")).show()
+df.filter(col("name").startswith("Al")).show()
+df.filter(col("name").endswith("ce")).show()
+```
+
+### Filtering on Nulls
+
+```python
+# Keep rows where salary IS NULL
+df.filter(col("salary").isNull()).show()
+
+# Keep rows where salary IS NOT NULL
+df.filter(col("salary").isNotNull()).show()
+
+# In SQL string
+df.where("salary IS NULL").show()
+df.where("salary IS NOT NULL").show()
+```
+
+### between - Range Filter
+
+```python
+# salary between 70000 and 100000 (inclusive)
+df.filter(col("salary").between(70000, 100000)).show()
+
+# Equivalent to:
+df.filter((col("salary") >= 70000) & (col("salary") <= 100000)).show()
+```
+
+## drop - Remove Columns
+
+`drop()` returns a new DataFrame with specified columns removed.
+
+```python
+# Drop one column
+df.drop("id").show()
+
+# Drop multiple columns
+df.drop("id", "country").show()
+
+# Drop from a list
+drop_cols = ["id", "country"]
+df.drop(*drop_cols).show()
+
+# Safe to drop non-existent columns (no error)
+df.drop("nonexistent_column").show()
+
+# Alternative: keep columns via select (clearer when keeping is simpler)
+keep_cols = [c for c in df.columns if c not in ["id", "country"]]
+df.select(keep_cols).show()
+```
+
+### Drop vs Select
+
+```python
+# When to use drop:
+# - You know which columns to REMOVE (small list of drops)
+df.drop("internal_id", "temp_flag").show()
+
+# When to use select:
+# - You know which columns to KEEP (small list of keeps)
+df.select("name", "dept", "salary").show()
+```
+
+## Practical Patterns
+
+### Chain Everything
+
+```python
+result = df \
+    .filter(col("dept") == "Engineering") \
+    .filter(col("salary").isNotNull()) \
+    .select("name", "salary", "country") \
+    .filter(col("salary") > 95000)
+
+result.show()
+# +-----+------+-------+
+# | name|salary|country|
+# +-----+------+-------+
+# |Carol|110000|     US|
+# |  Eve|105000|     GB|
+# +-----+------+-------+
+```
+
+### Filter with SQL String - Readable for Complex Conditions
+
+```python
+df.filter("""
+    dept = 'Engineering'
+    AND salary > 90000
+    AND country IN ('US', 'GB')
+""").show()
+```
+
+### Dynamic Filter Based on List
+
+```python
+target_depts = ["Engineering", "Marketing"]
+df.filter(col("dept").isin(target_depts)).show()
+
+# Dynamic column selection with exclusion
+exclude = ["id", "country"]
+df.select([c for c in df.columns if c not in exclude]).show()
+```
+
+## Common Interview Questions
+
+**Q: What is the difference between filter() and where()?**
+Nothing - they are identical methods, both aliases for the same operation. Use whichever reads more naturally for your context. `where()` reads well with SQL string conditions; `filter()` reads well with column expressions.
+
+**Q: What is the difference between select() and withColumn()?**
+`select()` creates a new DataFrame with only the specified columns (replacing the schema). `withColumn()` adds or replaces a single column while keeping all others. Use `select()` when restructuring columns, `withColumn()` when adding/modifying one column.
+
+**Q: Can you use Python `and`/`or` in Spark filter conditions?**
+No. Spark Column objects override `&`, `|`, `~` operators. Python's `and`/`or` don't work correctly on Column objects. Always use `&` for AND, `|` for OR, `~` for NOT - and wrap each condition in parentheses.
+
+## Summary
+
+- `select()` - choose or rename columns; use `selectExpr()` for SQL expressions
+- `filter()` / `where()` - filter rows; they are identical
+- Use `&`, `|`, `~` for AND/OR/NOT - not Python `and`/`or`/`not`
+- `.isin()`, `.like()`, `.between()`, `.isNull()`, `.isNotNull()` for common patterns
+- `drop()` - remove specific columns; useful when removing few columns from a wide schema
+- Chain operations fluently - Spark optimizes the full chain before executing

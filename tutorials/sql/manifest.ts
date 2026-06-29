@@ -1,12 +1,6 @@
-export interface Tutorial {
-  id: string
-  filename: string
-  title: string
-  description: string
-  order: number
-  category: 'beginner' | 'intermediate' | 'advance' | 'designAndPerformance' | 'bonus'
-  tags: ('concept' | 'practice' | 'interview')[]
-}
+import { Tutorial } from "../shared"
+
+export type { Tutorial }
 
 export const tutorials = ([
   

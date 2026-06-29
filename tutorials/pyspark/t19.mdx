@@ -1,0 +1,213 @@
+## What is when/otherwise?
+
+`when(condition, value).otherwise(value)` is PySpark's equivalent of SQL's `CASE WHEN ... THEN ... ELSE ... END`. It lets you create conditional column values inline without UDFs.
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, when, lit
+
+spark = SparkSession.builder.appName("WhenDemo").getOrCreate()
+
+df = spark.createDataFrame([
+    (1, "Alice",  95000, "Engineering"),
+    (2, "Bob",    72000, "Marketing"),
+    (3, "Carol",  110000,"Engineering"),
+    (4, "David",  60000, "HR"),
+    (5, "Eve",    105000,"Engineering"),
+    (6, "Frank",  None,  "Marketing"),
+], ["id", "name", "salary", "dept"])
+```
+
+## Basic Syntax
+
+```python
+# SQL equivalent:
+# CASE WHEN salary > 100000 THEN 'Senior' ELSE 'Junior' END
+
+df.withColumn("level",
+    when(col("salary") > 100000, "Senior")
+    .otherwise("Junior")
+).show()
+
+# +---+-----+------+-----------+------+
+# | id| name|salary|       dept| level|
+# +---+-----+------+-----------+------+
+# |  1|Alice| 95000|Engineering|Junior|
+# |  3|Carol|110000|Engineering|Senior|
+# |  5|  Eve|105000|Engineering|Senior|
+# ...
+```
+
+## Multiple Conditions - Chaining when()
+
+```python
+# SQL equivalent:
+# CASE
+#   WHEN salary > 100000 THEN 'High'
+#   WHEN salary > 80000  THEN 'Mid'
+#   WHEN salary > 60000  THEN 'Low'
+#   ELSE 'Entry'
+# END
+
+df.withColumn("salary_band",
+    when(col("salary") > 100000, "High")
+    .when(col("salary") > 80000,  "Mid")
+    .when(col("salary") > 60000,  "Low")
+    .otherwise("Entry")
+).show()
+```
+
+Conditions are evaluated **top to bottom** - first match wins, just like SQL CASE WHEN.
+
+## without otherwise - Returns null for Non-Matches
+
+```python
+# If no otherwise(), non-matching rows get null
+df.withColumn("high_earner_flag",
+    when(col("salary") > 100000, "Yes")
+).show()
+# Rows with salary <= 100000 → null for high_earner_flag
+
+# Equivalent to:
+# CASE WHEN salary > 100000 THEN 'Yes' END  (no ELSE → returns NULL)
+```
+
+## Conditions on Multiple Columns
+
+```python
+# Combine conditions with & (AND), | (OR), ~ (NOT)
+df.withColumn("category",
+    when((col("dept") == "Engineering") & (col("salary") > 100000), "Senior Engineer")
+    .when((col("dept") == "Engineering") & (col("salary") <= 100000), "Junior Engineer")
+    .when(col("dept") == "Marketing", "Marketer")
+    .otherwise("Other")
+).show()
+```
+
+## Using when Inside select
+
+```python
+# Use in select, not just withColumn
+df.select(
+    "name",
+    "salary",
+    when(col("salary") > 90000, "Senior").otherwise("Junior").alias("level"),
+    when(col("dept") == "Engineering", 1).otherwise(0).alias("is_engineer")
+).show()
+```
+
+## Numeric Results - Calculations in when
+
+```python
+# Return computed values, not just strings
+df.withColumn("bonus",
+    when(col("dept") == "Engineering", col("salary") * 0.20)
+    .when(col("dept") == "Marketing",  col("salary") * 0.15)
+    .otherwise(col("salary") * 0.10)
+).show()
+
+# Conditional rounding
+df.withColumn("display_salary",
+    when(col("salary") > 100000, col("salary") / 1000)
+    .otherwise(col("salary"))
+)
+```
+
+## Handling Nulls in when
+
+```python
+# Check for null inside when
+df.withColumn("salary_status",
+    when(col("salary").isNull(), "Unknown")
+    .when(col("salary") > 100000, "High")
+    .when(col("salary") > 70000,  "Medium")
+    .otherwise("Low")
+).show()
+# +---+-----+------+-----------+-------------+
+# | id| name|salary|       dept|salary_status|
+# +---+-----+------+-----------+-------------+
+# |  6|Frank|  null|  Marketing|      Unknown|
+# ...
+```
+
+## Nested when - Equivalent to Nested CASE WHEN
+
+```python
+df.withColumn("tag",
+    when(col("dept") == "Engineering",
+        when(col("salary") > 100000, "Senior Eng")
+        .otherwise("Junior Eng")
+    ).when(col("dept") == "Marketing",
+        when(col("salary") > 75000, "Senior Mkt")
+        .otherwise("Junior Mkt")
+    ).otherwise("Other")
+).show()
+```
+
+## when with expr - SQL String Inside
+
+```python
+from pyspark.sql.functions import expr
+
+# Use expr() to write the whole CASE as a SQL string
+df.withColumn("level",
+    expr("CASE WHEN salary > 100000 THEN 'High' WHEN salary > 80000 THEN 'Mid' ELSE 'Low' END")
+).show()
+
+# Or use selectExpr
+df.selectExpr(
+    "name",
+    "salary",
+    "CASE WHEN salary > 100000 THEN 'High' ELSE 'Low' END as salary_band"
+).show()
+```
+
+## Practical Pattern - Flag Multiple Conditions at Once
+
+```python
+from pyspark.sql.functions import when, col
+
+# Add multiple flag columns at once using select
+df.select(
+    "*",
+    when(col("salary") > 100000, 1).otherwise(0).alias("is_high_earner"),
+    when(col("dept") == "Engineering", 1).otherwise(0).alias("is_engineer"),
+    when(col("salary").isNull(), 1).otherwise(0).alias("has_null_salary"),
+    when(
+        (col("dept") == "Engineering") & (col("salary") > 100000), "⭐"
+    ).otherwise("").alias("star"),
+).show()
+```
+
+## when vs filter - Which to Use?
+
+```python
+# filter() - removes rows that don't match
+df.filter(col("salary") > 100000)          # drops rows
+
+# when() - keeps all rows, adds a conditional column
+df.withColumn("is_high", when(col("salary") > 100000, True).otherwise(False))  # keeps all rows
+
+# Use filter when you want to reduce rows
+# Use when when you want to label/categorize rows (keep all)
+```
+
+## Common Interview Questions
+
+**Q: What is the difference between `when` and `filter`?**
+`filter()` removes rows that don't match a condition. `when()` is used inside column expressions to produce conditional values - all rows are kept, just with different column values based on the condition.
+
+**Q: What happens if no `otherwise()` is provided?**
+Rows that don't match any `when()` condition receive `null` for that column. Always add `.otherwise()` unless you intentionally want nulls for non-matching rows.
+
+**Q: How do you replicate SQL's `CASE WHEN` in PySpark?**
+Use `when(condition, value).when(condition, value).otherwise(default_value)`. Each `.when()` chain adds another branch, evaluated top to bottom. This is a direct equivalent of SQL `CASE WHEN ... THEN ... WHEN ... THEN ... ELSE ... END`.
+
+## Summary
+
+- `when(condition, value).otherwise(value)` = SQL `CASE WHEN THEN ELSE END`
+- Chain multiple `.when()` calls for multiple branches - evaluated top to bottom
+- Omitting `.otherwise()` returns null for non-matching rows
+- Use `&`, `|`, `~` for AND/OR/NOT inside conditions
+- Works inside `withColumn()`, `select()`, `agg()`, and anywhere a Column expression is valid
+- Use `expr("CASE WHEN ...")` for complex SQL-style conditions inline

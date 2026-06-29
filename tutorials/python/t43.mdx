@@ -1,0 +1,276 @@
+## 1. Mutable Default Arguments
+
+The most famous Python gotcha. Default argument values are evaluated **once** when the function is defined - not each time the function is called.
+
+```python
+# WRONG - the list is created once and shared across all calls
+def append_item(item, lst=[]):
+    lst.append(item)
+    return lst
+
+print(append_item(1))   # [1]
+print(append_item(2))   # [1, 2] - expected [2], got the same list!
+print(append_item(3))   # [1, 2, 3]
+```
+
+```python
+# RIGHT - use None as the default, create inside the function
+def append_item(item, lst=None):
+    if lst is None:
+        lst = []
+    lst.append(item)
+    return lst
+
+print(append_item(1))   # [1]
+print(append_item(2))   # [2] - fresh list each time
+```
+
+This applies to any mutable type as a default: `list`, `dict`, `set`, custom objects.
+
+```python
+# Same problem with dict
+def add_key(key, value, d={}):   # WRONG
+    d[key] = value
+    return d
+
+# Fix
+def add_key(key, value, d=None):
+    if d is None:
+        d = {}
+    d[key] = value
+    return d
+```
+
+## 2. Late Binding in Closures
+
+Closures capture the **variable**, not its value at definition time. The value is looked up when the function is **called**.
+
+```python
+# WRONG - all functions see the final value of i
+funcs = []
+for i in range(5):
+    funcs.append(lambda: i)
+
+print([f() for f in funcs])   # [4, 4, 4, 4, 4] - not [0, 1, 2, 3, 4]!
+```
+
+```python
+# RIGHT - capture the current value with a default argument
+funcs = []
+for i in range(5):
+    funcs.append(lambda i=i: i)   # default arg evaluated at definition
+
+print([f() for f in funcs])   # [0, 1, 2, 3, 4]
+
+# Alternative: use a factory function
+def make_func(i):
+    return lambda: i
+
+funcs = [make_func(i) for i in range(5)]
+print([f() for f in funcs])   # [0, 1, 2, 3, 4]
+```
+
+## 3. Modifying a List While Iterating Over It
+
+```python
+# WRONG - skips elements
+numbers = [1, 2, 3, 4, 5, 6]
+for num in numbers:
+    if num % 2 == 0:
+        numbers.remove(num)
+
+print(numbers)   # [1, 3, 5] - looks right but...
+
+# Hidden bug: [1, 2, 3, 4, 5, 6]
+# Remove 2: [1, 3, 4, 5, 6] - index advances, skips 3
+# Remove 4: [1, 3, 5, 6]   - skips 5
+# Final: [1, 3, 5] - accidentally correct here, but NOT reliable
+```
+
+```python
+# RIGHT - iterate over a copy or build a new list
+numbers = [1, 2, 3, 4, 5, 6]
+
+# Option 1: filter (best)
+evens_removed = [x for x in numbers if x % 2 != 0]
+
+# Option 2: iterate over a copy
+for num in numbers[:]:   # numbers[:] creates a copy
+    if num % 2 == 0:
+        numbers.remove(num)
+```
+
+## 4. Variable Scope Trap (UnboundLocalError)
+
+Python decides at compile time whether a variable is local based on whether any assignment exists in the function.
+
+```python
+x = 10
+
+def bad_func():
+    print(x)   # UnboundLocalError!
+    x = 20     # this assignment makes x LOCAL throughout the function
+               # even before the assignment - so the print fails
+
+# Fix 1: global
+def func_with_global():
+    global x
+    print(x)
+    x = 20
+
+# Fix 2: don't shadow the variable
+def func_clean(value):
+    print(value)
+    value = 20
+```
+
+## 5. Chained Comparisons vs Chained Operations
+
+```python
+# Python supports chained comparisons - this is fine and idiomatic
+1 < x < 10   # True if x is between 1 and 10
+a == b == c  # True if all three are equal
+
+# BUT be careful with 'is' chaining
+a = b = 256   # both point to the same cached int - safe
+a is b        # True (by coincidence, cache)
+
+a = b = 1000
+a is b        # might be True in some contexts - never rely on this
+```
+
+## 6. Integer Division Surprise (Python 2 Legacy)
+
+```python
+# Even in Python 3, this can surprise you
+result = 7 / 2     # 3.5 - float division
+result = 7 // 2    # 3   - floor division
+result = -7 // 2   # -4  - floors toward negative infinity, not toward zero!
+
+# This is different from C/Java truncation behavior
+# In C: -7 / 2 = -3 (truncates toward zero)
+# In Python: -7 // 2 = -4 (floors toward negative infinity)
+```
+
+## 7. Copying Mutable Objects
+
+```python
+# Assignment - alias, not a copy
+a = [1, [2, 3], 4]
+b = a
+b.append(5)
+print(a)   # [1, [2, 3], 4, 5] - a changed too
+
+# Shallow copy - top level is copied, nested objects are shared
+import copy
+b = a[:]          # or list(a) or copy.copy(a)
+b.append(99)
+print(a)   # [1, [2, 3], 4, 5] - outer list unaffected
+
+b[1].append(99)
+print(a)   # [1, [2, 3, 99], 4, 5] - NESTED list still shared!
+
+# Deep copy - everything is copied recursively
+b = copy.deepcopy(a)
+b[1].append(0)
+print(a)   # [1, [2, 3], 4, 5] - completely independent
+```
+
+## 8. Using `==` Instead of `is` for None
+
+```python
+# WRONG - == calls __eq__, which could be overridden
+if x == None:
+    ...
+
+# RIGHT - None is a singleton; use identity check
+if x is None:
+    ...
+
+if x is not None:
+    ...
+```
+
+## 9. Exception Handling Too Broadly
+
+```python
+# WRONG - catches everything, hides bugs
+try:
+    result = do_something()
+except:   # bare except catches SystemExit, KeyboardInterrupt, etc.
+    pass
+
+# Also wrong - still too broad
+try:
+    result = do_something()
+except Exception:
+    pass   # silences all exceptions, makes debugging impossible
+
+# RIGHT - catch specific exceptions and handle them
+try:
+    result = do_something()
+except ValueError as e:
+    logger.warning(f"Bad value: {e}")
+    result = default_value
+except FileNotFoundError:
+    raise RuntimeError("Config file missing") from None
+```
+
+## 10. String Formatting with `%` in Logging
+
+```python
+# WRONG - string is always formatted, even if log level filters it out
+logger.debug("Processing %s items: %s" % (len(items), items))
+
+# RIGHT - lazy formatting: string is only built if DEBUG is enabled
+logger.debug("Processing %s items: %s", len(items), items)
+```
+
+## 11. `+=` with Tuples vs Lists
+
+```python
+# Unexpected behavior with tuples and +=
+t = (1, 2, 3)
+t += (4,)       # creates a NEW tuple - old one unchanged
+print(id(t))    # different from original
+
+lst = [1, 2, 3]
+lst += [4]      # modifies in place - same object
+print(id(lst))  # same as original
+
+# The real trap: tuple containing a mutable object
+t = ([1, 2], [3, 4])
+t[0] += [5]     # raises TypeError (tuple is immutable)
+                # BUT t[0] IS modified! [1, 2, 5]
+                # += on a list modifies in place THEN tries to assign - the assign fails
+print(t)        # ([1, 2, 5], [3, 4]) - modified despite the error!
+```
+
+## Interview Questions
+
+**Q: Why shouldn't you use a mutable object as a default argument?**
+Default argument values are evaluated once when the function is defined, not on each call. If you use a mutable default like `[]` or `{}`, all calls that don't pass that argument share the same object. Use `None` as the default and create the mutable object inside the function.
+
+**Q: What is the late binding problem in closures?**
+Closures capture the variable reference, not its value at the time of creation. In a loop, all closures share the same loop variable. When the closures are called, they all see the final value of that variable. Fix it by using a default argument (`lambda i=i: i`) which is evaluated at definition time.
+
+**Q: What is the difference between shallow copy and deep copy?**
+A shallow copy creates a new container but references the same inner objects. Modifying a nested mutable object in the copy also changes the original. A deep copy recursively copies all objects - the copy is completely independent. Use `copy.copy()` for shallow, `copy.deepcopy()` for deep.
+
+**Q: What is `UnboundLocalError` and what causes it?**
+Python determines whether a variable is local or global at compile time. If the function contains any assignment to a name, that name is treated as local throughout the function - even before the assignment. Reading it before the assignment triggers `UnboundLocalError`. Use `global` or restructure the code to fix it.
+
+**Q: Why is a bare `except:` clause dangerous?**
+A bare `except:` catches everything, including `SystemExit` (raised by `sys.exit()`), `KeyboardInterrupt` (Ctrl+C), and `GeneratorExit`. This can prevent a program from being interrupted or shut down. Always catch specific exception types or at minimum use `except Exception:`.
+
+## Summary
+
+- **Mutable defaults** - use `None` as default, create mutable inside function; never `def f(lst=[])`
+- **Late binding** - closures capture variables not values; fix with `lambda i=i: i` default arg
+- **Iterate safely** - never modify a list while iterating; use list comprehension or iterate over a copy
+- **Scope trap** - any assignment in a function makes the variable local throughout; use `global`/`nonlocal` to fix
+- **`//` floors toward -∞** - not truncation; `-7 // 2` is `-4`, not `-3`
+- **Shallow vs deep copy** - `copy.copy()` shares nested objects; `copy.deepcopy()` is fully independent
+- **`is None` not `== None`** - always use identity check for singletons
+- **Catch specific exceptions** - never use bare `except:`; log or re-raise properly
+- **Logger string formatting** - use `logger.debug("msg %s", val)` not `"msg %s" % val`

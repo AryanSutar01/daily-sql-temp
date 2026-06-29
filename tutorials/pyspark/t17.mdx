@@ -1,0 +1,276 @@
+## Overview
+
+`pyspark.sql.functions` (commonly imported as `F`) contains 300+ built-in functions that run natively on the JVM - no Python serialization overhead, unlike UDFs.
+
+```python
+from pyspark.sql import SparkSession
+import pyspark.sql.functions as F
+from pyspark.sql.functions import col, lit
+
+spark = SparkSession.builder.appName("FunctionsDemo").getOrCreate()
+
+# Best practice: import the whole module as F, use F.function_name()
+# This avoids conflicts with Python builtins (sum, max, min, etc.)
+```
+
+## Math Functions
+
+```python
+df = spark.createDataFrame([(1, -4.7, 16.0, 3.14)], ["id", "a", "b", "c"])
+
+df.select(
+    F.abs(col("a")).alias("abs"),           # absolute value: 4.7
+    F.ceil(col("a")).alias("ceil"),         # ceiling: -4
+    F.floor(col("a")).alias("floor"),       # floor: -5
+    F.round(col("c"), 1).alias("round"),    # round to 1 decimal: 3.1
+    F.bround(col("c"), 1).alias("bround"),  # banker's round
+    F.sqrt(col("b")).alias("sqrt"),         # square root: 4.0
+    F.pow(col("b"), 2).alias("pow"),        # power: 256.0
+    F.log(col("b")).alias("log"),           # natural log
+    F.log10(col("b")).alias("log10"),       # log base 10: 1.2
+    F.exp(col("c")).alias("exp"),           # e^x
+    F.greatest(col("a"), col("b")).alias("greatest"),  # max of columns
+    F.least(col("a"), col("b")).alias("least"),        # min of columns
+    F.sign(col("a")).alias("sign"),         # -1, 0, or 1
+    F.rand(seed=42).alias("rand"),          # random [0, 1)
+    F.randn(seed=42).alias("randn"),        # random normal
+).show()
+```
+
+## String Functions
+
+```python
+df = spark.createDataFrame([
+    (1, "  hello world  ", "john.doe@email.com", "2024-01-15"),
+], ["id", "text", "email", "date_str"])
+
+df.select(
+    # Case
+    F.upper(col("text")).alias("upper"),
+    F.lower(col("text")).alias("lower"),
+    F.initcap(col("text")).alias("initcap"),   # Title Case
+
+    # Trim whitespace
+    F.trim(col("text")).alias("trim"),
+    F.ltrim(col("text")).alias("ltrim"),
+    F.rtrim(col("text")).alias("rtrim"),
+
+    # Length and padding
+    F.length(col("text")).alias("length"),
+    F.lpad(col("date_str"), 12, "*").alias("lpad"),
+    F.rpad(col("date_str"), 12, "*").alias("rpad"),
+
+    # Substring and position
+    F.substring(col("text"), 3, 5).alias("substr"),     # pos 3, length 5
+    F.instr(col("text"), "world").alias("instr"),        # position of "world"
+
+    # Split and concat
+    F.split(col("email"), "@").alias("email_parts"),     # returns array
+    F.concat(col("text"), lit("!")).alias("concat"),
+    F.concat_ws("-", col("text"), col("date_str")).alias("concat_ws"),
+
+    # Regex
+    F.regexp_extract(col("email"), r"(\w+)@", 1).alias("username"),
+    F.regexp_replace(col("text"), r"\s+", "_").alias("underscored"),
+    F.regexp_like(col("email"), r".*@.*\..*").alias("valid_email"),  # Spark 3.5+
+
+    # Checks
+    F.contains(col("text"), "world"),   # deprecated - use col.contains()
+).show(truncate=False)
+```
+
+## Date and Timestamp Functions
+
+```python
+from pyspark.sql.functions import (
+    current_date, current_timestamp, to_date, to_timestamp,
+    date_add, date_sub, datediff, months_between, add_months,
+    year, month, dayofmonth, dayofweek, dayofyear,
+    hour, minute, second,
+    date_format, trunc, date_trunc
+)
+
+df = spark.createDataFrame([
+    (1, "2024-01-15", "2024-03-22 14:30:00"),
+], ["id", "date_str", "ts_str"])
+
+df.select(
+    # Parse strings to date/timestamp
+    F.to_date(col("date_str"), "yyyy-MM-dd").alias("date"),
+    F.to_timestamp(col("ts_str"), "yyyy-MM-dd HH:mm:ss").alias("ts"),
+
+    # Current values
+    F.current_date().alias("today"),
+    F.current_timestamp().alias("now"),
+
+    # Extract parts
+    F.year(F.to_date(col("date_str"))).alias("year"),
+    F.month(F.to_date(col("date_str"))).alias("month"),
+    F.dayofmonth(F.to_date(col("date_str"))).alias("day"),
+    F.dayofweek(F.to_date(col("date_str"))).alias("dow"),      # 1=Sun
+    F.dayofyear(F.to_date(col("date_str"))).alias("doy"),
+    F.quarter(F.to_date(col("date_str"))).alias("quarter"),
+    F.weekofyear(F.to_date(col("date_str"))).alias("week"),
+
+    # Arithmetic
+    F.date_add(F.to_date(col("date_str")), 30).alias("plus_30_days"),
+    F.date_sub(F.to_date(col("date_str")), 7).alias("minus_7_days"),
+    F.datediff(F.current_date(), F.to_date(col("date_str"))).alias("days_since"),
+    F.add_months(F.to_date(col("date_str")), 3).alias("plus_3_months"),
+    F.months_between(F.current_date(), F.to_date(col("date_str"))).alias("months_since"),
+
+    # Formatting
+    F.date_format(F.to_date(col("date_str")), "dd/MM/yyyy").alias("formatted"),
+    F.date_format(F.to_date(col("date_str")), "MMMM dd, yyyy").alias("long_format"),
+
+    # Truncate to period
+    F.trunc(F.to_date(col("date_str")), "month").alias("month_start"),
+    F.trunc(F.to_date(col("date_str")), "year").alias("year_start"),
+    F.date_trunc("hour", F.to_timestamp(col("ts_str"))).alias("hour_trunc"),
+).show(truncate=False)
+```
+
+## Conditional Functions
+
+```python
+df = spark.createDataFrame([
+    (1, "Alice", 95000, None),
+    (2, "Bob",   72000, 5000),
+    (3, "Carol", None,  None),
+], ["id", "name", "salary", "bonus"])
+
+df.select(
+    # when / otherwise (CASE WHEN)
+    F.when(col("salary") > 90000, "Senior")
+     .when(col("salary") > 70000, "Mid")
+     .otherwise("Junior").alias("level"),
+
+    # coalesce - first non-null
+    F.coalesce(col("bonus"), lit(0)).alias("bonus_safe"),
+    F.coalesce(col("salary"), lit(50000)).alias("salary_safe"),
+
+    # nullif - return null if two values are equal
+    F.nullif(col("salary"), lit(72000)).alias("not_72k"),
+
+    # ifnull / nvl
+    F.ifnull(col("bonus"), lit(0)).alias("bonus_ifnull"),
+
+    # nvl2 - like ternary: if col is not null → val1, else → val2
+    F.nvl2(col("bonus"), lit("has_bonus"), lit("no_bonus")).alias("bonus_status"),
+).show()
+```
+
+## Type Conversion Functions
+
+```python
+df.select(
+    col("salary").cast("string").alias("salary_str"),
+    col("salary").cast("double").alias("salary_dbl"),
+    F.hash(col("name")).alias("name_hash"),              # integer hash
+    F.md5(col("name")).alias("name_md5"),                # MD5 hex string
+    F.sha2(col("name"), 256).alias("name_sha256"),       # SHA-256
+    F.base64(col("name").cast("binary")).alias("b64"),   # base64 encode
+    F.encode(col("name"), "utf-8").alias("binary"),      # to binary
+)
+```
+
+## Array Functions
+
+```python
+df = spark.createDataFrame([
+    (1, [3, 1, 4, 1, 5], {"a": 1, "b": 2}),
+    (2, [2, 7, 1],       {"c": 3}),
+], ["id", "nums", "props"])
+
+df.select(
+    F.size(col("nums")).alias("arr_size"),
+    F.array_contains(col("nums"), 4).alias("has_4"),
+    F.array_distinct(col("nums")).alias("unique_nums"),
+    F.array_sort(col("nums")).alias("sorted_nums"),
+    F.array_min(col("nums")).alias("arr_min"),
+    F.array_max(col("nums")).alias("arr_max"),
+    F.element_at(col("nums"), 1).alias("first_elem"),  # 1-indexed
+    F.slice(col("nums"), 1, 3).alias("first_3"),
+    F.flatten(F.array(col("nums"), col("nums"))).alias("doubled"),
+    F.array_union(col("nums"), F.array(F.lit(99))).alias("union"),
+    F.array_intersect(col("nums"), F.array(F.lit(1), F.lit(4))).alias("intersect"),
+    F.explode(col("nums")).alias("exploded"),   # one row per element
+    F.map_keys(col("props")).alias("keys"),
+    F.map_values(col("props")).alias("values"),
+).show(truncate=False)
+```
+
+## Aggregate Functions (used inside agg())
+
+```python
+df = spark.createDataFrame([
+    ("A", 10), ("A", 20), ("B", 5), ("B", None),
+], ["grp", "val"])
+
+df.groupBy("grp").agg(
+    F.count("val").alias("count"),             # excludes null
+    F.count("*").alias("count_all"),           # includes null
+    F.countDistinct("val").alias("distinct"),
+    F.sum("val").alias("sum"),
+    F.avg("val").alias("avg"),
+    F.min("val").alias("min"),
+    F.max("val").alias("max"),
+    F.sum_distinct("val").alias("sum_distinct"),
+    F.stddev("val").alias("stddev"),
+    F.variance("val").alias("variance"),
+    F.skewness("val").alias("skewness"),
+    F.kurtosis("val").alias("kurtosis"),
+    F.percentile_approx("val", 0.5).alias("median"),
+    F.percentile_approx("val", [0.25, 0.75]).alias("quartiles"),
+    F.collect_list("val").alias("all_vals"),   # array including nulls
+    F.collect_set("val").alias("unique_vals"), # distinct non-null
+    F.first("val", ignorenulls=True).alias("first"),
+    F.last("val",  ignorenulls=True).alias("last"),
+).show(truncate=False)
+```
+
+## Utility Functions
+
+```python
+df.select(
+    F.monotonically_increasing_id().alias("row_id"),  # unique row IDs (not sequential)
+    F.spark_partition_id().alias("partition"),         # partition this row belongs to
+    F.input_file_name().alias("source_file"),          # which file this row came from
+    F.struct(col("id"), col("name")).alias("person"),  # create struct column
+    F.to_json(F.struct(col("id"), col("name"))).alias("json_str"),  # to JSON string
+    F.from_json(col("json_col"), schema).alias("parsed"),           # parse JSON string
+    F.lit(42).alias("constant"),                       # literal value
+    F.typedLit([1, 2, 3]).alias("array_literal"),     # typed literal
+)
+```
+
+## Best Practices
+
+```python
+# ✅ Always use built-in functions over Python UDFs
+# Built-in: runs in JVM, no serialization overhead
+df.withColumn("upper_name", F.upper(col("name")))   # fast
+
+# ❌ Avoid when built-in exists
+from pyspark.sql.functions import udf
+upper_udf = udf(lambda x: x.upper() if x else None)
+df.withColumn("upper_name", upper_udf(col("name"))) # slow - Python UDF
+
+# ✅ Import as F to avoid shadowing Python builtins
+import pyspark.sql.functions as F
+df.groupBy("dept").agg(F.sum("salary"), F.max("salary"))  # not Python sum/max
+
+# ❌ Direct import conflicts with Python builtins
+from pyspark.sql.functions import sum, max  # shadows Python built-ins!
+```
+
+## Summary
+
+- Import as `import pyspark.sql.functions as F` to avoid conflicts with Python builtins
+- Built-in functions run in the JVM - always prefer them over Python UDFs
+- **Math**: `abs`, `ceil`, `floor`, `round`, `sqrt`, `pow`, `log`, `greatest`, `least`
+- **String**: `upper`, `lower`, `trim`, `length`, `substring`, `split`, `concat`, `regexp_*`
+- **Date**: `to_date`, `to_timestamp`, `year`, `month`, `datediff`, `date_add`, `date_format`
+- **Conditional**: `when/otherwise`, `coalesce`, `nullif`, `ifnull`
+- **Array**: `size`, `explode`, `array_distinct`, `array_sort`, `collect_list`, `collect_set`
+- **Aggregate**: `count`, `sum`, `avg`, `min`, `max`, `stddev`, `percentile_approx`

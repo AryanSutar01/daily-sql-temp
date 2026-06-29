@@ -1,0 +1,212 @@
+## The Join Shuffle Problem
+
+A regular (sort-merge) join between two large tables is expensive:
+
+```
+Regular Join (Sort-Merge):
+Table A (1B rows)     Table B (500M rows)
+    ↓                      ↓
+  Shuffle A              Shuffle B
+  (all rows with        (all rows with
+  same key → same       same key → same
+  partition)            partition)
+         ↓            ↓
+         Sort & Merge
+              ↓
+           Result
+
+→ Two full network shuffles - expensive!
+```
+
+## Broadcast Join - Eliminate Shuffle for Small Tables
+
+When one table is small enough to fit in memory, **broadcast** it to every executor. No shuffle needed.
+
+```
+Broadcast Join:
+Table A (1B rows)     Table B (10K rows - small)
+    ↓                      ↓
+  Stay in place          Broadcast copy to every executor
+                         (no shuffle)
+         ↓
+    Each executor joins its A partitions with local copy of B
+              ↓
+           Result
+
+→ Zero shuffle of Table A, tiny broadcast of Table B ✅
+```
+
+## Auto-Broadcast - Spark Does It Automatically
+
+Spark automatically broadcasts tables below the threshold:
+
+```python
+# Default threshold: 10MB
+# Change it:
+spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "50m")   # 50MB
+spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "-1")    # disable auto-broadcast
+
+# Check current threshold
+print(spark.conf.get("spark.sql.autoBroadcastJoinThreshold"))
+
+# Spark checks table size before joining:
+# If estimated size < threshold → auto-broadcast the smaller table
+```
+
+## Manual Broadcast Hint
+
+When Spark's size estimate is wrong, force a broadcast:
+
+```python
+from pyspark.sql.functions import broadcast
+
+large_df = spark.read.parquet("s3://bucket/transactions/")   # 500GB
+small_df = spark.read.parquet("s3://bucket/dim_country/")    # 2MB
+
+# ✅ Broadcast the small table explicitly
+result = large_df.join(broadcast(small_df), on="country_code", how="inner")
+
+# Works for all join types
+result = large_df.join(broadcast(small_df), on="country_code", how="left")
+
+# Verify broadcast happened - check explain()
+result.explain()
+# Look for: BroadcastHashJoin or BroadcastExchange in the physical plan
+```
+
+## Join Hints - Controlling Spark's Join Strategy
+
+Spark 3.0+ supports explicit join hints using the `.hint()` method or SQL comments:
+
+### Available Join Strategies
+
+| Hint | Strategy | Use When |
+|---|---|---|
+| `broadcast` | BroadcastHashJoin | One table is small (< threshold) |
+| `merge` | SortMergeJoin | Both tables large and sorted |
+| `shuffle_hash` | ShuffledHashJoin | One side much smaller than the other |
+| `shuffle_replicate_nl` | ShuffleAndReplicate NestedLoop | Cross joins or non-equi joins |
+
+### Applying Hints
+
+```python
+# Method 1: broadcast() function (most common)
+from pyspark.sql.functions import broadcast
+result = large_df.join(broadcast(small_df), "id")
+
+# Method 2: .hint() on DataFrame
+result = large_df.join(small_df.hint("broadcast"), "id")
+
+# Method 3: Both sides (use the one Spark will actually broadcast)
+result = large_df.hint("merge").join(small_df, "id")   # force sort-merge join
+
+# Shuffle hash join hint
+result = large_df.join(small_df.hint("shuffle_hash"), "id")
+
+# SQL hints (inside SQL strings)
+spark.sql("""
+    SELECT /*+ BROADCAST(d) */ t.*, d.country_name
+    FROM transactions t
+    JOIN dim_country d ON t.country_code = d.code
+""").show()
+
+spark.sql("""
+    SELECT /*+ MERGE(t, d) */ t.*, d.name
+    FROM transactions t
+    JOIN departments d ON t.dept_id = d.id
+""")
+```
+
+## Checking the Join Strategy with explain()
+
+```python
+result = large_df.join(broadcast(small_df), "id")
+
+result.explain()
+# == Physical Plan ==
+# *(2) BroadcastHashJoin [id#5], [id#18], Inner, BuildRight, false
+# :- *(2) FileScan parquet [...]            ← large table (no shuffle)
+# +- BroadcastExchange HashedRelationBroadcastMode(...)   ← small table broadcast
+#    +- *(1) FileScan parquet [...]
+
+# Without broadcast (auto not triggered):
+result2 = large_df.join(small_df, "id")
+result2.explain()
+# == Physical Plan ==
+# *(5) SortMergeJoin [id#5], [id#18], Inner
+# :- *(2) Sort [...]
+# :  +- Exchange hashpartitioning(id#5, 200)   ← SHUFFLE of large table
+# +- *(4) Sort [...]
+#    +- Exchange hashpartitioning(id#18, 200)  ← SHUFFLE of small table
+```
+
+## When to Use Each Strategy
+
+```python
+# ✅ Use broadcast when:
+# - One table is clearly small (dimension table, lookup table)
+# - < 10-50MB in memory
+large_sales.join(broadcast(dim_country), "country_code")
+large_sales.join(broadcast(dim_product), "product_id")
+
+# ✅ Use sort-merge (default) when:
+# - Both tables are large
+# - Data will be reused (sort once, join multiple times)
+large_orders.join(large_customers, "customer_id")
+
+# ✅ Use shuffle-hash when:
+# - One table significantly smaller than the other (but not broadcastable)
+# - Avoids the sort step of sort-merge
+medium_df.join(small_df.hint("shuffle_hash"), "id")
+
+# ❌ Avoid broadcast when:
+# - The "small" table is actually not that small
+# - Executors don't have enough memory (broadcasts can cause OOM)
+# - The table is filtered down later but the full table is broadcast first
+```
+
+## Broadcast Join with Multiple Dimensions (Star Schema)
+
+```python
+from pyspark.sql.functions import broadcast
+
+# Fact table: billions of rows
+fact_sales = spark.read.parquet("fact_sales/")
+
+# Dimension tables: thousands of rows each
+dim_product  = spark.read.parquet("dim_product/")    # 50k rows
+dim_customer = spark.read.parquet("dim_customer/")   # 200k rows
+dim_date     = spark.read.parquet("dim_date/")       # 3650 rows
+
+result = fact_sales \
+    .join(broadcast(dim_product),  "product_id") \
+    .join(broadcast(dim_customer), "customer_id") \
+    .join(broadcast(dim_date),     "date_id") \
+    .groupBy("product_name", "customer_region", "year") \
+    .sum("revenue")
+
+# All 3 joins are broadcast joins - no shuffle of fact table at all!
+```
+
+## Skewed Join - Problem and Solution
+
+Broadcast joins also solve skewed joins when used with salting - but that's a performance topic. The key insight: if the small side can be broadcast, skew on the large side doesn't matter because each executor joins with a local copy.
+
+```python
+# Skewed join problem: one key has millions of rows
+# If the small table can be broadcast, the skew is irrelevant
+result = skewed_large_df.join(broadcast(small_lookup), "key")
+# Even if one key has 100M rows, each executor handles its own partition
+# without waiting for others → no bottleneck
+```
+
+## Summary
+
+- **Broadcast join** ships a small table to every executor - eliminates shuffle of the large table
+- Spark auto-broadcasts tables below `spark.sql.autoBroadcastJoinThreshold` (default 10MB)
+- Force broadcast with `broadcast(small_df)` or `.hint("broadcast")` when auto doesn't trigger
+- Use `.explain()` to verify - look for `BroadcastHashJoin` or `BroadcastExchange` in the plan
+- Join hints: `broadcast`, `merge`, `shuffle_hash`, `shuffle_replicate_nl` - control Spark's strategy
+- SQL hint syntax: `/*+ BROADCAST(table) */` inside SQL strings
+- Broadcast multiple dimension tables in star-schema fact queries for maximum performance
+- Don't broadcast large tables - it can cause executor OOM errors

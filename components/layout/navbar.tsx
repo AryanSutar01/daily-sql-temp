@@ -39,13 +39,29 @@ export function Navbar() {
       iconColor: "text-[#4DD4C4]",
     },
     {
-      title: "learn SQL",
+      title: "Learn SQL",
       description: "Essential SQL theory.",
-      href: "/practice/learn",
+      href: "/practice/learn/sql",
       icon: BookOpen,
       iconBg: "bg-amber-400/10",
       iconColor: "text-amber-400",
     },
+    {
+      title: "Learn Python",
+      description: "Python fundamentals & interview prep.",
+      href: "/practice/learn/python",
+      icon: BookOpen,
+      iconBg: "bg-blue-400/10",
+      iconColor: "text-blue-400",
+    },
+    {
+      title: "Learn PySpark",
+      description: "Big data processing with PySpark.",
+      href: "/practice/learn/pyspark",
+      icon: BookOpen,
+      iconBg: "bg-orange-400/10",
+      iconColor: "text-orange-400",
+    }
   ];
 
   useEffect(() => {
@@ -87,8 +103,8 @@ export function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-white/5 bg-[#0a0f1c]/95 backdrop-blur supports-[backdrop-filter]:bg-[#0a0f1c]/80">
-      <div className="container mx-auto px-12 sm:px-20 lg:px-40">
+    <nav className="sticky top-0 z-50 w-full border-b border-white/5 bg-[#0a0f1c]/95 backdrop-blur supports-[backdrop-filter]:bg-[#0a0f1c]/80 overflow-visible">
+      <div className="container mx-auto px-12 sm:px-20 lg:px-40 overflow-visible">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
@@ -102,7 +118,7 @@ export function Navbar() {
             <div className="hidden md:flex items-center justify-center flex-1 space-x-8">
 
               {/* Practice Interview Question Dropdown */}
-              <div className="relative" ref={practiceRef}>
+              <div className="overflow-visible" ref={practiceRef}>
                 <button
                   onClick={() => setIsPracticeOpen((prev) => !prev)}
                   className="flex items-center gap-1 text-sm text-zinc-400 hover:text-white transition-colors cursor-pointer"
@@ -115,7 +131,7 @@ export function Navbar() {
                 </button>
 
                 {isPracticeOpen && (
-                  <div className="absolute top-8 left-0 w-[420px] bg-[#0f1623] border border-[#202736] rounded-2xl shadow-2xl p-3 z-[200] grid grid-cols-2 gap-2">
+                  <div className="absolute top-16 -left-20 w-[580px] bg-[#0f1623] border border-[#202736] rounded-2xl shadow-2xl p-4 z-[200] grid grid-cols-2 gap-3">
                     {practiceOptions.map((option) => (
                       <Link
                         key={option.href}

@@ -1,0 +1,223 @@
+## Setup
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, coalesce, isnull, isnan, lit, when
+
+spark = SparkSession.builder.appName("NullsDemo").getOrCreate()
+
+df = spark.createDataFrame([
+    (1, "Alice",  "Engineering", 95000.0),
+    (2, "Bob",    "Marketing",   None),
+    (3, None,     "Engineering", 110000.0),
+    (4, "David",  None,          60000.0),
+    (5, "Eve",    "Engineering", float("nan")),  # NaN != null
+], ["id", "name", "dept", "salary"])
+
+df.show()
+# +---+-----+-----------+--------+
+# | id| name|       dept|  salary|
+# +---+-----+-----------+--------+
+# |  1|Alice|Engineering| 95000.0|
+# |  2|  Bob|  Marketing|    null|
+# |  3| null|Engineering|110000.0|
+# |  4|David|       null| 60000.0|
+# |  5|  Eve|Engineering|     NaN|
+# +---+-----+-----------+--------+
+```
+
+## Detecting Nulls
+
+```python
+# Check which values are null
+df.filter(col("name").isNull()).show()
+df.filter(col("salary").isNull()).show()
+
+# isNotNull
+df.filter(col("name").isNotNull()).show()
+
+# SQL style
+df.filter("name IS NULL").show()
+df.filter("salary IS NOT NULL").show()
+
+# Count nulls per column
+from pyspark.sql.functions import count, when, isnan
+
+df.select([
+    count(when(col(c).isNull(), c)).alias(c)
+    for c in df.columns
+]).show()
+
+# null vs NaN: they are different!
+df.filter(col("salary").isNull()).count()   # 1 (Bob)
+df.filter(isnan(col("salary"))).count()    # 1 (Eve)
+df.filter(col("salary").isNull() | isnan(col("salary"))).count()  # 2 (both)
+```
+
+## dropna - Drop Rows with Nulls
+
+```python
+# Drop any row with at least one null
+df.dropna().show()           # drops Bob (null salary), row 3 (null name), David (null dept)
+
+# Alias
+df.na.drop().show()         # same as dropna()
+
+# Drop only if ALL columns are null (very permissive)
+df.dropna(how="all").show()
+
+# Drop if any specified columns have nulls
+df.dropna(subset=["name", "dept"]).show()     # drop if name OR dept is null
+
+# Drop if fewer than 'thresh' non-null values in a row
+df.dropna(thresh=3).show()  # keep only rows with at least 3 non-null values
+```
+
+## fillna - Fill Nulls with Default Values
+
+```python
+# Fill all null strings with "Unknown", all null numbers with 0
+df.fillna("Unknown").show()    # fills string columns only
+df.fillna(0).show()            # fills numeric columns only
+
+# Or use na.fill() - same thing
+df.na.fill("Unknown").show()
+df.na.fill(0).show()
+
+# Fill specific columns with specific values (dict)
+df.fillna({
+    "name":   "Unknown Employee",
+    "dept":   "Unassigned",
+    "salary": 0.0
+}).show()
+
+# Fill only specific columns
+df.fillna("Unknown", subset=["name", "dept"]).show()
+df.fillna(0.0, subset=["salary"]).show()
+```
+
+## coalesce - First Non-Null Value
+
+`coalesce()` returns the first non-null value from a list of columns or expressions:
+
+```python
+from pyspark.sql.functions import coalesce, lit
+
+# Use backup column when primary is null
+df2 = spark.createDataFrame([
+    (1, "Alice",   "alice_alias"),
+    (2, None,      "bob_alias"),
+    (3, "Carol",   None),
+    (4, None,      None),
+], ["id", "primary_name", "alias_name"])
+
+df2.withColumn("display_name",
+    coalesce(col("primary_name"), col("alias_name"), lit("Anonymous"))
+).show()
+# +---+------------+----------+------------+
+# | id|primary_name|alias_name|display_name|
+# +---+------------+----------+------------+
+# |  1|       Alice|alice_alias|       Alice|  ← primary used
+# |  2|        null|bob_alias  |   bob_alias|  ← alias used (primary null)
+# |  3|       Carol|      null |       Carol|  ← primary used (alias null)
+# |  4|        null|      null |   Anonymous|  ← literal fallback
+# +---+------------+----------+------------+
+
+# Practical: fill salary null with dept average (complex coalesce)
+from pyspark.sql.functions import avg
+dept_avg = df.groupBy("dept").agg(avg("salary").alias("dept_avg_salary"))
+df_with_avg = df.join(dept_avg, on="dept", how="left")
+df_filled = df_with_avg.withColumn("salary",
+    coalesce(col("salary"), col("dept_avg_salary"))
+)
+```
+
+## Null-Safe Equality - eqNullSafe
+
+Normal equality `==` returns null when comparing to null. Use `eqNullSafe` for null-aware comparison:
+
+```python
+# Standard == returns null for null comparisons
+df.filter(col("name") == None).show()       # ❌ returns 0 rows (null != null)
+df.filter(col("name") == "null").show()     # ❌ wrong
+
+# Correct: isNull
+df.filter(col("name").isNull()).show()      # ✅
+
+# eqNullSafe: null == null is True (SQL <=> operator)
+df.filter(col("name").eqNullSafe(None)).show()   # ✅ returns null rows
+df.filter(col("name").eqNullSafe("Alice")).show() # ✅ returns Alice row
+
+# Joining on possibly-null keys: use eqNullSafe
+df1.join(df2, df1.key.eqNullSafe(df2.key))  # treats null == null as match
+```
+
+## Replace Specific Values with Null (na.replace)
+
+```python
+# Replace specific values with null
+df.na.replace("Unknown", None, subset=["name"]).show()
+df.na.replace(0, None, subset=["salary"]).show()
+df.na.replace(["Unknown", "N/A"], None).show()
+```
+
+## Handling NaN vs Null
+
+```python
+from pyspark.sql.functions import isnan, when, col
+
+# NaN (Not a Number) is different from null!
+# NaN: result of invalid float operations (0/0, sqrt(-1))
+# null: missing/unknown value
+
+# Detect NaN
+df.filter(isnan(col("salary"))).show()  # only catches NaN
+
+# Replace NaN with null (normalize)
+df.withColumn("salary", when(isnan(col("salary")), None).otherwise(col("salary")))
+
+# Or use na.fill after converting NaN to null
+df = df.withColumn("salary",
+    when(isnan(col("salary")), None).otherwise(col("salary"))
+)
+df.fillna(0.0, subset=["salary"]).show()
+
+# Check for both null and NaN
+df.filter(col("salary").isNull() | isnan(col("salary"))).show()
+```
+
+## Complete Null Handling Pipeline
+
+```python
+# Real-world pattern: clean nulls and NaNs in one pipeline
+df_clean = df \
+    .withColumn("salary",
+        when(isnan(col("salary")), None).otherwise(col("salary"))) \
+    .fillna({
+        "name": "Unknown",
+        "dept": "Unassigned",
+    }) \
+    .fillna(0.0, subset=["salary"]) \
+    .filter(col("id").isNotNull())      # always keep id non-null
+
+df_clean.show()
+# +---+-------+-----------+--------+
+# | id|   name|       dept|  salary|
+# +---+-------+-----------+--------+
+# |  1|  Alice|Engineering| 95000.0|
+# |  2|    Bob|  Marketing|     0.0|  ← salary filled
+# |  3|Unknown|Engineering|110000.0| ← name filled
+# |  4|  David| Unassigned| 60000.0| ← dept filled
+# |  5|    Eve|Engineering|     0.0| ← NaN → null → 0
+# +---+-------+-----------+--------+
+```
+
+## Summary
+
+- `isNull()` / `isNotNull()` - filter on null values
+- `dropna(how, thresh, subset)` - drop rows based on null criteria
+- `fillna(value, subset)` - replace nulls with default values
+- `coalesce(col1, col2, ...)` - first non-null wins; great for fallback chains
+- `eqNullSafe(value)` - null-aware equality (`null == null` is True)
+- NaN ≠ null - use `isnan()` separately; normalize NaN to null before using `fillna`
+- Use `na.drop()` / `na.fill()` as alternate syntax for `dropna()` / `fillna()`

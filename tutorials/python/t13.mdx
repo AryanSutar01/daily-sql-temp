@@ -1,0 +1,199 @@
+## Lambda Functions
+
+Anonymous, one-line functions defined with `lambda`:
+
+```python
+# lambda args: expression
+square = lambda x: x ** 2
+add = lambda x, y: x + y
+greet = lambda name: f"Hello, {name}!"
+
+square(5)      # 25
+add(3, 4)      # 7
+greet("Alice") # "Hello, Alice!"
+
+# Inline use - most common
+sorted(["banana", "apple", "cherry"], key=lambda s: len(s))
+# ['apple', 'banana', 'cherry']
+```
+
+## map() - Transform Every Element
+
+`map(function, iterable)` applies a function to every element and returns an iterator.
+
+```python
+numbers = [1, 2, 3, 4, 5]
+
+# With lambda
+doubled = list(map(lambda x: x * 2, numbers))
+# [2, 4, 6, 8, 10]
+
+# With a named function
+def square(x):
+    return x ** 2
+
+squares = list(map(square, numbers))
+# [1, 4, 9, 16, 25]
+
+# With a built-in function
+strings = ["1", "2", "3", "4"]
+ints = list(map(int, strings))
+# [1, 2, 3, 4]
+
+# Map over multiple iterables
+a = [1, 2, 3]
+b = [10, 20, 30]
+sums = list(map(lambda x, y: x + y, a, b))
+# [11, 22, 33]
+
+# Modern equivalent - list comprehension (usually preferred)
+doubled = [x * 2 for x in numbers]
+```
+
+## filter() - Keep Elements That Match
+
+`filter(function, iterable)` keeps only elements where the function returns True.
+
+```python
+numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+evens = list(filter(lambda x: x % 2 == 0, numbers))
+# [2, 4, 6, 8, 10]
+
+# Filter with a named function
+def is_positive(x):
+    return x > 0
+
+mixed = [-3, -1, 0, 2, 5, -7, 8]
+positives = list(filter(is_positive, mixed))
+# [2, 5, 8]
+
+# filter(None, iterable) removes falsy values
+values = [0, 1, "", "hello", None, [], [1], False, True]
+truthy = list(filter(None, values))
+# [1, 'hello', [1], True]
+
+# Modern equivalent - list comprehension (preferred)
+evens = [x for x in numbers if x % 2 == 0]
+```
+
+## reduce() - Fold a Sequence to a Single Value
+
+`reduce(function, iterable)` applies a function cumulatively - combining elements into one.
+
+```python
+from functools import reduce
+
+numbers = [1, 2, 3, 4, 5]
+
+total = reduce(lambda acc, x: acc + x, numbers)   # 15
+product = reduce(lambda acc, x: acc * x, numbers)  # 120
+
+# How it works step by step:
+# [1, 2, 3, 4, 5]
+# Step 1: f(1, 2) = 3
+# Step 2: f(3, 3) = 6
+# Step 3: f(6, 4) = 10
+# Step 4: f(10, 5) = 15
+
+# With initial value
+reduce(lambda acc, x: acc + x, numbers, 100)   # 115
+
+# Find maximum
+reduce(lambda a, b: a if a > b else b, numbers)  # 5
+
+# Modern equivalents (usually preferred)
+sum(numbers)      # 15
+max(numbers)      # 5
+import math
+math.prod(numbers)  # 120
+```
+
+## Combining map and filter
+
+```python
+numbers = range(-5, 6)
+
+# Square only the positive numbers
+result = list(map(lambda x: x**2, filter(lambda x: x > 0, numbers)))
+# [1, 4, 9, 16, 25]
+
+# Easier to read as a comprehension
+result = [x**2 for x in numbers if x > 0]
+# [1, 4, 9, 16, 25]
+```
+
+## When to Use Each
+
+```python
+# lambda - short anonymous functions inline
+sorted(people, key=lambda p: p.age)
+map(str, numbers)
+
+# map - apply a function to every element
+list(map(int, string_numbers))   # convert types
+list(map(str.upper, words))      # apply method
+
+# filter - select elements
+list(filter(None, values))       # remove falsy values
+list(filter(os.path.exists, paths))  # filter valid paths
+
+# reduce - fold to single value
+reduce(operator.add, items)      # when sum() isn't enough
+reduce(lambda d, kv: {**d, kv[0]: kv[1]}, pairs, {})  # build dict
+
+# Comprehensions (generally preferred over map/filter)
+[f(x) for x in lst]             # instead of map
+[x for x in lst if cond(x)]     # instead of filter
+```
+
+## Real-World Examples
+
+```python
+from functools import reduce
+
+# Convert a list of strings to integers (map)
+prices_str = ["29.99", "49.99", "9.99", "14.99"]
+prices = list(map(float, prices_str))
+
+# Filter in-stock products (filter)
+products = [{"name": "A", "stock": 5}, {"name": "B", "stock": 0}, {"name": "C", "stock": 3}]
+in_stock = list(filter(lambda p: p["stock"] > 0, products))
+
+# Compute total revenue (reduce)
+orders = [{"total": 100}, {"total": 250}, {"total": 75}]
+revenue = reduce(lambda acc, order: acc + order["total"], orders, 0)
+# 425
+
+# Chain all three
+data = ["1", " 2 ", "", "3", " ", "4"]
+result = list(
+    map(int,
+        filter(str.strip,    # remove empty/whitespace strings
+               map(str.strip, data)))  # strip whitespace
+)
+# [1, 2, 3, 4]
+```
+
+## Interview Questions
+
+**Q: What is the difference between `map` and a list comprehension?**
+Both apply a transformation to every element. List comprehensions are generally more readable and idiomatic Python. `map` can be faster for simple built-in functions like `int` or `str` because it avoids creating a lambda. Use list comprehensions for clarity; `map` for type conversions with built-ins.
+
+**Q: What does `filter(None, iterable)` do?**
+It removes all falsy values - `0`, `""`, `[]`, `{}`, `None`, `False`. Passing `None` as the function tells filter to use the truthiness of each element directly.
+
+**Q: What does `reduce` do and when would you use it?**
+`reduce` applies a function cumulatively to a sequence, reducing it to a single value. Use it for operations like computing a running product, building a dict from a list of pairs, or combining nested structures - where no simpler built-in like `sum()`, `max()`, or `any()` fits.
+
+**Q: When would you use a lambda vs a `def`?**
+Use `lambda` for short, one-expression functions passed as arguments inline (`sorted`, `map`, `filter`). Use `def` when the function has multiple lines, needs a docstring, handles errors, or is reused in multiple places. Never use `lambda` just to assign it to a variable - use `def` instead.
+
+## Summary
+
+- `lambda args: expr` - anonymous one-liner; best used inline, not assigned to variables
+- `map(func, iter)` - apply function to every element; returns an iterator
+- `filter(func, iter)` - keep elements where function returns True; `filter(None, iter)` removes falsy
+- `reduce(func, iter, initial)` - fold sequence to single value; import from `functools`
+- List comprehensions are usually preferred over `map`/`filter` for readability
+- `map` with built-ins (`int`, `str`, `float`) is clean and fast for type conversion

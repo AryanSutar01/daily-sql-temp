@@ -1,0 +1,194 @@
+## for Loop
+
+Iterates over any iterable - list, string, range, dict, etc.
+
+```python
+# Iterate over a list
+fruits = ["apple", "banana", "cherry"]
+for fruit in fruits:
+    print(fruit)
+
+# Iterate over a string
+for char in "Python":
+    print(char)
+
+# range()
+for i in range(5):        # 0, 1, 2, 3, 4
+    print(i)
+
+for i in range(1, 6):     # 1, 2, 3, 4, 5
+    print(i)
+
+for i in range(0, 10, 2): # 0, 2, 4, 6, 8
+    print(i)
+
+for i in range(5, 0, -1): # 5, 4, 3, 2, 1
+    print(i)
+```
+
+## enumerate() - Index + Value
+
+```python
+fruits = ["apple", "banana", "cherry"]
+
+for i, fruit in enumerate(fruits):
+    print(f"{i}: {fruit}")
+# 0: apple
+# 1: banana
+# 2: cherry
+
+for i, fruit in enumerate(fruits, start=1):   # start from 1
+    print(f"{i}. {fruit}")
+```
+
+## zip() - Iterate Multiple Sequences Together
+
+```python
+names = ["Alice", "Bob", "Carol"]
+scores = [95, 82, 91]
+
+for name, score in zip(names, scores):
+    print(f"{name}: {score}")
+# Alice: 95
+# Bob: 82
+# Carol: 91
+```
+
+## Iterating Over a Dict
+
+```python
+d = {"name": "Alice", "age": 30}
+
+for key in d:               # iterate over keys
+    print(key)
+
+for key, value in d.items():
+    print(f"{key}: {value}")
+
+for value in d.values():
+    print(value)
+```
+
+## while Loop
+
+Runs as long as a condition is True.
+
+```python
+count = 0
+while count < 5:
+    print(count)
+    count += 1
+# 0 1 2 3 4
+
+# User input loop
+while True:
+    command = input("Enter command: ")
+    if command == "quit":
+        break
+    print(f"You entered: {command}")
+```
+
+## break - Exit the Loop Early
+
+```python
+for i in range(10):
+    if i == 5:
+        break        # exit loop immediately
+    print(i)
+# 0 1 2 3 4
+```
+
+## continue - Skip to Next Iteration
+
+```python
+for i in range(10):
+    if i % 2 == 0:
+        continue     # skip even numbers
+    print(i)
+# 1 3 5 7 9
+```
+
+## else Clause on Loops
+
+The `else` block runs when the loop completes normally - NOT if `break` was used:
+
+```python
+# Useful for "search and not found" patterns
+target = 7
+for i in range(5):
+    if i == target:
+        print("Found!")
+        break
+else:
+    print("Not found")   # runs because break wasn't triggered
+# Not found
+
+# Same with while
+n = 10
+while n > 0:
+    n -= 1
+else:
+    print("Loop completed normally")
+```
+
+## Nested Loops
+
+```python
+for i in range(3):
+    for j in range(3):
+        print(f"({i},{j})", end=" ")
+    print()
+# (0,0) (0,1) (0,2)
+# (1,0) (1,1) (1,2)
+# (2,0) (2,1) (2,2)
+
+# break only breaks the inner loop
+for i in range(3):
+    for j in range(3):
+        if j == 1:
+            break    # only breaks inner loop
+    print(f"i={i}")  # still prints for all i values
+```
+
+## Common Patterns
+
+```python
+# Sum with a loop
+total = sum(range(1, 101))   # prefer built-ins over loops
+
+# Find max manually
+nums = [3, 1, 4, 1, 5, 9, 2, 6]
+maximum = max(nums)   # use built-in
+
+# Filter with a loop (prefer comprehension)
+evens = [x for x in nums if x % 2 == 0]
+
+# Countdown
+for i in range(10, 0, -1):
+    print(i)
+print("Blast off!")
+```
+
+## Interview Questions
+
+**Q: What is the difference between `break` and `continue`?**
+`break` exits the loop immediately - no more iterations. `continue` skips the rest of the current iteration and moves to the next one. Both only affect the innermost loop they're in.
+
+**Q: What does the `else` clause on a loop do?**
+The `else` block runs when the loop finishes without hitting a `break`. It's most useful for "search and not found" patterns - if the item is found you `break`, and the `else` handles the not-found case.
+
+**Q: What is the difference between `for` and `while`?**
+`for` iterates over a sequence (list, range, string, etc.) - you know the number of iterations or are going through a collection. `while` runs as long as a condition is true - use when you don't know in advance how many iterations are needed.
+
+**Q: How do you iterate over a list with both index and value?**
+Use `enumerate()`: `for i, value in enumerate(lst):`. This is cleaner than `for i in range(len(lst))`.
+
+## Summary
+
+- `for x in iterable` - iterate over any sequence
+- `range(start, stop, step)` - generate a range of numbers
+- `enumerate(lst)` - get index + value pairs
+- `zip(a, b)` - iterate two sequences in parallel
+- `while condition` - repeat until condition is False
+- `break` - exit loop immediately; `continue` - skip to next iteration
+- `for/while ... else` - else runs only if no `break` occurred

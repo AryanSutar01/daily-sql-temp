@@ -1,0 +1,221 @@
+## What Is an Exception?
+
+An exception is an error that occurs during program execution. Without handling, it crashes your program.
+
+```python
+# This crashes with ZeroDivisionError
+result = 10 / 0
+
+# This crashes with ValueError
+int("abc")
+
+# This crashes with KeyError
+d = {"a": 1}
+d["b"]
+```
+
+## Basic try/except
+
+```python
+try:
+    result = 10 / 0
+except ZeroDivisionError:
+    print("Cannot divide by zero!")
+
+# Program continues after the except block
+print("Still running")
+```
+
+## Catching Specific Exceptions
+
+```python
+def get_value(data, key):
+    try:
+        value = data[key]
+        return int(value)
+    except KeyError:
+        print(f"Key '{key}' not found")
+        return None
+    except ValueError:
+        print(f"Cannot convert '{value}' to int")
+        return None
+```
+
+## Catching the Exception Object
+
+```python
+try:
+    result = int("abc")
+except ValueError as e:
+    print(f"Error: {e}")
+    # Error: invalid literal for int() with base 10: 'abc'
+```
+
+## Multiple Exceptions in One Clause
+
+```python
+try:
+    risky_operation()
+except (ValueError, TypeError, KeyError) as e:
+    print(f"One of several errors: {e}")
+```
+
+## else - Runs When No Exception Occurred
+
+```python
+try:
+    result = int("42")
+except ValueError:
+    print("Not a number")
+else:
+    print(f"Success! Got: {result}")   # only runs if no exception
+```
+
+## finally - Always Runs
+
+```python
+def read_file(path):
+    f = None
+    try:
+        f = open(path)
+        return f.read()
+    except FileNotFoundError:
+        print(f"File not found: {path}")
+        return None
+    finally:
+        if f:
+            f.close()   # always closes the file, even if error occurred
+
+# Better: use context manager (with statement)
+def read_file_better(path):
+    try:
+        with open(path) as f:
+            return f.read()
+    except FileNotFoundError:
+        return None
+```
+
+## Full Structure
+
+```python
+try:
+    # code that might raise an exception
+    result = risky()
+except SpecificError as e:
+    # handle specific error
+    handle(e)
+except (AnotherError, YetAnother):
+    # handle multiple error types
+    fallback()
+except Exception as e:
+    # catch-all for unexpected errors (use sparingly)
+    log_error(e)
+    raise   # re-raise after logging
+else:
+    # only runs if no exception was raised
+    process(result)
+finally:
+    # always runs - cleanup code
+    cleanup()
+```
+
+## Raising Exceptions
+
+```python
+def set_age(age):
+    if not isinstance(age, int):
+        raise TypeError(f"Age must be an int, got {type(age).__name__}")
+    if age < 0 or age > 150:
+        raise ValueError(f"Age must be between 0 and 150, got {age}")
+    return age
+
+set_age(-5)    # ValueError
+set_age("30")  # TypeError
+```
+
+## Custom Exceptions
+
+```python
+class InsufficientFundsError(Exception):
+    def __init__(self, balance, amount):
+        self.balance = balance
+        self.amount = amount
+        super().__init__(f"Cannot withdraw {amount}, balance is {balance}")
+
+class BankAccount:
+    def __init__(self, balance):
+        self.balance = balance
+
+    def withdraw(self, amount):
+        if amount > self.balance:
+            raise InsufficientFundsError(self.balance, amount)
+        self.balance -= amount
+        return self.balance
+
+account = BankAccount(100)
+try:
+    account.withdraw(200)
+except InsufficientFundsError as e:
+    print(e)            # Cannot withdraw 200, balance is 100
+    print(e.balance)    # 100
+```
+
+## Exception Chaining
+
+```python
+def load_config(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except FileNotFoundError as e:
+        raise RuntimeError(f"Config file missing: {path}") from e
+    # 'from e' preserves the original exception as context
+
+# suppress the original exception context:
+raise RuntimeError("Config missing") from None
+```
+
+## Common Built-in Exceptions
+
+```python
+ValueError      # wrong value type: int("abc")
+TypeError       # wrong type: "a" + 1
+KeyError        # dict key missing: d["missing"]
+IndexError      # list index out of range: lst[99]
+AttributeError  # object has no attribute: None.upper()
+NameError       # variable not defined: print(undefined_var)
+FileNotFoundError  # file doesn't exist
+ZeroDivisionError  # division by zero
+StopIteration   # iterator exhausted
+RuntimeError    # generic runtime error
+NotImplementedError  # abstract method not implemented
+```
+
+## Interview Questions
+
+**Q: What is the difference between `except Exception` and a bare `except:`?**
+`except Exception` catches all exceptions that inherit from `Exception` - which covers almost all runtime errors. A bare `except:` catches everything including `SystemExit`, `KeyboardInterrupt`, and `GeneratorExit` - which are not subclasses of `Exception` and usually shouldn't be caught. Always prefer `except Exception` or better, specific exception types.
+
+**Q: When does the `finally` block NOT run?**
+`finally` runs in almost all cases - even when `return`, `break`, or `continue` is used. The only exceptions are: if the Python process is killed with `os._exit()`, a hardware failure, or an infinite loop before `finally`. In practice, treat `finally` as always running.
+
+**Q: What is the difference between `raise` and `raise e`?**
+Bare `raise` re-raises the current exception with its original traceback intact. `raise e` raises the exception again but resets the traceback to the current line - losing context. Use bare `raise` in `except` blocks when you want to log and re-raise.
+
+**Q: What is exception chaining with `from`?**
+`raise NewError("msg") from original_error` attaches the original exception as context, preserving the full chain of what caused what. Use `from None` to suppress the original exception context and show only the new one.
+
+**Q: When should you create custom exceptions?**
+When you need to represent domain-specific error conditions - like `InsufficientFundsError` or `AuthenticationError` - that callers may want to catch specifically. Custom exceptions make error handling more precise and self-documenting.
+
+## Summary
+
+- `try/except` - catch and handle exceptions; don't let programs crash
+- Catch specific exceptions (`ValueError`, `KeyError`) before broad ones
+- `except Error as e` - get the exception object with `as`
+- `else` - runs only when no exception was raised
+- `finally` - always runs; use for cleanup (closing files, connections)
+- `raise ExceptionType("message")` - raise an exception explicitly
+- `raise` (bare) - re-raise the current exception in an `except` block
+- Custom exceptions: inherit from `Exception`, add context-specific attributes
+- Avoid bare `except:` - use `except Exception` or specific types

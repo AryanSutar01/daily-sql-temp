@@ -1,0 +1,255 @@
+## What is Spark SQL?
+
+Spark SQL lets you run standard SQL queries against DataFrames by registering them as **temporary views**. The same Catalyst optimizer that powers the DataFrame API powers Spark SQL - so performance is identical.
+
+```python
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("SparkSQLDemo").getOrCreate()
+
+employees = spark.createDataFrame([
+    (1, "Alice",  10, 95000,  "2020-06-15"),
+    (2, "Bob",    20, 72000,  "2022-01-10"),
+    (3, "Carol",  10, 110000, "2018-03-22"),
+    (4, "David",  30, 60000,  "2021-09-01"),
+    (5, "Eve",    10, 105000, "2019-11-30"),
+], ["emp_id", "name", "dept_id", "salary", "hire_date"])
+
+departments = spark.createDataFrame([
+    (10, "Engineering", "US"),
+    (20, "Marketing",   "US"),
+    (30, "HR",          "IN"),
+], ["dept_id", "dept_name", "country"])
+```
+
+## createOrReplaceTempView - Register a DataFrame as a SQL Table
+
+```python
+# Register - makes DataFrame queryable as "employees" in SQL
+employees.createOrReplaceTempView("employees")
+departments.createOrReplaceTempView("departments")
+
+# Now run SQL against it
+result = spark.sql("SELECT * FROM employees WHERE salary > 90000")
+result.show()
+```
+
+`createOrReplaceTempView`:
+- Creates a view scoped to the current **SparkSession**
+- Replaces the view if one with the same name already exists
+- View exists only while the session is alive - not persisted to disk
+- No data is moved - it's just a named reference to the DataFrame
+
+## Running SQL Queries
+
+```python
+# Basic SELECT
+spark.sql("SELECT name, salary FROM employees").show()
+
+# WHERE clause
+spark.sql("SELECT * FROM employees WHERE salary > 90000").show()
+
+# ORDER BY
+spark.sql("SELECT name, salary FROM employees ORDER BY salary DESC").show()
+
+# LIMIT
+spark.sql("SELECT * FROM employees ORDER BY salary DESC LIMIT 3").show()
+
+# Aggregation
+spark.sql("""
+    SELECT dept_id,
+           COUNT(*) AS emp_count,
+           AVG(salary) AS avg_salary,
+           MAX(salary) AS max_salary
+    FROM employees
+    GROUP BY dept_id
+    ORDER BY avg_salary DESC
+""").show()
+
+# JOIN
+spark.sql("""
+    SELECT e.name, e.salary, d.dept_name, d.country
+    FROM employees e
+    INNER JOIN departments d ON e.dept_id = d.dept_id
+    WHERE e.salary > 80000
+    ORDER BY e.salary DESC
+""").show()
+
+# Subquery
+spark.sql("""
+    SELECT name, salary
+    FROM employees
+    WHERE salary > (SELECT AVG(salary) FROM employees)
+    ORDER BY salary DESC
+""").show()
+
+# CASE WHEN
+spark.sql("""
+    SELECT name, salary,
+        CASE
+            WHEN salary > 100000 THEN 'High'
+            WHEN salary > 80000  THEN 'Mid'
+            ELSE 'Low'
+        END AS salary_band
+    FROM employees
+""").show()
+
+# Window function
+spark.sql("""
+    SELECT name, dept_id, salary,
+        RANK() OVER (PARTITION BY dept_id ORDER BY salary DESC) AS dept_rank
+    FROM employees
+""").show()
+
+# CTE (Common Table Expression)
+spark.sql("""
+    WITH dept_stats AS (
+        SELECT dept_id, AVG(salary) AS avg_sal
+        FROM employees
+        GROUP BY dept_id
+    )
+    SELECT e.name, e.salary, ds.avg_sal,
+           (e.salary - ds.avg_sal) AS diff_from_avg
+    FROM employees e
+    JOIN dept_stats ds ON e.dept_id = ds.dept_id
+    ORDER BY diff_from_avg DESC
+""").show()
+```
+
+## Spark SQL Returns a DataFrame
+
+The result of `spark.sql()` is always a regular PySpark DataFrame - you can chain DataFrame API operations on it:
+
+```python
+result = spark.sql("""
+    SELECT dept_id, AVG(salary) as avg_salary
+    FROM employees
+    GROUP BY dept_id
+""")
+
+# Chain DataFrame operations on the SQL result
+result.filter(result.avg_salary > 90000) \
+      .orderBy("avg_salary", ascending=False) \
+      .show()
+
+# Write SQL result to parquet
+result.write.mode("overwrite").parquet("output/dept_averages/")
+```
+
+## View Types
+
+```python
+# 1. Temporary View - scoped to current SparkSession
+employees.createOrReplaceTempView("employees")
+# Accessible: only in current session
+# Persisted: no - gone when session ends
+
+# 2. Global Temporary View - shared across sessions
+employees.createOrReplaceGlobalTempView("employees_global")
+# Must use "global_temp" database prefix to query:
+spark.sql("SELECT * FROM global_temp.employees_global").show()
+# Accessible: all SparkSessions in same SparkContext
+# Persisted: no - gone when application ends
+
+# 3. Permanent Table (requires Hive metastore)
+employees.write.saveAsTable("default.employees_permanent")
+spark.sql("SELECT * FROM default.employees_permanent").show()
+# Accessible: across sessions and application restarts
+# Persisted: yes - stored in Hive metastore + warehouse
+```
+
+## Catalog - Manage Views and Tables
+
+```python
+# List all available tables/views in current session
+spark.catalog.listTables()
+
+# Check if a table exists
+spark.catalog.tableExists("employees")
+
+# List columns of a view
+spark.catalog.listColumns("employees")
+
+# List all databases
+spark.catalog.listDatabases()
+
+# Drop a temporary view
+spark.catalog.dropTempView("employees")
+
+# Drop a global temp view
+spark.catalog.dropGlobalTempView("employees_global")
+```
+
+## Mixing SQL and DataFrame API
+
+Both APIs produce the same result - use whichever is clearer for each step:
+
+```python
+# Step 1: Load and clean with DataFrame API
+raw = spark.read.csv("raw_sales.csv", header=True, inferSchema=True)
+clean = raw.filter(raw.amount > 0).dropna(subset=["customer_id"])
+
+# Step 2: Register for SQL
+clean.createOrReplaceTempView("sales")
+
+# Step 3: Complex analytics in SQL
+result = spark.sql("""
+    WITH monthly AS (
+        SELECT
+            YEAR(sale_date)  AS yr,
+            MONTH(sale_date) AS mo,
+            SUM(amount)      AS total
+        FROM sales
+        GROUP BY 1, 2
+    )
+    SELECT yr, mo, total,
+           LAG(total) OVER (ORDER BY yr, mo) AS prev_month,
+           total - LAG(total) OVER (ORDER BY yr, mo) AS mom_change
+    FROM monthly
+    ORDER BY yr, mo
+""")
+
+# Step 4: Back to DataFrame API for final write
+result.write.mode("overwrite").parquet("output/monthly_trends/")
+```
+
+## SQL Functions Available in Spark SQL
+
+Spark SQL supports most standard SQL functions:
+
+```sql
+-- String functions
+SELECT UPPER(name), LENGTH(name), TRIM(name), SUBSTRING(name, 1, 3) FROM employees;
+
+-- Date functions
+SELECT YEAR(hire_date), MONTH(hire_date), DATEDIFF(CURRENT_DATE, hire_date) FROM employees;
+
+-- Math functions
+SELECT ROUND(salary, -3), ABS(salary - 90000), SQRT(salary) FROM employees;
+
+-- Conditional
+SELECT NVL(salary, 0), COALESCE(salary, 0), IF(salary > 90000, 'High', 'Low') FROM employees;
+
+-- Array/Map functions (on complex types)
+SELECT EXPLODE(tags), COLLECT_LIST(name), ARRAY_CONTAINS(skills, 'Python') FROM employees;
+```
+
+## Common Interview Questions
+
+**Q: What is the difference between createOrReplaceTempView and createOrReplaceGlobalTempView?**
+A temp view is scoped to the current SparkSession - invisible to other sessions. A global temp view lives under the `global_temp` database and is accessible to all SparkSessions sharing the same SparkContext, but still disappears when the application ends.
+
+**Q: Is Spark SQL slower than the DataFrame API?**
+No - both use the same Catalyst optimizer and Tungsten execution engine. The execution plan is identical for equivalent operations. Choose based on readability; SQL is often cleaner for complex multi-table analytics with CTEs.
+
+**Q: Can you mix SQL and DataFrame API?**
+Yes - `spark.sql()` returns a DataFrame, so you can chain DataFrame operations on it. You can register any DataFrame as a view at any point and switch between the two styles freely.
+
+## Summary
+
+- `df.createOrReplaceTempView("name")` registers a DataFrame as a queryable SQL view
+- `spark.sql("SELECT ...")` runs SQL and returns a DataFrame
+- Spark SQL supports full SQL: JOINs, CTEs, window functions, subqueries, aggregations
+- Temp views are session-scoped; global temp views are SparkContext-scoped; both are in-memory only
+- SQL and DataFrame API share the same optimizer - identical performance
+- Use `spark.catalog` to list, check, and drop views and tables

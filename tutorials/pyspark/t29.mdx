@@ -1,0 +1,243 @@
+## Long vs Wide Format
+
+```
+Long format (normalized):         Wide format (pivoted):
+dept    | month  | revenue         dept    | Jan  | Feb  | Mar
+--------+--------+--------         --------+------+------+------
+Eng     | Jan    | 100000          Eng     |100000|120000| 95000
+Eng     | Feb    | 120000          Mkt     | 80000| 75000| 90000
+Eng     | Mar    |  95000          HR      | 60000| 62000| 58000
+Mkt     | Jan    |  80000
+...
+
+Pivot: Long → Wide
+Unpivot (stack): Wide → Long
+```
+
+## Setup
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, expr, sum as spark_sum, avg
+
+spark = SparkSession.builder.appName("PivotDemo").getOrCreate()
+
+# Long format data
+sales = spark.createDataFrame([
+    ("Engineering", "Q1", 310000),
+    ("Engineering", "Q2", 380000),
+    ("Engineering", "Q3", 420000),
+    ("Engineering", "Q4", 450000),
+    ("Marketing",   "Q1", 240000),
+    ("Marketing",   "Q2", 280000),
+    ("Marketing",   "Q3", 260000),
+    ("Marketing",   "Q4", 310000),
+    ("HR",          "Q1", 180000),
+    ("HR",          "Q2", 185000),
+    ("HR",          "Q3", 190000),
+    ("HR",          "Q4", 200000),
+], ["dept", "quarter", "revenue"])
+```
+
+## pivot - Long to Wide
+
+`pivot(column)` rotates unique values of `column` into separate columns.
+
+```python
+# Basic pivot: dept as rows, quarter as columns, sum of revenue as values
+wide_df = sales.groupBy("dept").pivot("quarter").sum("revenue")
+wide_df.show()
+# +-----------+------+------+------+------+
+# |       dept|    Q1|    Q2|    Q3|    Q4|
+# +-----------+------+------+------+------+
+# |Engineering|310000|380000|420000|450000|
+# |         HR|180000|185000|190000|200000|
+# |  Marketing|240000|280000|260000|310000|
+# +-----------+------+------+------+------+
+```
+
+### Specify Pivot Values - Avoid Extra Scan
+
+Without explicit values, Spark scans the data twice to find distinct values. Always specify them in production:
+
+```python
+# ✅ Specify pivot values explicitly - one scan, deterministic column order
+wide_df = sales.groupBy("dept") \
+               .pivot("quarter", ["Q1", "Q2", "Q3", "Q4"]) \
+               .sum("revenue")
+wide_df.show()
+```
+
+### Pivot with Different Aggregations
+
+```python
+# Average instead of sum
+sales.groupBy("dept").pivot("quarter", ["Q1","Q2","Q3","Q4"]).avg("revenue").show()
+
+# agg() for named output columns
+sales.groupBy("dept").pivot("quarter", ["Q1","Q2","Q3","Q4"]).agg(
+    spark_sum("revenue").alias("total")
+).show()
+
+# Multiple aggregations - each pivot value gets multiple columns
+products = spark.createDataFrame([
+    ("Laptop", "Q1", 10, 50000),
+    ("Laptop", "Q2", 12, 52000),
+    ("Mouse",  "Q1", 50,   800),
+    ("Mouse",  "Q2", 45,   820),
+], ["product", "quarter", "units", "price"])
+
+products.groupBy("product").pivot("quarter", ["Q1","Q2"]).agg(
+    spark_sum("units").alias("units_sold"),
+    avg("price").alias("avg_price")
+).show()
+# +-------+----------+-----------+----------+-----------+
+# |product|Q1_units..|Q1_avg_price|Q2_units..|Q2_avg_price|
+# ...
+```
+
+### Pivot with Missing Values
+
+When a combination doesn't exist, the cell becomes null:
+
+```python
+# If HR has no Q4 data, Q4 column will be null for HR row
+# Use fillna to replace with 0
+wide_df = sales.groupBy("dept").pivot("quarter", ["Q1","Q2","Q3","Q4"]).sum("revenue")
+wide_df.fillna(0).show()
+```
+
+## Unpivot - Wide to Long
+
+PySpark doesn't have a native `unpivot()` function. Use `stack()` via `selectExpr()` or `expr()`.
+
+```python
+# Wide format
+wide_df = spark.createDataFrame([
+    ("Engineering", 310000, 380000, 420000, 450000),
+    ("Marketing",   240000, 280000, 260000, 310000),
+    ("HR",          180000, 185000, 190000, 200000),
+], ["dept", "Q1", "Q2", "Q3", "Q4"])
+wide_df.show()
+```
+
+### stack() Expression - Unpivot
+
+```python
+# stack(n, col1_name, col1, col2_name, col2, ...)
+# n = number of pivot columns
+# Returns rows: (col1_name, col1), (col2_name, col2), ...
+
+long_df = wide_df.selectExpr(
+    "dept",
+    "stack(4, 'Q1', Q1, 'Q2', Q2, 'Q3', Q3, 'Q4', Q4) as (quarter, revenue)"
+)
+long_df.show()
+# +-----------+-------+-------+
+# |       dept|quarter|revenue|
+# +-----------+-------+-------+
+# |Engineering|     Q1| 310000|
+# |Engineering|     Q2| 380000|
+# |Engineering|     Q3| 420000|
+# |Engineering|     Q4| 450000|
+# |  Marketing|     Q1| 240000|
+# ...
+
+# Same using expr()
+from pyspark.sql.functions import expr
+long_df = wide_df.select(
+    "dept",
+    expr("stack(4, 'Q1', Q1, 'Q2', Q2, 'Q3', Q3, 'Q4', Q4) as (quarter, revenue)")
+)
+```
+
+### Dynamic Unpivot - When Column Names Are Variable
+
+```python
+# When you don't know the pivot columns in advance
+pivot_cols = ["Q1", "Q2", "Q3", "Q4"]   # or discover from df.columns
+
+# Build stack expression programmatically
+n = len(pivot_cols)
+stack_expr = f"stack({n}, {', '.join([f\"'{c}', {c}\" for c in pivot_cols])}) as (quarter, revenue)"
+# stack(4, 'Q1', Q1, 'Q2', Q2, 'Q3', Q3, 'Q4', Q4) as (quarter, revenue)
+
+long_df = wide_df.select(["dept"] + [expr(stack_expr)])
+# Alternative - keeping non-pivot cols
+long_df = wide_df.selectExpr(
+    *[c for c in wide_df.columns if c not in pivot_cols],  # keep ID columns
+    stack_expr
+)
+long_df.show()
+```
+
+## Unpivot with Spark 3.4+ (Native unpivot)
+
+Spark 3.4 introduced a native `unpivot()` method:
+
+```python
+# Spark 3.4+
+long_df = wide_df.unpivot(
+    ids=["dept"],
+    values=["Q1", "Q2", "Q3", "Q4"],
+    variableColumnName="quarter",
+    valueColumnName="revenue"
+)
+long_df.show()
+```
+
+## SQL Approach
+
+```python
+wide_df.createOrReplaceTempView("wide_sales")
+sales.createOrReplaceTempView("long_sales")
+
+# Pivot in SQL
+spark.sql("""
+    SELECT dept,
+           SUM(CASE WHEN quarter = 'Q1' THEN revenue END) AS Q1,
+           SUM(CASE WHEN quarter = 'Q2' THEN revenue END) AS Q2,
+           SUM(CASE WHEN quarter = 'Q3' THEN revenue END) AS Q3,
+           SUM(CASE WHEN quarter = 'Q4' THEN revenue END) AS Q4
+    FROM long_sales
+    GROUP BY dept
+""").show()
+
+# Unpivot in SQL using stack
+spark.sql("""
+    SELECT dept, quarter, revenue
+    FROM wide_sales
+    LATERAL VIEW EXPLODE(
+        MAP('Q1', Q1, 'Q2', Q2, 'Q3', Q3, 'Q4', Q4)
+    ) AS quarter, revenue
+""").show()
+```
+
+## Real-World Pattern: Monthly Report
+
+```python
+# Input: transactional log (long format)
+transactions = spark.read.parquet("transactions.parquet")
+# columns: dept, product, month, amount
+
+# Pivot to report: rows=dept, columns=month (Jan-Dec), values=sum(amount)
+report = transactions \
+    .groupBy("dept") \
+    .pivot("month", ["Jan","Feb","Mar","Apr","May","Jun",
+                     "Jul","Aug","Sep","Oct","Nov","Dec"]) \
+    .agg(spark_sum("amount").alias("total")) \
+    .fillna(0) \
+    .orderBy("dept")
+
+report.show()
+```
+
+## Summary
+
+- `pivot(column)` rotates unique values of a column into new columns - collapses rows into columns
+- Always specify pivot values explicitly with `.pivot("col", [val1, val2, ...])` in production (avoids double scan)
+- `fillna(0)` after pivot handles missing combinations
+- **Unpivot** = inverse of pivot, uses `stack()` SQL function via `selectExpr()`
+- Spark 3.4+ has native `df.unpivot()` method
+- Use `stack(n, 'name1', col1, 'name2', col2, ...)` syntax - n = number of value columns
+- Build stack expressions dynamically from `df.columns` for generic unpivot utilities

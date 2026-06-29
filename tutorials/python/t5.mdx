@@ -1,0 +1,127 @@
+## Basic if/elif/else
+
+```python
+age = 20
+
+if age < 13:
+    print("Child")
+elif age < 18:
+    print("Teenager")
+elif age < 65:
+    print("Adult")
+else:
+    print("Senior")
+# Adult
+```
+
+## Comparison Operators
+
+```python
+x = 10
+x == 10    # True  - equal
+x != 5     # True  - not equal
+x > 5      # True  - greater than
+x < 20     # True  - less than
+x >= 10    # True  - greater than or equal
+x <= 10    # True  - less than or equal
+```
+
+## Logical Operators
+
+```python
+age = 25
+income = 50000
+
+# and - both must be True
+if age >= 18 and income >= 30000:
+    print("Eligible for loan")
+
+# or - at least one must be True
+if age < 10 or age > 65:
+    print("Discounted ticket")
+
+# not - negates
+logged_in = False
+if not logged_in:
+    print("Please log in")
+```
+
+## Chained Comparisons
+
+```python
+# Python allows chaining comparisons
+x = 15
+if 10 < x < 20:
+    print("x is between 10 and 20")   # prints
+
+# Equivalent to:
+if 10 < x and x < 20:
+    print("x is between 10 and 20")
+```
+
+## Conditional Expression (Ternary)
+
+```python
+# value_if_true if condition else value_if_false
+age = 20
+label = "Adult" if age >= 18 else "Minor"
+print(label)   # Adult
+
+# Assign based on condition
+score = 85
+grade = "A" if score >= 90 else "B" if score >= 80 else "C"
+print(grade)   # B
+```
+
+## Truthiness in Conditions
+
+```python
+# Python evaluates the truthiness of any value in an if statement
+name = "Alice"
+if name:            # True - non-empty string
+    print("Name is set")
+
+items = []
+if not items:       # True - empty list is falsy
+    print("No items")
+
+value = None
+if value is None:   # explicit None check (preferred)
+    print("Value is None")
+```
+
+## match Statement (Python 3.10+)
+
+```python
+command = "quit"
+
+match command:
+    case "quit":
+        print("Quitting...")
+    case "help":
+        print("Showing help")
+    case "start" | "begin":
+        print("Starting...")
+    case _:             # default case
+        print(f"Unknown command: {command}")
+```
+
+## Interview Questions
+
+**Q: What is the difference between `==` and `is`?**
+`==` checks value equality - are the contents the same? `is` checks identity - are they the same object in memory? Use `==` for value comparison and `is` only for comparing to `None`, `True`, or `False`.
+
+**Q: What is a ternary expression in Python?**
+`value_if_true if condition else value_if_false`. It's a one-line if/else for assigning a value based on a condition: `label = "Pass" if score >= 50 else "Fail"`.
+
+**Q: How does Python evaluate `and` and `or`?**
+Both use short-circuit evaluation. `and` returns the first falsy value, or the last value if all are truthy. `or` returns the first truthy value, or the last value if all are falsy. This means `x = value or default` assigns `default` when `value` is falsy.
+
+## Summary
+
+- `if / elif / else` - conditional branching; only one branch executes
+- Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
+- Logic: `and`, `or`, `not`; short-circuit evaluation
+- Chained comparisons: `10 < x < 20` - cleaner and idiomatic
+- Ternary: `a if condition else b` - one-line conditional assignment
+- Truthiness: empty collections, `0`, `""`, `None` are falsy; everything else is truthy

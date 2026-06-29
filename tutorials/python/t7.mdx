@@ -1,0 +1,169 @@
+## Defining and Calling Functions
+
+```python
+def greet(name):
+    print(f"Hello, {name}!")
+
+greet("Alice")   # Hello, Alice!
+
+# Function with return value
+def add(a, b):
+    return a + b
+
+result = add(3, 4)   # 7
+```
+
+## Default Parameters
+
+```python
+def greet(name, greeting="Hello"):
+    return f"{greeting}, {name}!"
+
+greet("Alice")             # "Hello, Alice!"
+greet("Bob", "Hi")         # "Hi, Bob!"
+greet("Carol", greeting="Hey")  # "Hey, Carol!"
+```
+
+## Keyword Arguments
+
+```python
+def describe_pet(name, animal="dog", age=None):
+    info = f"{name} is a {animal}"
+    if age:
+        info += f" aged {age}"
+    return info
+
+describe_pet("Max")
+describe_pet("Whiskers", animal="cat")
+describe_pet(age=5, name="Buddy")   # keyword args can be in any order
+```
+
+## Multiple Return Values
+
+```python
+def min_max(numbers):
+    return min(numbers), max(numbers)   # returns a tuple
+
+low, high = min_max([3, 1, 4, 1, 5, 9])
+print(low, high)   # 1 9
+
+# Ignore a return value
+_, high = min_max([3, 1, 4, 1, 5, 9])
+```
+
+## Docstrings
+
+```python
+def calculate_area(radius):
+    """
+    Calculate the area of a circle.
+
+    Args:
+        radius (float): The radius of the circle.
+
+    Returns:
+        float: The area of the circle.
+
+    Example:
+        >>> calculate_area(5)
+        78.53981633974483
+    """
+    import math
+    return math.pi * radius ** 2
+
+help(calculate_area)       # displays the docstring
+calculate_area.__doc__     # access docstring programmatically
+```
+
+## First-Class Functions
+
+Functions are objects in Python - they can be assigned, passed, and returned:
+
+```python
+def square(x):
+    return x ** 2
+
+# Assign to a variable
+operation = square
+operation(5)   # 25
+
+# Pass as an argument
+def apply(func, values):
+    return [func(x) for x in values]
+
+apply(square, [1, 2, 3, 4])   # [1, 4, 9, 16]
+apply(abs, [-1, -2, 3])        # [1, 2, 3]
+
+# Return a function
+def make_multiplier(n):
+    def multiplier(x):
+        return x * n
+    return multiplier
+
+double = make_multiplier(2)
+triple = make_multiplier(3)
+double(5)   # 10
+triple(5)   # 15
+```
+
+## Lambda Functions
+
+Anonymous one-line functions:
+
+```python
+square = lambda x: x ** 2
+add = lambda x, y: x + y
+
+square(5)    # 25
+add(3, 4)    # 7
+
+# Common with sorted, map, filter
+names = ["Charlie", "Alice", "Bob"]
+sorted(names, key=lambda x: len(x))   # ['Bob', 'Alice', 'Charlie']
+
+numbers = [1, 2, 3, 4, 5]
+evens = list(filter(lambda x: x % 2 == 0, numbers))   # [2, 4]
+doubled = list(map(lambda x: x * 2, numbers))          # [2, 4, 6, 8, 10]
+```
+
+## Scope
+
+```python
+x = "global"
+
+def outer():
+    x = "enclosing"
+
+    def inner():
+        x = "local"
+        print(x)   # "local" - finds local x first
+
+    inner()
+
+outer()
+print(x)   # "global" - unchanged
+```
+
+## Interview Questions
+
+**Q: What does `return` do in a function?**
+`return` exits the function and sends a value back to the caller. A function without `return` (or with bare `return`) returns `None`. You can return multiple values as a tuple: `return a, b`.
+
+**Q: What is a lambda function?**
+A lambda is an anonymous, one-line function: `lambda args: expression`. It's used for short, simple operations that don't need a full function definition - especially as arguments to `sorted()`, `map()`, `filter()`.
+
+**Q: What are first-class functions?**
+In Python, functions are first-class objects - they can be assigned to variables, passed as arguments to other functions, returned from functions, and stored in data structures. This enables functional programming patterns like decorators and callbacks.
+
+**Q: What is the difference between a function parameter and an argument?**
+A parameter is the variable in the function definition: `def greet(name)` - `name` is a parameter. An argument is the actual value passed when calling the function: `greet("Alice")` - `"Alice"` is an argument.
+
+## Summary
+
+- `def name(params): return value` - define a function
+- Default parameters: `def f(x, y=10)` - `y` defaults to 10 if not provided
+- Keyword arguments: `f(y=5, x=1)` - can pass in any order
+- Multiple return values: `return a, b` - returns a tuple; unpack with `a, b = f()`
+- Functions are first-class - assignable, passable, returnable
+- `lambda x: expr` - anonymous one-line function
+- Add docstrings with `"""..."""` immediately after `def`

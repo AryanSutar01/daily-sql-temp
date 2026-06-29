@@ -1,0 +1,257 @@
+# Data Skew & Salting Technique
+
+## What is Data Skew?
+
+**Data skew** occurs when data is unevenly distributed across partitions - some partitions have significantly more data than others. In a distributed system like Spark, all tasks in a stage must complete before the next stage begins. So if one partition has 100x more data than others, that one "straggler" task holds up the entire job.
+
+Imagine 10 workers distributing customer orders by country. If 90% of orders come from one country, one worker is overwhelmed while the rest sit idle - that's skew.
+
+---
+
+## Identifying Data Skew
+
+### 1. Spark UI Symptoms
+- Stage takes much longer than expected
+- Most tasks complete in seconds but 1-2 tasks take minutes
+- **Task duration metrics** show a huge gap between max and median task time
+
+### 2. Check Data Distribution
+
+```python
+# Check value distribution for potential join/groupBy keys
+df.groupBy("country").count().orderBy("count", ascending=False).show(20)
+```
+
+```
++----------+----------+
+|   country|     count|
++----------+----------+
+|        IN| 45000000|   ← 45M rows - heavily skewed!
+|        US|  2000000|
+|        UK|   500000|
+|        DE|   200000|
++----------+----------+
+```
+
+### 3. Check Partition Sizes
+
+```python
+# Check sizes of each partition
+from pyspark.sql.functions import spark_partition_id
+
+df.withColumn("partition_id", spark_partition_id()) \
+  .groupBy("partition_id") \
+  .count() \
+  .orderBy("count", ascending=False) \
+  .show(10)
+```
+
+---
+
+## Why Skew is Problematic
+
+```
+Tasks in Stage 2 (join on country):
+  Task 1: country=IN → 45,000,000 rows → runs for 45 minutes 😴
+  Task 2: country=US →  2,000,000 rows → completes in 2 minutes ✅
+  Task 3: country=UK →    500,000 rows → completes in 30 seconds ✅
+  ...
+
+Stage 3 cannot start until Task 1 finishes → entire job delayed by 45 minutes
+```
+
+---
+
+## Solutions for Data Skew
+
+### Solution 1: Salting (Manual)
+
+**Salting** artificially increases the cardinality of the skewed key by appending a random number (the "salt") to it. This distributes the skewed key across multiple partitions.
+
+#### How it works:
+
+```python
+import random
+from pyspark.sql import functions as F
+
+# Step 1: Add a salt column to the large (skewed) table
+SALT_FACTOR = 10  # Split skewed key into 10 buckets
+
+df_large = df_large.withColumn(
+    "salt",
+    (F.rand() * SALT_FACTOR).cast("int")
+)
+df_large = df_large.withColumn(
+    "salted_key",
+    F.concat(F.col("country"), F.lit("_"), F.col("salt"))
+)
+
+# Step 2: Explode the small (lookup) table to match the salt values
+df_small = df_small.withColumn("salt_array", F.array([F.lit(i) for i in range(SALT_FACTOR)]))
+df_small = df_small.withColumn("salt", F.explode(F.col("salt_array")))
+df_small = df_small.withColumn(
+    "salted_key",
+    F.concat(F.col("country"), F.lit("_"), F.col("salt"))
+)
+
+# Step 3: Join on the salted key
+result = df_large.join(df_small, "salted_key")
+
+# Step 4: Drop the salt columns from result
+result = result.drop("salt", "salted_key", "salt_array")
+```
+
+#### Visual explanation:
+
+```
+Before salting:
+  Large table: IN (45M rows) → goes to 1 partition
+  Small table: IN (1 row)
+
+After salting (SALT_FACTOR=5):
+  Large table: IN_0 (9M), IN_1 (9M), IN_2 (9M), IN_3 (9M), IN_4 (9M) → 5 partitions
+  Small table: IN_0 (1), IN_1 (1), IN_2 (1), IN_3 (1), IN_4 (1) → replicated 5x
+
+Now the join is evenly distributed across 5 partitions!
+```
+
+---
+
+### Solution 2: AQE Skew Join Handling (Spark 3.0+)
+
+The easiest solution - enable Adaptive Query Execution and let Spark handle skew automatically:
+
+```python
+# Enable AQE (default in Spark 3.2+)
+spark.conf.set("spark.sql.adaptive.enabled", True)
+
+# Enable skew join optimization
+spark.conf.set("spark.sql.adaptive.skewJoin.enabled", True)
+
+# Tune skew detection thresholds
+spark.conf.set("spark.sql.adaptive.skewJoin.skewedPartitionFactor", 5)
+# A partition is skewed if it's 5x larger than the median partition size
+
+spark.conf.set("spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes", "256MB")
+# Only consider partitions larger than 256MB as skewed
+```
+
+AQE automatically splits skewed partitions and replicates the matching side - similar to salting but done automatically at runtime.
+
+---
+
+### Solution 3: Broadcast Join
+
+If the smaller side is small enough, broadcast it to avoid the shuffle entirely (and thus avoid the skew problem at the join level):
+
+```python
+from pyspark.sql.functions import broadcast
+
+# If df_small is small enough (< autoBroadcastJoinThreshold)
+result = df_large.join(broadcast(df_small), "country")
+```
+
+---
+
+### Solution 4: Pre-aggregate Before Join
+
+If you only need aggregated results, aggregate the large table before joining to reduce its size:
+
+```python
+# Instead of joining 45M rows, aggregate first
+df_aggregated = df_large.groupBy("country").agg({"revenue": "sum"})
+# Now df_aggregated has one row per country - much smaller
+
+result = df_aggregated.join(df_small, "country")
+```
+
+---
+
+### Solution 5: Isolate Skewed Keys
+
+Handle skewed keys separately and union the results:
+
+```python
+# Split into skewed and non-skewed data
+skewed_keys = ["IN"]
+
+df_skewed = df_large.filter(F.col("country").isin(skewed_keys))
+df_normal = df_large.filter(~F.col("country").isin(skewed_keys))
+
+# Handle skewed data with broadcast join
+result_skewed = df_skewed.join(broadcast(df_small.filter(F.col("country").isin(skewed_keys))), "country")
+
+# Handle normal data with regular join
+result_normal = df_normal.join(df_small.filter(~F.col("country").isin(skewed_keys)), "country")
+
+# Combine results
+result = result_skewed.union(result_normal)
+```
+
+---
+
+## Full Salting Example
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
+
+spark = SparkSession.builder.appName("SkewDemo").getOrCreate()
+
+# Simulate a skewed dataset
+orders = spark.createDataFrame([
+    ("IN", 100), ("IN", 200), ("IN", 150),  # heavily skewed
+    ("US", 300), ("UK", 250)
+] * 1000, ["country", "amount"])
+
+# Small lookup table
+country_info = spark.createDataFrame([
+    ("IN", "India"), ("US", "United States"), ("UK", "United Kingdom")
+], ["country", "country_name"])
+
+SALT = 3
+
+# Salt the large table
+orders_salted = orders.withColumn("salt", (F.rand() * SALT).cast("int")) \
+                      .withColumn("country_salt", F.concat(F.col("country"), F.lit("_"), F.col("salt")))
+
+# Explode the small table
+country_salted = country_info \
+    .withColumn("salt_array", F.array([F.lit(i) for i in range(SALT)])) \
+    .withColumn("salt", F.explode("salt_array")) \
+    .withColumn("country_salt", F.concat(F.col("country"), F.lit("_"), F.col("salt"))) \
+    .drop("salt_array", "salt", "country")
+
+# Join on salted key
+result = orders_salted.join(country_salted, "country_salt") \
+                      .drop("salt", "country_salt")
+
+result.show()
+```
+
+---
+
+## Interview Tips 🎯
+
+> **Q: What is data skew in Spark and how does it affect performance?**
+
+**Answer:** Data skew occurs when data is unevenly distributed across partitions - one or a few partitions have significantly more rows than others. Since Spark waits for all tasks in a stage to complete before proceeding, a skewed partition becomes a straggler that delays the entire job. The affected task may take 10-100x longer than others while other executors sit idle.
+
+> **Q: What is the salting technique and when do you use it?**
+
+**Answer:** Salting is a technique to break up a skewed key into multiple sub-keys by appending a random number (salt). The large skewed table gets a random salt value (0 to N-1) appended to the key, distributing rows across N partitions. The smaller lookup table is replicated N times with each salt value appended, so joins still match correctly. This is used when a join key has very high cardinality imbalance - e.g., one value accounts for 80% of rows.
+
+> **Q: How does AQE help with data skew?**
+
+**Answer:** In Spark 3.0+, Adaptive Query Execution (AQE) can automatically detect skewed partitions at runtime and split them into smaller sub-partitions, replicating the matching data from the other side. This is essentially automated salting - you just need to enable `spark.sql.adaptive.skewJoin.enabled=True` and tune the skew detection thresholds.
+
+---
+
+## Summary
+
+- **Data skew** = uneven data distribution → straggler tasks → slow jobs
+- Detect skew by checking value distribution (`groupBy().count()`) or Spark UI task metrics
+- **Salting** manually distributes skewed keys across multiple partitions by adding a random salt
+- **AQE skew join** (Spark 3.0+) automatically handles skew at runtime - prefer this when available
+- Other options: **broadcast join** (if one side is small), **pre-aggregation**, or **isolating skewed keys**
+- Salting increases the size of the small table (replicated N times) - choose salt factor wisely

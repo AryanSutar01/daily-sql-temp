@@ -1,0 +1,363 @@
+# PySpark MLlib Basics
+
+## What is MLlib?
+
+**MLlib** is Apache Spark's built-in machine learning library. It provides scalable ML algorithms, feature engineering utilities, and model evaluation tools that run in a distributed fashion across a Spark cluster.
+
+MLlib comes in two forms:
+- **`pyspark.ml`** (DataFrame-based API - recommended, newer)
+- **`pyspark.mllib`** (RDD-based API - legacy, still supported)
+
+Always use `pyspark.ml` for new projects.
+
+---
+
+## Why MLlib?
+
+| Scenario | Tool |
+|---|---|
+| Dataset fits in memory (< a few GB) | scikit-learn, XGBoost |
+| Dataset is too large for one machine | PySpark MLlib |
+| Need to combine ETL + ML in one job | PySpark MLlib |
+| Streaming ML / online learning | PySpark MLlib |
+
+MLlib shines when your training data is **too large to fit on a single machine** or when your data is already in Spark (e.g., in a Delta Lake table) and you want to avoid moving it out.
+
+---
+
+## Core Concepts: Transformers, Estimators, and Pipelines
+
+MLlib follows a clean API pattern:
+
+```
+Transformer: Takes a DataFrame, adds one or more columns, returns DataFrame
+             e.g. VectorAssembler, StandardScaler, StringIndexer
+
+Estimator:   Learns from data (has a .fit() method), returns a Transformer
+             e.g. LogisticRegression, RandomForestClassifier, KMeans
+
+Pipeline:    Chains multiple Transformers and Estimators into one workflow
+             Call .fit() on the Pipeline once - applies all stages in order
+```
+
+---
+
+## Feature Engineering
+
+### VectorAssembler - Combine features into one vector column
+
+```python
+from pyspark.ml.feature import VectorAssembler
+
+assembler = VectorAssembler(
+    inputCols=["age", "income", "num_purchases", "days_since_last_order"],
+    outputCol="features"
+)
+
+df_assembled = assembler.transform(df)
+df_assembled.select("features").show(3, truncate=False)
+# [23.0, 55000.0, 12.0, 7.0]
+```
+
+### StringIndexer - Encode categorical strings to numbers
+
+```python
+from pyspark.ml.feature import StringIndexer
+
+indexer = StringIndexer(inputCol="category", outputCol="category_index")
+model = indexer.fit(df)
+df_indexed = model.transform(df)
+# "electronics" → 0.0, "clothing" → 1.0, "books" → 2.0
+```
+
+### OneHotEncoder - Convert indexed categories to binary vectors
+
+```python
+from pyspark.ml.feature import OneHotEncoder
+
+encoder = OneHotEncoder(inputCols=["category_index"], outputCols=["category_vec"])
+model = encoder.fit(df_indexed)
+df_encoded = model.transform(df_indexed)
+# category_index=0 → [1.0, 0.0, 0.0]
+# category_index=1 → [0.0, 1.0, 0.0]
+```
+
+### StandardScaler - Normalize features
+
+```python
+from pyspark.ml.feature import StandardScaler
+
+scaler = StandardScaler(inputCol="features", outputCol="scaled_features",
+                        withStd=True, withMean=True)
+scaler_model = scaler.fit(df_assembled)
+df_scaled = scaler_model.transform(df_assembled)
+```
+
+### Other useful feature transformers:
+```python
+from pyspark.ml.feature import (
+    Tokenizer,           # Split text into words
+    StopWordsRemover,    # Remove stop words
+    HashingTF,           # Term frequency hashing
+    IDF,                 # TF-IDF
+    PCA,                 # Dimensionality reduction
+    Bucketizer,          # Bin continuous values
+    Normalizer           # L1/L2 normalization
+)
+```
+
+---
+
+## Classification
+
+### Logistic Regression
+
+```python
+from pyspark.ml.classification import LogisticRegression
+from pyspark.ml.feature import VectorAssembler
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("MLDemo").getOrCreate()
+
+# Load data
+df = spark.read.csv("data/churn.csv", header=True, inferSchema=True)
+
+# Assemble features
+assembler = VectorAssembler(
+    inputCols=["tenure", "monthly_charges", "num_products"],
+    outputCol="features"
+)
+df_features = assembler.transform(df)
+
+# Train/test split
+train_df, test_df = df_features.randomSplit([0.8, 0.2], seed=42)
+
+# Train model
+lr = LogisticRegression(featuresCol="features", labelCol="churn", maxIter=100)
+lr_model = lr.fit(train_df)
+
+# Predict
+predictions = lr_model.transform(test_df)
+predictions.select("churn", "prediction", "probability").show(5)
+```
+
+### Random Forest Classifier
+
+```python
+from pyspark.ml.classification import RandomForestClassifier
+
+rf = RandomForestClassifier(
+    featuresCol="features",
+    labelCol="label",
+    numTrees=100,
+    maxDepth=5,
+    seed=42
+)
+rf_model = rf.fit(train_df)
+predictions = rf_model.transform(test_df)
+
+# Feature importance
+print(rf_model.featureImportances)
+```
+
+### Other classifiers:
+```python
+from pyspark.ml.classification import (
+    DecisionTreeClassifier,
+    GBTClassifier,            # Gradient Boosted Trees
+    LinearSVC,
+    NaiveBayes,
+    MultilayerPerceptronClassifier  # Neural network
+)
+```
+
+---
+
+## Regression
+
+```python
+from pyspark.ml.regression import LinearRegression, RandomForestRegressor, GBTRegressor
+
+# Linear regression
+lr = LinearRegression(featuresCol="features", labelCol="price", maxIter=100, regParam=0.1)
+lr_model = lr.fit(train_df)
+
+print(f"Coefficients: {lr_model.coefficients}")
+print(f"Intercept: {lr_model.intercept}")
+print(f"RMSE: {lr_model.summary.rootMeanSquaredError}")
+print(f"R²: {lr_model.summary.r2}")
+```
+
+---
+
+## Clustering
+
+### K-Means
+
+```python
+from pyspark.ml.clustering import KMeans
+
+kmeans = KMeans(featuresCol="features", k=5, seed=42, maxIter=20)
+kmeans_model = kmeans.fit(df_features)
+
+# Assign clusters
+clustered = kmeans_model.transform(df_features)
+clustered.select("features", "prediction").show(10)
+
+# Cluster centers
+print(kmeans_model.clusterCenters())
+
+# Silhouette score (cluster quality)
+from pyspark.ml.evaluation import ClusteringEvaluator
+evaluator = ClusteringEvaluator()
+silhouette = evaluator.evaluate(clustered)
+print(f"Silhouette: {silhouette}")
+```
+
+---
+
+## Model Evaluation
+
+```python
+from pyspark.ml.evaluation import (
+    BinaryClassificationEvaluator,
+    MulticlassClassificationEvaluator,
+    RegressionEvaluator
+)
+
+# Binary classification
+binary_eval = BinaryClassificationEvaluator(
+    labelCol="label",
+    rawPredictionCol="rawPrediction",
+    metricName="areaUnderROC"   # or "areaUnderPR"
+)
+auc = binary_eval.evaluate(predictions)
+print(f"AUC-ROC: {auc}")
+
+# Multi-class
+multi_eval = MulticlassClassificationEvaluator(
+    labelCol="label",
+    predictionCol="prediction",
+    metricName="accuracy"  # or "f1", "weightedPrecision", "weightedRecall"
+)
+accuracy = multi_eval.evaluate(predictions)
+
+# Regression
+reg_eval = RegressionEvaluator(
+    labelCol="price",
+    predictionCol="prediction",
+    metricName="rmse"   # or "mse", "r2", "mae"
+)
+rmse = reg_eval.evaluate(predictions)
+```
+
+---
+
+## Pipelines (Best Practice)
+
+Pipelines combine preprocessing and modeling into one reusable unit:
+
+```python
+from pyspark.ml import Pipeline
+from pyspark.ml.feature import StringIndexer, VectorAssembler, StandardScaler
+from pyspark.ml.classification import RandomForestClassifier
+from pyspark.ml.evaluation import BinaryClassificationEvaluator
+
+df = spark.read.csv("data/churn.csv", header=True, inferSchema=True)
+train_df, test_df = df.randomSplit([0.8, 0.2], seed=42)
+
+# Stage 1: Encode categorical column
+indexer = StringIndexer(inputCol="plan_type", outputCol="plan_index")
+
+# Stage 2: Assemble all features
+assembler = VectorAssembler(
+    inputCols=["tenure", "monthly_charges", "num_products", "plan_index"],
+    outputCol="features"
+)
+
+# Stage 3: Scale features
+scaler = StandardScaler(inputCol="features", outputCol="scaled_features")
+
+# Stage 4: Train classifier
+rf = RandomForestClassifier(
+    featuresCol="scaled_features",
+    labelCol="churn",
+    numTrees=100
+)
+
+# Build pipeline
+pipeline = Pipeline(stages=[indexer, assembler, scaler, rf])
+
+# Fit entire pipeline on training data (all stages are chained automatically)
+pipeline_model = pipeline.fit(train_df)
+
+# Predict on test data (same preprocessing applied automatically)
+predictions = pipeline_model.transform(test_df)
+
+# Evaluate
+evaluator = BinaryClassificationEvaluator(labelCol="churn")
+auc = evaluator.evaluate(predictions)
+print(f"AUC: {auc}")
+
+# Save and reload the pipeline model
+pipeline_model.save("s3://my-bucket/models/churn-model-v1")
+
+from pyspark.ml import PipelineModel
+loaded_model = PipelineModel.load("s3://my-bucket/models/churn-model-v1")
+```
+
+---
+
+## Hyperparameter Tuning
+
+```python
+from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
+
+# Build parameter grid
+param_grid = ParamGridBuilder() \
+    .addGrid(rf.numTrees, [50, 100, 200]) \
+    .addGrid(rf.maxDepth, [3, 5, 10]) \
+    .build()
+
+# Cross-validation
+cv = CrossValidator(
+    estimator=pipeline,
+    estimatorParamMaps=param_grid,
+    evaluator=BinaryClassificationEvaluator(labelCol="churn"),
+    numFolds=3,
+    parallelism=4   # Run 4 fits in parallel
+)
+
+cv_model = cv.fit(train_df)
+best_model = cv_model.bestModel
+
+print(f"Best numTrees: {best_model.stages[-1].getNumTrees}")
+```
+
+---
+
+## Interview Tips 🎯
+
+> **Q: What is the difference between pyspark.ml and pyspark.mllib?**
+
+**Answer:** `pyspark.ml` is the newer, DataFrame-based API and is the recommended way to use MLlib. It supports Pipelines, a cleaner API, and integrates naturally with DataFrame operations. `pyspark.mllib` is the legacy RDD-based API - it's still available but in maintenance mode and not recommended for new projects.
+
+> **Q: What is a Pipeline in PySpark MLlib?**
+
+**Answer:** A Pipeline chains multiple Transformers (feature engineering steps) and Estimators (model training steps) into a single object. You call `.fit()` once on the Pipeline with training data - each stage is applied in order, with each Estimator fitted and converted to a Transformer automatically. When you call `.transform()` on new data, all stages are applied in the same sequence. This prevents data leakage (preprocessing is fitted only on training data) and makes the workflow reproducible and deployable.
+
+> **Q: When would you use MLlib over scikit-learn?**
+
+**Answer:** Use MLlib when your training data doesn't fit on a single machine (typically > a few GB) or when your data is already in a Spark DataFrame (e.g., from a Delta Lake table) and you want to avoid the overhead of moving it out. For smaller datasets, scikit-learn is faster, has more algorithms, and is simpler to use. A common pattern is to use PySpark for data preparation and feature engineering, then export to Pandas for scikit-learn training if the data fits in memory.
+
+---
+
+## Summary
+
+- **MLlib** (`pyspark.ml`) is Spark's distributed ML library - use it for large-scale training
+- Core abstractions: **Transformer** (transform data), **Estimator** (fit model), **Pipeline** (chain both)
+- Feature engineering: `VectorAssembler`, `StringIndexer`, `OneHotEncoder`, `StandardScaler`
+- Algorithms: classification (LogisticRegression, RandomForest, GBT), regression, clustering (KMeans)
+- **Pipelines** are best practice - prevent data leakage, enable reproducibility, support save/load
+- **CrossValidator** + `ParamGridBuilder` for hyperparameter tuning
+- Use MLlib when data is too large for a single machine; use scikit-learn for smaller datasets

@@ -1,0 +1,175 @@
+## What Is a Module?
+
+A module is any `.py` file. When you import it, Python executes the file and gives you access to everything defined in it.
+
+```python
+# math_utils.py
+PI = 3.14159
+
+def area(radius):
+    return PI * radius ** 2
+
+def perimeter(radius):
+    return 2 * PI * radius
+```
+
+## Importing Modules
+
+```python
+# Import the whole module
+import math_utils
+math_utils.area(5)
+math_utils.PI
+
+# Import specific names
+from math_utils import area, PI
+area(5)   # no prefix needed
+PI
+
+# Import everything (avoid in production)
+from math_utils import *
+area(5)
+
+# Import with alias
+import math_utils as mu
+mu.area(5)
+
+from math_utils import area as circle_area
+circle_area(5)
+```
+
+## Python Standard Library
+
+```python
+import math
+math.pi          # 3.14159...
+math.sqrt(16)    # 4.0
+math.ceil(4.2)   # 5
+math.floor(4.9)  # 4
+
+import os
+os.getcwd()                    # current working directory
+os.listdir(".")                # list files in current dir
+os.path.exists("file.txt")    # check if file exists
+os.environ.get("HOME")        # environment variable
+
+import sys
+sys.argv          # command line arguments
+sys.path          # list of directories Python searches for modules
+sys.version       # Python version string
+sys.exit(0)       # exit the program
+
+import datetime
+datetime.date.today()
+datetime.datetime.now()
+
+import random
+random.randint(1, 10)    # random int in range
+random.choice([1,2,3])  # random element
+random.shuffle(lst)     # shuffle in place
+
+import re
+re.search(r"\d+", "abc123")   # find digits
+
+import json, csv, pathlib, collections, itertools, functools
+```
+
+## Packages - Organizing Modules
+
+A package is a directory with an `__init__.py` file:
+
+```
+my_package/
+├── __init__.py       # makes it a package
+├── core.py
+├── utils.py
+└── models/
+    ├── __init__.py
+    └── user.py
+```
+
+```python
+# Import from package
+from my_package import core
+from my_package.utils import helper_function
+from my_package.models.user import User
+```
+
+## `__init__.py`
+
+```python
+# my_package/__init__.py
+# Controls what's available when you do: from my_package import *
+
+from .core import process       # expose at package level
+from .utils import format_data
+
+__version__ = "1.0.0"
+__all__ = ["process", "format_data"]   # controls * imports
+```
+
+## `if __name__ == "__main__"`
+
+```python
+# script.py
+def main():
+    print("Running as a script")
+
+def helper():
+    return 42
+
+if __name__ == "__main__":
+    main()
+    # This block only runs when the file is executed directly
+    # NOT when it's imported as a module
+
+# When you run: python script.py → __name__ == "__main__" → main() runs
+# When you do: import script → __name__ == "script" → main() does NOT run
+```
+
+## Relative vs Absolute Imports
+
+```python
+# Absolute import (preferred)
+from my_package.utils import helper
+
+# Relative import (within a package)
+from . import utils           # same package
+from .utils import helper     # specific name from same package
+from ..models import User     # parent package
+```
+
+## `sys.path` - Where Python Looks for Modules
+
+```python
+import sys
+print(sys.path)
+# ['', '/usr/lib/python311.zip', '/usr/lib/python3.11', ...]
+
+# Add a path at runtime (not recommended for production)
+sys.path.append("/path/to/my/modules")
+```
+
+## Interview Questions
+
+**Q: What is the difference between `import module` and `from module import name`?**
+`import module` imports the entire module - you access names with `module.name`. `from module import name` imports a specific name into the current namespace - you use `name` directly. The module itself is still fully loaded in both cases.
+
+**Q: What does `if __name__ == "__main__"` do?**
+`__name__` is a special variable. When a script is run directly, `__name__` is `"__main__"`. When the same file is imported as a module, `__name__` is the module's name. This guard prevents setup/run code from executing when the file is imported.
+
+**Q: What is `__init__.py` used for?**
+It marks a directory as a Python package, allowing it to be imported. It can also expose names at the package level - so users can do `from my_package import func` instead of `from my_package.submodule import func`.
+
+**Q: What is `sys.path`?**
+`sys.path` is a list of directories that Python searches when you import a module. It includes the current directory, standard library paths, and site-packages (where pip installs). You can add directories to it, but it's better to install packages properly with pip.
+
+## Summary
+
+- A module is any `.py` file; a package is a directory with `__init__.py`
+- `import module` - access with `module.name`
+- `from module import name` - use `name` directly in current namespace
+- `import module as alias` - use a shorter name
+- `if __name__ == "__main__"` - code that only runs when the script is executed directly, not when imported
+- `__init__.py` - marks a directory as a package; controls what's exposed at the package level
+- Standard library: `math`, `os`, `sys`, `datetime`, `random`, `json`, `csv`, `pathlib`, `re`

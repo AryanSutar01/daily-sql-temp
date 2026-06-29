@@ -1,0 +1,322 @@
+## Why Testing Matters
+
+Tests verify your code behaves as expected - and catch regressions when you make changes later.
+
+```
+Without tests: "I think it works"
+With tests:    "I know it works, and I'll know immediately if it breaks"
+```
+
+Python has two main testing tools:
+- **`unittest`** - built-in, class-based, verbose
+- **`pytest`** - third-party, minimal syntax, more powerful, industry standard
+
+## unittest - Built-in Testing Framework
+
+```python
+# math_utils.py
+def add(a, b):
+    return a + b
+
+def divide(a, b):
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
+    return a / b
+```
+
+```python
+# test_math_utils.py
+import unittest
+from math_utils import add, divide
+
+class TestMathUtils(unittest.TestCase):
+
+    def test_add_positive_numbers(self):
+        result = add(2, 3)
+        self.assertEqual(result, 5)
+
+    def test_add_negative_numbers(self):
+        self.assertEqual(add(-1, -2), -3)
+
+    def test_add_zero(self):
+        self.assertEqual(add(5, 0), 5)
+
+    def test_divide_normal(self):
+        self.assertAlmostEqual(divide(10, 3), 3.333, places=2)
+
+    def test_divide_by_zero(self):
+        with self.assertRaises(ValueError):
+            divide(10, 0)
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+```bash
+python -m unittest test_math_utils.py
+# or discover all test files
+python -m unittest discover
+```
+
+### Common unittest Assertions
+
+```python
+self.assertEqual(a, b)          # a == b
+self.assertNotEqual(a, b)       # a != b
+self.assertTrue(expr)           # bool(expr) is True
+self.assertFalse(expr)          # bool(expr) is False
+self.assertIsNone(x)            # x is None
+self.assertIsNotNone(x)         # x is not None
+self.assertIn(a, b)             # a in b
+self.assertNotIn(a, b)          # a not in b
+self.assertRaises(ExcType, fn)  # fn raises ExcType
+self.assertAlmostEqual(a, b)    # a ≈ b (for floats)
+self.assertIsInstance(obj, cls) # isinstance(obj, cls)
+```
+
+### setUp and tearDown
+
+```python
+import unittest
+
+class TestDatabase(unittest.TestCase):
+
+    def setUp(self):
+        # runs before EACH test method
+        self.db = {"users": [], "orders": []}
+
+    def tearDown(self):
+        # runs after EACH test method
+        self.db.clear()
+
+    @classmethod
+    def setUpClass(cls):
+        # runs once before ALL tests in the class
+        print("Setting up test database...")
+
+    @classmethod
+    def tearDownClass(cls):
+        # runs once after ALL tests in the class
+        print("Tearing down test database...")
+
+    def test_add_user(self):
+        self.db["users"].append("Alice")
+        self.assertIn("Alice", self.db["users"])
+
+    def test_db_starts_empty(self):
+        self.assertEqual(len(self.db["users"]), 0)
+```
+
+## pytest - The Modern Standard
+
+```bash
+pip install pytest
+
+# Run all tests
+pytest
+
+# Run a specific file
+pytest test_math_utils.py
+
+# Run with verbose output
+pytest -v
+
+# Run a specific test
+pytest test_math_utils.py::test_add_positive_numbers
+```
+
+```python
+# test_math_utils.py - pytest style (no classes needed)
+from math_utils import add, divide
+import pytest
+
+def test_add_positive():
+    assert add(2, 3) == 5
+
+def test_add_negative():
+    assert add(-1, -2) == -3
+
+def test_divide_normal():
+    assert divide(10, 2) == 5.0
+
+def test_divide_by_zero():
+    with pytest.raises(ValueError, match="Cannot divide by zero"):
+        divide(10, 0)
+```
+
+### Fixtures - pytest's Setup/Teardown
+
+```python
+import pytest
+
+@pytest.fixture
+def sample_user():
+    return {"name": "Alice", "age": 30, "email": "alice@example.com"}
+
+@pytest.fixture
+def empty_cart():
+    return []
+
+def test_user_name(sample_user):
+    assert sample_user["name"] == "Alice"
+
+def test_user_is_adult(sample_user):
+    assert sample_user["age"] >= 18
+
+def test_cart_is_empty(empty_cart):
+    assert len(empty_cart) == 0
+```
+
+### Fixtures with Scope and Teardown
+
+```python
+import pytest
+
+@pytest.fixture(scope="module")   # shared across all tests in the module
+def db_connection():
+    conn = {"connected": True, "data": []}
+    yield conn                    # yield instead of return enables teardown
+    conn["connected"] = False     # teardown runs after all tests complete
+    print("DB connection closed")
+
+def test_connection_active(db_connection):
+    assert db_connection["connected"] is True
+
+def test_insert_data(db_connection):
+    db_connection["data"].append("record1")
+    assert "record1" in db_connection["data"]
+```
+
+### Parametrize - Test Multiple Cases Cleanly
+
+```python
+import pytest
+from math_utils import add
+
+@pytest.mark.parametrize("a, b, expected", [
+    (2, 3, 5),
+    (-1, 1, 0),
+    (0, 0, 0),
+    (100, -50, 50),
+    (1.5, 2.5, 4.0),
+])
+def test_add(a, b, expected):
+    assert add(a, b) == expected
+
+# Instead of writing 5 separate tests - all run automatically
+```
+
+## Mocking - Isolating External Dependencies
+
+```python
+from unittest.mock import Mock, patch, MagicMock
+
+# Mock an object
+mock_service = Mock()
+mock_service.get_user.return_value = {"name": "Alice", "id": 1}
+result = mock_service.get_user(1)
+print(result)   # {'name': 'Alice', 'id': 1}
+
+# Verify a method was called
+mock_service.get_user.assert_called_once_with(1)
+```
+
+```python
+# patch - replace a real dependency with a mock during a test
+import requests
+from unittest.mock import patch
+
+def get_github_user(username):
+    response = requests.get(f"https://api.github.com/users/{username}")
+    return response.json()
+
+def test_get_github_user():
+    mock_response = Mock()
+    mock_response.json.return_value = {"login": "alice", "id": 123}
+
+    with patch("requests.get", return_value=mock_response):
+        result = get_github_user("alice")
+        assert result["login"] == "alice"
+        assert result["id"] == 123
+```
+
+```python
+# patch as a decorator
+from unittest.mock import patch
+
+@patch("requests.get")
+def test_api_call(mock_get):
+    mock_get.return_value.json.return_value = {"status": "ok"}
+    result = get_github_user("alice")
+    assert result["status"] == "ok"
+    mock_get.assert_called_once()
+```
+
+## Test Organization & Best Practices
+
+```
+project/
+├── src/
+│   ├── auth.py
+│   ├── orders.py
+│   └── utils.py
+└── tests/
+    ├── conftest.py         # shared fixtures across all test files
+    ├── test_auth.py
+    ├── test_orders.py
+    └── test_utils.py
+```
+
+```python
+# conftest.py - fixtures available to all test files without importing
+import pytest
+
+@pytest.fixture(scope="session")
+def app_config():
+    return {
+        "db_host": "localhost",
+        "db_port": 5432,
+        "debug": True,
+    }
+```
+
+```python
+# Good test naming and structure
+def test_<function>_<scenario>_<expected_result>():
+    # Arrange - set up test data
+    user = User(name="Alice", balance=1000)
+
+    # Act - call the function under test
+    result = user.withdraw(200)
+
+    # Assert - verify the result
+    assert result is True
+    assert user.balance == 800
+```
+
+## Interview Questions
+
+**Q: What is the difference between unittest and pytest?**
+`unittest` is Python's built-in framework - class-based, verbose, requires inheriting from `TestCase`. `pytest` is a third-party library with simpler syntax - no classes needed, plain `assert` statements, powerful fixtures, and parametrize. `pytest` is the industry standard for most projects.
+
+**Q: What is a fixture in pytest?**
+A fixture is a function decorated with `@pytest.fixture` that provides setup data or objects to test functions. Unlike `setUp`/`tearDown` in unittest, fixtures are composable, reusable, and can have different scopes (`function`, `module`, `session`).
+
+**Q: What is mocking and why is it used in testing?**
+Mocking replaces real dependencies (databases, APIs, file systems) with fake objects that return controlled responses. This isolates the unit being tested, making tests faster, reliable, and independent of external services.
+
+**Q: What is the Arrange-Act-Assert pattern?**
+A standard structure for writing clear tests: Arrange sets up test data and state; Act calls the function being tested; Assert verifies the result. This pattern keeps tests focused and readable.
+
+**Q: What is parametrize in pytest?**
+`@pytest.mark.parametrize` runs the same test function multiple times with different input/output combinations. This reduces duplication and ensures your function is tested against many edge cases with a single test function.
+
+## Summary
+
+- **unittest** - built-in, class-based; use `assertEqual`, `assertRaises`, `setUp`/`tearDown`
+- **pytest** - industry standard; plain `assert`, fixtures, parametrize, better output
+- **Fixtures** - reusable setup/teardown via `@pytest.fixture`; support scopes and `yield` for cleanup
+- **Parametrize** - test multiple input/output cases with one test function
+- **Mocking** - replace real dependencies with controlled fakes using `unittest.mock.patch`
+- **conftest.py** - shared fixtures available across all test files in the directory
+- Good test structure: one test per behaviour, clear names, Arrange-Act-Assert pattern

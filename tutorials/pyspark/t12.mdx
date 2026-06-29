@@ -1,0 +1,266 @@
+## Setup
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, count, sum, avg, min, max, countDistinct
+
+spark = SparkSession.builder.appName("GroupByDemo").getOrCreate()
+
+df = spark.createDataFrame([
+    (1, "Alice",  "Engineering", "US", 95000),
+    (2, "Bob",    "Marketing",   "US", 72000),
+    (3, "Carol",  "Engineering", "US", 110000),
+    (4, "David",  "HR",          "IN", 60000),
+    (5, "Eve",    "Engineering", "GB", 105000),
+    (6, "Frank",  "Marketing",   "IN", 78000),
+    (7, "Grace",  "HR",          "US", 65000),
+    (8, "Henry",  "Engineering", "IN", 90000),
+], ["id", "name", "dept", "country", "salary"])
+```
+
+## Basic groupBy + agg
+
+```python
+# Count employees per department
+df.groupBy("dept").count().show()
+# +-----------+-----+
+# |       dept|count|
+# +-----------+-----+
+# |Engineering|    4|
+# |  Marketing|    2|
+# |         HR|    2|
+# +-----------+-----+
+
+# Sum of salaries per department
+df.groupBy("dept").sum("salary").show()
+
+# Average salary per department
+df.groupBy("dept").avg("salary").show()
+
+# Min and max salary per department
+df.groupBy("dept").min("salary").show()
+df.groupBy("dept").max("salary").show()
+```
+
+## agg() - Multiple Aggregations at Once
+
+```python
+from pyspark.sql.functions import (
+    count, sum, avg, min, max, countDistinct,
+    stddev, variance, first, last, collect_list, collect_set
+)
+
+# Multiple aggregations in one groupBy
+df.groupBy("dept").agg(
+    count("id").alias("employee_count"),
+    sum("salary").alias("total_salary"),
+    avg("salary").alias("avg_salary"),
+    min("salary").alias("min_salary"),
+    max("salary").alias("max_salary"),
+).show()
+
+# +--co-----------+---------------+------------+-----------+-----------+-----------+
+# |       dept|employee_count|total_salary|avg_salary|min_salary|max_salary|
+# +-----------+--------------+------------+----------+----------+----------+
+# |Engineering|             4|      400000|  100000.0|     90000|    110000|
+# |  Marketing|             2|      150000|   75000.0|     72000|     78000|
+# |         HR|             2|      125000|   62500.0|     60000|     65000|
+# +-----------+--------------+------------+----------+----------+----------+
+```
+
+## groupBy Multiple Columns
+
+```python
+# Group by dept AND country
+df.groupBy("dept", "country").agg(
+    count("id").alias("count"),
+    avg("salary").alias("avg_salary")
+).orderBy("dept", "country").show()
+# +-----------+-------+-----+----------+
+# |       dept|country|count|avg_salary|
+# +-----------+-------+-----+----------+
+# |Engineering|     GB|    1|  105000.0|
+# |Engineering|     IN|    1|   90000.0|
+# |Engineering|     US|    2|  102500.0|
+# |         HR|     IN|    1|   60000.0|
+# |         HR|     US|    1|   65000.0|
+# |  Marketing|     IN|    1|   78000.0|
+# |  Marketing|     US|    1|   72000.0|
+# +-----------+-------+-----+----------+
+```
+
+## All Aggregation Functions
+
+```python
+from pyspark.sql.functions import *
+
+df.groupBy("dept").agg(
+    # Count
+    count("id").alias("row_count"),
+    count("*").alias("row_count_all"),          # counts NULLs too
+    countDistinct("country").alias("country_count"),
+
+    # Sum / Avg
+    sum("salary").alias("total_salary"),
+    avg("salary").alias("avg_salary"),
+    mean("salary").alias("mean_salary"),         # alias for avg
+
+    # Min / Max
+    min("salary").alias("min_salary"),
+    max("salary").alias("max_salary"),
+
+    # Statistical
+    stddev("salary").alias("stddev_salary"),
+    variance("salary").alias("variance_salary"),
+
+    # First / Last (nondeterministic without orderBy)
+    first("name").alias("first_name"),
+    last("name").alias("last_name"),
+
+    # Collect into arrays
+    collect_list("name").alias("all_names"),      # keeps duplicates
+    collect_set("country").alias("countries"),    # deduplicates
+).show(truncate=False)
+```
+
+## Filtering After Aggregation - Having Clause
+
+```python
+# SQL equivalent: HAVING count > 1
+df.groupBy("dept").agg(
+    count("id").alias("cnt"),
+    avg("salary").alias("avg_sal")
+).filter(col("cnt") > 1).show()   # filter AFTER agg = HAVING
+
+# Chained with ordering
+df.groupBy("dept").agg(
+    count("*").alias("emp_count"),
+    sum("salary").alias("total_salary")
+).filter(col("emp_count") >= 2) \
+ .orderBy(col("total_salary").desc()) \
+ .show()
+```
+
+## Filtering Before Aggregation - WHERE Clause
+
+```python
+# SQL equivalent: WHERE country = 'US' GROUP BY dept
+df.filter(col("country") == "US") \
+  .groupBy("dept") \
+  .agg(count("id").alias("us_employees")) \
+  .show()
+
+# Full WHERE + GROUP BY + HAVING pattern
+df \
+    .filter(col("salary") > 70000) \          # WHERE
+    .groupBy("dept") \                         # GROUP BY
+    .agg(count("id").alias("cnt"),             #
+         avg("salary").alias("avg_sal")) \     # aggregations
+    .filter(col("cnt") >= 2) \                 # HAVING
+    .orderBy(col("avg_sal").desc()) \          # ORDER BY
+    .show()
+```
+
+## Aggregation on All Rows (No groupBy)
+
+```python
+# Global aggregation - no GROUP BY
+from pyspark.sql.functions import count, sum, avg, max
+
+df.agg(
+    count("*").alias("total_employees"),
+    sum("salary").alias("total_salary"),
+    avg("salary").alias("avg_salary"),
+    max("salary").alias("max_salary")
+).show()
+```
+
+## rollup - Hierarchical Subtotals
+
+```python
+# rollup adds subtotal rows for each level of grouping
+df.rollup("dept", "country").agg(
+    count("id").alias("cnt"),
+    sum("salary").alias("total_sal")
+).orderBy("dept", "country").show()
+
+# +--co-----------+-------+---+----------+
+# |       dept|country|cnt|total_sal|
+# +-----------+-------+---+---------+
+# |       null|   null| 8 |  675000 |  ← grand total
+# |Engineering|   null| 4 |  400000 |  ← dept subtotal
+# |Engineering|     GB| 1 |  105000 |
+# |Engineering|     IN| 1 |   90000 |
+# |Engineering|     US| 2 |  205000 |
+# |         HR|   null| 2 |  125000 |  ← dept subtotal
+# ...
+```
+
+## cube - All Combinations of Subtotals
+
+```python
+# cube gives all possible subtotals (more powerful than rollup)
+df.cube("dept", "country").agg(
+    count("id").alias("cnt")
+).orderBy("dept", "country").show()
+# Includes: grand total, per-dept, per-country, and per-dept+country
+```
+
+## pivot - Reshape GroupBy to Wide Format
+
+```python
+# Pivot: dept as rows, country as columns, avg salary as values
+df.groupBy("dept").pivot("country").avg("salary").show()
+# +-----------+--------+--------+--------+
+# |       dept|      GB|      IN|      US|
+# +-----------+--------+--------+--------+
+# |Engineering|105000.0| 90000.0|102500.0|
+# |         HR|    null| 60000.0| 65000.0|
+# |  Marketing|    null| 78000.0| 72000.0|
+# +-----------+--------+--------+--------+
+
+# Specify pivot values explicitly (avoids extra scan for distinct values)
+df.groupBy("dept").pivot("country", ["IN", "US", "GB"]).avg("salary").show()
+```
+
+## Using SQL for groupBy
+
+```python
+df.createOrReplaceTempView("employees")
+
+spark.sql("""
+    SELECT dept,
+           COUNT(*) as emp_count,
+           SUM(salary) as total_salary,
+           AVG(salary) as avg_salary,
+           MAX(salary) as max_salary
+    FROM employees
+    GROUP BY dept
+    HAVING COUNT(*) > 1
+    ORDER BY total_salary DESC
+""").show()
+```
+
+## Common Interview Questions
+
+**Q: What is the difference between count("col") and count("*")?**
+`count("col")` counts non-null values in that column. `count("*")` or `count(lit(1))` counts all rows including those with nulls. Use `count("*")` for total row count per group.
+
+**Q: How do you implement HAVING in PySpark?**
+Use `.filter()` after `.agg()`. The filter after aggregation is equivalent to SQL's HAVING clause.
+
+**Q: What is the difference between collect_list and collect_set?**
+`collect_list` collects all values including duplicates. `collect_set` collects only distinct values (like a set). Both return arrays.
+
+**Q: What does rollup do differently from groupBy?**
+`rollup` generates subtotal rows for each level of the grouping hierarchy, plus a grand total row. It's equivalent to `GROUP BY ROLLUP(col1, col2)` in SQL. `cube` generates all possible combinations of subtotals.
+
+## Summary
+
+- `groupBy("col").agg(...)` is the standard pattern for grouped aggregations
+- Use `agg()` with multiple functions for multi-column summaries in one pass
+- `filter()` before `groupBy` = WHERE; `filter()` after `agg()` = HAVING
+- `countDistinct()` counts unique values per group
+- `collect_list()` and `collect_set()` aggregate values into arrays
+- `rollup` and `cube` generate hierarchical subtotals
+- `pivot()` rotates row values into column headers for cross-tab reports

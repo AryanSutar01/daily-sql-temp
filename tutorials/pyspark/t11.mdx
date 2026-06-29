@@ -1,0 +1,257 @@
+## withColumn - Add or Replace a Column
+
+`withColumn(name, expression)` returns a new DataFrame with a column added or replaced.
+
+- If `name` is a **new** column name → adds a column
+- If `name` is an **existing** column name → replaces that column
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, upper, lower, round, lit, when
+
+spark = SparkSession.builder.appName("Demo").getOrCreate()
+
+df = spark.createDataFrame([
+    (1, "Alice",  95000.0, "Engineering"),
+    (2, "Bob",    72000.0, "Marketing"),
+    (3, "Carol",  110000.0,"Engineering"),
+], ["id", "name", "salary", "dept"])
+```
+
+### Add a New Column
+
+```python
+# Add a constant value column
+df.withColumn("currency", lit("USD")).show()
+
+# Add computed column from existing columns
+df.withColumn("monthly_salary", col("salary") / 12).show()
+
+# Add boolean column
+df.withColumn("is_senior", col("salary") > 90000).show()
+
+# Add rounded column
+df.withColumn("salary_k", round(col("salary") / 1000, 1)).show()
+
+# Add string-transformed column
+df.withColumn("name_upper", upper(col("name"))).show()
+df.withColumn("dept_lower", lower(col("dept"))).show()
+```
+
+### Replace an Existing Column
+
+```python
+# Overwrite salary column with rounded version
+df.withColumn("salary", round(col("salary"), -3)).show()
+# salary becomes: 95000 → 95000, 72000 → 72000, 110000 → 110000
+
+# Overwrite name with uppercase
+df.withColumn("name", upper(col("name"))).show()
+```
+
+### Chaining withColumn
+
+```python
+result = df \
+    .withColumn("monthly_salary", col("salary") / 12) \
+    .withColumn("annual_bonus", col("salary") * 0.10) \
+    .withColumn("total_comp", col("salary") + col("annual_bonus")) \
+    .withColumn("is_senior", col("salary") > 90000)
+
+result.show()
+```
+
+> ⚠️ **Performance note:** Each `withColumn()` call creates a new plan node. Chaining 50+ `withColumn()` calls on the same DataFrame can cause performance issues. For many columns, use `select()` with all expressions at once instead.
+
+```python
+# ❌ Slow for many columns - 10+ withColumn calls
+df = df.withColumn("c1", ...)
+df = df.withColumn("c2", ...)
+# ... 10 more ...
+
+# ✅ Faster - single select with all transformations
+df = df.select(
+    "*",  # keep all existing columns
+    expr1.alias("c1"),
+    expr2.alias("c2"),
+    # ...
+)
+```
+
+## withColumnRenamed - Rename a Column
+
+```python
+# Rename one column
+df.withColumnRenamed("salary", "annual_salary").show()
+
+# Rename multiple columns (chain them)
+df \
+    .withColumnRenamed("name", "employee_name") \
+    .withColumnRenamed("dept", "department") \
+    .show()
+
+# Rename using a mapping dict
+rename_map = {"name": "employee_name", "dept": "department", "salary": "annual_salary"}
+df_renamed = df
+for old, new in rename_map.items():
+    df_renamed = df_renamed.withColumnRenamed(old, new)
+```
+
+## Column Expressions - Four Ways to Reference Columns
+
+Understanding these four syntaxes is essential for reading any PySpark codebase:
+
+```python
+from pyspark.sql.functions import col
+from pyspark.sql.functions import expr
+
+# Style 1: String column name (only works as argument to some methods)
+df.select("salary")
+df.orderBy("salary")
+
+# Style 2: df.column_name attribute - quick but fragile with special characters
+df.select(df.salary)
+df.filter(df.salary > 90000)
+
+# Style 3: col("column_name") - most flexible, works everywhere
+df.select(col("salary"))
+df.filter(col("salary") > 90000)
+df.withColumn("tax", col("salary") * 0.30)
+
+# Style 4: expr("sql expression string") - full SQL inside Python
+df.select(expr("salary * 1.10 as new_salary"))
+df.withColumn("tax", expr("salary * 0.30"))
+df.filter(expr("salary > 90000 AND dept = 'Engineering'"))
+```
+
+### When to Use Which
+
+```python
+# col() - use inside withColumn, filter, when/otherwise, window functions
+df.withColumn("bonus", col("salary") * 0.10)
+df.filter(col("salary") > 100000)
+
+# expr() - use when you want SQL-style expressions with SQL functions
+df.withColumn("name_len", expr("length(name)"))
+df.withColumn("tenure_years", expr("datediff(current_date(), hire_date) / 365"))
+
+# String names - use in select, orderBy, groupBy when no computation needed
+df.select("id", "name")
+df.orderBy("salary")
+df.groupBy("dept")
+```
+
+## Column Arithmetic
+
+```python
+# Basic arithmetic
+df.withColumn("half_salary", col("salary") / 2)
+df.withColumn("double_salary", col("salary") * 2)
+df.withColumn("salary_plus_bonus", col("salary") + 5000)
+df.withColumn("salary_minus_tax", col("salary") - col("salary") * 0.30)
+
+# Power / modulo
+from pyspark.sql.functions import pow as spark_pow
+df.withColumn("salary_squared", spark_pow(col("salary"), 2))
+df.withColumn("remainder", col("salary") % 1000)
+
+# Integer division
+from pyspark.sql.functions import floor
+df.withColumn("salary_k_floor", floor(col("salary") / 1000))
+```
+
+## Column String Operations
+
+```python
+from pyspark.sql.functions import (
+    upper, lower, trim, ltrim, rtrim,
+    length, substring, concat, concat_ws,
+    regexp_replace, regexp_extract, split, lpad, rpad
+)
+
+df.withColumn("name_upper", upper(col("name")))
+df.withColumn("name_lower", lower(col("name")))
+df.withColumn("name_len", length(col("name")))
+df.withColumn("name_trim", trim(col("name")))
+
+# Concatenate columns
+df.withColumn("full_info", concat(col("name"), lit(" - "), col("dept")))
+df.withColumn("full_info", concat_ws(" | ", col("name"), col("dept"), col("salary").cast("string")))
+
+# Substring
+df.withColumn("dept_abbrev", substring(col("dept"), 1, 3))  # first 3 chars
+
+# Replace
+df.withColumn("dept_clean", regexp_replace(col("dept"), "Engineering", "Eng"))
+
+# Extract with regex
+df.withColumn("first_char", regexp_extract(col("name"), "^([A-Z])", 1))
+
+# Split into array
+df.withColumn("name_parts", split(col("name"), " "))
+```
+
+## Casting Column Types
+
+```python
+from pyspark.sql.functions import col
+
+# Cast to different types
+df.withColumn("salary_int",    col("salary").cast("integer"))
+df.withColumn("salary_str",    col("salary").cast("string"))
+df.withColumn("salary_double", col("salary").cast("double"))
+df.withColumn("is_senior_int", col("is_senior").cast("integer"))  # bool → 0/1
+
+# Using DataType objects
+from pyspark.sql.types import IntegerType, StringType, DoubleType
+df.withColumn("salary_int", col("salary").cast(IntegerType()))
+```
+
+## drop - Remove a Column
+
+```python
+df.drop("id")              # drop one
+df.drop("id", "dept")     # drop multiple
+df.drop(*["id", "dept"])  # drop from list
+```
+
+## Practical: Full Column Engineering Pipeline
+
+```python
+from pyspark.sql.functions import (
+    col, upper, round, when, lit, concat_ws, current_date, datediff, to_date
+)
+
+df = spark.createDataFrame([
+    (1, "alice",  95000.0, "2020-06-15", "Engineering"),
+    (2, "bob",    72000.0, "2022-01-10", "Marketing"),
+    (3, "carol",  110000.0,"2018-03-22", "Engineering"),
+], ["id", "name", "salary", "hire_date", "dept"])
+
+result = df \
+    .withColumn("name", upper(col("name"))) \
+    .withColumn("hire_date", to_date(col("hire_date"), "yyyy-MM-dd")) \
+    .withColumn("tenure_days", datediff(current_date(), col("hire_date"))) \
+    .withColumn("tenure_years", round(col("tenure_days") / 365, 1)) \
+    .withColumn("monthly_salary", round(col("salary") / 12, 2)) \
+    .withColumn("tax_bracket",
+        when(col("salary") > 100000, "High")
+        .when(col("salary") > 80000, "Mid")
+        .otherwise("Low")
+    ) \
+    .withColumn("display_label",
+        concat_ws(" | ", col("name"), col("dept"), col("tax_bracket"))
+    ) \
+    .drop("hire_date", "tenure_days")
+
+result.show(truncate=False)
+```
+
+## Summary
+
+- `withColumn(name, expr)` - add a new column or replace an existing one
+- `withColumnRenamed(old, new)` - rename a column without changing data
+- Four ways to reference columns: string, `df.col`, `col()`, `expr()` - prefer `col()` for expressions
+- Chain multiple `withColumn()` calls for readability, but use `select()` for 10+ transformations
+- Use `cast()` to change column data types
+- `expr()` supports full SQL expressions inline, great for date math and regex

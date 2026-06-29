@@ -1,0 +1,251 @@
+## What Is a Context Manager?
+
+A context manager is an object that defines setup and teardown logic around a block of code. The `with` statement guarantees the teardown runs - even if an exception is raised.
+
+```python
+# Without context manager - easy to forget cleanup
+f = open("data.txt")
+data = f.read()
+f.close()   # what if read() raises an error? close() is never called
+
+# With context manager - cleanup is guaranteed
+with open("data.txt") as f:
+    data = f.read()
+# f.close() is automatically called here, even if an exception occurred
+```
+
+## How It Works - The Protocol
+
+A context manager implements two dunder methods:
+
+```python
+class ManagedResource:
+    def __enter__(self):
+        # setup: called when entering the with block
+        print("Setting up...")
+        return self   # value bound to the 'as' variable
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # teardown: called when exiting the with block
+        print("Cleaning up...")
+        # Return True to suppress exceptions, False (or None) to re-raise
+        return False
+
+with ManagedResource() as r:
+    print("Inside the block")
+    # Output:
+    # Setting up...
+    # Inside the block
+    # Cleaning up...
+```
+
+### The `__exit__` Parameters
+
+```python
+def __exit__(self, exc_type, exc_val, exc_tb):
+    # exc_type  - type of exception (None if no exception)
+    # exc_val   - exception instance
+    # exc_tb    - traceback object
+
+    if exc_type is not None:
+        print(f"An exception occurred: {exc_val}")
+
+    return False   # False or None: re-raise the exception
+                   # True: suppress it (the with block continues normally)
+```
+
+## Building a Real Context Manager
+
+```python
+import time
+
+class Timer:
+    def __enter__(self):
+        self.start = time.time()
+        return self
+
+    def __exit__(self, *args):
+        self.elapsed = time.time() - self.start
+        print(f"Elapsed: {self.elapsed:.4f}s")
+        return False
+
+with Timer() as t:
+    total = sum(range(1_000_000))
+
+print(f"Sum: {total}, Time: {t.elapsed:.4f}s")
+```
+
+```python
+class DatabaseConnection:
+    def __init__(self, host):
+        self.host = host
+        self.conn = None
+
+    def __enter__(self):
+        print(f"Connecting to {self.host}...")
+        self.conn = f"<connection to {self.host}>"   # simulate connect
+        return self.conn
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        print("Closing connection...")
+        self.conn = None
+        if exc_type:
+            print(f"Rolling back due to: {exc_val}")
+        return False   # re-raise any exception
+
+with DatabaseConnection("localhost") as conn:
+    print(f"Using {conn}")
+    # Connecting to localhost...
+    # Using <connection to localhost>
+    # Closing connection...
+```
+
+## contextlib - The Easier Way
+
+For simple cases, `contextlib.contextmanager` lets you write a context manager as a generator function:
+
+```python
+from contextlib import contextmanager
+import time
+
+@contextmanager
+def timer():
+    start = time.time()
+    yield               # everything before yield = __enter__
+                        # everything after yield = __exit__
+    elapsed = time.time() - start
+    print(f"Elapsed: {elapsed:.4f}s")
+
+with timer():
+    total = sum(range(1_000_000))
+```
+
+```python
+@contextmanager
+def managed_file(path, mode="r"):
+    f = open(path, mode)
+    try:
+        yield f          # the value after yield is bound to 'as'
+    finally:
+        f.close()        # always runs - equivalent to __exit__
+
+with managed_file("data.txt") as f:
+    print(f.read())
+```
+
+### Handling Exceptions in contextmanager
+
+```python
+from contextlib import contextmanager
+
+@contextmanager
+def suppress_errors(*exceptions):
+    try:
+        yield
+    except exceptions as e:
+        print(f"Suppressed: {e}")
+
+with suppress_errors(ValueError, ZeroDivisionError):
+    x = int("not a number")   # ValueError - suppressed
+    print("This won't print")
+
+print("Continues here")   # executes normally
+```
+
+## contextlib Utilities
+
+```python
+from contextlib import suppress, nullcontext, ExitStack
+
+# suppress - silently ignore specific exceptions
+with suppress(FileNotFoundError):
+    open("nonexistent.txt")   # no error raised
+
+# nullcontext - a no-op context manager (useful for conditional with blocks)
+debug_mode = False
+cm = timer() if debug_mode else nullcontext()
+
+with cm:
+    do_work()
+
+# ExitStack - dynamically manage multiple context managers
+files = ["a.txt", "b.txt", "c.txt"]
+with ExitStack() as stack:
+    handles = [stack.enter_context(open(f)) for f in files]
+    for h in handles:
+        print(h.read())
+# All files closed automatically
+```
+
+## Nested Context Managers
+
+```python
+# Verbose nesting
+with open("input.txt") as fin:
+    with open("output.txt", "w") as fout:
+        fout.write(fin.read())
+
+# Cleaner - multiple context managers on one line
+with open("input.txt") as fin, open("output.txt", "w") as fout:
+    fout.write(fin.read())
+```
+
+## Common Use Cases
+
+```python
+# 1. File handling
+with open("data.csv") as f:
+    for line in f:
+        print(line.strip())
+
+# 2. Thread locks
+import threading
+lock = threading.Lock()
+
+with lock:
+    # critical section - lock acquired on entry, released on exit
+    shared_counter += 1
+
+# 3. Temporary directory
+import tempfile, os
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    path = os.path.join(tmpdir, "temp.txt")
+    with open(path, "w") as f:
+        f.write("temporary data")
+# tmpdir and all its contents are deleted here
+
+# 4. Mocking in tests
+from unittest.mock import patch
+
+with patch("module.ClassName") as mock_cls:
+    mock_cls.return_value.method.return_value = 42
+    result = code_under_test()
+```
+
+## Interview Questions
+
+**Q: What are the two methods that define a context manager?**
+`__enter__` and `__exit__`. `__enter__` runs when entering the `with` block and its return value is bound to the `as` variable. `__exit__` runs when leaving the block - whether normally or due to an exception - and receives the exception info as arguments.
+
+**Q: What does returning `True` from `__exit__` do?**
+It suppresses the exception - the `with` block exits cleanly as if no error occurred. Returning `False` or `None` lets the exception propagate normally.
+
+**Q: How does `@contextmanager` work?**
+It turns a generator function into a context manager. Everything before `yield` acts as `__enter__`, the value yielded is bound to the `as` variable, and everything after `yield` (typically in a `finally` block) acts as `__exit__`.
+
+**Q: Why use a context manager instead of try/finally?**
+Context managers are more reusable and readable. The cleanup logic is defined once inside the manager and reused everywhere. `try/finally` scatters cleanup logic across call sites.
+
+**Q: What is `contextlib.suppress`?**
+A built-in context manager that silently ignores specific exception types within its block - a clean alternative to `try/except/pass`.
+
+## Summary
+
+- Context managers define **setup** (`__enter__`) and **teardown** (`__exit__`) around a code block
+- The `with` statement guarantees teardown runs even when exceptions occur
+- Return `True` from `__exit__` to suppress an exception; `False` or `None` to re-raise
+- `@contextmanager` from `contextlib` - write context managers as simple generator functions using `yield`
+- `contextlib.suppress` - ignore specific exceptions cleanly
+- `contextlib.ExitStack` - manage a dynamic number of context managers
+- Common uses: file I/O, database connections, locks, timers, temp directories, mocking

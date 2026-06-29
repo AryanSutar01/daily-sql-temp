@@ -1,0 +1,264 @@
+## What Are Type Hints?
+
+Type hints are optional annotations that describe the expected types of variables, function parameters, and return values. Python doesn't enforce them at runtime - they're for static analysis tools and human readers.
+
+```python
+# Without type hints
+def add(a, b):
+    return a + b
+
+# With type hints
+def add(a: int, b: int) -> int:
+    return a + b
+```
+
+Type hints don't change how Python runs your code - they're documentation that tools like **mypy** and IDEs use to catch errors before you run the program.
+
+## Basic Type Annotations
+
+```python
+# Variables
+name: str = "Alice"
+age: int = 30
+height: float = 5.9
+active: bool = True
+
+# Functions
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+
+def add(a: int, b: int) -> int:
+    return a + b
+
+def print_info(name: str, age: int) -> None:   # None = no return value
+    print(f"{name} is {age}")
+
+# Optional return
+def find_user(user_id: int) -> str | None:   # Python 3.10+
+    if user_id == 1:
+        return "Alice"
+    return None
+```
+
+## typing Module - Common Types
+
+```python
+from typing import List, Dict, Tuple, Set, Optional, Union, Any
+
+# Collections (Python 3.8 and earlier style)
+names: List[str] = ["Alice", "Bob"]
+scores: Dict[str, int] = {"Alice": 95, "Bob": 88}
+point: Tuple[int, int] = (10, 20)
+unique: Set[int] = {1, 2, 3}
+
+# Optional - either the type or None
+def get_name(user_id: int) -> Optional[str]:
+    return "Alice" if user_id == 1 else None
+
+# Union - one of multiple types
+def process(value: Union[int, str]) -> str:
+    return str(value)
+
+# Any - disables type checking for that variable
+def debug(value: Any) -> None:
+    print(value)
+```
+
+## Modern Syntax (Python 3.9+)
+
+```python
+# Use built-in types directly instead of importing from typing
+names: list[str] = ["Alice", "Bob"]
+scores: dict[str, int] = {"Alice": 95}
+point: tuple[int, int] = (10, 20)
+
+# Python 3.10+ - use | instead of Union and Optional
+def find(user_id: int) -> str | None:
+    ...
+
+def process(value: int | str | float) -> str:
+    return str(value)
+```
+
+## Callable, TypeVar, Generic
+
+```python
+from typing import Callable, TypeVar, Generic
+
+# Callable - type of a function
+def apply(func: Callable[[int, int], int], a: int, b: int) -> int:
+    return func(a, b)
+
+apply(lambda x, y: x + y, 3, 4)   # 7
+
+# TypeVar - generic type placeholder
+T = TypeVar("T")
+
+def first(items: list[T]) -> T:
+    return items[0]
+
+first([1, 2, 3])       # returns int
+first(["a", "b"])      # returns str
+
+# Generic class
+class Stack(Generic[T]):
+    def __init__(self) -> None:
+        self._items: list[T] = []
+
+    def push(self, item: T) -> None:
+        self._items.append(item)
+
+    def pop(self) -> T:
+        return self._items.pop()
+
+s: Stack[int] = Stack()
+s.push(1)
+s.push(2)
+print(s.pop())   # 2
+```
+
+## TypedDict - Typed Dictionaries
+
+```python
+from typing import TypedDict
+
+class UserDict(TypedDict):
+    name: str
+    age: int
+    email: str
+
+def process_user(user: UserDict) -> str:
+    return f"{user['name']} ({user['age']})"
+
+user: UserDict = {"name": "Alice", "age": 30, "email": "alice@example.com"}
+process_user(user)   # type-checked
+```
+
+## Literal & Final
+
+```python
+from typing import Literal, Final
+
+# Literal - restrict to specific values
+def set_direction(direction: Literal["left", "right", "up", "down"]) -> None:
+    print(f"Moving {direction}")
+
+set_direction("left")    # OK
+set_direction("diagonal")  # mypy error
+
+# Final - constant that cannot be reassigned
+MAX_SIZE: Final = 100
+MAX_SIZE = 200   # mypy error
+```
+
+## Using Mypy
+
+Mypy is the most widely used static type checker for Python.
+
+```bash
+pip install mypy
+
+# Check a single file
+mypy script.py
+
+# Check with strict mode
+mypy --strict script.py
+
+# Check an entire package
+mypy mypackage/
+```
+
+```python
+# Example - mypy catches this at check time, not runtime
+def double(n: int) -> int:
+    return n * 2
+
+result = double("hello")   # mypy error: Argument 1 has incompatible type "str"; expected "int"
+```
+
+### Common Mypy Errors
+
+```python
+# error: Incompatible types in assignment
+x: int = "hello"
+
+# error: Argument has incompatible type
+def greet(name: str) -> str: ...
+greet(42)
+
+# error: Item "None" has no attribute "upper"
+def get_name() -> str | None: ...
+name = get_name()
+print(name.upper())   # name could be None - mypy flags this
+
+# Fix: check for None first
+if name is not None:
+    print(name.upper())
+```
+
+## Practical Example
+
+```python
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
+class Product:
+    id: int
+    name: str
+    price: float
+    category: str
+    discount: Optional[float] = None
+
+    def final_price(self) -> float:
+        if self.discount is not None:
+            return self.price * (1 - self.discount)
+        return self.price
+
+def get_cheapest(products: list[Product]) -> Product | None:
+    if not products:
+        return None
+    return min(products, key=lambda p: p.final_price())
+
+def format_price(price: float, currency: str = "INR") -> str:
+    return f"{currency} {price:.2f}"
+
+products = [
+    Product(1, "Laptop", 50000.0, "Electronics", 0.1),
+    Product(2, "Phone", 30000.0, "Electronics"),
+    Product(3, "Book", 500.0, "Education"),
+]
+
+cheapest = get_cheapest(products)
+if cheapest:
+    print(format_price(cheapest.final_price()))
+```
+
+## Interview Questions
+
+**Q: Does Python enforce type hints at runtime?**
+No. Type hints are purely for static analysis tools (mypy, pyright) and IDEs. Python ignores them at runtime - you can still pass the wrong type and the code will run, but mypy will flag it before execution.
+
+**Q: What is the difference between `Optional[str]` and `str | None`?**
+They are equivalent. `Optional[str]` is from the `typing` module and works in Python 3.5+. `str | None` is the newer union syntax available from Python 3.10+. Both mean the value can be a string or None.
+
+**Q: What is `TypeVar` used for?**
+`TypeVar` creates generic type placeholders. It lets you write functions or classes that work with any type while still maintaining type consistency - for example, a function that returns the same type it receives as input.
+
+**Q: What is `TypedDict`?**
+A way to define the expected shape of a dictionary with specific key names and value types. Useful for annotating dictionaries that represent structured data like API payloads or config objects.
+
+**Q: What is mypy and when would you use it in a project?**
+Mypy is a static type checker that reads your type annotations and reports type errors before runtime. In a team or production project, it's typically run as part of CI to catch type errors early - similar to a linter but for types.
+
+## Summary
+
+- Type hints annotate variables, parameters, and return types - Python doesn't enforce them at runtime
+- Use `list[str]`, `dict[str, int]`, `tuple[int, int]` for built-in collection types (Python 3.9+)
+- `str | None` (Python 3.10+) or `Optional[str]` - a value that can be a type or None
+- `Union[int, str]` or `int | str` - a value that can be one of several types
+- `TypeVar` - generic placeholder for writing type-safe generic functions and classes
+- `TypedDict` - typed shape for dictionaries
+- `Literal` - restrict a parameter to specific allowed values
+- `Final` - mark a variable as a constant
+- **mypy** - static type checker; run with `mypy file.py` to catch errors before runtime

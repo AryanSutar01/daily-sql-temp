@@ -1,0 +1,270 @@
+## Why Data Cleaning Matters
+
+Real-world data is almost always messy - inconsistent formats, missing values, duplicates, wrong data types, and outliers. Before any analysis, you must clean it.
+
+```
+Common data quality issues:
+- Missing values (NaN, None, empty strings, "N/A")
+- Wrong data types (numbers stored as strings)
+- Inconsistent formatting ("Male", "male", "M", "MALE")
+- Duplicates
+- Outliers and impossible values
+- Inconsistent date formats
+- Extra whitespace
+```
+
+## Detecting Problems First
+
+```python
+import pandas as pd
+import numpy as np
+
+df = pd.read_csv("customers.csv")
+
+# Overview
+df.info()           # dtypes, non-null counts
+df.describe()       # statistics - spot outliers
+df.head(10)         # first look at the data
+
+# Missing values
+df.isnull().sum()                         # count per column
+df.isnull().mean() * 100                  # % missing per column
+df.isnull().sum()[df.isnull().sum() > 0]  # only columns with NaN
+
+# Duplicates
+df.duplicated().sum()                   # total duplicate rows
+df.duplicated(subset=["email"]).sum()   # duplicate emails
+df[df.duplicated(subset=["email"], keep=False)]  # show all duplicates
+```
+
+## Handling Missing Values
+
+### Strategy 1 - Drop
+
+```python
+# Drop rows with ANY missing values
+df.dropna(inplace=True)
+
+# Drop rows where SPECIFIC columns are missing
+df.dropna(subset=["email", "phone"], inplace=True)
+
+# Drop columns with too many missing values (e.g. > 50%)
+threshold = len(df) * 0.5
+df.dropna(axis=1, thresh=threshold, inplace=True)
+```
+
+### Strategy 2 - Fill with a Fixed Value
+
+```python
+df["country"].fillna("Unknown", inplace=True)
+df["discount"].fillna(0, inplace=True)
+df["active"].fillna(False, inplace=True)
+```
+
+### Strategy 3 - Fill with Statistical Value
+
+```python
+# Numeric columns - mean or median
+df["age"].fillna(df["age"].mean(), inplace=True)
+df["salary"].fillna(df["salary"].median(), inplace=True)   # more robust to outliers
+
+# Fill per group - e.g. median salary by department
+df["salary"] = df.groupby("department")["salary"].transform(
+    lambda x: x.fillna(x.median())
+)
+```
+
+### Strategy 4 - Forward/Backward Fill (Time Series)
+
+```python
+# Forward fill - use the last known value
+df["price"].fillna(method="ffill", inplace=True)
+
+# Backward fill
+df["price"].fillna(method="bfill", inplace=True)
+
+# Limit how many consecutive NaNs to fill
+df["price"].fillna(method="ffill", limit=2)
+```
+
+## Removing Duplicates
+
+```python
+# Remove exact duplicate rows
+df.drop_duplicates(inplace=True)
+
+# Remove duplicates based on specific columns - keep first occurrence
+df.drop_duplicates(subset=["email"], keep="first", inplace=True)
+
+# Keep last occurrence (most recent record)
+df.sort_values("updated_at").drop_duplicates(subset=["user_id"], keep="last")
+```
+
+## Fixing Data Types
+
+```python
+# Check types
+df.dtypes
+
+# Convert types
+df["age"] = df["age"].astype(int)
+df["salary"] = df["salary"].astype(float)
+df["active"] = df["active"].astype(bool)
+
+# Numeric conversion - handle errors gracefully
+df["salary"] = pd.to_numeric(df["salary"], errors="coerce")  # bad values → NaN
+
+# Dates
+df["date"] = pd.to_datetime(df["date"])
+df["date"] = pd.to_datetime(df["date"], format="%d/%m/%Y")
+df["date"] = pd.to_datetime(df["date"], errors="coerce")     # bad dates → NaT
+
+# Categorical - saves memory for low-cardinality columns
+df["department"] = df["department"].astype("category")
+```
+
+## String Cleaning
+
+```python
+# Strip whitespace
+df["name"] = df["name"].str.strip()
+
+# Normalize case
+df["gender"] = df["gender"].str.lower().str.strip()
+# "Male", "MALE", " male " → all become "male"
+
+# Map variants to standard values
+gender_map = {"m": "Male", "f": "Female", "male": "Male", "female": "Female"}
+df["gender"] = df["gender"].str.lower().str.strip().map(gender_map)
+
+# Remove special characters
+df["phone"] = df["phone"].str.replace(r"[^\d]", "", regex=True)  # keep digits only
+df["salary_str"] = df["salary_str"].str.replace(",", "").str.replace("₹", "")
+
+# Fix inconsistent values with replace
+df["status"] = df["status"].replace({
+    "activ": "active",
+    "inactiv": "inactive",
+    "Active": "active",
+})
+```
+
+## Handling Outliers
+
+```python
+# Detect with describe and visual inspection
+df["salary"].describe()
+
+# IQR method - remove statistical outliers
+Q1 = df["salary"].quantile(0.25)
+Q3 = df["salary"].quantile(0.75)
+IQR = Q3 - Q1
+
+lower = Q1 - 1.5 * IQR
+upper = Q3 + 1.5 * IQR
+
+# Flag outliers
+df["is_outlier"] = (df["salary"] < lower) | (df["salary"] > upper)
+
+# Remove outliers
+df_clean = df[(df["salary"] >= lower) & (df["salary"] <= upper)]
+
+# Cap outliers (winsorize) - instead of removing
+df["salary"] = df["salary"].clip(lower=lower, upper=upper)
+```
+
+## Standardizing Date Columns
+
+```python
+df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
+# Extract components
+df["year"] = df["date"].dt.year
+df["month"] = df["date"].dt.month
+df["day"] = df["date"].dt.day
+df["day_of_week"] = df["date"].dt.day_name()
+df["is_weekend"] = df["date"].dt.weekday >= 5
+
+# Date math
+from datetime import datetime
+df["days_since_signup"] = (datetime.now() - df["signup_date"]).dt.days
+```
+
+## Full Cleaning Pipeline Example
+
+```python
+import pandas as pd
+import numpy as np
+
+def clean_customer_data(filepath: str) -> pd.DataFrame:
+    df = pd.read_csv(filepath)
+
+    # Step 1: Remove fully empty rows
+    df.dropna(how="all", inplace=True)
+
+    # Step 2: Fix column names
+    df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_")
+
+    # Step 3: Remove duplicates on email
+    df.drop_duplicates(subset=["email"], keep="last", inplace=True)
+
+    # Step 4: Clean strings
+    df["name"] = df["name"].str.strip().str.title().fillna("Unknown")
+    df["email"] = df["email"].str.strip().str.lower()
+    df["gender"] = df["gender"].str.strip().str.lower().map({
+        "m": "Male", "f": "Female", "male": "Male", "female": "Female"
+    })
+
+    # Step 5: Fix numeric types
+    df["age"] = pd.to_numeric(df["age"], errors="coerce")
+    df["salary"] = pd.to_numeric(
+        df["salary"].astype(str).str.replace(",", "").str.replace("₹", ""),
+        errors="coerce"
+    )
+
+    # Step 6: Fill missing values
+    df["age"].fillna(df["age"].median(), inplace=True)
+    df["salary"].fillna(df["salary"].median(), inplace=True)
+    df["gender"].fillna("Unknown", inplace=True)
+
+    # Step 7: Fix dates
+    df["signup_date"] = pd.to_datetime(df["signup_date"], errors="coerce")
+
+    # Step 8: Remove salary outliers
+    Q1, Q3 = df["salary"].quantile([0.25, 0.75])
+    IQR = Q3 - Q1
+    df["salary"] = df["salary"].clip(Q1 - 1.5 * IQR, Q3 + 1.5 * IQR)
+
+    # Step 9: Convert types
+    df["age"] = df["age"].astype(int)
+
+    return df
+```
+
+## Interview Questions
+
+**Q: How do you detect missing values in a pandas DataFrame?**
+Use `df.isnull().sum()` to count NaN values per column, and `df.isnull().mean() * 100` to see the percentage. `df.info()` also shows non-null counts for each column.
+
+**Q: What is the difference between `dropna` and `fillna`?**
+`dropna` removes rows or columns that contain NaN values. `fillna` replaces NaN values with a specified value (constant, mean, median, forward fill, etc.). `dropna` reduces your dataset size; `fillna` preserves it - the choice depends on how many values are missing and why.
+
+**Q: When would you use median vs mean to fill missing numeric values?**
+Use median when the column has outliers or is skewed - median is more robust. Use mean when data is roughly normally distributed. For example, salary data is typically right-skewed, so median is safer than mean.
+
+**Q: What is forward fill and when do you use it?**
+Forward fill (`method="ffill"`) replaces NaN with the last valid non-null value. It's used in time series data where a missing value can logically be assumed to be the same as the previous measurement - for example, a stock price or sensor reading.
+
+**Q: How do you handle duplicate rows in pandas?**
+Use `df.duplicated().sum()` to count duplicates and `df.drop_duplicates()` to remove them. Specify `subset` to check for duplicates on specific columns only, and `keep="first"` or `keep="last"` to control which occurrence to retain.
+
+## Summary
+
+- Always start with `df.info()`, `df.describe()`, `df.isnull().sum()` - understand the data first
+- **Drop** missing values when the proportion is small and the rows are not recoverable
+- **Fill** with mean/median for numeric, mode for categorical, "Unknown" for strings, or forward fill for time series
+- `pd.to_numeric(errors="coerce")` and `pd.to_datetime(errors="coerce")` - safe type conversion, bad values become NaN
+- `drop_duplicates(subset=["col"], keep="last")` - remove duplicates, keep most recent
+- IQR method - detect and cap/remove outliers: `clip(Q1 - 1.5*IQR, Q3 + 1.5*IQR)`
+- Standardize strings: `str.strip().str.lower()` + `map()` for variant normalization
+- Build a cleaning pipeline as a function - reproducible and testable

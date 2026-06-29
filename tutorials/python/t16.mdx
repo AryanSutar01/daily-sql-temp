@@ -1,0 +1,214 @@
+## What Is OOP?
+
+Object-Oriented Programming organizes code around objects - bundles of data (attributes) and behaviour (methods). Instead of separate functions and variables, an object combines both.
+
+```
+Procedural:           OOP:
+- variables           - object (bundles both)
+- functions             - attributes (data)
+                        - methods (behaviour)
+```
+
+## Defining a Class
+
+```python
+class BankAccount:
+    # Class variable - shared across all instances
+    interest_rate = 0.05
+
+    def __init__(self, owner, balance=0):
+        # Instance variables - unique to each instance
+        self.owner = owner
+        self.balance = balance
+        self._transactions = []   # _ prefix = convention for "private"
+
+    def deposit(self, amount):
+        if amount <= 0:
+            raise ValueError("Deposit must be positive")
+        self.balance += amount
+        self._transactions.append(("deposit", amount))
+        return self.balance
+
+    def withdraw(self, amount):
+        if amount > self.balance:
+            raise ValueError("Insufficient funds")
+        self.balance -= amount
+        self._transactions.append(("withdraw", amount))
+        return self.balance
+
+    def get_statement(self):
+        return self._transactions
+
+    def __repr__(self):
+        return f"BankAccount(owner={self.owner!r}, balance={self.balance})"
+
+    def __str__(self):
+        return f"{self.owner}'s account - Balance: ₹{self.balance:,.2f}"
+```
+
+## Creating and Using Objects
+
+```python
+# Create instances
+acc1 = BankAccount("Alice", 1000)
+acc2 = BankAccount("Bob")
+
+# Call methods
+acc1.deposit(500)
+acc1.withdraw(200)
+print(acc1.balance)   # 1300
+
+# Access attributes
+print(acc1.owner)     # Alice
+print(acc1.interest_rate)   # 0.05 - from class variable
+
+# String representation
+print(repr(acc1))   # BankAccount(owner='Alice', balance=1300)
+print(str(acc1))    # Alice's account - Balance: ₹1,300.00
+print(acc1)         # same as str()
+```
+
+## Instance vs Class Variables
+
+```python
+class Counter:
+    count = 0   # class variable - shared
+
+    def __init__(self, name):
+        Counter.count += 1    # modify the class variable
+        self.name = name      # instance variable - unique
+
+c1 = Counter("first")
+c2 = Counter("second")
+c3 = Counter("third")
+
+print(Counter.count)   # 3
+print(c1.count)        # 3 - reads class variable (no instance override)
+c1.count = 99          # creates INSTANCE variable, doesn't change class var
+print(Counter.count)   # 3 - class variable unchanged
+print(c2.count)        # 3 - other instances unaffected
+```
+
+## @property - Computed and Validated Attributes
+
+```python
+class Temperature:
+    def __init__(self, celsius):
+        self._celsius = celsius   # _ marks it as "private by convention"
+
+    @property
+    def celsius(self):
+        return self._celsius
+
+    @celsius.setter
+    def celsius(self, value):
+        if value < -273.15:
+            raise ValueError("Temperature below absolute zero")
+        self._celsius = value
+
+    @property
+    def fahrenheit(self):
+        return self._celsius * 9/5 + 32   # computed property - no setter
+
+t = Temperature(100)
+print(t.celsius)      # 100
+print(t.fahrenheit)   # 212.0
+t.celsius = 0
+print(t.fahrenheit)   # 32.0
+t.celsius = -300      # ValueError
+```
+
+## @staticmethod and @classmethod
+
+```python
+class User:
+    _count = 0
+
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
+        User._count += 1
+
+    @classmethod
+    def get_count(cls):
+        # cls = the class itself (not an instance)
+        return cls._count
+
+    @classmethod
+    def from_string(cls, data_str):
+        # Factory method - alternative constructor
+        name, email = data_str.split(",")
+        return cls(name.strip(), email.strip())
+
+    @staticmethod
+    def validate_email(email):
+        # No access to cls or self - just a utility function
+        return "@" in email and "." in email
+
+u1 = User("Alice", "alice@example.com")
+u2 = User.from_string("Bob, bob@example.com")
+
+print(User.get_count())                   # 2
+print(User.validate_email("not-valid"))   # False
+```
+
+## The Four Pillars of OOP
+
+```python
+# 1. ENCAPSULATION - bundle data + methods; hide internals
+class Account:
+    def __init__(self):
+        self.__balance = 0   # double underscore = name mangling (stronger "private")
+
+    def deposit(self, amount):
+        if amount > 0:
+            self.__balance += amount
+
+    def get_balance(self):
+        return self.__balance
+
+# 2. INHERITANCE - reuse code from parent class (covered in next topic)
+class SavingsAccount(Account):
+    pass
+
+# 3. POLYMORPHISM - same method, different behaviour
+class Dog:
+    def speak(self): return "Woof!"
+
+class Cat:
+    def speak(self): return "Meow!"
+
+animals = [Dog(), Cat(), Dog()]
+for animal in animals:
+    print(animal.speak())   # works on any object with speak()
+
+# 4. ABSTRACTION - hide implementation, expose interface (covered in ABC topic)
+```
+
+## Interview Questions
+
+**Q: What is the difference between a class variable and an instance variable?**
+A class variable is shared across all instances - defined directly in the class body. An instance variable is unique to each instance - assigned via `self.var = value` in `__init__`. Modifying a class variable through the class affects all instances; assigning through an instance creates a new instance variable that shadows the class variable.
+
+**Q: What is `self` in Python?**
+`self` is a reference to the current instance of the class. It's the first parameter of every instance method and is passed automatically by Python when you call a method on an object. Through `self`, methods can access and modify the instance's attributes.
+
+**Q: What is the difference between `__str__` and `__repr__`?**
+`__str__` is for human-readable output - shown by `print()` and `str()`. `__repr__` is for developer/debug output - shown in the REPL and by `repr()`. The convention is that `repr` should ideally return a string that could recreate the object. If `__str__` is not defined, Python falls back to `__repr__`.
+
+**Q: What is the difference between `@staticmethod` and `@classmethod`?**
+`@staticmethod` has no implicit first argument - it's just a regular function placed in the class namespace, with no access to class or instance. `@classmethod` receives `cls` (the class) as its first argument - it can access class variables and create instances. Use `@classmethod` for factory methods and `@staticmethod` for utility functions related to the class.
+
+**Q: What is encapsulation?**
+Encapsulation bundles data and the methods that operate on that data together in a class, hiding internal implementation details. Python uses `_name` (single underscore, convention) and `__name` (double underscore, name mangling) to indicate private attributes. This protects internal state and reduces coupling.
+
+## Summary
+
+- `class Name:` - define a class; `__init__(self, ...)` - constructor
+- `self` - reference to the current instance; required as first param of instance methods
+- Instance variables (`self.x`) - unique per instance; class variables - shared across all
+- `@property` - computed attribute with getter/setter validation
+- `@classmethod` - receives `cls`; used for factory methods and class-level operations
+- `@staticmethod` - no `self` or `cls`; utility function scoped to the class
+- `__str__` - human-readable; `__repr__` - developer-readable
+- Four pillars: Encapsulation, Inheritance, Polymorphism, Abstraction

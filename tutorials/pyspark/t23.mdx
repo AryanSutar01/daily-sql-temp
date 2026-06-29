@@ -1,0 +1,238 @@
+## Setup
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, lag, lead, ntile
+from pyspark.sql.window import Window
+
+spark = SparkSession.builder.appName("LagLeadNtile").getOrCreate()
+
+# Monthly sales data per product
+sales = spark.createDataFrame([
+    ("Laptop", "2024-01", 120000),
+    ("Laptop", "2024-02", 135000),
+    ("Laptop", "2024-03", 115000),
+    ("Laptop", "2024-04", 150000),
+    ("Mouse",  "2024-01",  25000),
+    ("Mouse",  "2024-02",  28000),
+    ("Mouse",  "2024-03",  22000),
+    ("Mouse",  "2024-04",  30000),
+], ["product", "month", "revenue"])
+```
+
+## lag - Access the Previous Row
+
+`lag(column, offset, default)` returns the value from `offset` rows **before** the current row within the window.
+
+```python
+# Window: per product, ordered by month
+window = Window.partitionBy("product").orderBy("month")
+
+sales.withColumn("prev_month_revenue",
+    lag("revenue", 1).over(window)   # offset=1 → previous row
+).show()
+# +-------+-------+-------+------------------+
+# |product|  month|revenue|prev_month_revenue|
+# +-------+-------+-------+------------------+
+# | Laptop|2024-01| 120000|              null|  ← no previous row
+# | Laptop|2024-02| 135000|            120000|
+# | Laptop|2024-03| 115000|            135000|
+# | Laptop|2024-04| 150000|            115000|
+# |  Mouse|2024-01|  25000|              null|  ← partition restarts
+# |  Mouse|2024-02|  28000|             25000|
+# |  Mouse|2024-03|  22000|             28000|
+# |  Mouse|2024-04|  30000|             22000|
+# +-------+-------+-------+------------------+
+
+# lag with default value (instead of null for first row)
+sales.withColumn("prev_revenue",
+    lag("revenue", 1, 0).over(window)   # default=0 when no previous row
+).show()
+
+# lag with offset=2 (2 rows back)
+sales.withColumn("revenue_2_months_ago",
+    lag("revenue", 2).over(window)
+).show()
+```
+
+### Practical: Month-over-Month Change
+
+```python
+from pyspark.sql.functions import round as spark_round
+
+sales \
+    .withColumn("prev_revenue", lag("revenue", 1).over(window)) \
+    .withColumn("mom_change", col("revenue") - col("prev_revenue")) \
+    .withColumn("mom_pct_change",
+        spark_round((col("revenue") - col("prev_revenue")) / col("prev_revenue") * 100, 2)
+    ) \
+    .show()
+# +-------+-------+-------+------------+----------+--------------+
+# |product|  month|revenue|prev_revenue|mom_change|mom_pct_change|
+# +-------+-------+-------+------------+----------+--------------+
+# | Laptop|2024-01| 120000|        null|      null|          null|
+# | Laptop|2024-02| 135000|      120000|     15000|         12.5 |
+# | Laptop|2024-03| 115000|      135000|    -20000|        -14.81|
+# | Laptop|2024-04| 150000|      115000|     35000|         30.43|
+# ...
+```
+
+## lead - Access the Next Row
+
+`lead(column, offset, default)` returns the value from `offset` rows **after** the current row.
+
+```python
+sales.withColumn("next_month_revenue",
+    lead("revenue", 1).over(window)
+).show()
+# +-------+-------+-------+------------------+
+# |product|  month|revenue|next_month_revenue|
+# +-------+-------+-------+------------------+
+# | Laptop|2024-01| 120000|            135000|
+# | Laptop|2024-02| 135000|            115000|
+# | Laptop|2024-03| 115000|            150000|
+# | Laptop|2024-04| 150000|              null|  ← no next row
+# |  Mouse|2024-01|  25000|             28000|
+# |  Mouse|2024-02|  28000|             22000|
+# |  Mouse|2024-03|  22000|             30000|
+# |  Mouse|2024-04|  30000|              null|
+# +-------+-------+-------+------------------+
+
+# lead with default value
+sales.withColumn("next_revenue",
+    lead("revenue", 1, 0).over(window)
+).show()
+```
+
+### Practical: Is Next Month Higher?
+
+```python
+from pyspark.sql.functions import when
+
+sales \
+    .withColumn("next_revenue", lead("revenue", 1).over(window)) \
+    .withColumn("trend",
+        when(col("next_revenue") > col("revenue"), "↑ Up")
+        .when(col("next_revenue") < col("revenue"), "↓ Down")
+        .when(col("next_revenue") == col("revenue"), "→ Flat")
+        .otherwise("(last month)")
+    ) \
+    .select("product", "month", "revenue", "next_revenue", "trend") \
+    .show()
+```
+
+### Session Gap Detection with lead
+
+```python
+# Detect gaps between user sessions
+sessions = spark.createDataFrame([
+    ("user1", "2024-01-01 08:00", "2024-01-01 08:30"),
+    ("user1", "2024-01-01 09:00", "2024-01-01 09:45"),
+    ("user1", "2024-01-01 11:00", "2024-01-01 11:20"),
+    ("user2", "2024-01-01 10:00", "2024-01-01 10:15"),
+], ["user", "session_start", "session_end"])
+
+from pyspark.sql.functions import to_timestamp, unix_timestamp
+
+w = Window.partitionBy("user").orderBy("session_start")
+
+sessions \
+    .withColumn("next_start", lead("session_start", 1).over(w)) \
+    .withColumn("gap_minutes",
+        (unix_timestamp("next_start") - unix_timestamp("session_end")) / 60
+    ) \
+    .show()
+```
+
+## ntile - Divide Into Equal Buckets
+
+`ntile(n)` divides the rows within each partition into `n` roughly equal buckets and assigns a bucket number (1 to n).
+
+```python
+employees = spark.createDataFrame([
+    ("Alice",  110000),
+    ("Bob",     95000),
+    ("Carol",  105000),
+    ("Dave",    80000),
+    ("Eve",     70000),
+    ("Frank",   65000),
+    ("Grace",   60000),
+    ("Henry",   75000),
+], ["name", "salary"])
+
+salary_window = Window.orderBy(col("salary").desc())
+
+employees.withColumn("quartile",  ntile(4).over(salary_window)) \
+         .withColumn("decile",    ntile(10).over(salary_window)) \
+         .withColumn("percentile_bucket", ntile(100).over(salary_window)) \
+         .show()
+# +-----+------+--------+------+-----------------+
+# | name|salary|quartile|decile|percentile_bucket|
+# +-----+------+--------+------+-----------------+
+# |Alice|110000|       1|     1|                1|
+# |Carol|105000|       1|     2|               13|
+# |  Bob| 95000|       2|     3|               25|
+# |Henry| 75000|       2|     4|               38|
+# | Dave| 80000|       3|     5|               50|
+# |  Eve| 70000|       3|     6|               63|
+# |Frank| 65000|       4|     9|               75|
+# |Grace| 60000|       4|    10|              100|
+# +-----+------+--------+------+-----------------+
+```
+
+### ntile per Partition (e.g., quartile within department)
+
+```python
+dept_df = spark.createDataFrame([
+    ("Alice",  "Eng", 110000),
+    ("Bob",    "Eng",  95000),
+    ("Carol",  "Eng", 105000),
+    ("Dave",   "Mkt",  80000),
+    ("Eve",    "Mkt",  70000),
+    ("Frank",  "Mkt",  65000),
+], ["name", "dept", "salary"])
+
+dept_window = Window.partitionBy("dept").orderBy(col("salary").desc())
+
+dept_df.withColumn("salary_quartile_in_dept",
+    ntile(4).over(dept_window)
+).show()
+```
+
+### Practical: Label Top / Bottom Performers
+
+```python
+window_all = Window.orderBy(col("salary").desc())
+
+employees \
+    .withColumn("bucket", ntile(4).over(window_all)) \
+    .withColumn("tier",
+        when(col("bucket") == 1, "Top 25%")
+        .when(col("bucket") == 4, "Bottom 25%")
+        .otherwise("Middle 50%")
+    ) \
+    .show()
+```
+
+## SQL Equivalent
+
+```python
+sales.createOrReplaceTempView("sales")
+
+spark.sql("""
+    SELECT product, month, revenue,
+           LAG(revenue, 1)  OVER (PARTITION BY product ORDER BY month) AS prev_revenue,
+           LEAD(revenue, 1) OVER (PARTITION BY product ORDER BY month) AS next_revenue,
+           NTILE(4)         OVER (ORDER BY revenue DESC) AS quartile
+    FROM sales
+""").show()
+```
+
+## Summary
+
+- `lag(col, offset, default)` - value from `offset` rows **before** current row; null if no prior row
+- `lead(col, offset, default)` - value from `offset` rows **after** current row; null if no next row
+- `ntile(n)` - divides partition into `n` equal buckets (1 to n)
+- All three require a `WindowSpec` with at least `orderBy()`; use `partitionBy()` for group-level behavior
+- `lag` / `lead` are the go-to tools for **time-series comparisons**: MoM change, session gaps, trend detection
+- `ntile` is the standard way to compute **quartiles, deciles, percentile buckets** in PySpark

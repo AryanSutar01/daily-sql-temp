@@ -1,0 +1,245 @@
+## Why This Still Matters
+
+Python 2 reached end-of-life in January 2020. Most new projects use Python 3. However, interviews still ask about the differences because:
+- Legacy codebases still run Python 2
+- Understanding the differences shows depth of language knowledge
+- Some changes reflect fundamental Python design decisions
+
+## print - Statement vs Function
+
+```python
+# Python 2
+print "Hello, World!"
+print "Name:", name
+print   # blank line
+
+# Python 3
+print("Hello, World!")
+print("Name:", name)
+print()   # blank line
+print("a", "b", sep="-", end="!\n")   # new keyword args
+```
+
+## Division - Integer vs Float
+
+```python
+# Python 2
+10 / 3    # 3    - integer division (both operands are int)
+10 / 3.0  # 3.333... - float division
+10 // 3   # 3    - explicit integer division
+
+# Python 3
+10 / 3    # 3.333... - always float division
+10 // 3   # 3         - explicit integer division
+10 % 3    # 1         - modulo (same)
+```
+
+This was one of the most common Python 2 bugs - passing two integers to `/` expecting float division.
+
+## Strings - bytes vs unicode
+
+```python
+# Python 2
+s = "hello"      # bytes string by default
+u = u"hello"     # unicode string (requires u prefix)
+b = b"hello"     # bytes (same as str in Python 2)
+
+# Python 3
+s = "hello"      # str is unicode by default (UTF-8)
+b = b"hello"     # bytes - explicit byte string
+s.encode()       # str → bytes
+b.decode()       # bytes → str
+
+# Python 3 makes the distinction clear and enforces it
+"hello" + b"hello"   # TypeError - can't mix str and bytes
+```
+
+## range vs xrange
+
+```python
+# Python 2
+range(10)    # returns a list [0,1,2,...,9] - memory-heavy
+xrange(10)   # returns an iterator - memory-efficient (like Python 3's range)
+
+# Python 3
+range(10)    # returns a range object (iterator-like) - like Python 2's xrange
+# xrange no longer exists in Python 3
+```
+
+## input vs raw_input
+
+```python
+# Python 2
+raw_input("Enter: ")   # reads input as a string - safe
+input("Enter: ")       # evaluates the input as Python code - dangerous
+
+# Python 3
+input("Enter: ")   # reads input as a string (like Python 2's raw_input)
+# raw_input does not exist in Python 3
+```
+
+## Integer Types
+
+```python
+# Python 2
+type(10)      # <type 'int'>
+type(10L)     # <type 'long'> - separate long type for big integers
+10 / 3        # 3 (integer division)
+
+# Python 3
+type(10)      # <class 'int'>
+# No 'long' - int handles arbitrary precision automatically
+type(10 ** 100)   # <class 'int'> - no overflow
+```
+
+## Exception Syntax
+
+```python
+# Python 2
+try:
+    risky()
+except ValueError, e:   # old syntax
+    print e
+
+# Python 3 (and Python 2.6+)
+try:
+    risky()
+except ValueError as e:   # new syntax - 'as' keyword required
+    print(e)
+```
+
+## Classes - Old Style vs New Style
+
+```python
+# Python 2
+class OldStyle:          # old-style class (doesn't inherit from object)
+    pass
+
+class NewStyle(object):  # new-style class - required in Python 2 for full features
+    pass
+
+# Python 3
+class MyClass:           # all classes are new-style by default
+    pass                 # implicitly inherits from object
+```
+
+Old-style classes in Python 2 had different MRO (Method Resolution Order) behavior. In Python 3, all classes are new-style.
+
+## super() Syntax
+
+```python
+# Python 2
+class Child(Parent):
+    def __init__(self):
+        super(Child, self).__init__()   # must pass class and self
+
+# Python 3
+class Child(Parent):
+    def __init__(self):
+        super().__init__()   # no arguments needed
+```
+
+## Dictionary Methods
+
+```python
+d = {"a": 1, "b": 2, "c": 3}
+
+# Python 2
+d.keys()     # returns a list - ['a', 'b', 'c']
+d.values()   # returns a list
+d.items()    # returns a list of tuples
+d.has_key("a")   # True - removed in Python 3
+
+# Python 3
+d.keys()     # returns a view object - not a list
+d.values()   # view object
+d.items()    # view object of (key, value) tuples
+"a" in d     # use 'in' instead of has_key()
+
+list(d.keys())   # convert view to list in Python 3
+```
+
+## map and filter - List vs Iterator
+
+```python
+# Python 2
+map(str, [1, 2, 3])     # returns a list: ['1', '2', '3']
+filter(None, [0, 1, 2]) # returns a list: [1, 2]
+
+# Python 3
+map(str, [1, 2, 3])     # returns a map object (iterator)
+filter(None, [0, 1, 2]) # returns a filter object (iterator)
+list(map(str, [1, 2, 3]))   # convert to list explicitly
+```
+
+## Unpacking and Extended Unpacking
+
+```python
+# Python 2 - basic unpacking only
+a, b = [1, 2]
+
+# Python 3 - extended unpacking with *
+first, *rest = [1, 2, 3, 4, 5]
+# first = 1, rest = [2, 3, 4, 5]
+
+*start, last = [1, 2, 3, 4, 5]
+# start = [1, 2, 3, 4], last = 5
+
+a, *middle, b = [1, 2, 3, 4, 5]
+# a = 1, middle = [2, 3, 4], b = 5
+```
+
+## Key Python 3 Features Not in Python 2
+
+```python
+# f-strings (Python 3.6+)
+name = "Alice"
+f"Hello, {name}"   # not available in Python 2
+
+# Type hints (Python 3.5+)
+def greet(name: str) -> str: ...
+
+# Walrus operator := (Python 3.8+)
+if (n := len(data)) > 10:
+    print(f"Too long: {n}")
+
+# Structural pattern matching (Python 3.10+)
+match command:
+    case "quit": quit()
+    case "help": show_help()
+
+# dataclasses (Python 3.7+)
+from dataclasses import dataclass
+
+# asyncio (Python 3.4+)
+import asyncio
+```
+
+## Interview Questions
+
+**Q: What are the most important differences between Python 2 and Python 3?**
+Key differences: `print` is a function in Python 3; `/` always returns a float; strings are unicode by default; `range()` returns an iterator (not a list); `raw_input()` is renamed to `input()`; all classes are new-style; `super()` requires no arguments; dictionary methods return views, not lists.
+
+**Q: Why does `10 / 3 == 3` in Python 2?**
+In Python 2, dividing two integers performs integer division - the fractional part is truncated. This was a common source of bugs. Python 3 changed `/` to always return a float, making the behavior more intuitive. Use `//` for explicit integer (floor) division in Python 3.
+
+**Q: What is the difference between `str` in Python 2 and Python 3?**
+In Python 2, `str` is a byte string by default; you need the `u""` prefix for unicode. In Python 3, `str` is always unicode (UTF-8). Python 3 enforces a strict separation between `str` (text) and `bytes` (raw bytes), eliminating a whole class of encoding bugs common in Python 2.
+
+**Q: What replaced `xrange` in Python 3?**
+Python 3's built-in `range()` behaves like Python 2's `xrange()` - it returns a lazy range object instead of a list. `xrange` was removed in Python 3 because it's no longer needed as a separate function.
+
+**Q: How does `super()` differ between Python 2 and Python 3?**
+In Python 2, `super()` requires the class name and `self` as arguments: `super(Child, self).__init__()`. In Python 3, `super()` can be called without arguments - Python automatically determines the enclosing class and instance.
+
+## Summary
+
+- `print` - statement in Python 2; function in Python 3
+- `/` - integer division in Python 2; true division in Python 3; `//` is explicit floor division in both
+- `str` - bytes in Python 2; unicode in Python 3; Python 3 enforces str/bytes separation
+- `range()` - returns a list in Python 2; a lazy iterator in Python 3 (like Python 2's `xrange`)
+- `input()` - evaluates code in Python 2; reads string in Python 3 (like Python 2's `raw_input`)
+- `super()` - needs class and self in Python 2; no arguments in Python 3
+- All classes are new-style in Python 3 (no need for `class Foo(object):`)
+- Dict methods return views in Python 3, not lists
+- Python 2 reached end-of-life January 2020 - all new projects should use Python 3

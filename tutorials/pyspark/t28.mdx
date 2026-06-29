@@ -1,0 +1,286 @@
+## Why Complex Types Matter
+
+Real-world data from APIs, Kafka, and event logs is rarely flat. JSON payloads, nested objects, and arrays are the norm:
+
+```json
+{
+  "order_id": 1001,
+  "customer": { "id": 42, "name": "Alice", "city": "Mumbai" },
+  "items": [
+    { "sku": "LAP001", "qty": 1, "price": 50000 },
+    { "sku": "MSE001", "qty": 2, "price": 800 }
+  ],
+  "metadata": { "source": "mobile", "campaign": "summer_sale" }
+}
+```
+
+PySpark can read this natively and manipulate it without flattening upfront.
+
+## Setup - Nested JSON
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, explode, struct, to_json, from_json, schema_of_json
+from pyspark.sql.types import *
+
+spark = SparkSession.builder.appName("NestedTypesDemo").getOrCreate()
+
+# Create DataFrame with nested structure
+schema = StructType([
+    StructField("order_id", IntegerType(), False),
+    StructField("customer", StructType([
+        StructField("id",   IntegerType(), True),
+        StructField("name", StringType(),  True),
+        StructField("city", StringType(),  True),
+    ]), True),
+    StructField("items", ArrayType(StructType([
+        StructField("sku",   StringType(),  True),
+        StructField("qty",   IntegerType(), True),
+        StructField("price", DoubleType(),  True),
+    ])), True),
+    StructField("metadata", MapType(StringType(), StringType()), True),
+])
+
+data = [
+    (1001,
+     (42, "Alice", "Mumbai"),
+     [("LAP001", 1, 50000.0), ("MSE001", 2, 800.0)],
+     {"source": "mobile", "campaign": "summer_sale"}),
+    (1002,
+     (43, "Bob", "Delhi"),
+     [("MON001", 1, 25000.0)],
+     {"source": "web", "campaign": None}),
+]
+
+df = spark.createDataFrame(data, schema=schema)
+df.printSchema()
+# root
+#  |-- order_id: integer (nullable = false)
+#  |-- customer: struct (nullable = true)
+#  |    |-- id: integer (nullable = true)
+#  |    |-- name: string (nullable = true)
+#  |    |-- city: string (nullable = true)
+#  |-- items: array (nullable = true)
+#  |    |-- element: struct (containsNull = true)
+#  |    |    |-- sku: string (nullable = true)
+#  |    |    |-- qty: integer (nullable = true)
+#  |    |    |-- price: double (nullable = true)
+#  |-- metadata: map (nullable = true)
+#  |    |-- key: string
+#  |    |-- value: string (valueContainsNull = true)
+```
+
+## Accessing Nested Struct Fields
+
+```python
+# Dot notation - access nested fields
+df.select(
+    "order_id",
+    "customer.name",
+    "customer.city",
+    col("customer.id").alias("cust_id")
+).show()
+# +--------+-----+------+-------+
+# |order_id| name|  city|cust_id|
+# +--------+-----+------+-------+
+# |    1001|Alice|Mumbai|     42|
+# |    1002|  Bob| Delhi|     43|
+# +--------+-----+------+-------+
+
+# Filtering on nested field
+df.filter(col("customer.city") == "Mumbai").show()
+
+# Select entire struct
+df.select("order_id", "customer").show()
+```
+
+## Flattening Structs
+
+```python
+# Manual flatten - promote struct fields to top level
+df_flat = df.select(
+    "order_id",
+    col("customer.id").alias("customer_id"),
+    col("customer.name").alias("customer_name"),
+    col("customer.city").alias("customer_city"),
+    col("metadata")["source"].alias("source"),
+)
+
+# Programmatic flatten for all struct fields
+def flatten_struct(df, col_name, prefix=""):
+    """Flatten one level of a struct column into top-level columns."""
+    field = df.schema[col_name]
+    if isinstance(field.dataType, StructType):
+        new_prefix = f"{prefix}{col_name}_" if prefix else f"{col_name}_"
+        return [
+            col(f"{col_name}.{f.name}").alias(f"{new_prefix}{f.name}")
+            for f in field.dataType.fields
+        ]
+    return [col(col_name)]
+
+flat_cols = [col("order_id")] + flatten_struct(df, "customer")
+df.select(flat_cols).show()
+```
+
+## Exploding Array of Structs
+
+```python
+# explode array of structs → one row per item, struct fields stay nested
+df_items = df.withColumn("item", explode("items")) \
+             .select(
+                 "order_id",
+                 "customer.name",
+                 col("item.sku").alias("sku"),
+                 col("item.qty").alias("qty"),
+                 col("item.price").alias("price"),
+             )
+
+df_items.show()
+# +--------+-----+------+---+-------+
+# |order_id| name|   sku|qty|  price|
+# +--------+-----+------+---+-------+
+# |    1001|Alice|LAP001|  1|50000.0|
+# |    1001|Alice|MSE001|  2|  800.0|
+# |    1002|  Bob|MON001|  1|25000.0|
+# +--------+-----+------+---+-------+
+
+# Compute total per order line
+df_items.withColumn("line_total", col("qty") * col("price")) \
+        .groupBy("order_id") \
+        .sum("line_total") \
+        .show()
+```
+
+## Creating Struct Columns
+
+```python
+from pyspark.sql.functions import struct, lit
+
+flat_df = spark.createDataFrame([
+    (1, "Alice", "Mumbai", 95000),
+    (2, "Bob",   "Delhi",  72000),
+], ["id", "name", "city", "salary"])
+
+# Create a struct column from existing columns
+nested = flat_df.withColumn("profile",
+    struct(
+        col("name"),
+        col("city"),
+        col("salary")
+    )
+)
+nested.printSchema()
+# |-- profile: struct (nullable = false)
+# |    |-- name: string
+# |    |-- city: string
+# |    |-- salary: integer
+
+nested.select("id", "profile.name", "profile.city").show()
+```
+
+## JSON String Columns - from_json / to_json
+
+When JSON data is stored as a string column (common from Kafka, APIs):
+
+```python
+from pyspark.sql.functions import from_json, to_json, schema_of_json
+
+# DataFrame with JSON string column
+json_df = spark.createDataFrame([
+    (1, '{"name": "Alice", "age": 30, "city": "Mumbai"}'),
+    (2, '{"name": "Bob",   "age": 25, "city": "Delhi"}'),
+], ["id", "json_col"])
+
+# Define schema for the JSON
+json_schema = StructType([
+    StructField("name", StringType(), True),
+    StructField("age",  IntegerType(), True),
+    StructField("city", StringType(), True),
+])
+
+# Parse JSON string → struct
+parsed = json_df.withColumn("parsed", from_json(col("json_col"), json_schema))
+parsed.select("id", "parsed.name", "parsed.age", "parsed.city").show()
+
+# Auto-infer schema from a sample JSON string (Spark 3.0+)
+sample = '{"name": "Alice", "age": 30}'
+inferred_schema = schema_of_json(sample)
+json_df.withColumn("parsed", from_json(col("json_col"), inferred_schema)).show()
+
+# Struct → JSON string
+nested.withColumn("json_str", to_json(col("profile"))).show()
+# json_str: '{"name":"Alice","city":"Mumbai","salary":95000}'
+
+# to_json on entire row
+nested.withColumn("full_json", to_json(struct("*"))).show()
+```
+
+## Nested Arrays of Arrays
+
+```python
+from pyspark.sql.functions import flatten, explode
+
+nested_arrays = spark.createDataFrame([
+    (1, [[1, 2, 3], [4, 5], [6]]),
+    (2, [[7, 8], [9, 10, 11]]),
+], ["id", "nested"])
+
+# Flatten array of arrays into one array
+nested_arrays.withColumn("flat", flatten(col("nested"))).show()
+# flat: [1,2,3,4,5,6] and [7,8,9,10,11]
+
+# Explode the outer array (gives inner arrays as rows)
+nested_arrays.withColumn("inner_array", explode("nested")).show()
+# Then explode again for individual elements
+nested_arrays.withColumn("inner_array", explode("nested")) \
+             .withColumn("element", explode("inner_array")) \
+             .show()
+```
+
+## Updating Nested Fields
+
+Spark DataFrames are immutable - you can't update a nested field in place. You must recreate the struct:
+
+```python
+from pyspark.sql.functions import struct, upper, col
+
+# Update customer.name to uppercase, keep other fields
+df.withColumn("customer",
+    struct(
+        col("customer.id"),
+        upper(col("customer.name")).alias("name"),
+        col("customer.city")
+    )
+).select("order_id", "customer.name").show()
+```
+
+## Reading Real Nested JSON Files
+
+```python
+# Spark reads nested JSON natively
+df = spark.read.option("multiLine", "true").json("orders.json")
+df.printSchema()   # entire nested schema inferred
+
+# Access any depth immediately
+df.select("customer.address.city", "items.sku").show()
+
+# explode array, access nested struct
+df.withColumn("item", explode("items")) \
+  .select(
+      "order_id",
+      col("customer.name"),
+      col("item.sku"),
+      col("item.price")
+  ).show()
+```
+
+## Summary
+
+- Access struct fields with **dot notation**: `col("customer.city")`, `"customer.city"`
+- Flatten structs manually with `select()` + dot notation, or programmatically
+- `explode()` on `ArrayType(StructType)` → one row per element, struct sub-fields still accessible
+- `struct(col1, col2, ...)` creates a new struct column from existing columns
+- `from_json(col, schema)` parses JSON strings into struct columns (common from Kafka)
+- `to_json(struct_col)` serializes a struct back to a JSON string
+- `flatten()` collapses nested arrays into one flat array
+- To update a nested field, recreate the entire struct with `struct(...)`

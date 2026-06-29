@@ -1,0 +1,281 @@
+## LEGB - Python's Name Resolution Order
+
+When Python encounters a variable name, it searches scopes in this exact order:
+
+```
+L - Local       The current function's scope
+E - Enclosing   Any enclosing function scopes (for closures)
+G - Global      The module-level scope
+B - Built-in    Python's built-in names (len, range, print, etc.)
+```
+
+The first match wins. If nothing is found, `NameError` is raised.
+
+```python
+x = "global"   # Global scope
+
+def outer():
+    x = "enclosing"   # Enclosing scope
+
+    def inner():
+        x = "local"   # Local scope
+        print(x)      # L → found "local"
+
+    inner()           # prints "local"
+    print(x)          # E → found "enclosing"
+
+outer()
+print(x)              # G → found "global"
+```
+
+## Local Scope
+
+Variables assigned inside a function are local:
+
+```python
+def greet():
+    message = "Hello"   # local variable
+    print(message)
+
+greet()
+print(message)   # NameError - message doesn't exist in global scope
+```
+
+## Enclosing Scope
+
+The enclosing scope is the scope of any outer function:
+
+```python
+def outer():
+    name = "Alice"   # enclosing scope for inner()
+
+    def inner():
+        print(name)   # E - found in enclosing scope
+
+    inner()   # Alice
+
+outer()
+```
+
+## Global Scope
+
+Module-level variables:
+
+```python
+counter = 0   # global
+
+def increment():
+    print(counter)   # reads global - OK
+
+increment()   # 0
+
+def bad_increment():
+    counter += 1   # UnboundLocalError!
+    # Python sees the assignment and treats 'counter' as local
+    # But it's referenced before assignment (as a local) → error
+
+def good_increment():
+    global counter   # declare intent to modify global
+    counter += 1
+
+good_increment()
+print(counter)   # 1
+```
+
+## The `global` Keyword
+
+```python
+total = 0
+
+def add(n):
+    global total
+    total += n
+
+add(5)
+add(3)
+print(total)   # 8
+```
+
+Using `global` is generally discouraged - it makes functions harder to test and reason about. Prefer returning values or using class state.
+
+## Closures - Functions That Remember
+
+A closure is an inner function that **captures and remembers** variables from its enclosing scope - even after the outer function has returned.
+
+```python
+def make_counter():
+    count = 0   # this variable is "closed over"
+
+    def increment():
+        nonlocal count   # needed to MODIFY the enclosing variable
+        count += 1
+        return count
+
+    return increment   # return the inner function
+
+counter = make_counter()
+print(counter())   # 1
+print(counter())   # 2
+print(counter())   # 3
+
+counter2 = make_counter()
+print(counter2())  # 1 - independent closure
+```
+
+The variable `count` lives on even after `make_counter()` has returned - it's kept alive because `increment` holds a reference to it.
+
+## The `nonlocal` Keyword
+
+Use `nonlocal` to modify a variable in the **enclosing (not global)** scope:
+
+```python
+def outer():
+    x = 10
+
+    def inner():
+        nonlocal x   # declare intent to modify enclosing variable
+        x += 5
+        print(x)
+
+    inner()   # 15
+    print(x)  # 15 - modified by inner()
+
+outer()
+```
+
+```python
+# nonlocal vs global
+x = 100   # global
+
+def outer():
+    x = 10   # enclosing
+
+    def inner():
+        nonlocal x   # modifies outer's x (10), not global x (100)
+        x = 99
+
+    inner()
+    print(x)   # 99
+
+outer()
+print(x)   # 100 - global unchanged
+```
+
+## Practical Closure Patterns
+
+### Factory Functions
+
+```python
+def multiplier(factor):
+    def multiply(n):
+        return n * factor   # factor is captured from enclosing scope
+    return multiply
+
+double = multiplier(2)
+triple = multiplier(3)
+
+print(double(5))   # 10
+print(triple(5))   # 15
+```
+
+### Memoization with Closure
+
+```python
+def memoize(func):
+    cache = {}   # captured by wrapper - persists across calls
+
+    def wrapper(*args):
+        if args not in cache:
+            cache[args] = func(*args)
+        return cache[args]
+
+    return wrapper
+
+@memoize
+def slow_square(n):
+    return n ** 2
+
+slow_square(4)   # computed and cached
+slow_square(4)   # returned from cache
+```
+
+### Partial Application
+
+```python
+def make_adder(n):
+    return lambda x: x + n   # n is captured
+
+add5 = make_adder(5)
+add10 = make_adder(10)
+
+print(add5(3))    # 8
+print(add10(3))   # 13
+```
+
+## Common Closure Trap - Late Binding
+
+```python
+# WRONG - all functions capture the same variable 'i'
+funcs = []
+for i in range(5):
+    funcs.append(lambda: i)
+
+print([f() for f in funcs])   # [4, 4, 4, 4, 4] - all see final value of i!
+
+# RIGHT - capture the current value with a default argument
+funcs = []
+for i in range(5):
+    funcs.append(lambda i=i: i)   # i=i captures current value
+
+print([f() for f in funcs])   # [0, 1, 2, 3, 4] - correct
+```
+
+This is one of the most common Python interview tricks. The closure captures the **variable** `i`, not its value at the time of creation. By the time the lambdas run, the loop has finished and `i` is 4.
+
+## Inspecting Closures
+
+```python
+def outer():
+    x = 10
+    y = 20
+
+    def inner():
+        return x + y
+
+    return inner
+
+fn = outer()
+print(fn.__closure__)    # tuple of cell objects
+print(fn.__code__.co_freevars)   # ('x', 'y') - names of closed-over variables
+
+for cell in fn.__closure__:
+    print(cell.cell_contents)    # 10, then 20
+```
+
+## Interview Questions
+
+**Q: What is LEGB in Python?**
+LEGB stands for Local, Enclosing, Global, Built-in - the order in which Python searches for a variable name. Python first checks the local function scope, then any enclosing function scopes, then the module-level global scope, and finally Python's built-in namespace.
+
+**Q: What is a closure?**
+A closure is an inner function that captures and retains references to variables from its enclosing scope, even after the outer function has returned. The inner function "closes over" those variables, keeping them alive. Closures are the foundation of decorators, factory functions, and callbacks.
+
+**Q: What is the difference between `global` and `nonlocal`?**
+`global` declares that a variable assignment refers to the module-level global scope. `nonlocal` declares that it refers to the nearest enclosing function scope (not global). Use `global` to modify module-level state; use `nonlocal` to modify a variable in an outer (but not global) function.
+
+**Q: Why does `lambda: i` in a loop give the same value for all functions?**
+Closures capture the variable reference, not the value at the time of definition. When the loop ends, `i` holds its final value, and all lambdas see that final value when called. Fix it with a default argument: `lambda i=i: i` - default arguments are evaluated at definition time, capturing the current value.
+
+**Q: What does `UnboundLocalError` mean?**
+Python determines whether a variable is local or global at compile time. If a function contains any assignment to a name, Python treats that name as local throughout the function - even before the assignment. If you read it before assigning, you get `UnboundLocalError`. Use `global` or `nonlocal` to change this behavior.
+
+## Summary
+
+- **LEGB** - Python searches Local → Enclosing → Global → Built-in for names
+- **Local** - variables assigned inside the current function
+- **Enclosing** - variables in any outer function (for nested functions)
+- **Global** - module-level variables; use `global` keyword to modify them from inside a function
+- **Closure** - inner function that captures variables from enclosing scope; those variables persist beyond the outer function's lifetime
+- `nonlocal` - modify a variable in the enclosing (but not global) scope
+- **Late binding trap** - closures capture the variable, not its value; fix with `lambda i=i: i`
+- `func.__closure__` and `func.__code__.co_freevars` - inspect what a closure captures
