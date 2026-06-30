@@ -1,0 +1,282 @@
+## Why Explicit Schemas Matter
+
+```python
+# inferSchema=True: Spark reads entire file twice - slow and may guess wrong
+df = spark.read.csv("data.csv", header=True, inferSchema=True)
+
+# Explicit schema: one pass, correct types, safe for production
+from pyspark.sql.types import *
+schema = StructType([...])
+df = spark.read.csv("data.csv", header=True, schema=schema)
+```
+
+| Approach | Pros | Cons |
+|---|---|---|
+| `inferSchema=True` | Easy, auto | Slow (2 scans), may mistype, non-deterministic |
+| Explicit `StructType` | Fast, correct, documented | More code upfront |
+| DDL string | Compact | Less readable for complex types |
+
+## StructType and StructField
+
+```python
+from pyspark.sql.types import (
+    StructType, StructField,
+    StringType, IntegerType, LongType, DoubleType, FloatType,
+    BooleanType, DateType, TimestampType,
+    ArrayType, MapType,
+    DecimalType, ShortType, ByteType, BinaryType
+)
+
+# StructField(name, dataType, nullable=True)
+schema = StructType([
+    StructField("order_id",    LongType(),      nullable=False),
+    StructField("customer_id", LongType(),      nullable=True),
+    StructField("product",     StringType(),    nullable=True),
+    StructField("quantity",    IntegerType(),   nullable=True),
+    StructField("price",       DoubleType(),    nullable=True),
+    StructField("order_date",  DateType(),      nullable=True),
+    StructField("is_returned", BooleanType(),   nullable=True),
+])
+
+df = spark.read.csv("orders.csv", header=True, schema=schema)
+df.printSchema()
+# root
+#  |-- order_id: long (nullable = false)
+#  |-- customer_id: long (nullable = true)
+#  |-- product: string (nullable = true)
+#  |-- quantity: integer (nullable = true)
+#  |-- price: double (nullable = true)
+#  |-- order_date: date (nullable = true)
+#  |-- is_returned: boolean (nullable = true)
+```
+
+## All Primitive Data Types
+
+```python
+from pyspark.sql.types import *
+
+# Numeric
+ByteType()          # 1-byte integer (-128 to 127)
+ShortType()         # 2-byte integer
+IntegerType()       # 4-byte integer
+LongType()          # 8-byte integer (use for IDs, large counts)
+FloatType()         # 4-byte float
+DoubleType()        # 8-byte float
+DecimalType(10, 2)  # exact decimal: precision=10, scale=2 (e.g. 99999999.99)
+
+# String / Binary
+StringType()        # variable-length UTF-8 string
+BinaryType()        # byte array
+
+# Boolean
+BooleanType()       # True / False
+
+# Date / Time
+DateType()          # date without time (yyyy-MM-dd)
+TimestampType()     # datetime with timezone (microsecond precision)
+TimestampNTZType()  # datetime WITHOUT timezone (Spark 3.4+)
+```
+
+## Complex Types - ArrayType
+
+```python
+from pyspark.sql.types import StructType, StructField, StringType, ArrayType, IntegerType
+
+schema = StructType([
+    StructField("user_id", IntegerType(), True),
+    StructField("tags",    ArrayType(StringType(), containsNull=True), True),
+    # containsNull=True → array elements can be null
+])
+
+df = spark.createDataFrame([
+    (1, ["python", "spark", "sql"]),
+    (2, ["java", None]),
+    (3, []),
+], schema=schema)
+
+df.show()
+# +-------+--------------------+
+# |user_id|                tags|
+# +-------+--------------------+
+# |      1|  [python, spark, sql]|
+# |      2|         [java, null]|
+# |      3|                  []|
+# +-------+--------------------+
+
+# Access array elements
+from pyspark.sql.functions import col, size, explode, array_contains
+df.withColumn("tag_count",       size(col("tags"))).show()
+df.withColumn("has_spark",       array_contains(col("tags"), "spark")).show()
+df.withColumn("first_tag",       col("tags")[0]).show()
+
+# Explode array into rows
+df.withColumn("tag", explode(col("tags"))).show()
+```
+
+## Complex Types - MapType
+
+```python
+from pyspark.sql.types import MapType, StringType, IntegerType
+
+schema = StructType([
+    StructField("user_id",  IntegerType(), True),
+    StructField("scores",   MapType(StringType(), IntegerType(), valueContainsNull=True), True),
+])
+
+df = spark.createDataFrame([
+    (1, {"math": 95, "science": 88}),
+    (2, {"math": 72, "english": 91}),
+], schema=schema)
+
+df.show()
+# +-------+------------------------------+
+# |user_id|                        scores|
+# +-------+------------------------------+
+# |      1|  {math -> 95, science -> 88} |
+# |      2|  {math -> 72, english -> 91} |
+
+# Access map values
+from pyspark.sql.functions import map_keys, map_values, explode
+df.withColumn("math_score", col("scores")["math"]).show()
+df.withColumn("all_keys",   map_keys(col("scores"))).show()
+
+# Explode map into rows
+df.withColumn("kv", explode(col("scores"))) \
+  .select("user_id", col("kv").alias("subject_score")) \
+  .show()
+```
+
+## Complex Types - Nested StructType
+
+```python
+# Nested struct - struct within struct
+address_schema = StructType([
+    StructField("street",  StringType(), True),
+    StructField("city",    StringType(), True),
+    StructField("zip",     StringType(), True),
+    StructField("country", StringType(), True),
+])
+
+schema = StructType([
+    StructField("id",      IntegerType(), False),
+    StructField("name",    StringType(),  True),
+    StructField("address", address_schema, True),
+])
+
+df = spark.createDataFrame([
+    (1, "Alice", ("123 Main St", "Mumbai",    "400001", "IN")),
+    (2, "Bob",   ("456 Oak Ave", "New York",  "10001",  "US")),
+], schema=schema)
+
+df.printSchema()
+# root
+#  |-- id: integer (nullable = false)
+#  |-- name: string (nullable = true)
+#  |-- address: struct (nullable = true)
+#  |    |-- street: string (nullable = true)
+#  |    |-- city: string (nullable = true)
+#  |    |-- zip: string (nullable = true)
+#  |    |-- country: string (nullable = true)
+
+# Access nested fields using dot notation
+df.select("name", "address.city", "address.country").show()
+df.select(col("name"), col("address.city"), col("address.zip")).show()
+
+# Filter on nested field
+df.filter(col("address.country") == "IN").show()
+```
+
+## DDL String Schema - Compact Syntax
+
+```python
+# Equivalent to StructType - shorter for simple schemas
+schema_ddl = "order_id LONG NOT NULL, product STRING, quantity INT, price DOUBLE, order_date DATE"
+
+df = spark.read.schema(schema_ddl).csv("orders.csv", header=True)
+
+# Complex types in DDL
+schema_ddl = """
+    user_id INT,
+    tags ARRAY<STRING>,
+    scores MAP<STRING, INT>,
+    address STRUCT<city: STRING, zip: STRING>
+"""
+df = spark.read.schema(schema_ddl).json("users.json")
+```
+
+## Schema Operations
+
+```python
+# Inspect schema
+df.schema                    # StructType object
+df.printSchema()             # pretty-printed tree
+df.dtypes                    # list of (name, type_string) tuples
+df.columns                   # list of column name strings
+
+# Programmatic schema building
+fields = []
+for col_name, col_type in [("id", LongType()), ("name", StringType())]:
+    fields.append(StructField(col_name, col_type, True))
+schema = StructType(fields)
+
+# Convert schema to JSON (for documentation / schema registry)
+import json
+print(json.dumps(json.loads(df.schema.json()), indent=2))
+
+# Compare schemas
+schema1 = df1.schema
+schema2 = df2.schema
+print(schema1 == schema2)   # True/False
+print(set(df1.columns) - set(df2.columns))  # columns in df1 not in df2
+```
+
+## Enforcing Schema on Bad Data
+
+```python
+schema = StructType([
+    StructField("id",     IntegerType(), False),
+    StructField("amount", DoubleType(),  True),
+])
+
+# PERMISSIVE (default) - bad types become null
+df = spark.read.schema(schema).option("mode", "PERMISSIVE").csv("data.csv", header=True)
+
+# FAILFAST - throw on first bad row
+df = spark.read.schema(schema).option("mode", "FAILFAST").csv("data.csv", header=True)
+
+# DROPMALFORMED - silently skip bad rows
+df = spark.read.schema(schema).option("mode", "DROPMALFORMED").csv("data.csv", header=True)
+```
+
+## Creating DataFrames with Schema
+
+```python
+schema = StructType([
+    StructField("id",   IntegerType(), False),
+    StructField("name", StringType(),  True),
+    StructField("score", DoubleType(), True),
+])
+
+# From list of tuples
+df = spark.createDataFrame([(1, "Alice", 9.5), (2, "Bob", 8.2)], schema=schema)
+
+# From list of Row objects
+from pyspark.sql import Row
+rows = [Row(id=1, name="Alice", score=9.5), Row(id=2, name="Bob", score=8.2)]
+df = spark.createDataFrame(rows, schema=schema)
+
+# From pandas DataFrame
+import pandas as pd
+pdf = pd.DataFrame({"id": [1, 2], "name": ["Alice", "Bob"], "score": [9.5, 8.2]})
+df = spark.createDataFrame(pdf, schema=schema)
+```
+
+## Summary
+
+- `StructType` + `StructField` is the standard way to define explicit schemas
+- Always prefer explicit schemas over `inferSchema=True` in production - faster and correct
+- `nullable=False` enforces that a column cannot have null values
+- Complex types: `ArrayType` for lists, `MapType` for key-value pairs, nested `StructType` for objects
+- DDL string syntax (`"col TYPE, col TYPE"`) is a compact alternative for simpler schemas
+- Access nested fields with dot notation: `col("address.city")`
+- Use `df.printSchema()` to inspect, `df.schema.json()` to serialize for documentation

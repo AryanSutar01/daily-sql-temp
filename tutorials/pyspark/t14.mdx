@@ -1,0 +1,268 @@
+## Setup
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, broadcast
+
+spark = SparkSession.builder.appName("JoinsDemo").getOrCreate()
+
+employees = spark.createDataFrame([
+    (1, "Alice",  10),
+    (2, "Bob",    20),
+    (3, "Carol",  10),
+    (4, "David",  30),
+    (5, "Eve",    99),   # dept 99 doesn't exist
+], ["emp_id", "name", "dept_id"])
+
+departments = spark.createDataFrame([
+    (10, "Engineering"),
+    (20, "Marketing"),
+    (30, "HR"),
+    (40, "Finance"),    # no employees here
+], ["dept_id", "dept_name"])
+```
+
+## Inner Join - Matching Rows Only
+
+Returns rows that have a match in **both** DataFrames.
+
+```python
+# Basic syntax
+result = employees.join(departments, on="dept_id", how="inner")
+result.show()
+# +-------+-----+-------+-----------+
+# | emp_id| name|dept_id|  dept_name|
+# +-------+-----+-------+-----------+
+# |      1|Alice|     10|Engineering|
+# |      3|Carol|     10|Engineering|
+# |      2|  Bob|     20|  Marketing|
+# |      4|David|     30|         HR|
+# +-------+-----+-------+-----------+
+# Eve (dept 99) and Finance (dept 40) are excluded
+
+# "inner" is the default, so you can omit it
+employees.join(departments, on="dept_id").show()
+
+# Join on multiple columns
+df1.join(df2, on=["col1", "col2"], how="inner")
+
+# Join on expression (when column names differ)
+employees.join(departments,
+    employees.dept_id == departments.dept_id,
+    how="inner"
+).show()
+```
+
+## Left Join - All Left Rows
+
+Returns all rows from the **left** DataFrame. Right side gets nulls where no match.
+
+```python
+result = employees.join(departments, on="dept_id", how="left")
+# Also valid: how="left_outer"
+result.show()
+# +-------+-----+-------+-----------+
+# | emp_id| name|dept_id|  dept_name|
+# +-------+-----+-------+-----------+
+# |      1|Alice|     10|Engineering|
+# |      3|Carol|     10|Engineering|
+# |      2|  Bob|     20|  Marketing|
+# |      4|David|     30|         HR|
+# |      5|  Eve|     99|       null|  ← Eve has no matching dept
+# +-------+-----+-------+-----------+
+
+# Use case: keep all employees, show dept info where available
+```
+
+## Right Join - All Right Rows
+
+Returns all rows from the **right** DataFrame. Left side gets nulls where no match.
+
+```python
+result = employees.join(departments, on="dept_id", how="right")
+# Also valid: how="right_outer"
+result.show()
+# +-------+-----+-------+-----------+
+# | emp_id| name|dept_id|  dept_name|
+# +-------+-----+-------+-----------+
+# |      1|Alice|     10|Engineering|
+# |      3|Carol|     10|Engineering|
+# |      2|  Bob|     20|  Marketing|
+# |      4|David|     30|         HR|
+# |   null| null|     40|    Finance|  ← Finance has no employees
+# +-------+-----+-------+-----------+
+```
+
+## Full Outer Join - All Rows from Both
+
+Returns all rows from **both** DataFrames. Nulls where no match on either side.
+
+```python
+result = employees.join(departments, on="dept_id", how="full")
+# Also valid: how="full_outer", how="outer"
+result.show()
+# +-------+-----+-------+-----------+
+# | emp_id| name|dept_id|  dept_name|
+# +-------+-----+-------+-----------+
+# |      1|Alice|     10|Engineering|
+# |      3|Carol|     10|Engineering|
+# |      2|  Bob|     20|  Marketing|
+# |      4|David|     30|         HR|
+# |      5|  Eve|     99|       null|  ← no dept match
+# |   null| null|     40|    Finance|  ← no employee match
+# +-------+-----+-------+-----------+
+```
+
+## Semi Join - Exists Check (No Right Columns)
+
+Returns rows from the **left** DataFrame that have a match on the right - but includes **only left columns**.
+
+```python
+result = employees.join(departments, on="dept_id", how="left_semi")
+result.show()
+# +-------+-----+-------+
+# | emp_id| name|dept_id|
+# +-------+-----+-------+
+# |      1|Alice|     10|
+# |      3|Carol|     10|
+# |      2|  Bob|     20|
+# |      4|David|     30|
+# +-------+-----+-------+
+# Eve excluded (no match); no dept columns included
+
+# Equivalent SQL: SELECT * FROM employees WHERE dept_id IN (SELECT dept_id FROM departments)
+# More efficient than inner join when you only need left-side data
+```
+
+## Anti Join - Not Exists Check
+
+Returns rows from the **left** DataFrame that have **no** match on the right.
+
+```python
+result = employees.join(departments, on="dept_id", how="left_anti")
+result.show()
+# +-------+----+-------+
+# | emp_id|name|dept_id|
+# +-------+----+-------+
+# |      5| Eve|     99|
+# +-------+----+-------+
+# Only Eve - the only employee without a matching department
+
+# Equivalent SQL: SELECT * FROM employees WHERE dept_id NOT IN (SELECT dept_id FROM departments)
+# Great for finding orphaned records, unmatched rows, exceptions
+```
+
+## Cross Join - Cartesian Product
+
+Every row from left joined with every row from right. Use with caution!
+
+```python
+# Result size = left_rows × right_rows
+small_df1 = spark.createDataFrame([(1,), (2,)], ["a"])
+small_df2 = spark.createDataFrame([("X",), ("Y",)], ["b"])
+
+small_df1.crossJoin(small_df2).show()
+# +---+---+
+# |  a|  b|
+# +---+---+
+# |  1|  X|
+# |  1|  Y|
+# |  2|  X|
+# |  2|  Y|
+# +---+---+
+
+# In Spark 3.x, cross joins require explicit crossJoin() or setting a config
+spark.conf.set("spark.sql.crossJoin.enabled", "true")
+```
+
+## Handling Ambiguous Column Names
+
+When both DataFrames have a column with the same name:
+
+```python
+# Problem: both DataFrames have "dept_id" after join on expression
+result = employees.join(departments,
+    employees.dept_id == departments.dept_id)
+
+# This causes AnalysisException - ambiguous column
+result.select("dept_id")  # ❌ ERROR: ambiguous
+
+# Solution 1: Join using on= string (auto-deduplicates join column)
+result = employees.join(departments, on="dept_id")  # ✅ one dept_id in result
+
+# Solution 2: Drop duplicate after expression join
+result = employees.join(departments, employees.dept_id == departments.dept_id) \
+                  .drop(departments.dept_id)  # ✅ keep only employees.dept_id
+
+# Solution 3: Rename before joining
+departments_renamed = departments.withColumnRenamed("dept_id", "d_dept_id")
+result = employees.join(departments_renamed, employees.dept_id == departments_renamed.d_dept_id)
+
+# Solution 4: Use aliases
+emp = employees.alias("e")
+dept = departments.alias("d")
+result = emp.join(dept, col("e.dept_id") == col("d.dept_id")) \
+            .select("e.*", col("d.dept_name"))
+```
+
+## Broadcast Join - Small Table Optimization
+
+When one DataFrame is small (typically < 10MB), broadcast it to all executors to avoid shuffle:
+
+```python
+from pyspark.sql.functions import broadcast
+
+# Hint to Spark to broadcast the smaller DataFrame
+result = employees.join(broadcast(departments), on="dept_id", how="inner")
+
+# Auto-broadcast: Spark auto-broadcasts tables under threshold
+spark.conf.set("spark.sql.autoBroadcastJoinThreshold", "10m")  # 10MB default
+```
+
+## Join Type Reference
+
+```python
+join_types = {
+    "inner":       "Matching rows only",
+    "left":        "All left + matching right (null for no match)",
+    "right":       "All right + matching left (null for no match)",
+    "full":        "All rows from both sides",
+    "left_semi":   "Left rows with a match (no right columns)",
+    "left_anti":   "Left rows WITHOUT a match",
+    "cross":       "Cartesian product (all combinations)",
+}
+```
+
+| Join Type | Left Unmatched | Right Unmatched | Right Columns |
+|---|---|---|---|
+| inner | ❌ excluded | ❌ excluded | ✅ included |
+| left | ✅ included (nulls) | ❌ excluded | ✅ included |
+| right | ❌ excluded | ✅ included (nulls) | ✅ included |
+| full | ✅ included (nulls) | ✅ included (nulls) | ✅ included |
+| left_semi | ❌ excluded | ❌ excluded | ❌ not included |
+| left_anti | ✅ included | ❌ excluded | ❌ not included |
+
+## SQL Equivalent
+
+```python
+employees.createOrReplaceTempView("employees")
+departments.createOrReplaceTempView("departments")
+
+spark.sql("""
+    SELECT e.emp_id, e.name, d.dept_name
+    FROM employees e
+    LEFT JOIN departments d ON e.dept_id = d.dept_id
+    WHERE d.dept_name IS NOT NULL OR e.name = 'Eve'
+""").show()
+```
+
+## Summary
+
+- `inner` - matching rows only (most common)
+- `left` - keep all left rows, nulls for unmatched right
+- `right` - keep all right rows, nulls for unmatched left
+- `full` - keep all rows from both sides
+- `left_semi` - filter left by existence of match (no right columns) - efficient alternative to inner join when you need only left data
+- `left_anti` - filter left by absence of match - great for finding orphans
+- Use `on="col"` (string) to avoid duplicate column issue on equi-joins
+- Use `broadcast()` hint for small dimension tables to avoid shuffle

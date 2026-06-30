@@ -1,0 +1,274 @@
+## What is a UDF?
+
+A **UDF (User-Defined Function)** lets you apply custom Python logic to DataFrame columns - when built-in PySpark functions aren't enough.
+
+```
+Built-in function (best):      UDF (when you need custom logic):
+col("price") * 1.18            @udf(returnType=DoubleType())
+                               def apply_gst(price):
+                               → stays in JVM                  return price * 1.18 if price else None
+                               → Catalyst can optimize         → serialized to Python process
+                                                               → slower
+```
+
+## Regular UDF - Row-by-Row Python
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import udf, col
+from pyspark.sql.types import StringType, DoubleType, IntegerType
+
+spark = SparkSession.builder.appName("UDFDemo").getOrCreate()
+
+df = spark.createDataFrame([
+    (1, "alice smith",  95000.0, "IN"),
+    (2, "bob jones",    72000.0, "US"),
+    (3, "carol brown", 110000.0, "GB"),
+], ["id", "name", "salary", "country"])
+```
+
+### Define and Register a UDF
+
+```python
+# Method 1: udf() decorator-style
+def title_case(s):
+    if s is None:
+        return None
+    return s.title()
+
+title_case_udf = udf(title_case, StringType())
+
+df.withColumn("name_titled", title_case_udf(col("name"))).show()
+# +---+-----------+--------+-------+-----------+
+# | id|       name|  salary|country|name_titled|
+# +---+-----------+--------+-------+-----------+
+# |  1|alice smith| 95000.0|     IN|Alice Smith|
+# |  2|  bob jones| 72000.0|     US|  Bob Jones|
+# |  3|carol brown|110000.0|     GB|Carol Brown|
+# +---+-----------+--------+-------+-----------+
+
+# Method 2: @udf decorator
+@udf(returnType=StringType())
+def tax_bracket(salary):
+    if salary is None:
+        return "Unknown"
+    if salary > 100000:
+        return "High"
+    elif salary > 75000:
+        return "Mid"
+    else:
+        return "Low"
+
+df.withColumn("bracket", tax_bracket(col("salary"))).show()
+
+# Method 3: register for SQL use
+spark.udf.register("tax_bracket_sql", tax_bracket, StringType())
+df.createOrReplaceTempView("employees")
+spark.sql("SELECT name, tax_bracket_sql(salary) as bracket FROM employees").show()
+```
+
+### UDF Return Types
+
+```python
+from pyspark.sql.types import *
+
+udf(func, StringType())          # string
+udf(func, IntegerType())         # int
+udf(func, DoubleType())          # float
+udf(func, BooleanType())         # bool
+udf(func, ArrayType(StringType()))          # list of strings
+udf(func, MapType(StringType(), IntegerType()))  # dict
+udf(func, StructType([                      # custom struct (row)
+    StructField("first", StringType()),
+    StructField("last", StringType())
+]))
+
+# Example: UDF returning a struct
+from pyspark.sql.types import StructType, StructField, StringType
+
+@udf(returnType=StructType([
+    StructField("first_name", StringType()),
+    StructField("last_name", StringType())
+]))
+def split_name(full_name):
+    if full_name is None:
+        return None
+    parts = full_name.split()
+    return (parts[0], parts[-1]) if len(parts) >= 2 else (full_name, "")
+
+df.withColumn("name_parts", split_name(col("name"))) \
+  .withColumn("first", col("name_parts.first_name")) \
+  .withColumn("last",  col("name_parts.last_name")) \
+  .show()
+```
+
+## UDF Performance Problem
+
+Regular UDFs have a **serialization overhead**:
+
+```
+For each row:
+  JVM (Spark)  →  serialize row to Python pickle
+                  Python process runs your function
+                  serialize result back to JVM
+  JVM (Spark)  ←  deserialize result
+
+This crossing happens once per row - can be 10-100x slower than built-in functions.
+```
+
+## Pandas UDFs - Vectorized (Much Faster)
+
+**Pandas UDFs** (also called vectorized UDFs) process entire batches of rows at once using pandas Series/DataFrames - avoiding per-row serialization overhead.
+
+```
+Regular UDF:         Pandas UDF:
+row 1 → Python       [row1, row2, ..., rowN] → Python (one batch)
+row 2 → Python       → pandas Series operations (C-level speed)
+row 3 → Python       [result1, result2, ..., resultN] → JVM
+...                  (Arrow format, not pickle - much faster)
+```
+
+### Pandas UDF - Series to Series (Most Common)
+
+```python
+import pandas as pd
+from pyspark.sql.functions import pandas_udf
+from pyspark.sql.types import DoubleType, StringType
+
+# Takes a pandas Series, returns a pandas Series
+@pandas_udf(DoubleType())
+def apply_tax(salary: pd.Series) -> pd.Series:
+    return salary * 0.70   # apply 30% tax
+
+df.withColumn("net_salary", apply_tax(col("salary"))).show()
+
+# String processing
+@pandas_udf(StringType())
+def normalize_name(name: pd.Series) -> pd.Series:
+    return name.str.strip().str.title()
+
+df.withColumn("clean_name", normalize_name(col("name"))).show()
+```
+
+### Pandas UDF - Multiple Input Columns
+
+```python
+@pandas_udf(StringType())
+def build_label(name: pd.Series, country: pd.Series) -> pd.Series:
+    return name.str.title() + " (" + country + ")"
+
+df.withColumn("label", build_label(col("name"), col("country"))).show()
+# label: "Alice Smith (IN)", "Bob Jones (US)", ...
+```
+
+### Pandas UDF - Iterator of Series (Batch Processing)
+
+For UDFs that need to load a model or resource once per batch rather than once per row:
+
+```python
+from typing import Iterator
+
+@pandas_udf(DoubleType())
+def predict_score(iterator: Iterator[pd.Series]) -> Iterator[pd.Series]:
+    # Load model ONCE per partition (not per row!)
+    import joblib
+    model = joblib.load("model.pkl")   # expensive - done once
+    for batch in iterator:
+        yield pd.Series(model.predict(batch.values.reshape(-1, 1)).flatten())
+
+df.withColumn("score", predict_score(col("salary"))).show()
+```
+
+### Pandas UDF - GroupBy Apply (UDAF-style)
+
+```python
+from pyspark.sql.functions import pandas_udf, PandasUDFType
+
+# Define schema for the output DataFrame
+output_schema = "dept string, avg_salary double, headcount long"
+
+@pandas_udf(output_schema, PandasUDFType.GROUPED_MAP)
+def normalize_within_dept(pdf: pd.DataFrame) -> pd.DataFrame:
+    """Normalize salary within each department group."""
+    pdf["avg_salary"] = pdf["salary"].mean()
+    pdf["headcount"] = len(pdf)
+    return pdf[["dept", "avg_salary", "headcount"]].drop_duplicates()
+
+df.groupBy("dept").apply(normalize_within_dept).show()
+```
+
+> In Spark 3.0+ the preferred API is `applyInPandas`:
+
+```python
+def normalize_dept(key, pdf: pd.DataFrame) -> pd.DataFrame:
+    pdf["dept_avg"] = pdf["salary"].mean()
+    pdf["normalized"] = pdf["salary"] / pdf["dept_avg"]
+    return pdf
+
+result = df.groupBy("dept").applyInPandas(
+    normalize_dept,
+    schema="id long, name string, salary double, country string, dept string, dept_avg double, normalized double"
+)
+result.show()
+```
+
+## UDF vs Pandas UDF vs Built-in - When to Use Each
+
+| Approach | Speed | Flexibility | Use When |
+|---|---|---|---|
+| Built-in functions | ⚡⚡⚡ Fastest | Limited to available funcs | Always prefer when available |
+| Pandas UDF | ⚡⚡ Fast | Any pandas/numpy logic | Custom logic on numeric/string columns |
+| Regular UDF | ⚡ Slow | Any Python logic | Complex logic, returning structs/maps, external libraries |
+
+```python
+# ✅ Best: built-in function - no Python crossing
+df.withColumn("upper_name", upper(col("name")))
+
+# ✅ Good: pandas UDF - batched, Arrow-serialized
+@pandas_udf(StringType())
+def custom_normalize(s: pd.Series) -> pd.Series:
+    return s.str.strip().str.lower().str.replace(r"\s+", "_", regex=True)
+df.withColumn("slug", custom_normalize(col("name")))
+
+# ⚠️ Avoid when possible: regular UDF - row-by-row Python
+@udf(StringType())
+def slow_normalize(s):
+    return s.strip().lower().replace(" ", "_") if s else None
+df.withColumn("slug", slow_normalize(col("name")))
+```
+
+## Null Handling in UDFs
+
+```python
+# Regular UDF: None is passed for null values - always handle it
+@udf(returnType=DoubleType())
+def safe_divide(a, b):
+    if a is None or b is None or b == 0:
+        return None
+    return a / b
+
+# Pandas UDF: nulls come as NaN in float Series, None in object Series
+@pandas_udf(DoubleType())
+def safe_pct(salary: pd.Series) -> pd.Series:
+    return salary / salary.sum()  # NaN propagates naturally in pandas
+```
+
+## Common Interview Questions
+
+**Q: Why are UDFs slow in PySpark?**
+Regular Python UDFs require serializing data from JVM to Python (via pickle), executing Python code row by row, and deserializing results back to JVM. This JVM↔Python boundary crossing is expensive. Pandas UDFs avoid this by using Apache Arrow for batch-level transfer.
+
+**Q: When would you choose a UDF over built-in functions?**
+When the logic cannot be expressed using existing `pyspark.sql.functions` - e.g., calling an external API, using a trained ML model, parsing a custom string format, or returning complex nested structures.
+
+**Q: What is the difference between a regular UDF and a pandas UDF?**
+A regular UDF processes one row at a time and uses Python pickle for serialization. A pandas UDF receives an entire batch as a pandas Series (using Apache Arrow for fast serialization), enabling vectorized operations - making them 10x+ faster than regular UDFs.
+
+## Summary
+
+- **Regular UDF**: `@udf(returnType=...)` - flexible, any Python logic, but slow (row-by-row, pickle)
+- **Pandas UDF**: `@pandas_udf(returnType)` - vectorized, uses Arrow, 10x+ faster than regular UDFs
+- Always specify the `returnType` - Spark cannot infer Python function return types
+- Handle `None` explicitly in regular UDFs; NaN/None in pandas UDFs
+- Prefer **built-in functions** over UDFs whenever possible - they stay in the JVM and are optimized by Catalyst
+- Use `spark.udf.register()` to make UDFs callable from SQL expressions

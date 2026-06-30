@@ -1,0 +1,287 @@
+## The Golden Rule
+
+> "Premature optimization is the root of all evil." - Donald Knuth
+
+Always **measure first**. You can't optimize what you haven't profiled - guessing where the bottleneck is wastes time and often makes code worse.
+
+```
+Workflow:
+1. Make it work
+2. Profile it - find the actual bottleneck
+3. Optimize only the bottleneck
+4. Measure again - confirm improvement
+```
+
+## Timing Code
+
+### time module
+
+```python
+import time
+
+start = time.time()
+result = sum(range(10_000_000))
+elapsed = time.time() - start
+print(f"Elapsed: {elapsed:.4f}s")
+```
+
+### timeit - Accurate Benchmarking
+
+```python
+import timeit
+
+# Time a snippet (runs it 1,000,000 times by default)
+t = timeit.timeit("x = [i**2 for i in range(100)]", number=10000)
+print(f"List comprehension: {t:.4f}s")
+
+# Compare two approaches
+t1 = timeit.timeit("[i**2 for i in range(100)]", number=10000)
+t2 = timeit.timeit("list(map(lambda x: x**2, range(100)))", number=10000)
+print(f"Comprehension: {t1:.4f}s")
+print(f"map+lambda:    {t2:.4f}s")
+
+# In a script with functions
+def approach_a():
+    return [i**2 for i in range(1000)]
+
+def approach_b():
+    return list(map(lambda x: x**2, range(1000)))
+
+print(timeit.timeit(approach_a, number=10000))
+print(timeit.timeit(approach_b, number=10000))
+```
+
+### Jupyter / IPython Magic
+
+```python
+# In a Jupyter notebook
+%time sum(range(10_000_000))           # run once
+%timeit sum(range(10_000_000))         # run many times, report average
+%timeit -n 100 -r 5 sum(range(100))   # 100 loops, 5 repeats
+```
+
+## cProfile - Find the Bottleneck
+
+`cProfile` tells you exactly which functions are called, how many times, and how long each takes.
+
+```python
+import cProfile
+
+def slow_function():
+    total = 0
+    for i in range(100000):
+        total += i ** 2
+    return total
+
+def main():
+    for _ in range(10):
+        slow_function()
+
+cProfile.run("main()")
+```
+
+```
+         Output:
+         ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+              1    0.000    0.000    1.234    1.234 <string>:1(main)
+             10    1.230    0.123    1.230    0.123 script.py:3(slow_function)
+         ...
+```
+
+### Profile to a File & Analyze
+
+```python
+import cProfile
+import pstats
+
+# Save profile data
+cProfile.run("main()", "profile_output.prof")
+
+# Analyze
+stats = pstats.Stats("profile_output.prof")
+stats.sort_stats("cumulative")   # sort by cumulative time
+stats.print_stats(10)            # show top 10 functions
+stats.print_callers("slow_function")   # who called this?
+```
+
+## line_profiler - Line by Line
+
+```bash
+pip install line_profiler
+```
+
+```python
+# Decorate the function to profile
+@profile   # added by kernprof
+def process_data(data):
+    result = []
+    for item in data:             # line 3
+        cleaned = item.strip()    # line 4
+        if len(cleaned) > 0:      # line 5
+            result.append(cleaned.upper())  # line 6
+    return result
+```
+
+```bash
+kernprof -l -v script.py
+# Shows time per line
+```
+
+## memory_profiler - Track Memory Usage
+
+```bash
+pip install memory_profiler
+```
+
+```python
+from memory_profiler import profile
+
+@profile
+def load_data():
+    data = list(range(1_000_000))     # line 4
+    filtered = [x for x in data if x % 2 == 0]  # line 5
+    return filtered
+
+load_data()
+# Line 4: +7.6 MiB
+# Line 5: +3.8 MiB
+```
+
+## Common Optimizations
+
+### 1. Use Built-in Functions and Libraries
+
+```python
+# Slow - Python loop
+total = 0
+for x in data:
+    total += x
+
+# Fast - built-in
+total = sum(data)
+
+# Faster for numbers - NumPy
+import numpy as np
+total = np.sum(np.array(data))
+```
+
+### 2. List Comprehensions Over Loops
+
+```python
+# Slow
+result = []
+for x in range(10000):
+    if x % 2 == 0:
+        result.append(x ** 2)
+
+# Fast
+result = [x ** 2 for x in range(10000) if x % 2 == 0]
+```
+
+### 3. Generators for Large Data
+
+```python
+# Memory-heavy - loads everything into memory
+data = [process(x) for x in large_file]
+
+# Memory-efficient - one item at a time
+data = (process(x) for x in large_file)
+for item in data:
+    write(item)
+```
+
+### 4. Use Sets for Membership Testing
+
+```python
+# O(n) - slow for large lists
+valid_ids = [1, 2, 3, ..., 100000]
+if user_id in valid_ids:   # scans the entire list
+
+# O(1) - fast
+valid_ids = {1, 2, 3, ..., 100000}
+if user_id in valid_ids:   # hash lookup
+```
+
+### 5. String Concatenation
+
+```python
+# Slow - creates a new string at each iteration
+result = ""
+for word in words:
+    result += word + " "
+
+# Fast - join at the end
+result = " ".join(words)
+```
+
+### 6. Cache Expensive Results with functools.lru_cache
+
+```python
+from functools import lru_cache
+
+@lru_cache(maxsize=128)
+def fibonacci(n: int) -> int:
+    if n < 2:
+        return n
+    return fibonacci(n - 1) + fibonacci(n - 2)
+
+fibonacci(50)   # fast - results are cached
+```
+
+### 7. Avoid Repeated Attribute Lookup
+
+```python
+import math
+
+# Slow - looks up math.sqrt every iteration
+results = [math.sqrt(x) for x in range(100000)]
+
+# Fast - local variable is faster than attribute lookup
+sqrt = math.sqrt
+results = [sqrt(x) for x in range(100000)]
+```
+
+### 8. Use numpy for Numerical Work
+
+```python
+import numpy as np
+
+data = list(range(1_000_000))
+
+# Slow - Python loop
+result = [x * 2 for x in data]
+
+# Fast - NumPy vectorized
+arr = np.array(data)
+result = arr * 2   # 10-100x faster
+```
+
+## Interview Questions
+
+**Q: How do you identify a performance bottleneck in Python code?**
+Use `cProfile` to profile the entire program and identify which functions consume the most time. Then use `line_profiler` to find the specific lines within that function. Always measure before optimizing - don't guess.
+
+**Q: What is the difference between `time.time()` and `timeit`?**
+`time.time()` measures wall-clock time for a single run - affected by OS scheduling and other processes. `timeit` runs the code many times and reports the average, which gives a much more accurate benchmark for comparing small code snippets.
+
+**Q: Why are sets faster than lists for membership testing?**
+Lists use O(n) linear search - each element is checked one by one. Sets use a hash table, so membership testing is O(1) on average - a hash of the value is computed and the corresponding bucket is checked directly.
+
+**Q: What is `lru_cache` and when should you use it?**
+`lru_cache` (Least Recently Used cache) memoizes a function - it stores results for previous inputs and returns the cached result instead of recomputing. Use it for pure functions with expensive computation and repeated calls with the same arguments (e.g. recursive algorithms, database lookups).
+
+**Q: When would you use a generator instead of a list comprehension?**
+When processing large datasets where you don't need all results in memory at once. A list comprehension builds the entire list in memory; a generator yields one item at a time. For large files or streaming data, generators are far more memory-efficient.
+
+## Summary
+
+- **Measure first** - use `cProfile` to find bottlenecks; `line_profiler` for line-by-line detail
+- `timeit` - accurate benchmarking; runs code many times to average out noise
+- `memory_profiler` - track memory usage line by line
+- Built-in functions (`sum`, `max`, `sorted`) beat Python loops - they run in C
+- List comprehensions are faster than `for` loops with `append()`
+- Generators save memory for large datasets - `(x for x in ...)` vs `[x for x in ...]`
+- Sets for membership testing: O(1) vs O(n) for lists
+- `"".join(words)` for string building - never concatenate in a loop
+- `@lru_cache` - memoize expensive pure functions
+- NumPy for numerical work - 10–100x faster than Python loops

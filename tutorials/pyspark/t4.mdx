@@ -1,0 +1,236 @@
+## What is an RDD?
+
+**RDD (Resilient Distributed Dataset)** is Spark's original, fundamental data abstraction. It's an immutable, partitioned collection of records that can be processed in parallel across a cluster.
+
+Break down the name:
+- **Resilient** - fault-tolerant; if a partition is lost, Spark can recompute it from the lineage graph
+- **Distributed** - data is spread across multiple nodes in the cluster
+- **Dataset** - a collection of records (can be any Python object - tuples, dicts, custom classes)
+
+```
+RDD of 12 records, split across 4 partitions on 2 nodes:
+
+Node 1:                        Node 2:
+┌──────────────┐               ┌──────────────┐
+│ Partition 0  │               │ Partition 2  │
+│ [1, 2, 3]    │               │ [7, 8, 9]    │
+├──────────────┤               ├──────────────┤
+│ Partition 1  │               │ Partition 3  │
+│ [4, 5, 6]    │               │ [10, 11, 12] │
+└──────────────┘               └──────────────┘
+```
+
+## Creating RDDs
+
+```python
+sc = spark.sparkContext
+
+# 1. From a Python list (parallelize)
+rdd = sc.parallelize([1, 2, 3, 4, 5])
+rdd = sc.parallelize([1, 2, 3, 4, 5], numSlices=4)  # 4 partitions
+
+# 2. From a text file (each line = one record)
+rdd = sc.textFile("hdfs:///data/logs.txt")
+rdd = sc.textFile("s3://bucket/logs/*.txt")  # wildcards work too
+
+# 3. From multiple files
+rdd = sc.wholeTextFiles("hdfs:///data/")   # (filename, content) tuples
+
+# 4. From a DataFrame
+df = spark.read.csv("data.csv", header=True)
+rdd = df.rdd                               # DataFrame → RDD of Row objects
+```
+
+## RDD Transformations (Lazy)
+
+Transformations return a new RDD - they don't execute immediately.
+
+```python
+rdd = sc.parallelize([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+
+# map - apply function to every element
+doubled = rdd.map(lambda x: x * 2)
+# [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+
+# filter - keep elements matching condition
+evens = rdd.filter(lambda x: x % 2 == 0)
+# [2, 4, 6, 8, 10]
+
+# flatMap - like map, but flattens nested lists into a single list
+words = sc.parallelize(["hello world", "spark is fast"])
+word_list = words.flatMap(lambda line: line.split(" "))
+# ["hello", "world", "spark", "is", "fast"]
+
+# distinct - remove duplicates
+rdd2 = sc.parallelize([1, 1, 2, 2, 3])
+rdd2.distinct().collect()  # [1, 2, 3]
+
+# union - combine two RDDs
+rdd3 = sc.parallelize([10, 20, 30])
+combined = rdd.union(rdd3)
+
+# mapPartitions - apply function once per partition (more efficient for DB connections)
+def process_partition(iterator):
+    for item in iterator:
+        yield item * 2
+result = rdd.mapPartitions(process_partition)
+
+# reduceByKey - aggregate by key (works on RDD of (key, value) pairs)
+pairs = sc.parallelize([("a", 1), ("b", 2), ("a", 3), ("b", 4)])
+sums = pairs.reduceByKey(lambda x, y: x + y)
+# [("a", 4), ("b", 6)]
+
+# groupByKey - group all values with same key (less efficient than reduceByKey)
+groups = pairs.groupByKey().mapValues(list)
+# [("a", [1, 3]), ("b", [2, 4])]
+
+# sortBy
+sorted_rdd = rdd.sortBy(lambda x: x, ascending=False)
+```
+
+## RDD Actions (Trigger Execution)
+
+Actions trigger the DAG execution and return a result to the driver.
+
+```python
+rdd = sc.parallelize([1, 2, 3, 4, 5])
+
+rdd.collect()          # [1, 2, 3, 4, 5]  - bring all to driver (careful with large data!)
+rdd.count()            # 5
+rdd.first()            # 1
+rdd.take(3)            # [1, 2, 3]
+rdd.takeSample(False, 3)  # random 3 elements without replacement
+rdd.reduce(lambda a, b: a + b)  # 15  - aggregate to single value
+rdd.sum()              # 15
+rdd.max()              # 5
+rdd.min()              # 1
+rdd.mean()             # 3.0
+
+# save to disk
+rdd.saveAsTextFile("hdfs:///output/result")
+```
+
+## RDD Lineage - How Fault Tolerance Works
+
+RDDs don't store their data permanently. Instead, each RDD knows **how it was created** from its parent. This chain is called the **lineage** (or DAG).
+
+```python
+# Lineage graph:
+# textFile → filter → map → reduceByKey
+logs = sc.textFile("hdfs:///logs.txt")           # base RDD
+errors = logs.filter(lambda l: "ERROR" in l)     # child RDD
+pairs = errors.map(lambda l: (l.split()[0], 1))  # grandchild RDD
+counts = pairs.reduceByKey(lambda a, b: a + b)   # great-grandchild RDD
+counts.collect()  # triggers execution
+
+# If a partition of "counts" is lost:
+# Spark recomputes it by replaying the lineage:
+# textFile → filter → map → reduceByKey (only for lost partition)
+```
+
+```python
+# View the lineage
+print(counts.toDebugString().decode())
+# (2) PythonRDD[6] at RDD at PythonRDD.scala:53 []
+#  |  PairwiseRDD[5] at reduceByKey
+#  |  PythonRDD[4] at map
+#  |  PythonRDD[3] at filter
+#  |  logs.txt MapPartitionsRDD[1]
+```
+
+## Persistence / Caching RDDs
+
+If you use an RDD multiple times, cache it to avoid recomputation:
+
+```python
+from pyspark import StorageLevel
+
+rdd = sc.textFile("large_file.txt").filter(lambda l: "ERROR" in l)
+
+# Cache in memory (default)
+rdd.cache()         # = MEMORY_ONLY
+
+# Or choose persistence level explicitly
+rdd.persist(StorageLevel.MEMORY_AND_DISK)  # spill to disk if RAM full
+rdd.persist(StorageLevel.DISK_ONLY)        # only disk
+rdd.persist(StorageLevel.MEMORY_ONLY_2)    # replicated 2x in memory
+
+# Use the cached RDD multiple times
+count = rdd.count()        # computed + cached
+sample = rdd.take(10)      # uses cache - no recomputation
+
+# Release cache when done
+rdd.unpersist()
+```
+
+## RDD vs DataFrame - Quick Comparison
+
+| Feature | RDD | DataFrame |
+|---|---|---|
+| Data type | Any Python object | Structured rows with schema |
+| Optimization | None (you write it) | Catalyst optimizer, Tungsten |
+| Performance | Slower (Python overhead) | Faster (JVM-native execution) |
+| Type safety | Yes (Python types) | Schema-enforced |
+| SQL support | No | Yes |
+| API style | Functional (map, filter, reduce) | SQL-like (select, filter, groupBy) |
+| Introduced | Spark 1.0 | Spark 1.3 (matured in 2.0) |
+
+## When to Use RDDs
+
+In modern PySpark (2.0+), prefer DataFrames almost always. Use RDDs when:
+
+```python
+# ✅ Use RDD when:
+
+# 1. You need fine-grained control over partitioning
+rdd = sc.parallelize(data, numSlices=100)
+
+# 2. Your data is unstructured (raw text, binary)
+rdd = sc.textFile("access.log")
+parsed = rdd.map(lambda line: parse_log_line(line))
+
+# 3. You're using complex Python objects that don't fit a schema
+rdd = sc.parallelize([{"nested": {"key": [1,2,3]}}, ...])
+
+# 4. You need operations not available in DataFrame API
+rdd.mapPartitionsWithIndex(lambda idx, it: ...)
+
+# 5. Migrating/maintaining old Spark 1.x code
+
+# ❌ Don't use RDD when:
+# - Your data is structured/tabular  → use DataFrame
+# - You need SQL queries             → use DataFrame + spark.sql()
+# - You're doing ML                  → use DataFrame (MLlib uses it)
+# - You care about performance       → use DataFrame (Catalyst optimizer)
+```
+
+## Classic Word Count - RDD Style
+
+The "Hello World" of distributed computing:
+
+```python
+sc = spark.sparkContext
+
+text = sc.textFile("hdfs:///books/shakespeare.txt")
+
+word_counts = (
+    text
+    .flatMap(lambda line: line.lower().split())       # split lines into words
+    .map(lambda word: (word, 1))                      # (word, 1) pairs
+    .reduceByKey(lambda a, b: a + b)                  # sum counts
+    .sortBy(lambda x: x[1], ascending=False)          # sort by count desc
+)
+
+top_words = word_counts.take(10)
+for word, count in top_words:
+    print(f"{word}: {count}")
+```
+
+## Summary
+
+- RDD is Spark's original data structure - an **immutable, distributed, fault-tolerant** collection
+- RDDs use **lazy evaluation** - transformations build a DAG, actions trigger execution
+- **Lineage** provides fault tolerance - lost partitions are recomputed from parent RDDs
+- **Cache** RDDs that are reused to avoid redundant recomputation
+- Use RDDs for **unstructured data**, fine-grained control, or legacy code
+- For structured/tabular data, prefer **DataFrames** - they're faster thanks to Catalyst optimization

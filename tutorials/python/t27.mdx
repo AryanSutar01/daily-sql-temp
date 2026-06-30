@@ -1,0 +1,282 @@
+## The Problem: Dependency Conflicts
+
+Without virtual environments, all Python packages are installed globally - different projects requiring different versions of the same library will conflict.
+
+```
+Project A needs:  requests==2.25.0
+Project B needs:  requests==2.31.0
+Global install:   Can only have one version - conflict!
+
+Solution: Each project gets its own isolated environment.
+```
+
+## Virtual Environments with venv
+
+`venv` is Python's built-in tool for creating isolated environments.
+
+```bash
+# Create a virtual environment
+python -m venv venv           # creates a folder called 'venv'
+python -m venv .venv          # hidden folder (common convention)
+python3.11 -m venv venv       # specific Python version
+
+# Activate the environment
+source venv/bin/activate      # Linux / macOS
+venv\Scripts\activate         # Windows
+
+# Your prompt changes to show the active venv:
+(venv) $ python --version
+
+# Deactivate
+deactivate
+```
+
+### What's Inside a venv
+
+```
+venv/
+├── bin/              # (Scripts/ on Windows)
+│   ├── activate      # activation script
+│   ├── python        # isolated Python interpreter
+│   └── pip           # isolated pip
+├── include/
+└── lib/
+    └── python3.11/
+        └── site-packages/   # packages installed here, not globally
+```
+
+## pip - Package Management
+
+```bash
+# Install a package
+pip install requests
+pip install requests==2.31.0        # specific version
+pip install "requests>=2.25,<3.0"   # version range
+
+# Install multiple packages
+pip install requests pandas numpy
+
+# Upgrade a package
+pip install --upgrade requests
+
+# Uninstall
+pip uninstall requests
+
+# List installed packages
+pip list
+pip show requests    # details about a package
+
+# Freeze current environment to a file
+pip freeze > requirements.txt
+
+# Install from requirements file
+pip install -r requirements.txt
+```
+
+### requirements.txt
+
+```
+# requirements.txt
+requests==2.31.0
+pandas==2.1.0
+numpy==1.26.0
+pytest==7.4.0
+python-dotenv==1.0.0
+```
+
+```bash
+# Separate dev dependencies (common pattern)
+# requirements.txt - production only
+# requirements-dev.txt - includes dev tools
+
+# requirements-dev.txt
+-r requirements.txt          # include production deps
+pytest==7.4.0
+black==23.9.1
+mypy==1.5.1
+```
+
+## pipenv - Dependency Management + venv Combined
+
+```bash
+pip install pipenv
+
+pipenv install requests          # installs and creates Pipfile
+pipenv install pytest --dev      # dev dependency
+pipenv shell                     # activate the environment
+pipenv run python script.py      # run without activating
+pipenv lock                      # generate Pipfile.lock (exact versions)
+```
+
+```
+# Pipfile
+[packages]
+requests = "*"
+pandas = ">=2.0"
+
+[dev-packages]
+pytest = "*"
+black = "*"
+
+[requires]
+python_version = "3.11"
+```
+
+## pyenv - Manage Multiple Python Versions
+
+```bash
+# Install pyenv (macOS/Linux)
+curl https://pyenv.run | bash
+
+# List available versions
+pyenv install --list
+
+# Install a specific version
+pyenv install 3.11.5
+pyenv install 3.12.0
+
+# Set global default
+pyenv global 3.11.5
+
+# Set local version for a project (creates .python-version file)
+pyenv local 3.12.0
+
+python --version   # 3.12.0
+```
+
+## Project Structure Best Practices
+
+```
+my_project/
+├── .venv/                  # virtual environment (gitignored)
+├── src/
+│   └── my_package/
+│       ├── __init__.py
+│       ├── core.py
+│       └── utils.py
+├── tests/
+│   ├── conftest.py
+│   └── test_core.py
+├── .env                    # environment variables (gitignored)
+├── .gitignore
+├── pyproject.toml          # modern project config
+├── requirements.txt
+└── README.md
+```
+
+```
+# .gitignore - always include these
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+*.egg-info/
+dist/
+build/
+```
+
+## Environment Variables with python-dotenv
+
+```bash
+pip install python-dotenv
+```
+
+```
+# .env
+DATABASE_URL=postgresql://user:pass@localhost/mydb
+SECRET_KEY=supersecretkey123
+DEBUG=True
+API_KEY=abc123
+```
+
+```python
+from dotenv import load_dotenv
+import os
+
+load_dotenv()   # loads .env file into environment
+
+db_url = os.getenv("DATABASE_URL")
+secret = os.getenv("SECRET_KEY")
+debug = os.getenv("DEBUG", "False") == "True"   # with default
+
+print(db_url)   # postgresql://user:pass@localhost/mydb
+```
+
+## Creating a Python Package
+
+```
+my_package/
+├── my_package/
+│   ├── __init__.py       # makes it a package
+│   ├── core.py
+│   └── utils.py
+├── tests/
+├── README.md
+└── pyproject.toml
+```
+
+```python
+# my_package/__init__.py
+from .core import process
+from .utils import format_output
+
+__version__ = "1.0.0"
+__all__ = ["process", "format_output"]
+```
+
+```toml
+# pyproject.toml (modern standard - replaces setup.py)
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "my-package"
+version = "1.0.0"
+description = "A useful Python package"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.25.0",
+    "pandas>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "black", "mypy"]
+```
+
+```bash
+# Build and publish to PyPI
+pip install build twine
+
+python -m build            # creates dist/ with .whl and .tar.gz
+twine upload dist/*        # upload to PyPI
+```
+
+## Interview Questions
+
+**Q: What is a virtual environment and why do you need one?**
+A virtual environment is an isolated Python installation with its own packages, separate from the global Python environment. You need one to avoid dependency conflicts between projects - each project can use different versions of the same library without affecting others.
+
+**Q: What is the difference between `pip freeze` and `pip list`?**
+`pip list` shows installed packages in a human-readable table. `pip freeze` outputs them in `package==version` format suitable for a `requirements.txt` file. Use `pip freeze > requirements.txt` to capture the exact state of your environment.
+
+**Q: What is the difference between `requirements.txt` and `pyproject.toml`?**
+`requirements.txt` is a flat list of pinned dependencies used to reproduce an environment. `pyproject.toml` is the modern project configuration file that defines package metadata, build system, dependencies, and tool configs (black, mypy, pytest) in one place. `pyproject.toml` is used when distributing a package; `requirements.txt` is used for deploying applications.
+
+**Q: What is pyenv?**
+`pyenv` is a tool for managing multiple Python versions on the same machine. It lets you install any Python version and switch between them globally or per project using `.python-version` files.
+
+**Q: What should always be in `.gitignore` for a Python project?**
+At minimum: `.venv/` or `venv/` (virtual environment), `__pycache__/`, `*.pyc` (compiled bytecode), `.env` (secrets), `dist/` and `build/` (build artifacts), and `*.egg-info/`.
+
+## Summary
+
+- `python -m venv .venv` - create a virtual environment; `source .venv/bin/activate` to activate
+- Each venv has its own `pip` and installed packages - fully isolated from other projects
+- `pip freeze > requirements.txt` - capture exact dependencies; `pip install -r requirements.txt` to restore
+- `pyenv` - manage multiple Python versions on the same machine
+- `python-dotenv` - load secrets and config from a `.env` file into `os.environ`
+- `pyproject.toml` - modern standard for package configuration, replaces `setup.py`
+- Always add `.venv/`, `__pycache__/`, and `.env` to `.gitignore`

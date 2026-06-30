@@ -1,0 +1,152 @@
+## Variables
+
+A variable is a name that refers to a value stored in memory.
+
+```python
+name = "Alice"      # str
+age = 30            # int
+height = 5.7        # float
+is_active = True    # bool
+
+# Multiple assignment
+x = y = z = 0
+a, b, c = 1, 2, 3   # unpacking
+
+# Swap without temp variable
+a, b = b, a
+```
+
+## Core Data Types
+
+```python
+# Integer - whole numbers, unlimited precision
+age = 25
+big = 10 ** 100   # no overflow in Python
+
+# Float - decimal numbers (64-bit IEEE 754)
+pi = 3.14159
+temp = -0.5
+sci = 1.5e10      # scientific notation = 15000000000.0
+
+# String - text (immutable, unicode)
+name = "Alice"
+msg = 'Hello'
+multi = """Line 1
+Line 2"""
+
+# Boolean - True or False (subclass of int)
+active = True
+deleted = False
+print(int(True))    # 1
+print(int(False))   # 0
+
+# NoneType - absence of value (singleton)
+result = None
+```
+
+## type() and isinstance()
+
+```python
+x = 42
+print(type(x))            # <class 'int'>
+print(type(x).__name__)   # 'int'
+
+isinstance(x, int)    # True
+isinstance(x, float)  # False
+isinstance(x, (int, float))  # True - multiple types
+```
+
+## Type Conversion
+
+```python
+# Explicit conversion
+int("42")       # 42
+int(3.9)        # 3 - truncates, doesn't round
+float("3.14")   # 3.14
+str(100)        # "100"
+bool(0)         # False
+bool("")        # False
+bool([])        # False
+bool(None)      # False
+bool(1)         # True
+bool("hi")      # True
+bool([1])       # True
+
+# Failed conversion
+int("abc")   # ValueError
+int(None)    # TypeError
+```
+
+## Truthy and Falsy Values
+
+```python
+# Falsy - evaluate to False in boolean context
+False, 0, 0.0, "", [], {}, set(), None
+
+# Truthy - everything else
+True, 1, -1, "a", [0], {"a": 1}
+
+# Common use
+if user_list:         # True if list is non-empty
+    process(user_list)
+
+if name:              # True if name is non-empty string
+    print(name)
+```
+
+## Dynamic Typing
+
+```python
+# Python is dynamically typed - a variable can hold any type
+x = 10
+print(type(x))   # int
+
+x = "hello"
+print(type(x))   # str - same variable, different type
+
+x = [1, 2, 3]
+print(type(x))   # list
+```
+
+## Naming Conventions
+
+```python
+# snake_case for variables and functions (PEP 8)
+user_name = "Alice"
+max_retries = 3
+
+# UPPER_CASE for constants
+MAX_SIZE = 100
+PI = 3.14159
+
+# _single_underscore - internal/private by convention
+_cache = {}
+
+# __double_underscore - name mangling in classes
+class Foo:
+    __secret = 42   # becomes _Foo__secret
+```
+
+## Interview Questions
+
+**Q: What are Python's built-in data types?**
+Core types: `int`, `float`, `str`, `bool`, `NoneType`. Collections: `list`, `tuple`, `dict`, `set`, `frozenset`. All values in Python are objects - even integers and booleans.
+
+**Q: What is the difference between `int` and `float`?**
+`int` stores whole numbers with arbitrary precision - no overflow. `float` stores decimal numbers using 64-bit IEEE 754 format - precise to about 15-17 significant digits but with potential floating-point rounding errors (`0.1 + 0.2 != 0.3`).
+
+**Q: What values are falsy in Python?**
+`False`, `0`, `0.0`, `""` (empty string), `[]` (empty list), `{}` (empty dict), `set()` (empty set), `None`. All other values are truthy.
+
+**Q: Is Python statically or dynamically typed?**
+Python is dynamically typed - variable types are determined at runtime, not at compile time. You don't declare types explicitly (though you can add type hints). A variable can hold values of different types at different times.
+
+## Summary
+
+- Variables are names bound to objects - no type declaration needed
+- Core types: `int`, `float`, `str`, `bool`, `None`
+- `type()` - check the type of a value; `isinstance()` - check if an object is of a given type
+- Explicit conversion: `int()`, `float()`, `str()`, `bool()`
+- Falsy values: `0`, `""`, `[]`, `{}`, `None`, `False`
+- Python is dynamically typed - a variable can hold any type
+- Follow snake_case for variables, UPPER_CASE for constants

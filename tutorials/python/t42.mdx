@@ -1,0 +1,258 @@
+## The Default: __dict__ Per Instance
+
+Every Python object (without `__slots__`) stores its instance attributes in a dictionary called `__dict__`. This dict is flexible - you can add any attribute dynamically - but it has significant overhead.
+
+```python
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+p = Point(1, 2)
+
+print(p.__dict__)   # {'x': 1, 'y': 2}
+print(type(p.__dict__))   # <class 'dict'>
+
+# You can add attributes dynamically
+p.z = 3          # works!
+p.label = "A"    # works!
+print(p.__dict__)   # {'x': 1, 'y': 2, 'z': 3, 'label': 'A'}
+```
+
+## __slots__ - Fixed Attribute Storage
+
+`__slots__` replaces the per-instance `__dict__` with a fixed set of slots stored directly on the object, like C struct fields.
+
+```python
+class SlottedPoint:
+    __slots__ = ("x", "y")   # declare allowed attributes
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+p = SlottedPoint(1, 2)
+print(p.x)   # 1 - works normally
+
+# Cannot add undeclared attributes
+p.z = 3   # AttributeError: 'SlottedPoint' object has no attribute 'z'
+
+# No __dict__
+p.__dict__   # AttributeError - __dict__ doesn't exist
+```
+
+## Memory Comparison
+
+```python
+import sys
+
+class Regular:
+    def __init__(self, x, y, z):
+        self.x = x
+        self.y = y
+        self.z = z
+
+class Slotted:
+    __slots__ = ("x", "y", "z")
+
+    def __init__(self, x, y, z):
+        self.x = x
+        self.y = y
+        self.z = z
+
+r = Regular(1, 2, 3)
+s = Slotted(1, 2, 3)
+
+regular_size = sys.getsizeof(r) + sys.getsizeof(r.__dict__)
+slotted_size = sys.getsizeof(s)
+
+print(f"Regular: {regular_size} bytes")   # ~232 bytes
+print(f"Slotted: {slotted_size} bytes")   # ~56 bytes
+print(f"Reduction: {regular_size / slotted_size:.1f}x")   # ~4x smaller
+```
+
+### At Scale
+
+```python
+import sys
+
+class Regular:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+class Slotted:
+    __slots__ = ("x", "y")
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+n = 1_000_000
+
+regular_objects = [Regular(i, i*2) for i in range(n)]
+slotted_objects = [Slotted(i, i*2) for i in range(n)]
+
+# Memory usage difference: hundreds of MB at this scale
+```
+
+## Performance Comparison
+
+`__slots__` also speeds up attribute access because slots are stored at fixed offsets (like struct fields) instead of hash table lookups.
+
+```python
+import timeit
+
+class Regular:
+    def __init__(self):
+        self.x = 0
+
+class Slotted:
+    __slots__ = ("x",)
+    def __init__(self):
+        self.x = 0
+
+r = Regular()
+s = Slotted()
+
+t_regular = timeit.timeit(lambda: r.x, number=10_000_000)
+t_slotted = timeit.timeit(lambda: s.x, number=10_000_000)
+
+print(f"Regular: {t_regular:.3f}s")
+print(f"Slotted: {t_slotted:.3f}s")
+# Slotted is typically 10-20% faster for attribute access
+```
+
+## Inheritance with __slots__
+
+```python
+class Animal:
+    __slots__ = ("name", "age")
+
+    def __init__(self, name, age):
+        self.name = name
+        self.age = age
+
+class Dog(Animal):
+    __slots__ = ("breed",)   # only add NEW slots - don't repeat parent slots
+
+    def __init__(self, name, age, breed):
+        super().__init__(name, age)
+        self.breed = breed
+
+d = Dog("Max", 3, "Labrador")
+print(d.name)    # Max
+print(d.breed)   # Labrador
+
+# If subclass doesn't define __slots__, it gets __dict__ back
+class Cat(Animal):
+    pass   # no __slots__ → Cat has __dict__ (can add arbitrary attrs)
+
+c = Cat("Whiskers", 2)
+c.color = "orange"   # works - Cat has __dict__
+```
+
+## Adding __dict__ Back (Optional)
+
+You can keep the flexibility of `__dict__` while also having slots:
+
+```python
+class Flexible:
+    __slots__ = ("x", "y", "__dict__")   # add __dict__ explicitly
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+f = Flexible(1, 2)
+f.z = 3      # works - __dict__ is available for extra attributes
+f.x = 10     # works - slot attribute
+```
+
+## __slots__ with dataclass
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Point:
+    __slots__ = ("x", "y")
+    x: float
+    y: float
+
+# Python 3.10+ - cleaner syntax
+@dataclass(slots=True)
+class Point:
+    x: float
+    y: float
+
+p = Point(1.0, 2.0)
+print(p.x)   # 1.0
+```
+
+## When to Use __slots__
+
+```python
+# USE __slots__ when:
+# - Creating many (thousands+) instances of a class
+# - Memory is a constraint (embedded systems, large-scale data processing)
+# - You know all attributes upfront and don't need dynamic ones
+# - Attribute access speed matters
+
+# DON'T USE __slots__ when:
+# - You need to add attributes dynamically at runtime
+# - You're mixing with frameworks that inspect __dict__ (some ORMs, pickle)
+# - You're writing a base class others will inherit (they need slots too)
+# - The memory saving doesn't matter for your use case
+```
+
+## Practical Example - Sensor Data at Scale
+
+```python
+from dataclasses import dataclass
+
+# Without slots - processing 10M sensor readings
+@dataclass
+class SensorReadingRegular:
+    sensor_id: int
+    timestamp: float
+    value: float
+    unit: str
+
+# With slots - ~4x less memory
+@dataclass(slots=True)
+class SensorReading:
+    sensor_id: int
+    timestamp: float
+    value: float
+    unit: str
+
+# For 10 million readings, the difference is hundreds of MB
+```
+
+## Interview Questions
+
+**Q: What is `__slots__` and what problem does it solve?**
+`__slots__` is a class variable that declares the fixed set of instance attributes for a class. It replaces the per-instance `__dict__` with fixed-offset storage, reducing memory usage by 3–4x per instance. It's useful when creating a very large number of instances of a class.
+
+**Q: What are the trade-offs of using `__slots__`?**
+Benefits: lower memory per instance, slightly faster attribute access. Drawbacks: can't add attributes dynamically, no `__dict__` (breaks some introspection), subclasses must also define `__slots__` to keep the benefit, some frameworks that rely on `__dict__` may not work. Only use it when the memory savings justify the constraints.
+
+**Q: Why does `__slots__` save memory?**
+Without `__slots__`, each instance has a `__dict__` - a full Python dictionary with hash table overhead - to store its attributes. With `__slots__`, attributes are stored at fixed offsets on the object (like C struct fields), eliminating the dictionary overhead. The saving is roughly 3–4x per instance.
+
+**Q: Does `__slots__` affect inheritance?**
+If a parent class has `__slots__` and a subclass doesn't define `__slots__`, the subclass gets `__dict__` back - losing the memory savings. To maintain the benefit, every class in the hierarchy must declare `__slots__`. The subclass only needs to declare new slots, not repeat the parent's.
+
+**Q: How does Python 3.10's `@dataclass(slots=True)` work?**
+It's equivalent to defining `__slots__` manually in a dataclass. Python 3.10+ added the `slots=True` parameter to `@dataclass` as a convenient way to generate a slotted dataclass without manually defining `__slots__`.
+
+## Summary
+
+- Without `__slots__`, every instance has a `__dict__` dictionary - flexible but memory-heavy
+- `__slots__ = ("x", "y")` - replaces `__dict__` with fixed attribute storage
+- **Memory saving**: 3–4x less per instance - critical when creating millions of objects
+- **Speed**: attribute access is slightly faster due to fixed-offset storage
+- **Trade-off**: no dynamic attribute addition, no `__dict__`, more complex inheritance
+- Subclasses must also define `__slots__` to maintain the savings
+- Python 3.10+: `@dataclass(slots=True)` - convenient slotted dataclass
+- Use when: millions of instances, known attributes upfront, memory-constrained environments

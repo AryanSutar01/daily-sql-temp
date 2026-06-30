@@ -1,6 +1,6 @@
 import { compileMDX } from "next-mdx-remote/rsc"
-import { tutorials } from "@/tutorials/manifest"
-import { getTutorial } from "@/tutorials"
+import { tutorials } from "@/tutorials/python/manifest"
+import { getTutorial } from "@/tutorials/python"
 import { notFound } from "next/navigation"
 import remarkGfm from "remark-gfm"
 import Link from "next/link"
@@ -44,7 +44,7 @@ const mdxComponents = {
       <SyntaxHighlighter
         {...props}
         style={oneDark}
-        language="sql"
+        language="python"
         PreTag="div"
         customStyle={{
           margin: 0,
@@ -156,6 +156,7 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
     source: tutorial.source,
     components: mdxComponents,
     options: {
+      parseFrontmatter: true,
       mdxOptions: {
         remarkPlugins: [remarkGfm],
       },
@@ -167,39 +168,53 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
   const nextTutorial = currentIndex < tutorials.length - 1 ? tutorials[currentIndex + 1] : null
 
   return (
-    <main className="min-h-screen bg-[#0a0f1c]">
-      {/* Back button */}
-      <div className="border-b border-[#202736] bg-[#0f1623]">
-        <div className="mx-auto max-w-4xl px-6 py-4">
+    <main className="min-h-screen bg-[#080c16]">
+      {/* Hero Header for article */}
+      <section className="relative overflow-hidden pt-8 -mt-16 pb-10">
+        {/* Grid pattern */}
+        <div
+          className="absolute inset-0 pointer-events-none z-0 opacity-[0.05]"
+          style={{
+            backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)`,
+            backgroundSize: '40px 40px'
+          }}
+        />
+
+        {/* Top-left glow */}
+        <div className="absolute top-0 left-0 w-[600px] h-[400px] bg-[#4DD4C4]/15 blur-[120px] rounded-full pointer-events-none z-0 -translate-x-1/4 -translate-y-1/4" />
+
+        {/* Bottom fade line */}
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#30B5A6]/30 to-transparent" />
+
+        <div className="relative z-10 mx-auto max-w-4xl px-6 pt-24">
+          {/* Back button */}
           <Link
-            href="/practice/learn"
-            className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors"
+            href="/practice/learn/python"
+            className="inline-flex items-center gap-2 text-sm text-zinc-400 hover:text-[#4DD4C4] transition-colors mb-6"
           >
             <ArrowLeft size={16} />
-            Back to Learn
+            Back to Learn Python
           </Link>
+
+          {/* Title */}
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white mb-3">{tutorial.title}</h1>
+          <p className="text-lg text-[#7b8ca3]">{tutorial.description}</p>
         </div>
-      </div>
+      </section>
 
       {/* Article Content */}
       <article className="mx-auto max-w-4xl px-6 py-10">
-        {/* Header */}
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">{tutorial.title}</h1>
-          <p className="text-zinc-500">{tutorial.description}</p>
-        </header>
-
         {/* MDX Content */}
         <div className="prose prose-invert max-w-none">{content}</div>
 
         {/* Navigation */}
-        <nav className="flex items-center justify-between mt-12 pt-8 border-t border-[#202736]">
+        <nav className="flex items-center justify-between mt-16 pt-8 border-t border-[#202736]">
           {prevTutorial ? (
             <Link
-              href={`/practice/learn/${prevTutorial.id}`}
-              className="group flex items-center gap-3 p-4 rounded-xl border border-[#202736] bg-[#0f1623] hover:border-[#30B5A6]/50 transition-all"
+              href={`/practice/learn/python/${prevTutorial.id}`}
+              className="group flex items-center gap-3 p-4 rounded-xl border border-[#202736] bg-[#0f1623]/80 hover:border-[#4DD4C4]/30 transition-all duration-300"
             >
-              <ArrowLeft size={18} className="text-zinc-500 group-hover:text-[#30B5A6] transition-colors" />
+              <ArrowLeft size={18} className="text-zinc-500 group-hover:text-[#4DD4C4] transition-colors" />
               <div>
                 <p className="text-xs text-zinc-500 mb-0.5">Previous</p>
                 <p className="text-sm font-medium text-white group-hover:text-[#4DD4C4] transition-colors">
@@ -213,8 +228,8 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
 
           {nextTutorial ? (
             <Link
-              href={`/practice/learn/${nextTutorial.id}`}
-              className="group flex items-center gap-3 p-4 rounded-xl border border-[#202736] bg-[#0f1623] hover:border-[#30B5A6]/50 transition-all"
+              href={`/practice/learn/python/${nextTutorial.id}`}
+              className="group flex items-center gap-3 p-4 rounded-xl border border-[#202736] bg-[#0f1623]/80 hover:border-[#4DD4C4]/30 transition-all duration-300"
             >
               <div className="text-right">
                 <p className="text-xs text-zinc-500 mb-0.5">Next</p>
@@ -222,7 +237,7 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
                   {nextTutorial.title}
                 </p>
               </div>
-              <ArrowLeft size={18} className="text-zinc-500 rotate-180 group-hover:text-[#30B5A6] transition-colors" />
+              <ArrowLeft size={18} className="text-zinc-500 rotate-180 group-hover:text-[#4DD4C4] transition-colors" />
             </Link>
           ) : (
             <div />

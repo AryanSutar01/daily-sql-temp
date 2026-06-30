@@ -1,0 +1,214 @@
+# Caching & Persistence Levels
+
+## What is Caching in PySpark?
+
+By default, PySpark is **lazy** - it recomputes a DataFrame or RDD from scratch every time an action is called on it. If you use the same DataFrame multiple times in your pipeline, Spark will re-execute the entire lineage (all transformations) each time.
+
+**Caching** (also called **persistence**) tells Spark to store the computed result of a DataFrame or RDD in memory (or disk) after it is computed the first time, so it doesn't have to recompute it on subsequent accesses.
+
+---
+
+## Why Cache?
+
+```python
+# Without caching: lineage is re-executed 3 times
+df_filtered = df.filter("country = 'IN'").join(product_df, "product_id")
+
+count_result = df_filtered.count()          # Executes full lineage
+sum_result = df_filtered.agg({"sales": "sum"}).collect()   # Re-executes full lineage
+sample = df_filtered.limit(10).collect()    # Re-executes again!
+```
+
+```python
+# With caching: lineage executes once, result is reused
+df_filtered = df.filter("country = 'IN'").join(product_df, "product_id")
+df_filtered.cache()  # Mark for caching
+
+count_result = df_filtered.count()          # Executes + caches result
+sum_result = df_filtered.agg({"sales": "sum"}).collect()   # Uses cache ✅
+sample = df_filtered.limit(10).collect()    # Uses cache ✅
+```
+
+Caching is most valuable when:
+- A DataFrame is used **multiple times** in your code
+- The computation to build it is **expensive** (joins, aggregations, shuffles)
+- You are doing **iterative algorithms** (ML training loops)
+
+---
+
+## cache() vs persist()
+
+Both cache and persist store intermediate results. The difference is **where** they store it:
+
+```python
+# cache() - shorthand for MEMORY_AND_DISK (for DataFrames)
+df.cache()
+
+# persist() - gives you control over storage level
+from pyspark import StorageLevel
+df.persist(StorageLevel.MEMORY_AND_DISK)
+```
+
+`cache()` is simply `persist()` with a default storage level.
+
+---
+
+## Storage Levels (Persistence Levels)
+
+PySpark provides several storage levels that trade off between memory usage, speed, and reliability:
+
+| Storage Level | Memory | Disk | Serialized | Replicated | Description |
+|---|---|---|---|---|---|
+| `MEMORY_ONLY` | ✅ | ❌ | ❌ | ❌ | Store as deserialized Java objects in JVM heap. Fastest. If doesn't fit, partitions are recomputed. |
+| `MEMORY_AND_DISK` | ✅ | ✅ | ❌ | ❌ | Store in memory; spill to disk if doesn't fit. Default for DataFrames. |
+| `MEMORY_ONLY_SER` | ✅ | ❌ | ✅ | ❌ | Store as serialized bytes. More space-efficient, slightly slower to read. |
+| `MEMORY_AND_DISK_SER` | ✅ | ✅ | ✅ | ❌ | Serialized + spill to disk. Good balance of memory and speed. |
+| `DISK_ONLY` | ❌ | ✅ | ✅ | ❌ | Store only on disk. Slowest but uses no memory. |
+| `MEMORY_ONLY_2` | ✅ | ❌ | ❌ | ✅ | Same as MEMORY_ONLY but replicates on 2 nodes. |
+| `MEMORY_AND_DISK_2` | ✅ | ✅ | ❌ | ✅ | Same as MEMORY_AND_DISK but replicated. |
+| `OFF_HEAP` | ✅ (off-heap) | ❌ | ✅ | ❌ | Store in off-heap memory (outside JVM GC). Requires Tungsten. |
+
+---
+
+## Practical Examples
+
+```python
+from pyspark.sql import SparkSession
+from pyspark import StorageLevel
+
+spark = SparkSession.builder.appName("CacheDemo").getOrCreate()
+
+df = spark.read.parquet("data/large_sales_table")
+
+# Example 1: Simple cache
+df_cleaned = df.filter("amount > 0").dropna()
+df_cleaned.cache()
+df_cleaned.count()  # triggers caching
+
+# Example 2: Persist with specific level
+df_cleaned.persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+# Example 3: Check if cached
+print(df_cleaned.is_cached)  # True
+
+# Example 4: Remove from cache when done
+df_cleaned.unpersist()
+print(df_cleaned.is_cached)  # False
+```
+
+---
+
+## When Does Caching Actually Happen?
+
+**Caching is lazy** - calling `.cache()` or `.persist()` doesn't immediately store data. It just marks the DataFrame. The data is cached only when the **first action** (like `.count()`, `.collect()`, `.show()`) is executed.
+
+```python
+df.cache()       # Just marks it - nothing stored yet
+df.count()       # NOW data is computed AND cached
+df.show()        # Reads from cache ✅
+```
+
+---
+
+## How to Choose the Right Storage Level
+
+```
+Do you have enough memory?
+  ├── Yes → MEMORY_ONLY (fastest)
+  └── No  → Can you tolerate recomputation?
+              ├── Yes → MEMORY_ONLY (let partitions spill and recompute)
+              └── No  → MEMORY_AND_DISK (safe fallback)
+
+Is memory very tight?
+  └── Use MEMORY_AND_DISK_SER (serialized uses ~5x less memory)
+
+Is fault tolerance critical?
+  └── Use MEMORY_AND_DISK_2 (replicated)
+
+Is the data barely used after caching?
+  └── Don't cache - overhead not worth it
+```
+
+---
+
+## Caching Best Practices
+
+### ✅ DO cache:
+- DataFrames used multiple times in the same job
+- Results of expensive joins or aggregations
+- Base DataFrames in ML pipelines (before multiple model runs)
+
+### ❌ DON'T cache:
+- DataFrames used only once (wastes memory)
+- Very large DataFrames when you don't have enough memory (causes spills that slow you down)
+- Results that are quickly discarded
+
+### Always unpersist when done:
+```python
+df_cached.unpersist()  # Free up memory for other operations
+```
+
+---
+
+## Caching in Iterative ML Workloads
+
+This is where caching has the biggest impact - ML algorithms iterate over the same data many times:
+
+```python
+from pyspark.ml.classification import LogisticRegression
+from pyspark.ml.feature import VectorAssembler
+
+# Cache training data - it will be read on every iteration
+training_df = spark.read.parquet("data/training_data")
+training_df.cache()
+training_df.count()  # Trigger caching
+
+assembler = VectorAssembler(inputCols=["f1", "f2", "f3"], outputCol="features")
+assembled = assembler.transform(training_df)
+
+lr = LogisticRegression(maxIter=100)  # 100 iterations over same data
+model = lr.fit(assembled)  # Without cache: reads data 100 times!
+
+training_df.unpersist()
+```
+
+---
+
+## Checking Cache Usage in Spark UI
+
+In the **Spark UI → Storage tab**, you can see:
+- Which DataFrames / RDDs are cached
+- How much memory they consume
+- Fraction cached in memory vs. spilled to disk
+
+---
+
+## Interview Tips 🎯
+
+> **Q: What is the difference between cache() and persist()?**
+
+**Answer:** `cache()` is a shorthand for `persist()` with the default storage level (`MEMORY_AND_DISK` for DataFrames). `persist()` gives you explicit control over the storage level - you can choose `MEMORY_ONLY`, `DISK_ONLY`, `MEMORY_AND_DISK_SER`, etc., depending on your memory constraints and performance needs.
+
+> **Q: Is caching always beneficial in PySpark?**
+
+**Answer:** No. Caching is only beneficial when the same DataFrame is used multiple times. If a DataFrame is used only once, caching wastes memory and adds overhead. Also, caching a very large DataFrame when memory is insufficient causes excessive spilling to disk, which can be slower than just recomputing.
+
+> **Q: When does caching actually take place in Spark?**
+
+**Answer:** Caching is lazy. Calling `.cache()` or `.persist()` just marks the DataFrame - no data is stored yet. The actual caching happens when the first **action** (like `.count()` or `.show()`) is triggered. Subsequent actions read from the cached result.
+
+> **Q: What happens when cached data doesn't fit in memory?**
+
+**Answer:** With `MEMORY_ONLY`, Spark simply drops partitions that don't fit and recomputes them on demand. With `MEMORY_AND_DISK`, those partitions are spilled to disk instead of being dropped, so they don't need to be recomputed - at the cost of slower disk reads.
+
+---
+
+## Summary
+
+- **Caching** stores computed DataFrame results to avoid recomputation on repeated access
+- `cache()` = `persist(MEMORY_AND_DISK)` - use for most cases
+- `persist(StorageLevel.X)` - use when you need fine-grained control
+- **MEMORY_ONLY** is fastest; **MEMORY_AND_DISK** is safest; **MEMORY_AND_DISK_SER** is most memory-efficient
+- Caching is **lazy** - data is stored only after the first action
+- Always call **`unpersist()`** when done to free up resources
+- Most impactful in **iterative workloads** (ML training, repeated aggregations)

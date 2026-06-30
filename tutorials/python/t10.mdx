@@ -1,0 +1,175 @@
+## Opening Files
+
+```python
+# Always use the with statement - automatically closes the file
+with open("data.txt") as f:
+    content = f.read()
+
+# open() parameters
+open(file, mode="r", encoding="utf-8")
+
+# Common modes:
+# "r"  - read (default)
+# "w"  - write (overwrites existing content)
+# "a"  - append (adds to end of file)
+# "rb" - read binary
+# "wb" - write binary
+# "r+" - read and write
+```
+
+## Reading Files
+
+```python
+# Read entire file as a string
+with open("data.txt", encoding="utf-8") as f:
+    content = f.read()
+    print(content)
+
+# Read line by line - memory efficient for large files
+with open("data.txt") as f:
+    for line in f:
+        print(line.strip())   # strip() removes the trailing newline
+
+# Read all lines into a list
+with open("data.txt") as f:
+    lines = f.readlines()   # ['line1\n', 'line2\n', ...]
+
+# Read lines without newlines
+with open("data.txt") as f:
+    lines = f.read().splitlines()   # ['line1', 'line2', ...]
+```
+
+## Writing Files
+
+```python
+# Write (overwrites the file if it exists)
+with open("output.txt", "w", encoding="utf-8") as f:
+    f.write("Hello, World!\n")
+    f.write("Second line\n")
+
+# Write multiple lines
+lines = ["Alice\n", "Bob\n", "Carol\n"]
+with open("names.txt", "w") as f:
+    f.writelines(lines)
+
+# Append to existing file
+with open("log.txt", "a") as f:
+    f.write("New log entry\n")
+```
+
+## CSV Files
+
+```python
+import csv
+
+# Write CSV
+data = [
+    ["Name", "Age", "City"],
+    ["Alice", 30, "Mumbai"],
+    ["Bob", 25, "Delhi"],
+]
+with open("people.csv", "w", newline="", encoding="utf-8") as f:
+    writer = csv.writer(f)
+    writer.writerows(data)
+
+# Read CSV
+with open("people.csv", encoding="utf-8") as f:
+    reader = csv.reader(f)
+    for row in reader:
+        print(row)   # ['Name', 'Age', 'City'], ['Alice', '30', 'Mumbai'], ...
+
+# DictReader - each row as a dict
+with open("people.csv") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        print(row["Name"], row["Age"])
+```
+
+## JSON Files
+
+```python
+import json
+
+# Write JSON
+data = {"name": "Alice", "age": 30, "scores": [95, 88, 92]}
+with open("data.json", "w") as f:
+    json.dump(data, f, indent=2)
+
+# Read JSON
+with open("data.json") as f:
+    loaded = json.load(f)
+print(loaded["name"])   # Alice
+```
+
+## Working with File Paths
+
+```python
+from pathlib import Path
+
+# Create path objects
+p = Path("data/users.csv")
+p = Path.home() / "Documents" / "report.txt"
+
+# Check existence
+p.exists()
+p.is_file()
+p.is_dir()
+
+# Create directories
+Path("output/logs").mkdir(parents=True, exist_ok=True)
+
+# File info
+p.name        # "users.csv"
+p.stem        # "users"
+p.suffix      # ".csv"
+p.parent      # Path("data")
+
+# List files in directory
+for f in Path("data").glob("*.csv"):
+    print(f)
+
+# Read/write with pathlib
+text = Path("readme.txt").read_text(encoding="utf-8")
+Path("output.txt").write_text("Hello!", encoding="utf-8")
+```
+
+## Temporary Files
+
+```python
+import tempfile
+
+# Temporary file - auto-deleted when closed
+with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=True) as f:
+    f.write("Temporary content")
+    print(f.name)   # /tmp/tmpXXXXXX.txt
+
+# Temporary directory - auto-deleted with all contents
+with tempfile.TemporaryDirectory() as tmpdir:
+    temp_file = Path(tmpdir) / "output.csv"
+    temp_file.write_text("a,b,c\n1,2,3")
+# directory and files are deleted after the with block
+```
+
+## Interview Questions
+
+**Q: Why should you always use the `with` statement when opening files?**
+The `with` statement uses a context manager that automatically closes the file when the block exits - even if an exception occurs. Without it, you must manually call `f.close()`, and if an exception is raised before that, the file stays open - causing resource leaks.
+
+**Q: What is the difference between `read()`, `readline()`, and `readlines()`?**
+`read()` reads the entire file as one string. `readline()` reads one line at a time (including the newline). `readlines()` reads all lines into a list. For large files, iterating over the file object (`for line in f`) is most memory-efficient.
+
+**Q: What is the difference between `"w"` and `"a"` mode?**
+`"w"` (write) overwrites the file - all existing content is lost. `"a"` (append) opens the file and adds content at the end without affecting existing content. If the file doesn't exist, both modes create it.
+
+**Q: What is `pathlib` and why use it over `os.path`?**
+`pathlib.Path` provides an object-oriented interface for file paths - cleaner syntax, platform-independent, and chainable with `/`. `os.path` is the older functional approach. `Path("data") / "file.csv"` is cleaner than `os.path.join("data", "file.csv")`.
+
+## Summary
+
+- Always use `with open(file) as f:` - ensures file is closed even on exception
+- Modes: `"r"` read, `"w"` write (overwrites), `"a"` append, `"rb"`/`"wb"` binary
+- `f.read()` - full file; `for line in f` - line by line (memory efficient)
+- `f.write("text")` - write string; `f.writelines(list)` - write list of strings
+- `csv.reader` / `csv.DictReader` - parse CSV rows
+- `json.dump()` / `json.load()` - serialize/deserialize JSON to/from file
+- `pathlib.Path` - modern, clean file path handling with `/` operator

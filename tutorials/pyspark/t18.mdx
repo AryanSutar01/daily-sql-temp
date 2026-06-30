@@ -1,0 +1,319 @@
+## Setup
+
+```python
+from pyspark.sql import SparkSession
+import pyspark.sql.functions as F
+from pyspark.sql.functions import col
+
+spark = SparkSession.builder.appName("StringDateDemo").getOrCreate()
+```
+
+---
+
+## String Functions - Deep Dive
+
+### Cleaning & Normalization
+
+```python
+df = spark.createDataFrame([
+    (1, "  Alice Smith  "),
+    (2, "\tBob   Jones\n"),
+    (3, "carol WILLIAMS"),
+], ["id", "raw_name"])
+
+df.select(
+    col("id"),
+    F.trim(col("raw_name")).alias("trimmed"),
+    F.ltrim(col("raw_name")).alias("ltrimmed"),
+    F.rtrim(col("raw_name")).alias("rtrimmed"),
+    F.lower(F.trim(col("raw_name"))).alias("lower_trim"),
+    F.upper(F.trim(col("raw_name"))).alias("upper_trim"),
+    F.initcap(F.trim(col("raw_name"))).alias("title_case"),
+    F.regexp_replace(col("raw_name"), r"\s+", " ").alias("clean_spaces"),
+).show(truncate=False)
+```
+
+### Splitting & Extracting
+
+```python
+df = spark.createDataFrame([
+    (1, "Alice,Smith,alice@email.com,95000"),
+    (2, "Bob,Jones,bob@company.org,72000"),
+], ["id", "csv_row"])
+
+df.select(
+    # Split into array
+    F.split(col("csv_row"), ",").alias("parts"),
+
+    # Access array elements
+    F.split(col("csv_row"), ",").getItem(0).alias("first_name"),
+    F.split(col("csv_row"), ",").getItem(2).alias("email"),
+
+    # Substring: substring(col, startPos, length) - 1-indexed
+    F.substring(col("csv_row"), 1, 5).alias("first_5_chars"),
+
+    # Substring_index: keep N segments from delimiter
+    F.substring_index(col("csv_row"), ",", 2).alias("first_two"),       # "Alice,Smith"
+    F.substring_index(col("csv_row"), ",", -1).alias("last_segment"),   # "95000"
+).show(truncate=False)
+```
+
+### Searching & Matching
+
+```python
+df = spark.createDataFrame([
+    (1, "alice@gmail.com"),
+    (2, "bob@company.org"),
+    (3, "not-an-email"),
+], ["id", "text"])
+
+df.select(
+    # Position of substring (1-indexed, 0 if not found)
+    F.instr(col("text"), "@").alias("at_position"),
+
+    # String contains
+    col("text").contains("gmail").alias("is_gmail"),
+    col("text").startswith("alice").alias("starts_alice"),
+    col("text").endswith(".com").alias("ends_com"),
+
+    # SQL LIKE pattern
+    col("text").like("%@%.%").alias("like_email"),
+
+    # Regex match
+    col("text").rlike(r"^[^@]+@[^@]+\.[^@]+$").alias("valid_email_regex"),
+).show()
+```
+
+### Regex Extract & Replace
+
+```python
+df = spark.createDataFrame([
+    (1, "Order #12345 placed on 2024-01-15 for $99.99"),
+    (2, "Invoice #67890 dated 2024-02-20, total $149.00"),
+], ["id", "text"])
+
+df.select(
+    # regexp_extract(col, pattern, group_index)
+    F.regexp_extract(col("text"), r"#(\d+)", 1).alias("order_num"),
+    F.regexp_extract(col("text"), r"(\d{4}-\d{2}-\d{2})", 1).alias("date"),
+    F.regexp_extract(col("text"), r"\$([0-9.]+)", 1).alias("amount"),
+
+    # regexp_replace(col, pattern, replacement)
+    F.regexp_replace(col("text"), r"\$[0-9.]+", "***").alias("redacted_amount"),
+    F.regexp_replace(col("text"), r"\d{4}-\d{2}-\d{2}", "[DATE]").alias("no_date"),
+).show(truncate=False)
+```
+
+### Concatenation & Padding
+
+```python
+df = spark.createDataFrame([
+    (1, "Alice", "Smith", "Engineering"),
+    (2, "Bob", "Jones", "Marketing"),
+], ["id", "first", "last", "dept"])
+
+df.select(
+    # concat: no separator
+    F.concat(col("first"), F.lit(" "), col("last")).alias("full_name"),
+
+    # concat_ws: with separator
+    F.concat_ws(", ", col("last"), col("first")).alias("last_first"),
+    F.concat_ws(" | ", col("first"), col("last"), col("dept")).alias("display"),
+
+    # Padding
+    F.lpad(col("id").cast("string"), 5, "0").alias("padded_id"),  # "00001"
+    F.rpad(col("dept"), 15, ".").alias("padded_dept"),             # "Engineering...."
+).show()
+```
+
+### Encoding & Hashing
+
+```python
+df.select(
+    F.md5(col("first")).alias("md5"),
+    F.sha2(col("first"), 256).alias("sha256"),
+    F.hash(col("first")).alias("hash_int"),
+    F.crc32(col("first").cast("binary")).alias("crc32"),
+    F.base64(col("first").cast("binary")).alias("base64"),
+    F.unbase64(F.base64(col("first").cast("binary"))).cast("string").alias("decoded"),
+)
+```
+
+---
+
+## Date & Timestamp Functions - Deep Dive
+
+### Parsing Strings to Date/Timestamp
+
+```python
+df = spark.createDataFrame([
+    (1, "2024-01-15", "15/01/2024", "Jan 15, 2024", "2024-01-15 14:30:00"),
+    (2, "2024-06-30", "30/06/2024", "Jun 30, 2024", "2024-06-30 09:00:00"),
+], ["id", "iso_date", "eu_date", "long_date", "timestamp_str"])
+
+df.select(
+    # Parse ISO date (no format needed)
+    F.to_date(col("iso_date")).alias("date1"),
+
+    # Parse custom format
+    F.to_date(col("eu_date"), "dd/MM/yyyy").alias("date2"),
+    F.to_date(col("long_date"), "MMM dd, yyyy").alias("date3"),
+
+    # Parse timestamp
+    F.to_timestamp(col("timestamp_str"), "yyyy-MM-dd HH:mm:ss").alias("ts"),
+
+    # Parse to Unix timestamp (seconds since epoch)
+    F.unix_timestamp(col("iso_date"), "yyyy-MM-dd").alias("epoch_sec"),
+
+    # From Unix timestamp
+    F.from_unixtime(F.unix_timestamp(col("iso_date"), "yyyy-MM-dd")).alias("from_epoch"),
+).show(truncate=False)
+```
+
+### Extracting Date Parts
+
+```python
+df = spark.createDataFrame([(1, "2024-07-04 15:30:45")], ["id", "ts_str"])
+df = df.withColumn("ts", F.to_timestamp(col("ts_str")))
+
+df.select(
+    # Date parts
+    F.year(col("ts")).alias("year"),          # 2024
+    F.month(col("ts")).alias("month"),         # 7
+    F.dayofmonth(col("ts")).alias("day"),      # 4
+    F.dayofweek(col("ts")).alias("dow"),       # 5 (Thu; 1=Sun)
+    F.dayofyear(col("ts")).alias("doy"),       # 186
+    F.weekofyear(col("ts")).alias("week"),     # 27
+    F.quarter(col("ts")).alias("quarter"),     # 3
+
+    # Time parts
+    F.hour(col("ts")).alias("hour"),           # 15
+    F.minute(col("ts")).alias("minute"),       # 30
+    F.second(col("ts")).alias("second"),       # 45
+).show()
+```
+
+### Date Arithmetic
+
+```python
+df = spark.createDataFrame([(1, "2024-01-15")], ["id", "date_str"])
+df = df.withColumn("d", F.to_date(col("date_str")))
+
+df.select(
+    # Add/subtract days
+    F.date_add(col("d"), 30).alias("plus_30"),       # 2024-02-14
+    F.date_sub(col("d"), 7).alias("minus_7"),         # 2024-01-08
+
+    # Add months
+    F.add_months(col("d"), 3).alias("plus_3m"),       # 2024-04-15
+    F.add_months(col("d"), -1).alias("minus_1m"),     # 2023-12-15
+
+    # Difference
+    F.datediff(F.current_date(), col("d")).alias("days_since"),
+    F.months_between(F.current_date(), col("d")).alias("months_since"),
+    F.months_between(F.current_date(), col("d"), roundOff=False).alias("months_exact"),
+
+    # Last day of month
+    F.last_day(col("d")).alias("month_end"),           # 2024-01-31
+
+    # Next weekday (1=Mon, 2=Tue, ..., 7=Sun)
+    F.next_day(col("d"), "Monday").alias("next_monday"),
+).show(truncate=False)
+```
+
+### Formatting Dates
+
+```python
+df = spark.createDataFrame([(1, "2024-07-04")], ["id", "date_str"])
+df = df.withColumn("d", F.to_date(col("date_str")))
+
+df.select(
+    F.date_format(col("d"), "dd/MM/yyyy").alias("eu"),          # 04/07/2024
+    F.date_format(col("d"), "MM-dd-yyyy").alias("us"),          # 07-04-2024
+    F.date_format(col("d"), "MMMM dd, yyyy").alias("long"),     # July 04, 2024
+    F.date_format(col("d"), "yyyy-'Q'Q").alias("quarter_str"),  # 2024-Q3
+    F.date_format(col("d"), "EEE, MMM d").alias("short"),       # Thu, Jul 4
+    F.date_format(col("d"), "yyyyMMdd").alias("compact"),       # 20240704
+    F.date_format(col("d"), "yyyy-MM-dd").alias("iso"),         # 2024-07-04
+).show(truncate=False)
+```
+
+### Truncating Dates
+
+```python
+df = df.withColumn("ts", F.to_timestamp(F.lit("2024-07-04 15:30:45")))
+
+df.select(
+    # trunc: date-level truncation
+    F.trunc(col("d"), "year").alias("year_start"),     # 2024-01-01
+    F.trunc(col("d"), "quarter").alias("q_start"),     # 2024-07-01
+    F.trunc(col("d"), "month").alias("month_start"),   # 2024-07-01
+    F.trunc(col("d"), "week").alias("week_start"),     # 2024-07-01 (Mon)
+
+    # date_trunc: timestamp-level truncation
+    F.date_trunc("day",    col("ts")).alias("day_start"),     # 2024-07-04 00:00:00
+    F.date_trunc("hour",   col("ts")).alias("hour_start"),    # 2024-07-04 15:00:00
+    F.date_trunc("minute", col("ts")).alias("min_start"),     # 2024-07-04 15:30:00
+    F.date_trunc("month",  col("ts")).alias("month_start_ts"),
+).show(truncate=False)
+```
+
+### Timezone Handling
+
+```python
+df = spark.createDataFrame([(1, "2024-07-04 10:00:00")], ["id", "ts_str"])
+df = df.withColumn("ts", F.to_timestamp(col("ts_str")))
+
+df.select(
+    # Convert between timezones
+    F.convert_tz(col("ts"), "UTC", "Asia/Kolkata").alias("ist"),      # +5:30
+    F.convert_tz(col("ts"), "UTC", "America/New_York").alias("est"),  # -5
+
+    # Get current timestamp in UTC
+    F.current_timestamp().alias("local_now"),
+    F.to_utc_timestamp(col("ts"), "Asia/Kolkata").alias("to_utc"),
+    F.from_utc_timestamp(col("ts"), "Asia/Kolkata").alias("from_utc"),
+).show(truncate=False)
+```
+
+## Common Real-World Patterns
+
+```python
+# Pattern 1: Calculate age from birth date
+df = spark.createDataFrame([(1, "1992-10-25")], ["id", "dob"])
+df.withColumn("age",
+    (F.datediff(F.current_date(), F.to_date(col("dob"))) / 365.25).cast("int")
+).show()
+
+# Pattern 2: Flag weekends
+df.withColumn("is_weekend",
+    F.dayofweek(F.to_date(col("date_str"))).isin([1, 7])  # 1=Sun, 7=Sat
+).show()
+
+# Pattern 3: Extract and reformat date in one step
+df.withColumn("display_date",
+    F.date_format(F.to_date(col("eu_date"), "dd/MM/yyyy"), "MMMM dd, yyyy")
+).show()
+
+# Pattern 4: Get start and end of current month
+spark.range(1).select(
+    F.trunc(F.current_date(), "month").alias("month_start"),
+    F.last_day(F.current_date()).alias("month_end"),
+).show()
+```
+
+## Summary
+
+**String:**
+- Cleaning: `trim`, `ltrim`, `rtrim`, `lower`, `upper`, `initcap`, `regexp_replace`
+- Searching: `contains`, `startswith`, `endswith`, `like`, `rlike`, `instr`
+- Extracting: `split`, `substring`, `substring_index`, `regexp_extract`
+- Building: `concat`, `concat_ws`, `lpad`, `rpad`
+
+**Date/Timestamp:**
+- Parsing: `to_date`, `to_timestamp`, `unix_timestamp`, `from_unixtime`
+- Extracting: `year`, `month`, `dayofmonth`, `hour`, `minute`, `quarter`, `dayofweek`
+- Arithmetic: `date_add`, `date_sub`, `add_months`, `datediff`, `months_between`
+- Formatting: `date_format` with Java SimpleDateFormat patterns
+- Truncating: `trunc` (date-level), `date_trunc` (timestamp-level)
+- Timezone: `to_utc_timestamp`, `from_utc_timestamp`, `convert_tz`

@@ -1,0 +1,226 @@
+## Everything Is an Object
+
+In Python, every value - integers, strings, lists, functions, classes - is an object stored on the heap. Variables are not boxes that hold values; they are **names that reference objects**.
+
+```python
+x = 42
+# Python creates an integer object 42 on the heap
+# The name 'x' is bound to that object
+
+y = x
+# 'y' now references the SAME object as 'x'
+# No copy is made
+
+print(id(x))   # e.g. 9785120 - memory address of the object
+print(id(y))   # same address - same object
+```
+
+## Names vs Objects
+
+```python
+a = [1, 2, 3]
+b = a           # b references the same list object
+b.append(4)
+
+print(a)   # [1, 2, 3, 4] - a sees the change too
+print(b)   # [1, 2, 3, 4]
+
+# Reassigning a name doesn't affect the object
+a = [10, 20]   # a now points to a NEW list object
+print(b)       # [1, 2, 3, 4] - unchanged, b still points to old list
+```
+
+## Reference Counting
+
+Python's primary memory management mechanism is reference counting. Every object has a count of how many names (or containers) reference it.
+
+```python
+import sys
+
+a = [1, 2, 3]
+print(sys.getrefcount(a))   # 2 - 'a' + the argument passed to getrefcount
+
+b = a
+print(sys.getrefcount(a))   # 3 - 'a', 'b', + getrefcount arg
+
+del b
+print(sys.getrefcount(a))   # 2 - back to 'a' + getrefcount arg
+```
+
+When the reference count drops to **0**, Python immediately frees the memory.
+
+```python
+a = [1, 2, 3]   # ref count = 1
+b = a            # ref count = 2
+c = a            # ref count = 3
+
+del a            # ref count = 2
+del b            # ref count = 1
+del c            # ref count = 0 → object is freed
+```
+
+## Garbage Collector - Handling Cycles
+
+Reference counting fails with circular references:
+
+```python
+a = []
+b = []
+a.append(b)   # a references b
+b.append(a)   # b references a - cycle!
+
+del a
+del b
+# Both still have ref count = 1 (each references the other)
+# Reference counting alone can't free them
+```
+
+Python's cyclic garbage collector (`gc` module) periodically detects and collects these cycles.
+
+```python
+import gc
+
+gc.collect()           # manually trigger garbage collection
+gc.get_count()         # (gen0, gen1, gen2) - objects in each generation
+gc.disable()           # disable automatic GC
+gc.enable()            # re-enable
+```
+
+## Mutable vs Immutable - How Assignments Differ
+
+```python
+# IMMUTABLE types: int, float, str, tuple, frozenset
+# Assigning a new value creates a NEW object
+
+x = 10
+print(id(x))   # e.g. 9785600
+x = 10 + 1
+print(id(x))   # DIFFERENT address - new int object created
+
+# MUTABLE types: list, dict, set, custom classes
+# Modifying in place changes the SAME object
+
+lst = [1, 2, 3]
+print(id(lst))   # e.g. 140234567
+lst.append(4)
+print(id(lst))   # SAME address - same object, modified in place
+```
+
+## The Small Integer and String Cache
+
+```python
+# Python caches integers -5 to 256
+a = 256
+b = 256
+a is b   # True - same cached object
+
+a = 257
+b = 257
+a is b   # False - outside cache, new objects
+
+# Python interns short identifier-like strings
+a = "hello"
+b = "hello"
+a is b   # True - interned
+
+a = "hello world"   # space prevents interning
+b = "hello world"
+a is b   # False (usually)
+```
+
+## Memory Impact of Data Structures
+
+```python
+import sys
+
+print(sys.getsizeof(42))           # 28 bytes - int
+print(sys.getsizeof("hello"))      # 54 bytes - str
+print(sys.getsizeof([1, 2, 3]))    # 88 bytes - list (+ element objects)
+print(sys.getsizeof((1, 2, 3)))    # 72 bytes - tuple (smaller than list)
+print(sys.getsizeof({1, 2, 3}))    # 216 bytes - set (hash table overhead)
+
+# Large data - use numpy or generators to save memory
+import numpy as np
+lst = list(range(1_000_000))
+arr = np.arange(1_000_000)
+print(sys.getsizeof(lst))   # ~8MB
+print(arr.nbytes)            # ~8MB raw, but fewer Python object overheads
+```
+
+## __slots__ - Reducing Memory for Many Instances
+
+By default, Python stores instance attributes in a `__dict__` (a dictionary) per instance - wasteful when you have millions of objects.
+
+```python
+class RegularPoint:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+class SlottedPoint:
+    __slots__ = ("x", "y")   # no __dict__ - attributes stored directly
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+import sys
+rp = RegularPoint(1, 2)
+sp = SlottedPoint(1, 2)
+
+print(sys.getsizeof(rp) + sys.getsizeof(rp.__dict__))   # ~232 bytes
+print(sys.getsizeof(sp))                                  # ~56 bytes - 4x smaller
+
+# With __slots__:
+# - Cannot add arbitrary attributes dynamically
+# - No __dict__ per instance - significant memory savings at scale
+sp.z = 3   # AttributeError - not in __slots__
+```
+
+## weakref - Reference Without Incrementing Count
+
+```python
+import weakref
+
+class Cache:
+    pass
+
+obj = Cache()
+weak = weakref.ref(obj)
+
+print(weak())    # <Cache object> - object still alive
+
+del obj          # reference count drops to 0 - object freed
+print(weak())    # None - object has been garbage collected
+```
+
+Weak references are used in caches and observer patterns where you don't want to keep objects alive just because the cache references them.
+
+## Interview Questions
+
+**Q: What is the difference between a variable and an object in Python?**
+An object is a value stored on the heap with a type, value, and reference count. A variable is a name in the current namespace that references (points to) an object. Multiple names can reference the same object. Assigning a variable just binds a name to an object - it doesn't copy the object.
+
+**Q: How does Python's garbage collection work?**
+Python uses two mechanisms: reference counting (primary) and a cyclic garbage collector (secondary). When an object's reference count reaches zero, it's immediately freed. The cyclic GC runs periodically to detect and collect objects involved in circular references - which reference counting alone can't handle.
+
+**Q: What is the difference between mutable and immutable objects in terms of memory?**
+Immutable objects (int, str, tuple) cannot be changed in place - any "modification" creates a new object. Mutable objects (list, dict, set) can be changed in place, and all names referencing them see the change. This is why passing a list to a function and modifying it affects the original.
+
+**Q: What is `__slots__` and when would you use it?**
+`__slots__` replaces the per-instance `__dict__` with a fixed set of attributes stored directly on the object. This reduces memory usage significantly when creating many instances of a class. Use it when you're creating thousands or millions of instances and memory is a concern.
+
+**Q: What does `id()` return?**
+`id()` returns the memory address of an object - a unique integer that identifies the object for its lifetime. Two objects that are `is`-equal have the same `id()`. It's used to check object identity and understand how Python's memory model works.
+
+## Summary
+
+- Variables are **names** bound to objects - not boxes containing values
+- Every object has a **reference count** - freed immediately when count hits 0
+- Python's **cyclic GC** handles circular references that reference counting misses
+- `id()` returns the memory address - same `id` means same object (`is` returns True)
+- **Immutable** objects (int, str, tuple) create a new object on every "change"
+- **Mutable** objects (list, dict, set) change in place - all aliases see the change
+- Python caches small integers (-5 to 256) and interns short strings - implementation details
+- `__slots__` - eliminates per-instance `__dict__`; 3–4x memory saving at scale
+- `weakref` - reference an object without preventing garbage collection

@@ -1,0 +1,185 @@
+## Setup
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+
+spark = SparkSession.builder.appName("DedupeDemo").getOrCreate()
+
+df = spark.createDataFrame([
+    (1, "Alice",  "Engineering", 95000),
+    (2, "Bob",    "Marketing",   72000),
+    (1, "Alice",  "Engineering", 95000),   # exact duplicate of row 1
+    (3, "Carol",  "Engineering", 110000),
+    (2, "Bob",    "Marketing",   80000),   # same id+name, different salary
+    (4, "Alice",  "HR",          60000),   # same name, different everything
+], ["id", "name", "dept", "salary"])
+
+df.show()
+# +---+-----+-----------+------+
+# | id| name|       dept|salary|
+# +---+-----+-----------+------+
+# |  1|Alice|Engineering| 95000|
+# |  2|  Bob|  Marketing| 72000|
+# |  1|Alice|Engineering| 95000|  ← exact duplicate
+# |  3|Carol|Engineering|110000|
+# |  2|  Bob|  Marketing| 80000|  ← same id+name, different salary
+# |  4|Alice|         HR| 60000|  ← same name only
+# +---+-----+-----------+------+
+```
+
+## distinct - Remove Exact Duplicate Rows
+
+`distinct()` removes rows where **every column** is identical to another row.
+
+```python
+df.distinct().show()
+# +---+-----+-----------+------+
+# | id| name|       dept|salary|
+# +---+-----+-----------+------+
+# |  1|Alice|Engineering| 95000|
+# |  2|  Bob|  Marketing| 72000|
+# |  3|Carol|Engineering|110000|
+# |  2|  Bob|  Marketing| 80000|  ← kept (salary differs)
+# |  4|Alice|         HR| 60000|  ← kept (id differs)
+# +---+-----+-----------+------+
+# Only the exact duplicate (row 3, Alice/Engineering/95000) is removed
+
+print(df.count())          # 6
+print(df.distinct().count()) # 5  - one exact duplicate removed
+```
+
+## dropDuplicates - Remove Duplicates by Specific Columns
+
+`dropDuplicates(subset)` removes rows where the **specified columns** have the same values - even if other columns differ.
+
+```python
+# Deduplicate by id only - keep first occurrence
+df.dropDuplicates(subset=["id"]).show()
+# +---+-----+-----------+------+
+# | id| name|       dept|salary|
+# +---+-----+-----------+------+
+# |  1|Alice|Engineering| 95000|
+# |  2|  Bob|  Marketing| 72000|  ← first Bob kept
+# |  3|Carol|Engineering|110000|
+# |  4|Alice|         HR| 60000|
+# +---+-----+-----------+------+
+# Second Bob (id=2, salary=80000) removed - same id
+
+# Deduplicate by id + name
+df.dropDuplicates(subset=["id", "name"]).show()
+# Same result - id+name combo already unique once we remove exact dups
+
+# Deduplicate by name only
+df.dropDuplicates(subset=["name"]).show()
+# +---+-----+-----------+------+
+# | id| name|       dept|salary|
+# +---+-----+-----------+------+
+# |  1|Alice|Engineering| 95000|  ← first Alice kept
+# |  2|  Bob|  Marketing| 72000|  ← first Bob kept
+# |  3|Carol|Engineering|110000|
+# +---+-----+-----------+------+
+# Second Alice (id=4, HR) and second Bob (id=2, 80000) removed
+```
+
+## distinct vs dropDuplicates - Key Difference
+
+```python
+# distinct() = dropDuplicates() with ALL columns
+df.distinct()                        # deduplicate on all columns
+df.dropDuplicates()                  # same as distinct()
+df.dropDuplicates(subset=["id"])     # deduplicate on subset of columns
+
+# Common mistake: thinking distinct() works like SQL DISTINCT on selected columns
+# If you want distinct values of specific columns, SELECT FIRST then distinct:
+df.select("name").distinct().show()   # distinct names
+df.select("dept").distinct().show()   # distinct depts
+```
+
+## Controlling Which Row is Kept
+
+By default, `dropDuplicates()` keeps an arbitrary row when there are duplicates. To control which row is kept (e.g., keep the one with the highest salary), sort first:
+
+```python
+from pyspark.sql.functions import col
+
+# Keep the row with the HIGHEST salary for each id
+df.orderBy(col("salary").desc()) \
+  .dropDuplicates(subset=["id"]) \
+  .show()
+# +---+-----+-----------+------+
+# | id| name|       dept|salary|
+# +---+-----+-----------+------+
+# |  1|Alice|Engineering| 95000|
+# |  2|  Bob|  Marketing| 80000|  ← higher salary Bob kept
+# |  3|Carol|Engineering|110000|
+# |  4|Alice|         HR| 60000|
+# +---+-----+-----------+------+
+
+# Keep the row with the LOWEST salary for each id
+df.orderBy(col("salary").asc()) \
+  .dropDuplicates(subset=["id"]) \
+  .show()
+# Bob with 72000 is now kept
+```
+
+> ⚠️ Note: The sort-then-dropDuplicates pattern works but is not guaranteed to be deterministic across all Spark versions unless partitioning is also controlled. For truly deterministic deduplication, use window functions with `ROW_NUMBER()`.
+
+## Deterministic Deduplication with Window Functions
+
+For production pipelines where you need guaranteed row selection:
+
+```python
+from pyspark.sql.functions import col, row_number
+from pyspark.sql import Window
+
+# Assign row numbers - lowest rank = best match per id
+window = Window.partitionBy("id").orderBy(col("salary").desc())
+
+df_ranked = df.withColumn("rn", row_number().over(window))
+
+# Keep only rank 1 (highest salary per id)
+df_deduped = df_ranked.filter(col("rn") == 1).drop("rn")
+df_deduped.show()
+# Guaranteed: exactly one row per id, the one with highest salary
+```
+
+## Practical: Count Duplicates Before Removing
+
+```python
+from pyspark.sql.functions import count
+
+total = df.count()
+distinct = df.distinct().count()
+print(f"Total rows: {total}")
+print(f"Distinct rows: {distinct}")
+print(f"Duplicate rows: {total - distinct}")
+
+# Find which rows are duplicated (id+name combos appearing more than once)
+df.groupBy("id", "name") \
+  .count() \
+  .filter(col("count") > 1) \
+  .show()
+```
+
+## After union - Common Deduplication Pattern
+
+```python
+df_old = spark.read.parquet("old_data/")
+df_new = spark.read.parquet("new_data/")
+
+# Combine and deduplicate by business key
+df_merged = df_old.unionByName(df_new) \
+                  .dropDuplicates(subset=["transaction_id"])
+
+df_merged.write.mode("overwrite").parquet("merged_data/")
+```
+
+## Summary
+
+- `distinct()` - removes rows identical across **all** columns
+- `dropDuplicates()` - same as `distinct()` when called with no arguments
+- `dropDuplicates(subset=["col1", "col2"])` - removes rows with duplicate values in the specified columns; other columns may differ
+- To control which duplicate is kept, `orderBy()` before `dropDuplicates()`
+- For deterministic deduplication in production, use `row_number()` window function
+- Both are wide transformations (they require a shuffle to compare across partitions)

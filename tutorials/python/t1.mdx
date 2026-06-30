@@ -1,0 +1,176 @@
+## Installing Python
+
+```bash
+# Check if Python is already installed
+python --version       # might show Python 2.x
+python3 --version      # Python 3.x
+
+# Download from https://python.org (recommended)
+# macOS - using Homebrew
+brew install python
+
+# Ubuntu/Debian
+sudo apt update && sudo apt install python3 python3-pip
+
+# Windows - download installer from python.org
+# Check "Add Python to PATH" during installation
+```
+
+## The Python REPL
+
+The REPL (Read-Eval-Print Loop) lets you run Python interactively:
+
+```bash
+python3       # start the REPL
+>>> 2 + 2
+4
+>>> print("Hello")
+Hello
+>>> exit()   # quit
+```
+
+## Running Python Scripts
+
+```bash
+# Create a file
+echo 'print("Hello, World!")' > hello.py
+
+# Run it
+python3 hello.py
+# Hello, World!
+```
+
+## pip - Python Package Manager
+
+`pip` installs third-party packages from PyPI (Python Package Index).
+
+```bash
+# Install a package
+pip install requests
+
+# Install a specific version
+pip install requests==2.31.0
+
+# Upgrade a package
+pip install --upgrade requests
+
+# Uninstall
+pip uninstall requests
+
+# List installed packages
+pip list
+
+# Search for a package
+pip install pandas   # installs pandas + all its dependencies
+
+# Show package details
+pip show requests
+# Name: requests
+# Version: 2.31.0
+# Location: /usr/local/lib/python3.11/site-packages
+```
+
+## Virtual Environments
+
+A virtual environment isolates a project's packages so they don't conflict with other projects.
+
+```bash
+# Create a virtual environment
+python3 -m venv venv         # creates a 'venv' folder
+python3 -m venv .venv        # hidden folder (common convention)
+
+# Activate
+source venv/bin/activate     # macOS / Linux
+venv\Scripts\activate        # Windows
+
+# Your prompt changes:
+(venv) $
+
+# Now pip installs go into venv/, not globally
+pip install requests
+
+# Deactivate
+deactivate
+```
+
+## requirements.txt - Reproducible Environments
+
+```bash
+# Capture all installed packages and versions
+pip freeze > requirements.txt
+
+# Install from a requirements file (on a new machine or after cloning)
+pip install -r requirements.txt
+```
+
+```
+# requirements.txt example
+requests==2.31.0
+pandas==2.1.0
+numpy==1.26.0
+python-dotenv==1.0.0
+```
+
+## Project Structure
+
+```
+my_project/
+├── venv/                # virtual environment (never commit to git)
+├── src/
+│   └── main.py
+├── tests/
+│   └── test_main.py
+├── requirements.txt
+├── .gitignore
+└── README.md
+```
+
+```
+# .gitignore - always exclude these
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+```
+
+## Common First-Time Issues
+
+```bash
+# 'python' not found - try python3
+python3 script.py
+
+# pip not found
+python3 -m pip install requests
+
+# Permission error on global install
+pip install requests --user   # install for current user only
+# Better: use a virtual environment
+
+# Wrong Python version
+which python3        # shows which python is being used
+python3 --version    # confirms version
+```
+
+## Interview Questions
+
+**Q: What is pip?**
+pip is Python's package installer. It downloads and installs packages from PyPI (Python Package Index) along with their dependencies. It's the standard tool for managing third-party Python libraries.
+
+**Q: What is a virtual environment and why do you need one?**
+A virtual environment is an isolated Python installation with its own pip and installed packages. Each project gets its own venv so their dependencies don't conflict with each other or with the system Python.
+
+**Q: What is the difference between `pip install` and `pip install -r requirements.txt`?**
+`pip install package` installs a single package. `pip install -r requirements.txt` installs all packages listed in a requirements file - used to reproduce an environment exactly across different machines or team members.
+
+**Q: What does `pip freeze` do?**
+It outputs all currently installed packages and their exact versions in `package==version` format, suitable for saving to `requirements.txt`. Use `pip freeze > requirements.txt` to capture your current environment.
+
+## Summary
+
+- Install Python from python.org or via a package manager
+- `pip install package` - install from PyPI; `pip list` - see installed packages
+- Always create a virtual environment per project: `python3 -m venv venv`
+- Activate with `source venv/bin/activate`; deactivate with `deactivate`
+- `pip freeze > requirements.txt` - capture environment; `pip install -r requirements.txt` - restore it
+- Never commit `venv/` to git - add it to `.gitignore`

@@ -1,0 +1,307 @@
+## The Unified Write API
+
+PySpark uses a consistent API for writing DataFrames to all formats:
+
+```python
+df.write
+  .format("format_name")    # or shortcut methods
+  .mode("overwrite")        # save mode
+  .option("key", "value")   # format-specific options
+  .partitionBy("col1", ...) # optional: partition on disk
+  .save("path/to/output")   # trigger the write
+```
+
+Or shortcut methods:
+```python
+df.write.csv("output/")
+df.write.json("output/")
+df.write.parquet("output/")
+df.write.orc("output/")
+```
+
+## Save Modes
+
+The `mode()` setting controls what happens when the output path already exists:
+
+```python
+# overwrite - delete existing data, write new data
+df.write.mode("overwrite").parquet("output/")
+
+# append - add new files alongside existing ones
+df.write.mode("append").parquet("output/")
+
+# ignore - skip write if path already exists (no error)
+df.write.mode("ignore").parquet("output/")
+
+# error (default) - throw exception if path already exists
+df.write.mode("error").parquet("output/")
+df.write.parquet("output/")  # same as error mode
+```
+
+| Mode | Behavior |
+|---|---|
+| `overwrite` | Delete all existing files, write fresh |
+| `append` | Add new files to existing directory |
+| `ignore` | Do nothing if output already exists |
+| `error` | Throw exception if output already exists (default) |
+
+## Writing CSV
+
+```python
+# Basic write - outputs a directory with part files
+df.write.csv("output/results/")
+
+# With options
+df.write \
+    .mode("overwrite") \
+    .option("header", "true") \
+    .option("sep", ",") \
+    .option("quote", '"') \
+    .option("nullValue", "NULL") \
+    .option("encoding", "UTF-8") \
+    .option("compression", "gzip") \     # compress each file
+    .csv("output/results/")
+
+# Shortcut with common options
+df.write \
+    .mode("overwrite") \
+    .option("header", "true") \
+    .csv("output/results/")
+```
+
+### Output Structure
+
+```
+output/results/
+├── _SUCCESS                   ← created by Spark on success
+├── part-00000-abc123.csv      ← one file per partition
+├── part-00001-abc123.csv
+├── part-00002-abc123.csv
+└── ...
+```
+
+Spark writes one file per partition. If your DataFrame has 200 partitions, you get 200 files.
+
+```python
+# Reduce output files by repartitioning before writing
+df.coalesce(1).write.mode("overwrite").option("header", "true").csv("output/")
+# WARNING: coalesce(1) moves all data to one executor - only safe for small data
+
+# Better: use repartition for controlled output
+df.repartition(10).write.mode("overwrite").option("header", "true").csv("output/")
+```
+
+## Writing JSON
+
+```python
+df.write.mode("overwrite").json("output/json/")
+
+# With compression
+df.write \
+    .mode("overwrite") \
+    .option("compression", "gzip") \
+    .json("output/json/")
+
+# Output is JSONL (one JSON object per line), not a JSON array
+# Each part file looks like:
+# {"id":1,"name":"Alice","age":30}
+# {"id":2,"name":"Bob","age":25}
+```
+
+## Writing Parquet (Recommended)
+
+```python
+# Basic - Parquet with Snappy compression (default)
+df.write.mode("overwrite").parquet("output/parquet/")
+
+# Choose compression codec
+df.write \
+    .mode("overwrite") \
+    .option("compression", "snappy")  \  # snappy (default), gzip, lz4, zstd, none
+    .parquet("output/parquet/")
+
+# Using format() - equivalent
+df.write \
+    .format("parquet") \
+    .mode("overwrite") \
+    .save("output/parquet/")
+```
+
+## Writing ORC
+
+```python
+df.write.mode("overwrite").orc("output/orc/")
+
+df.write \
+    .mode("overwrite") \
+    .option("compression", "zlib") \  # zlib, snappy, lzo, none
+    .orc("output/orc/")
+```
+
+## Partitioned Writes - Critical for Performance
+
+Partitioning output by column values creates a directory structure that enables **partition pruning** on reads - queries only scan relevant partitions.
+
+```python
+# Partition by one column
+df.write \
+    .mode("overwrite") \
+    .partitionBy("country") \
+    .parquet("output/sales/")
+
+# Output structure:
+# output/sales/
+# ├── country=IN/
+# │   ├── part-00000-abc.parquet
+# │   └── part-00001-abc.parquet
+# ├── country=US/
+# │   └── part-00000-def.parquet
+# └── country=GB/
+#     └── part-00000-ghi.parquet
+
+# Partition by multiple columns (creates nested directories)
+df.write \
+    .mode("overwrite") \
+    .partitionBy("year", "month") \
+    .parquet("output/events/")
+
+# Output:
+# output/events/year=2024/month=01/part-...parquet
+# output/events/year=2024/month=02/part-...parquet
+```
+
+### Partition Pruning at Read Time
+
+```python
+# Writing with partitions pays off at read time:
+df_written = spark.read.parquet("output/sales/")
+
+# Spark only reads country=IN directory - skips all others!
+india_sales = df_written.filter(df_written.country == "IN")
+```
+
+## Controlling Output File Count
+
+Too many small files hurt performance. Control with `repartition` or `coalesce`:
+
+```python
+# Check current partition count
+print(df.rdd.getNumPartitions())  # e.g., 200
+
+# Option 1: coalesce - reduce partitions, no full shuffle (fast)
+# Use when reducing partition count (not increasing)
+df.coalesce(10).write.mode("overwrite").parquet("output/")
+
+# Option 2: repartition - full shuffle, can increase OR decrease
+df.repartition(50).write.mode("overwrite").parquet("output/")
+
+# Option 3: repartition by column value - good for partitioned writes
+df.repartition(col("country")).write \
+    .partitionBy("country") \
+    .mode("overwrite") \
+    .parquet("output/")
+
+# maxRecordsPerFile - limit rows per output file (Spark 2.2+)
+df.write \
+    .option("maxRecordsPerFile", 1000000) \
+    .mode("overwrite") \
+    .parquet("output/")
+```
+
+## Writing to Hive Tables
+
+```python
+# Write as a Hive-managed table (requires Hive support enabled)
+df.write \
+    .mode("overwrite") \
+    .saveAsTable("default.sales_2024")
+
+# Write to partitioned Hive table
+df.write \
+    .mode("append") \
+    .partitionBy("year", "month") \
+    .saveAsTable("default.events")
+
+# Insert via SQL
+df.createOrReplaceTempView("new_sales")
+spark.sql("INSERT INTO default.sales SELECT * FROM new_sales")
+```
+
+## Writing to JDBC (Databases)
+
+```python
+df.write \
+    .format("jdbc") \
+    .option("url", "jdbc:postgresql://host:5432/mydb") \
+    .option("dbtable", "public.sales") \
+    .option("user", "admin") \
+    .option("password", "secret") \
+    .option("batchsize", "10000") \
+    .mode("append") \
+    .save()
+```
+
+## Writing Delta Tables (Databricks / Delta Lake)
+
+```python
+df.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .save("s3://bucket/delta/sales/")
+
+# Or as a named table
+df.write \
+    .format("delta") \
+    .mode("overwrite") \
+    .saveAsTable("sales_delta")
+```
+
+## Compression Comparison
+
+| Codec | Speed | Size | Best For |
+|---|---|---|---|
+| `snappy` | Fast | Medium | Default; balanced |
+| `gzip` | Slow | Small | Storage-sensitive |
+| `lz4` | Very fast | Large | Speed-sensitive |
+| `zstd` | Fast | Small | Modern best choice |
+| `none` | N/A | Largest | Debugging only |
+
+## Complete Write Example
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, year, month
+
+spark = SparkSession.builder.appName("WriteDemo").getOrCreate()
+
+# Read raw data
+df = spark.read.csv("raw_sales.csv", header=True, inferSchema=True)
+
+# Transform
+df_clean = df \
+    .filter(col("amount") > 0) \
+    .withColumn("year",  year(col("order_date"))) \
+    .withColumn("month", month(col("order_date"))) \
+    .select("order_id", "customer_id", "amount", "year", "month")
+
+# Write partitioned parquet
+df_clean \
+    .repartition(col("year"), col("month")) \
+    .write \
+    .mode("overwrite") \
+    .partitionBy("year", "month") \
+    .option("compression", "snappy") \
+    .parquet("s3://bucket/clean_sales/")
+
+print("Write complete!")
+```
+
+## Summary
+
+- PySpark writes to a **directory** of part files, not a single file
+- **Save modes**: `overwrite`, `append`, `ignore`, `error` (default)
+- Use `partitionBy()` to write Hive-style directory partitions - enables partition pruning at read time
+- Control output file count with `coalesce()` (reduce only) or `repartition()` (increase or reduce)
+- **Parquet** is the preferred output format - columnar, compressed, schema-embedded
+- Use `maxRecordsPerFile` to prevent very large individual output files
+- Always write to a directory path - Spark manages the internal file naming

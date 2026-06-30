@@ -8,7 +8,7 @@ export async function getTutorial(id: string): Promise<(Tutorial & { source: str
   const t = tutorials.find((t) => t.id === id)
   if (!t) return null
 
-  const filePath = join(process.cwd(), "tutorials", t.filename)
+  const filePath = join(process.cwd(), "tutorials", "sql", t.filename)
   const source = await readFile(filePath, "utf8")
   return { ...t, source }
 }

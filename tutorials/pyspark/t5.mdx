@@ -1,0 +1,247 @@
+## The Three Abstractions
+
+Spark provides three APIs for working with data. Understanding the differences is one of the most common Spark interview topics.
+
+| Abstraction | Introduced | Language | Optimization | Type Safety |
+|---|---|---|---|---|
+| RDD | Spark 1.0 | All | None | Yes (runtime) |
+| DataFrame | Spark 1.3 | All | Catalyst + Tungsten | No (schema-based) |
+| Dataset | Spark 1.6 | Scala / Java only | Catalyst + Tungsten | Yes (compile-time) |
+
+> **PySpark note:** Python does not have a Dataset API. In PySpark, you work with either **RDDs** or **DataFrames**. Dataset is a Scala/Java concept.
+
+## RDD - Resilient Distributed Dataset
+
+The original Spark abstraction. A distributed collection of **any Python objects**.
+
+```python
+sc = spark.sparkContext
+
+# RDD of integers
+rdd = sc.parallelize([1, 2, 3, 4, 5])
+
+# RDD of Python dictionaries (no enforced schema)
+rdd2 = sc.parallelize([
+    {"name": "Alice", "age": 30},
+    {"name": "Bob",   "age": 25}
+])
+
+# Functional-style transformations
+result = rdd.map(lambda x: x * 2).filter(lambda x: x > 4).collect()
+print(result)  # [6, 8, 10]
+```
+
+**Strengths:**
+- Full Python flexibility - store any object
+- Fine-grained control over partitioning and execution
+- Essential for unstructured data (text, binary)
+
+**Weaknesses:**
+- Spark cannot optimize Python lambda functions - the Catalyst optimizer is blind here
+- Python UDFs on RDDs cross the JVM↔Python boundary via serialization (slow)
+- No schema = no SQL, no column-level optimizations
+
+## DataFrame - The Modern Default
+
+A DataFrame is a distributed collection of **rows organized into named columns** - like a SQL table or a pandas DataFrame, but distributed.
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+
+spark = SparkSession.builder.appName("Demo").getOrCreate()
+
+# Create from a list
+df = spark.createDataFrame([
+    (1, "Alice", 30),
+    (2, "Bob",   25),
+    (3, "Carol", 35)
+], schema=["id", "name", "age"])
+
+df.show()
+# +---+-----+---+
+# | id| name|age|
+# +---+-----+---+
+# |  1|Alice| 30|
+# |  2|  Bob| 25|
+# |  3|Carol| 35|
+# +---+-----+---+
+
+df.printSchema()
+# root
+#  |-- id: long (nullable = true)
+#  |-- name: string (nullable = true)
+#  |-- age: long (nullable = true)
+
+# SQL-style transformations
+result = df.filter(col("age") > 25).select("name", "age")
+result.show()
+
+# SQL directly
+df.createOrReplaceTempView("people")
+spark.sql("SELECT name FROM people WHERE age > 25").show()
+```
+
+**Strengths:**
+- Catalyst optimizer rewrites your query for optimal execution
+- Tungsten engine handles memory and CPU at JVM level - avoids Python serialization overhead
+- SQL support - register as a temp view and run full SQL
+- Schema enforcement - errors caught early
+- Rich built-in functions (`pyspark.sql.functions`)
+- Works natively with Parquet, JSON, CSV, ORC, Delta, Hive
+
+**Weaknesses:**
+- Less flexible than RDD - rows must fit a schema
+- Errors for type mismatches often appear at runtime, not during authoring
+
+## Dataset - Type-Safe API (Scala/Java Only)
+
+Dataset combines the best of RDD (compile-time type safety) and DataFrame (Catalyst + Tungsten optimization). Not available in PySpark.
+
+```scala
+// This is Scala - PySpark does NOT have this
+case class Person(name: String, age: Int)
+
+val ds: Dataset[Person] = spark.read.json("people.json").as[Person]
+ds.filter(_.age > 25).show()  // type-safe: compiler knows 'age' is Int
+```
+
+In PySpark, `df.rdd` gives you an RDD of `Row` objects, which is the closest equivalent:
+```python
+# PySpark "Dataset-like" pattern - rarely needed
+rdd_of_rows = df.rdd
+names = rdd_of_rows.map(lambda row: row["name"]).collect()
+```
+
+## Performance Comparison
+
+```
+Performance (fastest to slowest):
+
+Dataset (Scala) ≈ DataFrame >> RDD (Python)
+
+Why DataFrames are faster than Python RDDs:
+┌─────────────────────────────────────────────────────────┐
+│ RDD (Python lambda)                                      │
+│ JVM → serialize → Python process → deserialize → JVM    │
+│       ↑ crossing this boundary is expensive!            │
+└─────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│ DataFrame                                                │
+│ JVM → Catalyst generates JVM bytecode → executes in JVM │
+│       ↑ no Python boundary crossing!                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Benchmark guideline:** DataFrame operations can be 10–100x faster than equivalent Python RDD operations for the same data.
+
+## When to Use Each
+
+```python
+# ✅ Use DataFrame when:
+# - Data is structured (has columns and types)
+# - You want SQL or column-level operations
+# - Performance is important
+# - Working with Parquet, Delta, Hive, JDBC sources
+
+df = spark.read.parquet("s3://bucket/sales/")
+df.groupBy("region").sum("revenue").show()
+
+# ✅ Use RDD when:
+# - Data is unstructured (raw text, binary, custom objects)
+# - You need operations not in DataFrame API
+# - Fine-grained partition control
+# - Legacy Spark 1.x code maintenance
+
+rdd = sc.textFile("access.log").map(parse_log_line)
+
+# ✅ Use Dataset when: (Scala/Java only)
+# - Need compile-time type safety
+# - Building production Scala/Java pipelines
+```
+
+## Interoperability - Converting Between Them
+
+```python
+# DataFrame → RDD
+rdd = df.rdd                  # RDD of Row objects
+rdd2 = df.rdd.map(lambda row: (row["name"], row["age"]))  # RDD of tuples
+
+# RDD → DataFrame (need schema)
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+
+schema = StructType([
+    StructField("name", StringType(), True),
+    StructField("age",  IntegerType(), True)
+])
+rdd = sc.parallelize([("Alice", 30), ("Bob", 25)])
+df = spark.createDataFrame(rdd, schema=schema)
+
+# Or use toDF() with column names
+df = rdd.toDF(["name", "age"])
+
+# DataFrame → pandas (small data only!)
+pandas_df = df.toPandas()
+
+# pandas → DataFrame
+import pandas as pd
+pandas_df = pd.DataFrame({"name": ["Alice", "Bob"], "age": [30, 25]})
+spark_df = spark.createDataFrame(pandas_df)
+```
+
+## Schema - The Key Difference
+
+DataFrames enforce a schema; RDDs don't.
+
+```python
+# RDD - no schema, no validation
+rdd = sc.parallelize([
+    {"name": "Alice", "age": 30},
+    {"name": "Bob",   "age": "twenty-five"}  # wrong type - no error yet!
+])
+# Error will only surface when you try to process the data
+
+# DataFrame - schema enforced
+from pyspark.sql.types import *
+schema = StructType([
+    StructField("name", StringType(), True),
+    StructField("age",  IntegerType(), True)
+])
+# Bad data caught at creation or read time
+df = spark.read.schema(schema).json("people.json")
+```
+
+## Full Side-by-Side Comparison
+
+| Feature | RDD | DataFrame | Dataset |
+|---|---|---|---|
+| Available in PySpark | ✅ | ✅ | ❌ |
+| Type safety | Runtime | Schema-based | Compile-time (Scala/Java) |
+| Catalyst optimizer | ❌ | ✅ | ✅ |
+| Tungsten engine | ❌ | ✅ | ✅ |
+| SQL support | ❌ | ✅ | ✅ |
+| Unstructured data | ✅ | ❌ | ❌ |
+| Python lambda support | ✅ | Via UDF (slow) | N/A |
+| Built-in functions | ❌ | ✅ (pyspark.sql.functions) | ✅ |
+| Performance (Python) | Baseline | 10–100x faster | N/A |
+| Schema enforcement | ❌ | ✅ | ✅ |
+
+## Common Interview Questions
+
+**Q: Why is DataFrame faster than RDD in Python?**
+DataFrame operations are executed by the Catalyst optimizer as JVM bytecode - there's no Python process involved in the actual data processing. Python RDD lambdas require serializing data, crossing the JVM↔Python boundary, processing in Python, and deserializing back. This crossing is the bottleneck.
+
+**Q: Is there a Dataset in PySpark?**
+No. Dataset is a typed API available only in Scala and Java. In Python, DataFrames serve a similar role (minus compile-time type safety). PySpark's DataFrame is essentially equivalent to `Dataset[Row]` in Scala.
+
+**Q: When would you convert a DataFrame to RDD?**
+When you need to use operations not available on DataFrame, process unstructured data within rows, or interface with legacy RDD-based code. Generally, avoid this conversion for performance-sensitive code.
+
+## Summary
+
+- **RDD** - low-level, flexible, any Python object, no optimization, use for unstructured data
+- **DataFrame** - high-level, structured, schema-enforced, Catalyst-optimized, use for almost everything
+- **Dataset** - type-safe DataFrame; Scala/Java only; not available in PySpark
+- In PySpark, **default to DataFrames** - they're faster, easier, and support SQL
+- You can convert between RDD and DataFrame when needed, at a performance cost

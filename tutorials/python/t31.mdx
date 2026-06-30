@@ -1,0 +1,231 @@
+## Three Ways to Transform Data
+
+Pandas gives you multiple ways to apply transformations to columns and rows. Choosing the right one impacts both code clarity and performance.
+
+```
+Method              Applies to          Speed       Use when
+------              ----------          -----       ---------
+Vectorized ops      Series / column     Fastest     Simple math, string ops, comparisons
+map()               Series              Fast        Element-wise - replace values or apply function
+apply()             Series or DataFrame Slower      Custom logic not covered by built-ins
+applymap()          DataFrame           Slowest     Element-wise across entire DataFrame (deprecated → map())
+```
+
+## Vectorized Operations - Always Try First
+
+The fastest approach - uses NumPy under the hood, no Python loop.
+
+```python
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({
+    "salary": [70000, 85000, 92000, 65000, 78000],
+    "age": [25, 30, 35, 28, 32],
+    "name": ["alice smith", "bob jones", "carol white", "dave brown", "eve black"],
+})
+
+# Arithmetic - vectorized
+df["salary_monthly"] = df["salary"] / 12
+df["salary_with_bonus"] = df["salary"] * 1.1
+df["salary_diff_from_mean"] = df["salary"] - df["salary"].mean()
+
+# Comparisons - vectorized
+df["is_senior"] = df["age"] >= 30
+df["high_earner"] = df["salary"] > 80000
+
+# String operations - vectorized via str accessor
+df["name_upper"] = df["name"].str.upper()
+df["first_name"] = df["name"].str.split().str[0]
+df["name_length"] = df["name"].str.len()
+
+# numpy where - vectorized conditional
+df["level"] = np.where(df["salary"] > 80000, "Senior", "Junior")
+
+# np.select - multiple conditions
+conditions = [
+    df["salary"] > 90000,
+    df["salary"] > 75000,
+]
+choices = ["Lead", "Senior"]
+df["grade"] = np.select(conditions, choices, default="Junior")
+```
+
+## map() - Element-wise on a Series
+
+`map` applies a function or dictionary mapping to each element of a Series.
+
+```python
+# With a dict - replace values
+dept_codes = {1: "Engineering", 2: "Marketing", 3: "HR"}
+df["dept_name"] = df["dept_id"].map(dept_codes)
+
+# With a function
+df["salary_k"] = df["salary"].map(lambda x: f"₹{x/1000:.0f}k")
+
+# With a built-in function
+df["name_title"] = df["name"].map(str.title)
+
+# NaN for missing keys - fillna to handle
+df["dept_name"] = df["dept_id"].map(dept_codes).fillna("Unknown")
+```
+
+## apply() - Custom Logic on Series or DataFrame
+
+`apply` is the most flexible but slowest approach. Use it only when vectorized operations or built-in functions don't cover your case.
+
+### apply on a Series (column)
+
+```python
+# Simple function on one column
+def categorize_salary(salary):
+    if salary > 90000:
+        return "High"
+    elif salary > 75000:
+        return "Medium"
+    else:
+        return "Low"
+
+df["salary_band"] = df["salary"].apply(categorize_salary)
+
+# Lambda
+df["salary_k"] = df["salary"].apply(lambda x: round(x / 1000, 1))
+```
+
+### apply on a DataFrame row (axis=1)
+
+```python
+# Access multiple columns in one function
+def compute_score(row):
+    return row["salary"] / 1000 + (row["age"] - 20) * 2
+
+df["score"] = df.apply(compute_score, axis=1)
+
+# Equivalent (but much faster) vectorized version:
+df["score"] = df["salary"] / 1000 + (df["age"] - 20) * 2
+```
+
+### apply returning multiple values
+
+```python
+def parse_name(name):
+    parts = name.split()
+    return pd.Series({"first": parts[0], "last": parts[-1]})
+
+df[["first_name", "last_name"]] = df["name"].apply(parse_name)
+```
+
+## Performance Comparison
+
+```python
+import time
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({"salary": np.random.randint(50000, 150000, 1_000_000)})
+
+# apply - slowest
+start = time.time()
+df["cat"] = df["salary"].apply(lambda x: "High" if x > 100000 else "Low")
+print(f"apply: {time.time() - start:.3f}s")
+
+# np.where - fastest
+start = time.time()
+df["cat"] = np.where(df["salary"] > 100000, "High", "Low")
+print(f"np.where: {time.time() - start:.3f}s")
+
+# Typical results:
+# apply:    2.1s
+# np.where: 0.02s   ← 100x faster
+```
+
+## When to Use Each
+
+```python
+# USE vectorized ops when:
+# - Simple math, comparisons, string ops on a column
+df["tax"] = df["salary"] * 0.3
+df["name_clean"] = df["name"].str.strip().str.lower()
+
+# USE map() when:
+# - Replacing values with a dict lookup
+# - Applying a simple element-wise function to a Series
+df["dept"] = df["dept_id"].map({1: "Eng", 2: "Mkt"})
+
+# USE apply() when:
+# - Complex logic that can't be vectorized
+# - Need to return multiple columns from one function
+# - Logic depends on external state or multiple complex conditions
+
+# NEVER use apply() when:
+# - Simple arithmetic (df["a"] + df["b"])
+# - Simple conditions (np.where, np.select)
+# - String methods (str.upper(), str.contains())
+```
+
+## Practical Example - ETL Transformation
+
+```python
+import pandas as pd
+import numpy as np
+
+raw = pd.DataFrame({
+    "user_id": [1, 2, 3, 4, 5],
+    "full_name": ["  Alice Smith ", "BOB JONES", "carol WHITE", None, "EVE BLACK"],
+    "salary_str": ["70,000", "85,000", "92,000", "65,000", "N/A"],
+    "dept_code": ["ENG", "MKT", "ENG", "HR", "MKT"],
+})
+
+# Vectorized string cleaning
+raw["full_name"] = raw["full_name"].str.strip().str.title().fillna("Unknown")
+
+# Parse salary - map with a custom function
+def parse_salary(s):
+    try:
+        return float(s.replace(",", ""))
+    except (ValueError, AttributeError):
+        return np.nan
+
+raw["salary"] = raw["salary_str"].map(parse_salary)
+raw["salary"] = raw["salary"].fillna(raw["salary"].median())
+
+# Dict mapping
+dept_map = {"ENG": "Engineering", "MKT": "Marketing", "HR": "Human Resources"}
+raw["department"] = raw["dept_code"].map(dept_map)
+
+# Vectorized conditional
+raw["salary_band"] = np.select(
+    [raw["salary"] > 90000, raw["salary"] > 75000],
+    ["High", "Medium"],
+    default="Low",
+)
+
+print(raw[["user_id", "full_name", "salary", "department", "salary_band"]])
+```
+
+## Interview Questions
+
+**Q: What is the difference between `map`, `apply`, and vectorized operations in pandas?**
+Vectorized operations (e.g. `df["col"] * 2`) use NumPy and run in C - fastest. `map` applies a function or dict element-wise to a Series - fast. `apply` calls a Python function for each row or element - slowest but most flexible. Always prefer vectorized, then map, then apply.
+
+**Q: When would you use `apply` over vectorized operations?**
+When the logic is too complex for built-in vectorized operations - for example, when the output depends on multiple columns with conditional logic, when you're returning multiple columns from one function call, or when the transformation requires external state.
+
+**Q: How is `map` different from `apply` on a Series?**
+Both apply element-wise on a Series. `map` is simpler and can accept a dict for value replacement. `apply` is more flexible and can use functions that return complex objects. For simple element-wise transforms, `map` is cleaner and slightly faster.
+
+**Q: What is `np.select` and how is it better than nested `apply`?**
+`np.select` takes a list of conditions and a list of choices and returns a vectorized conditional array - much like a chain of `if/elif/else`. It's much faster than using `apply` with nested if statements because it operates on the entire array at once in C.
+
+**Q: What is the performance difference between `apply` and vectorized operations?**
+`apply` calls a Python function once per element - for 1 million rows, that's 1 million Python function calls. Vectorized operations run in C across the entire array in one pass. The difference is typically 10–100x, and on large datasets this becomes critical.
+
+## Summary
+
+- **Vectorized ops** - always the first choice; use NumPy math, comparisons, `.str.*` methods
+- `np.where(cond, a, b)` - fast vectorized if-else for one condition
+- `np.select(conditions, choices, default)` - fast vectorized if/elif/else
+- **`map()`** - element-wise on a Series; great for dict replacements and simple lambdas
+- **`apply()`** - most flexible but slowest; use only when vectorized alternatives don't exist
+- `apply(func, axis=1)` - pass each row as a Series to a function (access multiple columns)
+- Rule of thumb: if you can express it without `apply`, do so - `apply` is 10–100x slower

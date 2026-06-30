@@ -1,0 +1,277 @@
+## Inheritance Basics
+
+Inheritance lets a child class reuse and extend a parent class.
+
+```python
+class Animal:
+    def __init__(self, name, age):
+        self.name = name
+        self.age = age
+
+    def eat(self):
+        return f"{self.name} is eating"
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(name={self.name!r}, age={self.age})"
+
+class Dog(Animal):   # Dog inherits from Animal
+    def bark(self):
+        return f"{self.name} says Woof!"
+
+class Cat(Animal):
+    def meow(self):
+        return f"{self.name} says Meow!"
+
+dog = Dog("Max", 3)
+print(dog.eat())     # "Max is eating" - inherited from Animal
+print(dog.bark())    # "Max says Woof!" - defined on Dog
+print(repr(dog))     # Dog(name='Max', age=3)
+```
+
+## Overriding Methods
+
+Child classes can override parent methods to change behaviour:
+
+```python
+class Animal:
+    def speak(self):
+        return "..."
+
+class Dog(Animal):
+    def speak(self):          # override parent's speak()
+        return "Woof!"
+
+class Cat(Animal):
+    def speak(self):
+        return "Meow!"
+
+class Duck(Animal):
+    def speak(self):
+        return "Quack!"
+
+animals = [Dog(), Cat(), Duck()]
+for a in animals:
+    print(a.speak())
+# Woof!
+# Meow!
+# Quack!
+```
+
+## super() - Calling the Parent
+
+```python
+class Animal:
+    def __init__(self, name, age):
+        self.name = name
+        self.age = age
+
+    def describe(self):
+        return f"{self.name}, {self.age} years old"
+
+class Dog(Animal):
+    def __init__(self, name, age, breed):
+        super().__init__(name, age)   # call parent __init__
+        self.breed = breed            # add dog-specific attribute
+
+    def describe(self):
+        base = super().describe()     # call parent describe()
+        return f"{base}, breed: {self.breed}"
+
+d = Dog("Max", 3, "Labrador")
+print(d.describe())   # Max, 3 years old, breed: Labrador
+```
+
+## isinstance() and issubclass()
+
+```python
+class Animal: pass
+class Dog(Animal): pass
+class Labrador(Dog): pass
+
+lab = Labrador()
+
+isinstance(lab, Labrador)    # True - is a Labrador
+isinstance(lab, Dog)         # True - is a Dog (subclass of Dog)
+isinstance(lab, Animal)      # True - is an Animal (transitive)
+isinstance(lab, str)         # False
+
+issubclass(Labrador, Dog)    # True
+issubclass(Labrador, Animal) # True
+issubclass(Dog, Animal)      # True
+issubclass(Animal, object)   # True - all classes inherit from object
+```
+
+## Multiple Inheritance
+
+```python
+class Flyable:
+    def fly(self):
+        return f"{self.name} is flying"
+
+class Swimmable:
+    def swim(self):
+        return f"{self.name} is swimming"
+
+class Duck(Animal, Flyable, Swimmable):
+    def speak(self):
+        return "Quack!"
+
+d = Duck("Donald", 2)
+d.speak()   # "Quack!"
+d.fly()     # "Donald is flying"
+d.swim()    # "Donald is swimming"
+```
+
+## MRO - Method Resolution Order
+
+When multiple parent classes define the same method, Python uses MRO (C3 linearization) to determine which is used:
+
+```python
+class A:
+    def hello(self):
+        return "A"
+
+class B(A):
+    def hello(self):
+        return "B"
+
+class C(A):
+    def hello(self):
+        return "C"
+
+class D(B, C):
+    pass
+
+d = D()
+print(d.hello())   # "B" - MRO: D → B → C → A
+
+print(D.__mro__)
+# (<class 'D'>, <class 'B'>, <class 'C'>, <class 'A'>, <class 'object'>)
+
+D.mro()   # same as list
+```
+
+## Polymorphism
+
+Polymorphism means different objects respond to the same method call in different ways.
+
+```python
+class Shape:
+    def area(self):
+        raise NotImplementedError
+
+class Circle(Shape):
+    def __init__(self, radius):
+        self.radius = radius
+
+    def area(self):
+        import math
+        return math.pi * self.radius ** 2
+
+class Rectangle(Shape):
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+
+    def area(self):
+        return self.width * self.height
+
+class Triangle(Shape):
+    def __init__(self, base, height):
+        self.base = base
+        self.height = height
+
+    def area(self):
+        return 0.5 * self.base * self.height
+
+# Polymorphic code - works with ANY Shape subclass
+shapes = [Circle(5), Rectangle(4, 6), Triangle(3, 8)]
+for shape in shapes:
+    print(f"{shape.__class__.__name__}: area = {shape.area():.2f}")
+# Circle: area = 78.54
+# Rectangle: area = 24.00
+# Triangle: area = 12.00
+
+total_area = sum(shape.area() for shape in shapes)
+```
+
+## Duck Typing - Python's Style of Polymorphism
+
+In Python, you don't need inheritance for polymorphism. If it has the right method, it works:
+
+```python
+class Dog:
+    def speak(self):
+        return "Woof!"
+
+class Robot:
+    def speak(self):
+        return "Beep boop"
+
+class Parrot:
+    def speak(self):
+        return "Polly wants a cracker"
+
+# None of these inherit from a common base - doesn't matter
+things = [Dog(), Robot(), Parrot()]
+for thing in things:
+    print(thing.speak())   # works because all have speak()
+
+# "If it walks like a duck and quacks like a duck, it's a duck"
+```
+
+## Mixin Pattern
+
+Mixins add specific capabilities via multiple inheritance without full IS-A relationships:
+
+```python
+class LogMixin:
+    def log(self, message):
+        print(f"[{self.__class__.__name__}] {message}")
+
+class SerializeMixin:
+    def to_dict(self):
+        return self.__dict__
+
+class User(LogMixin, SerializeMixin):
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
+
+    def register(self):
+        self.log("User registered")
+        return self.to_dict()
+
+u = User("Alice", "alice@example.com")
+print(u.register())
+# [User] User registered
+# {'name': 'Alice', 'email': 'alice@example.com'}
+```
+
+## Interview Questions
+
+**Q: What is the difference between inheritance and composition?**
+Inheritance (IS-A): a Dog IS-A Animal - the child class inherits the parent's interface and implementation. Composition (HAS-A): a Car HAS-A Engine - one object contains another as an attribute. Prefer composition over inheritance for flexibility; use inheritance when the IS-A relationship is genuinely true.
+
+**Q: What is MRO and why does it matter?**
+MRO (Method Resolution Order) determines the order Python searches through parent classes to find a method. Python uses the C3 linearization algorithm, inspectable via `Class.__mro__`. It matters in multiple inheritance to avoid ambiguity when multiple parents define the same method.
+
+**Q: What is duck typing?**
+Duck typing is Python's approach where the type of an object is less important than whether it has the right methods. If an object has a `speak()` method, you can call `speak()` on it - regardless of its class hierarchy. This enables polymorphism without formal inheritance.
+
+**Q: When would you use multiple inheritance vs a mixin?**
+Use multiple inheritance sparingly for genuine IS-A relationships. Use mixins - small, focused classes that add specific capabilities (logging, serialization, caching) via multiple inheritance. Mixins have no `__init__` and depend on the host class's attributes. They're a clean way to share behaviour without deep inheritance hierarchies.
+
+**Q: What does `super()` do in Python 3?**
+`super()` returns a proxy object that delegates method calls to the parent class (or next in MRO). In Python 3, `super()` without arguments automatically determines the enclosing class and instance. Always use `super().__init__(...)` in a child's `__init__` to ensure proper initialization of parent state.
+
+## Summary
+
+- `class Child(Parent):` - Child inherits all attributes and methods from Parent
+- Override methods by redefining them in the child class
+- `super().__init__(...)` - call parent's `__init__`; `super().method()` - call parent's method
+- `isinstance(obj, Class)` - checks if object is an instance of that class or any subclass
+- **MRO** - Python searches D → B → C → A → object when resolving methods in multiple inheritance
+- **Polymorphism** - different classes, same interface; caller doesn't need to know the type
+- **Duck typing** - if it has the method, call it; no formal inheritance needed
+- **Mixin** - small class that adds specific behaviour via multiple inheritance; no standalone IS-A meaning

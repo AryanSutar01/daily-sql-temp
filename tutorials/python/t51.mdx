@@ -1,0 +1,283 @@
+## How Python Manages Memory
+
+Python's memory management happens at two levels:
+
+```
+1. The Python Memory Manager
+   → Requests memory from the OS
+   → Manages a private heap for all Python objects
+
+2. Garbage Collection (GC)
+   → Reference counting (primary)
+   → Cyclic GC (secondary - handles circular references)
+```
+
+## Reference Counting - Primary Mechanism
+
+Every Python object has a reference count - the number of names or containers pointing to it.
+
+```python
+import sys
+
+a = [1, 2, 3]
+sys.getrefcount(a)   # 2 - 'a' + the getrefcount argument itself
+
+b = a
+sys.getrefcount(a)   # 3 - 'a', 'b', + getrefcount
+
+c = a
+sys.getrefcount(a)   # 4
+
+del b
+sys.getrefcount(a)   # 3
+del c
+sys.getrefcount(a)   # 2
+```
+
+When the reference count drops to **zero**, Python immediately frees the memory:
+
+```python
+a = [1, 2, 3]   # ref count = 1
+b = a            # ref count = 2
+del a            # ref count = 1
+del b            # ref count = 0 → freed immediately
+```
+
+### What Increases the Reference Count
+
+```python
+x = [1, 2]      # ref count = 1 (assigned to x)
+y = x            # ref count = 2 (assigned to y)
+lst = [x, x]    # ref count = 4 (two entries in lst)
+def f(v): pass
+f(x)             # ref count temporarily +1 during function call
+```
+
+## Cyclic Garbage Collector
+
+Reference counting fails for circular references:
+
+```python
+class Node:
+    def __init__(self, val):
+        self.val = val
+        self.next = None
+
+a = Node(1)
+b = Node(2)
+a.next = b   # a references b
+b.next = a   # b references a - circular!
+
+del a
+del b
+# Both nodes still have ref count = 1 (each references the other)
+# Reference counting alone cannot free them - GC is needed
+```
+
+Python's cyclic garbage collector runs periodically to detect and break these cycles:
+
+```python
+import gc
+
+gc.collect()            # manually trigger garbage collection
+gc.get_count()          # (gen0, gen1, gen2) - objects in each generation
+gc.get_threshold()      # (700, 10, 10) - collection thresholds
+gc.disable()            # disable automatic GC (use with care)
+gc.enable()             # re-enable GC
+gc.isenabled()          # True/False
+
+# Get objects that the GC is tracking
+gc.get_objects()        # list of all tracked objects
+```
+
+## Generational Garbage Collection
+
+Python uses three generations to optimize GC:
+
+```
+Generation 0 - new objects (most GC runs here)
+Generation 1 - survived one GC pass
+Generation 2 - long-lived objects (rare GC)
+```
+
+```python
+gc.get_threshold()   # (700, 10, 10)
+# Gen 0 runs when 700+ new objects created
+# Gen 1 runs after Gen 0 has run 10 times
+# Gen 2 runs after Gen 1 has run 10 times
+```
+
+## Memory Profiling
+
+```python
+import tracemalloc
+
+# Track memory allocations
+tracemalloc.start()
+
+# Your code here
+data = [list(range(1000)) for _ in range(1000)]
+
+snapshot = tracemalloc.take_snapshot()
+top_stats = snapshot.statistics("lineno")
+
+for stat in top_stats[:5]:
+    print(stat)
+# Shows which lines allocated the most memory
+```
+
+```python
+# sys.getsizeof - size of a single object (not recursive)
+import sys
+
+sys.getsizeof([])          # 56 bytes - empty list
+sys.getsizeof([1, 2, 3])  # 88 bytes - list with 3 elements
+sys.getsizeof("hello")    # 54 bytes
+
+# Note: getsizeof doesn't include the memory of contained objects
+lst = [[1,2,3]] * 1000
+sys.getsizeof(lst)   # only the list overhead, not the inner lists
+```
+
+## Common Memory Leaks
+
+```python
+# 1. Global containers that grow unboundedly
+cache = {}
+def process(key, value):
+    cache[key] = value   # grows forever - no eviction
+
+# Fix: use functools.lru_cache or limit size
+from functools import lru_cache
+
+@lru_cache(maxsize=1000)
+def expensive(n):
+    return n ** 2
+
+# 2. Event listeners / callbacks not removed
+class EventSystem:
+    _listeners = []   # class variable - lives forever
+
+    @classmethod
+    def subscribe(cls, callback):
+        cls._listeners.append(callback)   # never cleaned up
+
+# Fix: use weakref for callbacks
+import weakref
+class EventSystem:
+    _listeners = []
+
+    @classmethod
+    def subscribe(cls, callback):
+        cls._listeners.append(weakref.ref(callback))
+
+# 3. Closures capturing large objects
+def make_handler(large_data):
+    def handler(event):
+        return large_data[event]   # large_data stays in memory as long as handler exists
+    return handler
+
+# Fix: capture only what you need
+def make_handler(large_data):
+    lookup = dict(large_data)   # extract only needed subset
+    def handler(event):
+        return lookup.get(event)
+    return handler
+```
+
+## weakref - Reference Without Preventing GC
+
+```python
+import weakref
+
+class Resource:
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return f"Resource({self.name})"
+
+r = Resource("database")
+weak = weakref.ref(r)   # weak reference - doesn't increment ref count
+
+print(weak())    # Resource(database) - object still alive
+
+del r            # ref count drops to 0 - object freed
+print(weak())    # None - object is gone
+```
+
+### WeakValueDictionary - Cache Without Memory Leaks
+
+```python
+import weakref
+
+# A cache that doesn't prevent garbage collection of its values
+cache = weakref.WeakValueDictionary()
+
+class Session:
+    def __init__(self, session_id):
+        self.session_id = session_id
+
+s1 = Session("abc123")
+cache["abc123"] = s1
+
+print(cache["abc123"])   # Session abc123
+
+del s1                   # only reference deleted
+# cache["abc123"] is now also gone - WeakValueDictionary doesn't keep it alive
+print(dict(cache))       # {} - automatically cleaned up
+```
+
+## Memory Optimization Tips
+
+```python
+# 1. Use generators instead of lists for large sequences
+total = sum(x**2 for x in range(1_000_000))   # ~112 bytes
+vs_list = sum([x**2 for x in range(1_000_000)])  # ~8.7 MB
+
+# 2. Use __slots__ to reduce per-instance overhead
+class Point:
+    __slots__ = ("x", "y")
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+# ~4x smaller than a regular class instance
+
+# 3. Use numpy arrays for numerical data
+import numpy as np
+python_list = list(range(1_000_000))   # ~8.5 MB
+numpy_array = np.arange(1_000_000)     # ~8 MB but much faster to operate on
+
+# 4. Delete large objects explicitly when done
+data = load_huge_dataset()
+process(data)
+del data     # free memory immediately, don't wait for GC
+gc.collect() # force collection if cyclic refs involved
+```
+
+## Interview Questions
+
+**Q: How does Python manage memory?**
+Python uses a private heap managed by the Python Memory Manager. Objects are allocated on this heap. Memory is freed primarily through reference counting - when an object's reference count reaches zero, it's immediately deallocated. A cyclic garbage collector runs periodically to handle circular references that reference counting can't resolve.
+
+**Q: What is reference counting and what is its limitation?**
+Reference counting tracks how many variables/containers point to each object. When the count hits zero, the object is freed immediately. The limitation: it can't handle circular references - objects that reference each other will each have a count of at least one, so they're never freed by reference counting alone.
+
+**Q: What is the cyclic garbage collector and when does it run?**
+The cyclic GC scans for groups of objects that reference each other but are not reachable from the program. It runs automatically based on thresholds (by default, every 700 new object allocations for generation 0). It can also be triggered manually with `gc.collect()`.
+
+**Q: What is a weak reference and when would you use it?**
+A weak reference (`weakref.ref`) points to an object without incrementing its reference count. If the object has no other references, it gets garbage collected and the weak reference becomes `None`. Use weak references in caches and observer patterns where you don't want to keep objects alive just because a cache entry exists.
+
+**Q: How do you detect and fix a memory leak in Python?**
+Use `tracemalloc` to track allocations per line of code. Common causes: unbounded global containers, closures capturing large objects, uncleaned event listeners, and circular references in custom classes. Fixes: use `lru_cache` with size limits, `weakref` for callbacks, generators instead of lists, and `del` + `gc.collect()` for large temporary objects.
+
+## Summary
+
+- Python uses **reference counting** as the primary memory management mechanism - objects are freed immediately when their ref count hits 0
+- `sys.getrefcount(obj)` - inspect the current reference count (add 1 for the call itself)
+- **Cyclic GC** handles circular references that reference counting can't free
+- Three generations: gen 0 (new objects, frequent), gen 1, gen 2 (long-lived, rare)
+- `gc.collect()` - manually trigger GC; `gc.disable()` - disable for performance-critical sections
+- **weakref** - reference an object without preventing garbage collection; use for caches and observers
+- Common leaks: growing global dicts, closures capturing large objects, uncleaned listeners
+- Memory optimizations: generators, `__slots__`, numpy arrays, explicit `del` for large temporaries

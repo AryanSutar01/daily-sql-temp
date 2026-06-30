@@ -1,0 +1,263 @@
+## Three Types of Methods
+
+```python
+class MyClass:
+    class_var = "shared"
+
+    def instance_method(self):
+        """Has access to self (the instance) and the class via self.__class__"""
+        return f"instance: {self.class_var}"
+
+    @classmethod
+    def class_method(cls):
+        """Has access to cls (the class) but NOT a specific instance"""
+        return f"class: {cls.class_var}"
+
+    @staticmethod
+    def static_method():
+        """Has access to NEITHER instance nor class - just a regular function"""
+        return "static: no self, no cls"
+```
+
+## Instance Methods - The Default
+
+```python
+class BankAccount:
+    def __init__(self, owner, balance):
+        self.owner = owner
+        self.balance = balance
+
+    def deposit(self, amount):
+        """Instance method - needs self to modify this specific account"""
+        self.balance += amount
+        return self.balance
+
+    def get_summary(self):
+        return f"{self.owner}: ₹{self.balance}"
+
+acc = BankAccount("Alice", 1000)
+acc.deposit(500)   # Python passes acc as self automatically
+acc.get_summary()  # "Alice: ₹1500"
+```
+
+## @classmethod - Receives the Class
+
+```python
+class User:
+    _count = 0
+    _default_role = "viewer"
+
+    def __init__(self, name, email, role=None):
+        self.name = name
+        self.email = email
+        self.role = role or User._default_role
+        User._count += 1
+
+    @classmethod
+    def get_count(cls):
+        """Access class-level data - no instance needed"""
+        return cls._count
+
+    @classmethod
+    def set_default_role(cls, role):
+        """Modify class state"""
+        cls._default_role = role
+
+    @classmethod
+    def from_string(cls, data):
+        """Factory method - alternative constructor"""
+        name, email = data.split(",")
+        return cls(name.strip(), email.strip())
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        """Another factory"""
+        return cls(data["name"], data["email"], data.get("role"))
+
+# Call on the class - no instance needed
+User.get_count()            # 0
+u1 = User("Alice", "alice@example.com")
+User.get_count()            # 1
+
+# Factory methods - clean alternative constructors
+u2 = User.from_string("Bob, bob@example.com")
+u3 = User.from_dict({"name": "Carol", "email": "carol@example.com"})
+```
+
+### Why `cls` Instead of Hardcoding the Class Name
+
+```python
+class Animal:
+    @classmethod
+    def create(cls):
+        return cls()   # creates an instance of whatever class called this
+
+class Dog(Animal):
+    def speak(self):
+        return "Woof!"
+
+# cls is Dog when called on Dog - NOT Animal
+dog = Dog.create()
+print(type(dog))    # <class 'Dog'>
+print(dog.speak())  # Woof!
+
+# If we used Animal() directly, Dog.create() would return an Animal, not a Dog
+```
+
+## @staticmethod - No Implicit Argument
+
+```python
+class PasswordManager:
+    _min_length = 8
+
+    def __init__(self, username):
+        self.username = username
+
+    @staticmethod
+    def validate_password(password):
+        """Utility - doesn't need instance or class state"""
+        if len(password) < 8:
+            return False, "Too short (min 8 chars)"
+        if not any(c.isupper() for c in password):
+            return False, "Must contain uppercase"
+        if not any(c.isdigit() for c in password):
+            return False, "Must contain a digit"
+        return True, "Valid"
+
+    @staticmethod
+    def hash_password(password):
+        import hashlib
+        return hashlib.sha256(password.encode()).hexdigest()
+
+# Call on class or instance - both work
+valid, msg = PasswordManager.validate_password("weak")
+print(valid, msg)   # False, "Too short (min 8 chars)"
+
+pm = PasswordManager("alice")
+pm.validate_password("Str0ngPass!")   # also works
+```
+
+## Side-by-Side Comparison
+
+```python
+class DateHelper:
+    fmt = "%Y-%m-%d"
+
+    def __init__(self, date_str):
+        from datetime import datetime
+        self.date = datetime.strptime(date_str, DateHelper.fmt)
+
+    def format(self):
+        """Instance method - uses self.date"""
+        return self.date.strftime(self.fmt)
+
+    @classmethod
+    def today(cls):
+        """Class method - creates instance using cls"""
+        from datetime import date
+        return cls(str(date.today()))
+
+    @staticmethod
+    def is_weekend(date_str):
+        """Static - pure utility, no instance or class needed"""
+        from datetime import datetime
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+        return d.weekday() >= 5
+
+# Usage
+d = DateHelper("2024-03-15")
+d.format()                          # "2024-03-15"   - instance method
+today = DateHelper.today()          # class method
+DateHelper.is_weekend("2024-03-16") # True - static method
+```
+
+## When to Use Which
+
+```python
+# Instance method - when you need to read or modify instance state
+def withdraw(self, amount):   # needs self.balance
+    self.balance -= amount
+
+# @classmethod - when you need:
+# 1. Alternative constructors (factory methods)
+@classmethod
+def from_csv(cls, row):
+    return cls(*row.split(","))
+
+# 2. Access or modify class-level data
+@classmethod
+def get_instance_count(cls):
+    return cls._count
+
+# 3. Inheritance-aware methods (cls instead of hardcoded class name)
+@classmethod
+def create_default(cls):
+    return cls()
+
+# @staticmethod - when:
+# 1. Function is logically related to the class but needs no instance/class
+@staticmethod
+def validate_email(email):
+    return "@" in email
+
+# 2. Utility/helper functions that belong conceptually with the class
+@staticmethod
+def celsius_to_fahrenheit(c):
+    return c * 9/5 + 32
+```
+
+## Calling from Instance vs Class
+
+```python
+class Demo:
+    @classmethod
+    def cm(cls):
+        return f"classmethod: {cls.__name__}"
+
+    @staticmethod
+    def sm():
+        return "staticmethod"
+
+    def im(self):
+        return "instance method"
+
+d = Demo()
+
+# All three ways work for classmethod and staticmethod
+Demo.cm()   # "classmethod: Demo"
+d.cm()      # "classmethod: Demo" - same result
+
+Demo.sm()   # "staticmethod"
+d.sm()      # "staticmethod" - same result
+
+# Instance method needs an instance
+d.im()       # works
+Demo.im(d)   # also works - but unusual
+Demo.im()    # TypeError - missing self
+```
+
+## Interview Questions
+
+**Q: What is the difference between `@staticmethod` and `@classmethod`?**
+`@classmethod` receives `cls` (the class) as its first argument - it can access and modify class-level state and is useful for factory methods and inheritance-aware operations. `@staticmethod` receives no implicit argument - it's a plain function scoped to the class namespace, used for utility functions that don't need class or instance access.
+
+**Q: When would you use `@classmethod` as a factory method?**
+When you want multiple ways to create an instance - for example `User.from_string("Alice,30")` or `User.from_dict({"name": "Alice"})`. Using `cls(...)` instead of `ClassName(...)` means subclasses that call the factory method get an instance of themselves, not the parent class.
+
+**Q: Can you call a `@staticmethod` on an instance?**
+Yes. Both `MyClass.static_method()` and `instance.static_method()` work. But calling on the class is clearer - it signals that the method doesn't depend on the instance.
+
+**Q: Why use `@staticmethod` instead of just a module-level function?**
+Grouping related utility functions inside the class improves discoverability and organization. `PasswordManager.validate_password()` signals the function belongs conceptually to `PasswordManager`, even if it doesn't use its state.
+
+**Q: What happens to `@classmethod` in inheritance?**
+`cls` always refers to the class the method is called on - not the class where it was defined. So `Dog.create()` with `return cls()` returns a `Dog`, even if `create` is defined on `Animal`. This is what makes class methods useful for factory patterns in inheritance hierarchies.
+
+## Summary
+
+- **Instance method** - default; receives `self`; reads/modifies instance state
+- **`@classmethod`** - receives `cls`; used for factory methods, class-level state, and inheritance-aware operations
+- **`@staticmethod`** - no `self` or `cls`; pure utility function scoped to the class
+- `cls` in `@classmethod` always refers to the actual class called on - enables correct behaviour in subclasses
+- Both `@classmethod` and `@staticmethod` can be called on the class or an instance
+- Use `@classmethod` for alternative constructors; `@staticmethod` for helpers that belong conceptually to the class

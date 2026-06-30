@@ -1,0 +1,247 @@
+# Execution Plan with explain()
+
+## What is an Execution Plan?
+
+When you write a PySpark query, Spark doesn't execute it immediately. Instead, it builds a **logical plan** (what you want to do) and then converts it into an **optimized physical plan** (how to actually do it). This is called the **query execution plan**.
+
+Understanding execution plans helps you:
+- Diagnose why a query is slow
+- Verify that Spark is applying optimizations (like broadcast joins, partition pruning)
+- Identify unnecessary shuffles or recomputations
+
+---
+
+## The 4 Stages of Query Planning
+
+```
+Your PySpark Code
+        ↓
+1. Unresolved Logical Plan   → Column names not yet validated
+        ↓
+2. Resolved Logical Plan     → Schema validated, types resolved (by Analyzer)
+        ↓
+3. Optimized Logical Plan    → Catalyst optimizer applies rules (pushdown, pruning)
+        ↓
+4. Physical Plan             → Actual execution strategy (SortMergeJoin, BroadcastJoin, etc.)
+        ↓
+   Executed by Spark Engine (Tungsten)
+```
+
+---
+
+## The explain() Function
+
+`explain()` prints the execution plan of a DataFrame to the console. It's your window into what Spark is actually going to do.
+
+### Basic syntax:
+
+```python
+df.explain()              # Shows only the physical plan (default)
+df.explain(True)          # Shows all 4 plans (unresolved → physical)
+df.explain("extended")    # Same as explain(True)
+df.explain("formatted")   # Cleaner, tree-style output (Spark 3.0+)
+df.explain("cost")        # Includes cost estimates
+df.explain("codegen")     # Shows generated Java code
+```
+
+---
+
+## Reading the Physical Plan
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import broadcast
+
+spark = SparkSession.builder.appName("ExplainDemo").getOrCreate()
+
+orders = spark.read.parquet("data/orders")
+products = spark.read.parquet("data/products")
+
+result = orders.join(products, "product_id") \
+               .filter("orders.country = 'IN'") \
+               .groupBy("category") \
+               .agg({"revenue": "sum"})
+
+result.explain()
+```
+
+**Sample output (simplified):**
+```
+== Physical Plan ==
+*(3) HashAggregate(keys=[category#10], functions=[sum(revenue#5)])
++- Exchange hashpartitioning(category#10, 200)       ← Shuffle (groupBy)
+   +- *(2) HashAggregate(keys=[category#10], functions=[partial_sum(revenue#5)])
+      +- *(2) Project [category#10, revenue#5]
+         +- *(2) SortMergeJoin [product_id#3], [product_id#8], Inner    ← Join type
+            :- *(1) Sort [product_id#3 ASC NULLS FIRST]
+            :  +- Exchange hashpartitioning(product_id#3, 200)           ← Shuffle
+            :     +- *(1) Filter (country#9 = IN)                        ← Pushed down filter
+            :        +- *(1) FileScan parquet [product_id#3,country#9,revenue#5]
+            +- *(1) Sort [product_id#8 ASC NULLS FIRST]
+               +- Exchange hashpartitioning(product_id#8, 200)
+                  +- *(1) FileScan parquet [product_id#8,category#10]
+```
+
+### Key things to look for:
+- **Exchange** → This is a shuffle (expensive!)
+- **SortMergeJoin** → Both sides are shuffled and sorted (can be optimized to BroadcastHashJoin)
+- **BroadcastHashJoin** → Small table broadcast, no shuffle
+- **Filter pushed down** → Filters applied early (good optimization)
+- **FileScan** with pushed filters → Partition pruning happening
+
+---
+
+## Extended Plan - Seeing All Stages
+
+```python
+result.explain("extended")
+```
+
+```
+== Parsed Logical Plan ==
+'Aggregate ['category], ['category, sum('revenue) AS sum(revenue)]
++- 'Filter ('country = IN)
+   +- 'Join Inner, ('product_id = 'product_id)
+      ...
+
+== Analyzed Logical Plan ==
+category: string, sum(revenue): bigint
+Aggregate [category#10], [category#10, sum(revenue#5) AS sum(revenue)#15L]
+...
+
+== Optimized Logical Plan ==
+Aggregate [category#10], [category#10, sum(revenue#5) AS sum(revenue)#15L]
++- Join Inner, (product_id#3 = product_id#8)
+   :- Filter (country#9 = IN)     ← Filter pushed below join by Catalyst!
+   ...
+
+== Physical Plan ==
+... (same as above)
+```
+
+Notice how the **Optimized Logical Plan** pushes the filter *below* the join - Spark's Catalyst optimizer automatically moved it for better performance.
+
+---
+
+## Formatted Plan (Spark 3.0+)
+
+```python
+result.explain("formatted")
+```
+
+Gives a cleaner, numbered tree output:
+
+```
+== Physical Plan ==
+AdaptiveSparkPlan (10)
++- HashAggregate (9)
+   +- Exchange (8)
+      +- HashAggregate (7)
+         +- Project (6)
+            +- SortMergeJoin Inner (5)
+               :- Sort (3)
+               :  +- Exchange (2)
+               :     +- Filter (1)
+               ...
+```
+
+---
+
+## Spotting Optimization Opportunities
+
+### Is Spark using a broadcast join?
+
+```python
+# Small table join - should be BroadcastHashJoin
+small_df = spark.read.csv("data/lookup.csv")   # 1MB
+large_df = spark.read.parquet("data/events")   # 100GB
+
+large_df.join(small_df, "id").explain()
+# Look for: BroadcastHashJoin vs SortMergeJoin
+```
+
+If you see `SortMergeJoin` but you expected a broadcast, try:
+```python
+spark.conf.set("spark.sql.autoBroadcastJoinThreshold", 20 * 1024 * 1024)  # 20MB
+# or force it:
+large_df.join(broadcast(small_df), "id").explain()
+```
+
+### Is partition pruning happening?
+
+```python
+df = spark.read.parquet("data/partitioned_sales")  # partitioned by year, month
+
+result = df.filter("year = 2024 AND month = '01'")
+result.explain()
+# Look for: PartitionFilters in FileScan - means Spark skips other partitions
+# FileScan parquet [col1, col2] PartitionFilters: [year=2024, month=01]
+```
+
+### Are there unexpected shuffles?
+
+```python
+df.groupBy("country").count().explain()
+# You'll see Exchange (shuffle) - expected for groupBy
+# If you see two Exchanges in a join, consider broadcasting one side
+```
+
+---
+
+## Using explain() in Development Workflow
+
+```python
+# Step 1: Write your transformation
+result = (
+    orders
+    .join(customers, "customer_id")
+    .filter("orders.status = 'completed'")
+    .groupBy("region")
+    .agg({"amount": "sum"})
+)
+
+# Step 2: Check the plan BEFORE running
+result.explain("formatted")
+
+# Step 3: Look for:
+#   - Unexpected shuffles (Exchange nodes)
+#   - SortMergeJoin when BroadcastHashJoin is possible
+#   - Missing filter pushdown
+#   - Large partition count in Exchange
+
+# Step 4: Optimize and re-check
+result_optimized = (
+    orders.filter("status = 'completed'")          # filter early
+    .join(broadcast(customers), "customer_id")     # broadcast small table
+    .groupBy("region")
+    .agg({"amount": "sum"})
+)
+result_optimized.explain("formatted")
+```
+
+---
+
+## Interview Tips 🎯
+
+> **Q: What does explain() show you in PySpark?**
+
+**Answer:** `explain()` shows the **execution plan** that Spark will use to run a query. By default it shows the physical plan - the actual operations (scans, shuffles, joins, aggregations). With `explain(True)` or `explain("extended")`, it also shows the unresolved, resolved, and optimized logical plans, letting you see what Catalyst optimizer changed.
+
+> **Q: What is the difference between a logical plan and a physical plan in Spark?**
+
+**Answer:** The **logical plan** describes *what* you want to compute (filters, joins, aggregations) without specifying how. The **physical plan** describes *how* Spark will actually execute it - choosing specific algorithms like `SortMergeJoin` vs `BroadcastHashJoin`, deciding where to shuffle, and in what order to apply operations. Catalyst optimizes the logical plan before converting it to a physical plan.
+
+> **Q: How do you verify that partition pruning is happening?**
+
+**Answer:** Use `explain()` and look at the `FileScan` line in the physical plan. If partition pruning is active, you'll see `PartitionFilters: [year=2024]` in the FileScan output, meaning Spark is only scanning relevant partition folders and skipping the rest.
+
+---
+
+## Summary
+
+- `explain()` reveals Spark's execution plan - use it to diagnose and optimize jobs
+- Four plan stages: **Unresolved → Resolved → Optimized Logical → Physical**
+- Look for **Exchange** nodes (shuffles), **join types**, and **filter pushdown** in the physical plan
+- `explain("formatted")` gives the cleanest output in Spark 3.0+
+- Use `explain()` **before** running expensive jobs to catch issues early
+- Key optimizations to verify: broadcast joins, partition pruning, filter pushdown

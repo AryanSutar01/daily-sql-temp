@@ -1,0 +1,319 @@
+# PySpark with Kafka
+
+## What is Kafka?
+
+**Apache Kafka** is a distributed event streaming platform. It acts as a high-throughput, fault-tolerant message bus where **producers** publish events (messages) to **topics**, and **consumers** read from those topics.
+
+In the data engineering world, Kafka is often the entry point for real-time data - clickstreams, transactions, IoT sensor readings, application logs - and PySpark is used to process that data at scale.
+
+---
+
+## Kafka Core Concepts
+
+```
+Producer App ──────→ [Kafka Cluster]  ──────→ Consumer App (PySpark)
+                           │
+                     Topic: "orders"
+                           │
+              ┌────────────┼────────────┐
+              │            │            │
+          Partition 0  Partition 1  Partition 2
+          [msg1]        [msg2]        [msg3]
+          [msg4]        [msg5]        [msg6]
+```
+
+| Concept | Description |
+|---|---|
+| **Topic** | Named stream of records (like a table name) |
+| **Partition** | Ordered, immutable log within a topic (enables parallelism) |
+| **Offset** | Position of a message within a partition |
+| **Producer** | App that writes messages to a topic |
+| **Consumer** | App that reads messages from a topic |
+| **Consumer Group** | Group of consumers that share partition assignments |
+| **Broker** | A Kafka server in the cluster |
+
+---
+
+## Setup: Adding Kafka to Spark
+
+To use Kafka with PySpark, add the Kafka connector package:
+
+```bash
+# spark-submit
+spark-submit \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0 \
+  your_script.py
+```
+
+```python
+# In SparkSession builder (for Databricks or notebooks)
+spark = SparkSession.builder \
+    .appName("KafkaPySpark") \
+    .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0") \
+    .getOrCreate()
+```
+
+---
+
+## Reading from Kafka (Streaming)
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, from_json, cast
+from pyspark.sql.types import StructType, StringType, DoubleType, LongType
+
+spark = SparkSession.builder.appName("KafkaReader").getOrCreate()
+
+# Read stream from Kafka
+raw_df = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "kafka1:9092,kafka2:9092") \
+    .option("subscribe", "orders_topic") \
+    .option("startingOffsets", "latest") \  # or "earliest" for all historical
+    .option("maxOffsetsPerTrigger", 100000) \  # Rate limiting
+    .load()
+
+raw_df.printSchema()
+# root
+#  |-- key: binary (nullable = true)
+#  |-- value: binary (nullable = true)
+#  |-- topic: string (nullable = true)
+#  |-- partition: integer (nullable = true)
+#  |-- offset: long (nullable = true)
+#  |-- timestamp: timestamp (nullable = true)
+#  |-- timestampType: integer (nullable = true)
+```
+
+### Subscribe options:
+```python
+# Single topic
+.option("subscribe", "orders")
+
+# Multiple topics
+.option("subscribe", "orders,payments,refunds")
+
+# Topic pattern (regex)
+.option("subscribePattern", "order.*")  # matches orders, order_events, etc.
+```
+
+---
+
+## Parsing Kafka Messages
+
+Kafka messages are raw bytes - you need to cast and parse them:
+
+```python
+# Define expected schema of JSON messages
+schema = StructType() \
+    .add("order_id", StringType()) \
+    .add("customer_id", StringType()) \
+    .add("product_id", StringType()) \
+    .add("amount", DoubleType()) \
+    .add("event_time", StringType()) \
+    .add("status", StringType())
+
+# Parse: bytes → string → JSON → columns
+parsed_df = raw_df \
+    .select(
+        col("key").cast("string").alias("kafka_key"),
+        col("value").cast("string").alias("raw_json"),
+        col("topic"),
+        col("partition"),
+        col("offset"),
+        col("timestamp").alias("kafka_timestamp")
+    ) \
+    .select(
+        from_json(col("raw_json"), schema).alias("data"),
+        col("kafka_key"),
+        col("kafka_timestamp")
+    ) \
+    .select("data.*", "kafka_key", "kafka_timestamp")
+```
+
+---
+
+## Processing Kafka Stream
+
+Once parsed, apply any DataFrame transformations:
+
+```python
+from pyspark.sql.functions import sum, count, window, to_timestamp
+
+# Add proper timestamp
+processed_df = parsed_df \
+    .withColumn("event_ts", to_timestamp("event_time")) \
+    .filter("status != 'cancelled'") \
+    .filter("amount > 0")
+
+# Aggregate: revenue per product per 5-minute window
+agg_df = processed_df \
+    .withWatermark("event_ts", "10 minutes") \
+    .groupBy(
+        window("event_ts", "5 minutes"),
+        col("product_id")
+    ) \
+    .agg(
+        sum("amount").alias("total_revenue"),
+        count("order_id").alias("order_count")
+    )
+```
+
+---
+
+## Writing Back to Kafka (Producer)
+
+PySpark can also write processed results back to a Kafka topic:
+
+```python
+from pyspark.sql.functions import to_json, struct
+
+# Convert output to JSON
+output_df = agg_df.select(
+    col("product_id").alias("key"),          # Kafka message key (string)
+    to_json(struct(                           # Kafka message value (JSON bytes)
+        col("window"),
+        col("product_id"),
+        col("total_revenue"),
+        col("order_count")
+    )).alias("value")
+)
+
+# Write stream to output Kafka topic
+query = output_df.writeStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "kafka1:9092,kafka2:9092") \
+    .option("topic", "order_revenue_aggregates") \
+    .option("checkpointLocation", "s3://bucket/checkpoints/kafka-to-kafka/") \
+    .outputMode("update") \
+    .trigger(processingTime="30 seconds") \
+    .start()
+
+query.awaitTermination()
+```
+
+---
+
+## Reading Kafka in Batch Mode
+
+Kafka can also be used as a batch source - read a specific offset range:
+
+```python
+# Read a specific offset range as a batch
+batch_df = spark.read \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "kafka1:9092") \
+    .option("subscribe", "orders_topic") \
+    .option("startingOffsets", '{"orders_topic":{"0":100,"1":200}}') \
+    .option("endingOffsets", '{"orders_topic":{"0":500,"1":800}}') \
+    .load()
+
+batch_df.select(col("value").cast("string")).show()
+```
+
+Or read from earliest to latest (all available data):
+```python
+batch_df = spark.read \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "kafka1:9092") \
+    .option("subscribe", "orders_topic") \
+    .option("startingOffsets", "earliest") \
+    .option("endingOffsets", "latest") \
+    .load()
+```
+
+---
+
+## Kafka + Delta Lake - Full Pipeline
+
+A common production pattern: Kafka → Structured Streaming → Delta Lake
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import from_json, col, to_timestamp
+from pyspark.sql.types import *
+
+spark = SparkSession.builder \
+    .appName("KafkaToDelta") \
+    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
+    .getOrCreate()
+
+schema = StructType([
+    StructField("order_id", StringType()),
+    StructField("user_id", StringType()),
+    StructField("amount", DoubleType()),
+    StructField("product", StringType()),
+    StructField("event_time", StringType())
+])
+
+# Read from Kafka
+stream = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "kafka:9092") \
+    .option("subscribe", "orders") \
+    .option("startingOffsets", "earliest") \
+    .load() \
+    .select(from_json(col("value").cast("string"), schema).alias("d")) \
+    .select("d.*") \
+    .withColumn("event_time", to_timestamp("event_time"))
+
+# Write to Delta Lake with micro-batch every 60 seconds
+query = stream.writeStream \
+    .format("delta") \
+    .option("path", "s3://bucket/delta/raw_orders/") \
+    .option("checkpointLocation", "s3://bucket/checkpoints/kafka-delta/") \
+    .outputMode("append") \
+    .trigger(processingTime="60 seconds") \
+    .start()
+
+print("Streaming query started:", query.id)
+query.awaitTermination()
+```
+
+---
+
+## Security: Kafka with SSL / SASL
+
+In production, Kafka is typically secured:
+
+```python
+# SASL/PLAIN authentication (e.g., Confluent Cloud)
+spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "pkc-xxx.confluent.cloud:9092") \
+    .option("kafka.security.protocol", "SASL_SSL") \
+    .option("kafka.sasl.mechanism", "PLAIN") \
+    .option("kafka.sasl.jaas.config",
+            'org.apache.kafka.common.security.plain.PlainLoginModule required '
+            'username="API_KEY" password="API_SECRET";') \
+    .option("subscribe", "orders") \
+    .load()
+```
+
+---
+
+## Interview Tips 🎯
+
+> **Q: How do you read from Kafka in PySpark?**
+
+**Answer:** Use `spark.readStream.format("kafka")` with options for `kafka.bootstrap.servers` and `subscribe` (topic name). Kafka messages come as binary key and value columns. You cast the value to string and then parse it (typically from JSON using `from_json`) into structured columns. For batch reading, use `spark.read.format("kafka")` with `startingOffsets` and `endingOffsets`.
+
+> **Q: How do you write results from PySpark back to Kafka?**
+
+**Answer:** Structure your output DataFrame to have a `key` (string) and `value` (string or bytes) column - which become the Kafka message key and value. Use `to_json(struct(*))` to serialize your result columns into a JSON string as the Kafka value. Then use `writeStream.format("kafka")` with `kafka.bootstrap.servers` and `topic` options.
+
+> **Q: What is the difference between startingOffsets "latest" and "earliest" in Kafka?**
+
+**Answer:** `"earliest"` starts reading from the beginning of the topic - all stored messages. `"latest"` starts reading only new messages that arrive after the query starts. For production streaming jobs, `"latest"` is typical for real-time processing. `"earliest"` is used for backfill or when you want to process all historical data first. After the initial start, Spark tracks offsets in the checkpoint directory and always resumes from where it left off.
+
+---
+
+## Summary
+
+- **Kafka** is the most common real-time data source for PySpark streaming jobs
+- Read with `spark.readStream.format("kafka")` - subscribe to topics, parse binary values
+- **Kafka schema**: key, value (binary), topic, partition, offset, timestamp
+- Parse messages: `col("value").cast("string")` → `from_json(value, schema)`
+- Write back to Kafka: structure a `key` + `value` column and use `writeStream.format("kafka")`
+- Combine with **Delta Lake** for the standard real-time lakehouse pipeline
+- Always set `checkpointLocation` to enable resume-on-failure

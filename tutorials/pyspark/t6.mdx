@@ -1,0 +1,260 @@
+## The Unified Read API
+
+PySpark uses a consistent API to read from all file formats:
+
+```python
+spark.read
+     .format("format_name")   # or shortcut methods
+     .option("key", "value")  # format-specific options
+     .schema(schema)          # optional: define schema explicitly
+     .load("path/to/data")    # trigger the read
+```
+
+Or use shortcut methods (most common):
+```python
+spark.read.csv(...)
+spark.read.json(...)
+spark.read.parquet(...)
+spark.read.orc(...)
+```
+
+## Reading CSV
+
+```python
+# Minimal read - all columns are strings
+df = spark.read.csv("data.csv")
+
+# With options - most real-world usage
+df = spark.read.csv(
+    "data.csv",
+    header=True,          # first row is column names
+    inferSchema=True,     # auto-detect types (triggers extra scan)
+    sep=",",              # delimiter (also: sep="|" for pipe-delimited)
+    quote='"',            # quote character
+    escape="\\",          # escape character
+    nullValue="NA",       # treat "NA" as null
+    nanValue="NaN",       # treat "NaN" as NaN
+    encoding="UTF-8",     # file encoding
+    multiLine=False       # set True if fields contain newlines
+)
+
+# Equivalent using .option() chains
+df = spark.read \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .option("sep", ",") \
+    .option("nullValue", "NA") \
+    .csv("data.csv")
+
+# Read multiple files / wildcard
+df = spark.read.csv("data/year=2024/*.csv", header=True, inferSchema=True)
+
+# Read entire directory
+df = spark.read.csv("data/", header=True, inferSchema=True)
+```
+
+### Define Schema Explicitly (Preferred Over inferSchema)
+
+`inferSchema=True` reads the file twice. For large files, define the schema manually:
+
+```python
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType, DateType
+
+schema = StructType([
+    StructField("order_id",    IntegerType(), nullable=False),
+    StructField("customer",    StringType(),  nullable=True),
+    StructField("amount",      DoubleType(),  nullable=True),
+    StructField("order_date",  DateType(),    nullable=True),
+])
+
+df = spark.read.csv("orders.csv", header=True, schema=schema)
+df.printSchema()
+# root
+#  |-- order_id: integer (nullable = false)
+#  |-- customer: string (nullable = true)
+#  |-- amount: double (nullable = true)
+#  |-- order_date: date (nullable = true)
+```
+
+### Handling Bad Rows
+
+```python
+# PERMISSIVE (default) - malformed rows get null values
+df = spark.read.csv("data.csv", header=True, inferSchema=True, mode="PERMISSIVE")
+
+# DROPMALFORMED - silently skip bad rows
+df = spark.read.csv("data.csv", header=True, mode="DROPMALFORMED")
+
+# FAILFAST - throw exception on first bad row
+df = spark.read.csv("data.csv", header=True, mode="FAILFAST")
+
+# Capture bad rows using columnNameOfCorruptRecord
+schema = StructType([
+    StructField("id",    IntegerType(), True),
+    StructField("name",  StringType(), True),
+    StructField("_corrupt_record", StringType(), True),  # captures bad rows
+])
+df = spark.read.csv("data.csv", schema=schema, mode="PERMISSIVE",
+                     columnNameOfCorruptRecord="_corrupt_record")
+bad = df.filter(df["_corrupt_record"].isNotNull())
+```
+
+## Reading JSON
+
+```python
+# Each line is a separate JSON object (default - JSONL format)
+df = spark.read.json("data.jsonl")
+
+# Pretty-printed / multi-line JSON files
+df = spark.read.json("data.json", multiLine=True)
+
+# With options
+df = spark.read \
+    .option("multiLine", "true") \
+    .option("allowComments", "true") \
+    .option("allowUnquotedFieldNames", "true") \
+    .json("data.json")
+
+# Schema from JSON (Spark infers nested structure automatically)
+df.printSchema()
+# root
+#  |-- address: struct (nullable = true)
+#  |    |-- city: string (nullable = true)
+#  |    |-- zip: string (nullable = true)
+#  |-- age: long (nullable = true)
+#  |-- name: string (nullable = true)
+
+# Read wildcard
+df = spark.read.json("logs/2024/*/events.json")
+```
+
+### Reading from RDD of JSON strings
+
+```python
+rdd = sc.parallelize(['{"name":"Alice","age":30}', '{"name":"Bob","age":25}'])
+df = spark.read.json(rdd)
+df.show()
+```
+
+## Reading Parquet
+
+Parquet is the **recommended format for PySpark** - columnar, compressed, schema-embedded, and natively optimized.
+
+```python
+# Reading parquet - schema is already embedded, no options needed usually
+df = spark.read.parquet("data.parquet")
+
+# Read partitioned parquet (common pattern from Hive/Delta tables)
+df = spark.read.parquet("s3://bucket/sales/year=2024/month=01/")
+
+# Auto-discover all partitions
+df = spark.read.parquet("s3://bucket/sales/")
+# Spark reads year, month as columns automatically if partitioned in Hive style
+
+# Select specific columns (push-down - only those columns are read from disk)
+df = spark.read.parquet("data.parquet").select("order_id", "amount")
+# Much faster than reading all columns and then selecting!
+
+# Filter push-down (Parquet statistics skip non-matching row groups)
+df = spark.read.parquet("data.parquet").filter("year = 2024")
+```
+
+### Why Parquet for Analytics?
+
+```
+CSV (row-based):                  Parquet (columnar):
+┌────┬────────┬────────┐          Column 'amount' stored together:
+│ id │ amount │  date  │          [100, 200, 150, 300, ...]
+├────┼────────┼────────┤
+│  1 │  100   │ Jan 1  │         To compute SUM(amount):
+│  2 │  200   │ Jan 2  │         CSV: read ALL columns for ALL rows
+│  3 │  150   │ Jan 3  │         Parquet: read ONLY amount column ✅
+│  4 │  300   │ Jan 4  │         → Less I/O, faster queries
+└────┴────────┴────────┘
+```
+
+## Reading ORC
+
+ORC (Optimized Row Columnar) is similar to Parquet - commonly used with Hive.
+
+```python
+# Reading ORC
+df = spark.read.orc("data.orc")
+
+# ORC also supports partition discovery and predicate push-down
+df = spark.read.orc("warehouse/sales/").filter("region = 'APAC'")
+
+# ORC with explicit schema
+df = spark.read.schema(schema).orc("data.orc")
+```
+
+## Reading from Other Sources
+
+```python
+# Delta Lake (Databricks / open source delta-rs)
+df = spark.read.format("delta").load("s3://bucket/delta_table/")
+
+# Hive table (if Hive metastore is configured)
+df = spark.read.table("default.sales")
+# Or equivalently:
+df = spark.sql("SELECT * FROM default.sales")
+
+# JDBC - read from a relational database
+df = spark.read \
+    .format("jdbc") \
+    .option("url", "jdbc:postgresql://host:5432/mydb") \
+    .option("dbtable", "orders") \
+    .option("user", "admin") \
+    .option("password", "secret") \
+    .option("numPartitions", "10") \
+    .option("partitionColumn", "order_id") \
+    .option("lowerBound", "1") \
+    .option("upperBound", "1000000") \
+    .load()
+
+# Avro (requires spark-avro package)
+df = spark.read.format("avro").load("data.avro")
+
+# Text file (each line as one string column)
+df = spark.read.text("log.txt")
+# +--------------------+
+# |               value|
+# +--------------------+
+# |2024-01-01 ERROR ...|
+```
+
+## Format Comparison
+
+| Format | Structure | Schema | Compression | Best For |
+|---|---|---|---|---|
+| CSV | Row-based | None | Optional | Interchange, small data |
+| JSON | Row-based | None (inferred) | Optional | APIs, semi-structured data |
+| Parquet | Columnar | Embedded | Snappy (default) | Analytics, data lakes |
+| ORC | Columnar | Embedded | Zlib/Snappy | Hive ecosystems |
+| Avro | Row-based | Embedded (separate) | Optional | Streaming, Kafka |
+| Delta | Columnar + log | Embedded | Snappy | ACID transactions |
+
+## Inspecting the DataFrame After Reading
+
+```python
+df = spark.read.parquet("sales.parquet")
+
+df.show()              # print first 20 rows
+df.show(5)             # print first 5 rows
+df.show(truncate=False) # don't truncate long strings
+df.printSchema()       # show column names and types
+df.columns             # ['order_id', 'amount', 'date']
+df.dtypes              # [('order_id', 'bigint'), ('amount', 'double'), ...]
+df.count()             # total row count (triggers a full scan)
+df.describe().show()   # summary statistics (count, mean, stddev, min, max)
+```
+
+## Summary
+
+- All formats use `spark.read.<format>(path)` or `spark.read.format().load(path)`
+- **CSV**: use `header=True`, prefer explicit schema over `inferSchema=True` for large files
+- **JSON**: use `multiLine=True` for pretty-printed files; Spark infers nested schemas
+- **Parquet**: preferred format - columnar, compressed, schema-embedded, fastest for analytics
+- **ORC**: similar to Parquet; common in Hive ecosystems
+- Use wildcard paths and partitioned directories for large datasets
+- Parquet and ORC support **predicate/column push-down** - filter and select before reading from disk

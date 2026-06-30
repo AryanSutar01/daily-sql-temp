@@ -1,0 +1,212 @@
+## What Is the GIL?
+
+The Global Interpreter Lock (GIL) is a mutex in CPython (the standard Python interpreter) that allows only **one thread to execute Python bytecode at a time** - even on multi-core processors.
+
+```
+Without GIL:
+  CPU Core 1: Thread A → executing Python
+  CPU Core 2: Thread B → executing Python simultaneously
+
+With GIL (CPython):
+  CPU Core 1: Thread A → executing Python
+  CPU Core 2: Thread B → WAITING for GIL
+  (only one thread runs Python bytecode at any moment)
+```
+
+## Why Does the GIL Exist?
+
+CPython uses reference counting for memory management. Without protection, two threads modifying an object's reference count simultaneously could corrupt memory.
+
+The GIL is a simple, global lock that prevents this - at the cost of true parallelism:
+
+```python
+import sys
+
+# Reference counting is NOT thread-safe without the GIL
+a = []
+# Thread 1: reads ref count → 1
+# Thread 2: reads ref count → 1
+# Thread 1: increments → writes 2
+# Thread 2: increments → writes 2 (should be 3!)
+# Memory corruption → segfault
+
+# The GIL prevents this by ensuring only one thread runs at a time
+```
+
+## What the GIL Does and Doesn't Block
+
+```
+GIL DOES block:
+  CPU-bound tasks running in multiple threads
+  → heavy computation, data processing, math
+  → threading gives NO speedup here
+
+GIL does NOT block:
+  I/O-bound tasks
+  → file reads, network calls, database queries
+  → the GIL is RELEASED while waiting for I/O
+  → threading DOES help here
+
+  C extensions that release the GIL
+  → NumPy, Pandas, SciPy release the GIL for numeric operations
+  → Those run in true parallel
+```
+
+## Demonstrating the GIL's Effect
+
+```python
+import threading
+import time
+
+def cpu_task(n):
+    """CPU-bound - pure Python computation"""
+    count = 0
+    for _ in range(n):
+        count += 1
+    return count
+
+# Single thread
+start = time.time()
+cpu_task(50_000_000)
+single = time.time() - start
+
+# Two threads - GIL means no actual parallelism
+start = time.time()
+t1 = threading.Thread(target=cpu_task, args=(25_000_000,))
+t2 = threading.Thread(target=cpu_task, args=(25_000_000,))
+t1.start(); t2.start()
+t1.join(); t2.join()
+threaded = time.time() - start
+
+print(f"Single:  {single:.2f}s")
+print(f"Threaded:{threaded:.2f}s")
+# Threaded may be SLOWER than single due to GIL contention overhead!
+```
+
+```python
+import threading, time, requests
+
+def io_task(url):
+    """I/O-bound - GIL released during network wait"""
+    requests.get(url)
+
+urls = ["https://httpbin.org/delay/1"] * 5
+
+# Sequential - takes ~5 seconds
+start = time.time()
+for url in urls:
+    io_task(url)
+print(f"Sequential: {time.time()-start:.1f}s")  # ~5s
+
+# Threaded - takes ~1 second (GIL released during I/O)
+start = time.time()
+threads = [threading.Thread(target=io_task, args=(url,)) for url in urls]
+for t in threads: t.start()
+for t in threads: t.join()
+print(f"Threaded: {time.time()-start:.1f}s")    # ~1s
+```
+
+## Working Around the GIL
+
+### For CPU-bound tasks - use multiprocessing
+
+```python
+from multiprocessing import Pool
+import time
+
+def cpu_task(n):
+    return sum(i**2 for i in range(n))
+
+# Each process has its own Python interpreter and GIL
+# True parallelism across CPU cores
+with Pool(processes=4) as pool:
+    results = pool.map(cpu_task, [1_000_000] * 4)
+```
+
+### For I/O-bound tasks - use threading or asyncio
+
+```python
+# Threading - fine for I/O (GIL released during I/O wait)
+import threading
+threads = [threading.Thread(target=fetch, args=(url,)) for url in urls]
+
+# asyncio - even better for I/O (no threads, event loop)
+import asyncio, aiohttp
+
+async def fetch_all(urls):
+    async with aiohttp.ClientSession() as session:
+        tasks = [session.get(url) for url in urls]
+        return await asyncio.gather(*tasks)
+```
+
+### Use C Extensions That Release the GIL
+
+```python
+import numpy as np
+
+# NumPy releases the GIL for most operations
+# → NumPy computations in multiple threads CAN run in parallel
+arr = np.random.rand(1_000_000)
+result = np.sum(arr)   # runs in C, GIL released
+```
+
+## Decision Tree
+
+```
+Task Type?
+├── I/O-bound (network, disk, DB)
+│   ├── Many connections → asyncio (lowest overhead)
+│   └── Simple concurrency → threading
+│
+└── CPU-bound (computation, data processing)
+    ├── Pure Python loops → multiprocessing
+    ├── NumPy / Pandas → threading (GIL released in C extensions)
+    └── Need to share memory → multiprocessing with Manager/Queue
+```
+
+## The GIL in Other Python Implementations
+
+```
+CPython    → Has the GIL (standard Python)
+PyPy       → Has a GIL (but JIT compilation makes it faster overall)
+Jython     → No GIL (runs on JVM - true thread parallelism)
+IronPython → No GIL (runs on .NET CLR)
+```
+
+## Python 3.13 - Per-Interpreter GIL (Upcoming)
+
+Python 3.12+ introduced experimental support for running multiple interpreters with separate GILs in one process - enabling true CPU parallelism without the overhead of `multiprocessing`. This is accessed via `interpreters` module (still experimental as of Python 3.13).
+
+```python
+# Future / experimental - Python 3.12+
+import _interpreters  # experimental module
+# Each interpreter has its own GIL - true parallelism possible
+```
+
+## Interview Questions
+
+**Q: What is the GIL?**
+The Global Interpreter Lock (GIL) is a mutex in CPython that ensures only one thread executes Python bytecode at a time, even on multi-core machines. It exists to protect CPython's reference counting memory management from race conditions.
+
+**Q: Does the GIL affect all Python programs?**
+It depends on the workload. I/O-bound programs (network, disk) are barely affected - the GIL is released during I/O waits, so threads can overlap. CPU-bound programs suffer - threads can't truly run in parallel. Use `multiprocessing` for CPU-bound parallelism.
+
+**Q: How do you achieve true parallelism in Python?**
+Use `multiprocessing` - each process has its own Python interpreter with its own GIL. Processes run truly in parallel across CPU cores. For I/O-bound work, `threading` or `asyncio` are sufficient since the GIL is released during I/O.
+
+**Q: Does the GIL affect NumPy?**
+Not significantly. NumPy releases the GIL during most numerical operations (executed in C), allowing true parallel execution with threads. This is why data science workloads with NumPy/Pandas can benefit from threading even in CPython.
+
+**Q: Why doesn't Python just remove the GIL?**
+Several attempts have been made. Removing the GIL requires replacing reference counting with thread-safe alternatives, which significantly slows down single-threaded programs. The Python community has been cautious because most Python code is single-threaded - the performance regression would affect everyone. Python 3.13 is experimenting with per-interpreter GILs as a middle ground.
+
+## Summary
+
+- The **GIL** is a mutex in CPython allowing only one thread to run Python bytecode at a time
+- It exists to protect **reference counting** from race conditions
+- **I/O-bound**: GIL released during I/O waits → threading and asyncio work well
+- **CPU-bound**: GIL blocks true parallelism → use `multiprocessing` instead
+- **C extensions** (NumPy, Pandas) release the GIL → threading works for numerical code
+- Only affects **CPython** - Jython and IronPython have no GIL
+- The decision tree: I/O → threading/asyncio; CPU (pure Python) → multiprocessing; CPU (NumPy) → threading
+- Python 3.12+ experimenting with per-interpreter GIL for true thread parallelism

@@ -1,0 +1,265 @@
+## When to Scrape
+
+Web scraping extracts data from HTML pages. Use it when:
+- No API is available
+- The API is too expensive or restricted
+- You need historical data not exposed via API
+
+Always check a site's `robots.txt` and Terms of Service before scraping.
+
+```bash
+pip install requests beautifulsoup4 lxml
+pip install selenium webdriver-manager   # for JS-rendered pages
+```
+
+## BeautifulSoup - Static HTML Scraping
+
+BeautifulSoup parses HTML and lets you navigate and search the document tree.
+
+```python
+import requests
+from bs4 import BeautifulSoup
+
+url = "https://books.toscrape.com"
+response = requests.get(url, timeout=10)
+soup = BeautifulSoup(response.text, "lxml")   # or "html.parser"
+
+print(soup.title.text)   # Page title
+```
+
+## Finding Elements
+
+```python
+# Find first matching element
+soup.find("h1")
+soup.find("div", class_="product")
+soup.find("a", href=True)
+soup.find(id="main-content")
+
+# Find ALL matching elements - returns a list
+soup.find_all("li")
+soup.find_all("a", class_="nav-link")
+soup.find_all("div", {"class": "product-card"})
+
+# CSS selectors - most flexible
+soup.select("div.product > h2")      # h2 directly inside div.product
+soup.select("ul li a")               # a inside li inside ul
+soup.select_one("#price")            # single element by id
+soup.select("input[type='text']")    # attribute selector
+```
+
+## Extracting Data
+
+```python
+element = soup.find("h2", class_="title")
+
+element.text          # inner text (with whitespace)
+element.get_text(strip=True)   # text with leading/trailing whitespace removed
+element["href"]       # attribute value
+element.get("href", "")   # attribute with default if missing
+
+# Tag navigation
+element.parent        # parent element
+element.children      # direct children (generator)
+element.siblings      # all siblings
+element.next_sibling  # next sibling
+```
+
+## Full Scraping Example - Books
+
+```python
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+
+def scrape_books(base_url: str, pages: int = 3) -> pd.DataFrame:
+    books = []
+
+    for page in range(1, pages + 1):
+        url = f"{base_url}/catalogue/page-{page}.html"
+        response = requests.get(url, timeout=10)
+        soup = BeautifulSoup(response.text, "lxml")
+
+        for article in soup.select("article.product_pod"):
+            title = article.select_one("h3 a")["title"]
+            price = article.select_one("p.price_color").get_text(strip=True)
+            rating = article.select_one("p.star-rating")["class"][1]
+            availability = article.select_one("p.availability").get_text(strip=True)
+
+            books.append({
+                "title": title,
+                "price": float(price.replace("£", "")),
+                "rating": rating,
+                "available": availability == "In stock",
+            })
+
+        print(f"Page {page}: scraped {len(soup.select('article.product_pod'))} books")
+
+    return pd.DataFrame(books)
+
+df = scrape_books("https://books.toscrape.com")
+print(df.head())
+```
+
+## Handling Headers & Rate Limiting
+
+```python
+import time
+import requests
+from bs4 import BeautifulSoup
+
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+def polite_get(url: str, delay: float = 1.0) -> BeautifulSoup:
+    time.sleep(delay)   # be respectful - don't hammer the server
+    response = requests.get(url, headers=headers, timeout=10)
+    response.raise_for_status()
+    return BeautifulSoup(response.text, "lxml")
+```
+
+## Selenium - JavaScript-Rendered Pages
+
+Some pages load content via JavaScript after the initial HTML is served. BeautifulSoup sees the empty HTML - Selenium launches a real browser and waits for JS to run.
+
+```python
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
+
+# Headless Chrome - no visible browser window
+options = Options()
+options.add_argument("--headless")
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
+
+driver = webdriver.Chrome(
+    service=Service(ChromeDriverManager().install()),
+    options=options,
+)
+```
+
+## Selenium - Finding & Interacting with Elements
+
+```python
+driver.get("https://example.com")
+
+# Find elements
+driver.find_element(By.ID, "search-box")
+driver.find_element(By.CLASS_NAME, "product-title")
+driver.find_element(By.CSS_SELECTOR, "div.card > h2")
+driver.find_element(By.XPATH, "//button[text()='Submit']")
+driver.find_elements(By.TAG_NAME, "li")   # all matching elements
+
+# Interactions
+element = driver.find_element(By.ID, "search-box")
+element.send_keys("Python books")    # type into input
+element.clear()                       # clear input
+element.click()                       # click
+
+driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+```
+
+## Selenium - Waiting for Elements
+
+```python
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+wait = WebDriverWait(driver, timeout=10)
+
+# Wait until element is visible
+element = wait.until(
+    EC.visibility_of_element_located((By.CSS_SELECTOR, ".results-list"))
+)
+
+# Wait until element is clickable
+button = wait.until(
+    EC.element_to_be_clickable((By.ID, "load-more"))
+)
+button.click()
+
+# Wait until text appears
+wait.until(EC.text_to_be_present_in_element((By.ID, "status"), "Complete"))
+```
+
+## Selenium - Full Example
+
+```python
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+import pandas as pd
+
+def scrape_with_selenium(url: str) -> pd.DataFrame:
+    options = Options()
+    options.add_argument("--headless")
+
+    driver = webdriver.Chrome(options=options)
+    results = []
+
+    try:
+        driver.get(url)
+
+        wait = WebDriverWait(driver, 10)
+        wait.until(EC.presence_of_element_located((By.CLASS_NAME, "product-card")))
+
+        cards = driver.find_elements(By.CLASS_NAME, "product-card")
+        for card in cards:
+            results.append({
+                "name": card.find_element(By.CLASS_NAME, "name").text,
+                "price": card.find_element(By.CLASS_NAME, "price").text,
+            })
+
+    finally:
+        driver.quit()   # always close the browser
+
+    return pd.DataFrame(results)
+```
+
+## Parsing Tables Directly with Pandas
+
+For pages with `<table>` tags, pandas can parse HTML directly:
+
+```python
+import pandas as pd
+
+tables = pd.read_html("https://en.wikipedia.org/wiki/List_of_countries_by_GDP")
+df = tables[0]   # first table on the page
+print(df.head())
+```
+
+## Interview Questions
+
+**Q: What is the difference between BeautifulSoup and Selenium?**
+BeautifulSoup parses static HTML - it's fast and lightweight but can't execute JavaScript. Selenium drives a real browser and can interact with dynamic, JavaScript-rendered pages, fill forms, click buttons, and wait for async content to load. Use BeautifulSoup for simple static pages; use Selenium when JavaScript renders the content.
+
+**Q: How do you avoid getting blocked while scraping?**
+Add delays between requests (`time.sleep()`), set realistic `User-Agent` headers, avoid scraping during peak hours, respect `robots.txt`, use session objects to reuse connections, and rotate IPs with a proxy pool if needed. Always check the site's Terms of Service.
+
+**Q: What is `WebDriverWait` in Selenium?**
+`WebDriverWait` pauses execution until a specific condition is true - like an element becoming visible or clickable. Without it, Selenium may try to interact with an element before JavaScript has rendered it, causing `NoSuchElementException`. It's essential for scraping dynamic pages.
+
+**Q: When would you use `pd.read_html()` instead of BeautifulSoup?**
+`pd.read_html()` is the fastest way to extract `<table>` elements from a page - it returns a list of DataFrames directly. Use it when the page has a well-structured HTML table. Use BeautifulSoup for complex extraction from non-table HTML structures.
+
+**Q: What are the ethical considerations of web scraping?**
+Check `robots.txt` to see which paths are disallowed. Review the Terms of Service - many sites prohibit scraping. Add delays to avoid overloading servers. Don't scrape personal data without authorization. Prefer official APIs when available.
+
+## Summary
+
+- **BeautifulSoup** - parse static HTML; use `find()`, `find_all()`, `select()` to extract elements
+- `soup.select("div.card > h2")` - CSS selectors are the most flexible way to find elements
+- **Selenium** - automates a real browser; use when the page requires JavaScript
+- `WebDriverWait` - always wait for elements before interacting, avoid `time.sleep()` guesses
+- Always call `driver.quit()` in a `finally` block to close the browser
+- `pd.read_html(url)` - instant DataFrame from an HTML `<table>`
+- Be polite: add delays, set User-Agent headers, respect robots.txt and ToS

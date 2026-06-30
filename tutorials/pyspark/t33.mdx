@@ -1,0 +1,353 @@
+# Structured Streaming Basics
+
+## What is Structured Streaming?
+
+**Structured Streaming** is Spark's built-in stream processing engine. It lets you write the same DataFrame/SQL code you use for batch processing, and run it on **continuously arriving data** - treating a live data stream as an unbounded table that keeps growing.
+
+The key insight: instead of writing two separate pipelines (one for batch, one for streaming), you write one query and Spark handles the execution incrementally as new data arrives.
+
+---
+
+## Core Concept: Streaming as a Table
+
+```
+Streaming Input (e.g., Kafka topic):
+
+  Time ──────────────────────────────────────────────────→
+       [row1] [row2] [row3]        [row4] [row5]   [row6] ...
+         t=1    t=2    t=3           t=10   t=11     t=15
+
+Structured Streaming treats this as an unbounded table:
+
+  ┌────────────────────────────────────────┐
+  │       Unbounded Input Table            │
+  │  row1                                  │
+  │  row2                                  │
+  │  row3          ← New rows keep coming  │
+  │  row4                                  │
+  │  ...                                   │
+  └────────────────────────────────────────┘
+
+Your query runs continuously on this growing table
+and writes results to an output sink.
+```
+
+---
+
+## Reading a Stream
+
+### From Socket (for testing/learning)
+
+```python
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("StreamingDemo").getOrCreate()
+
+# Read from a socket (good for local testing)
+# In terminal: nc -lk 9999   then type text
+df_stream = spark.readStream \
+    .format("socket") \
+    .option("host", "localhost") \
+    .option("port", 9999) \
+    .load()
+
+df_stream.printSchema()
+# root
+#  |-- value: string (nullable = true)
+```
+
+### From Kafka
+
+```python
+df_kafka = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "kafka-broker:9092") \
+    .option("subscribe", "orders_topic") \
+    .option("startingOffsets", "latest") \
+    .load()
+
+# Kafka gives you raw bytes - parse the JSON value
+from pyspark.sql.functions import from_json, col
+from pyspark.sql.types import StructType, StringType, IntegerType, DoubleType
+
+schema = StructType() \
+    .add("order_id", StringType()) \
+    .add("customer_id", StringType()) \
+    .add("amount", DoubleType()) \
+    .add("timestamp", StringType())
+
+df_parsed = df_kafka \
+    .select(from_json(col("value").cast("string"), schema).alias("data")) \
+    .select("data.*")
+```
+
+### From File Source (Auto-ingest new files)
+
+```python
+df_files = spark.readStream \
+    .format("parquet") \
+    .schema(my_schema) \
+    .load("s3://my-bucket/incoming-data/")
+# Spark monitors this directory and processes new files as they arrive
+```
+
+---
+
+## Transformations on Streams
+
+All standard DataFrame transformations work on streams:
+
+```python
+# Filter and select
+df_result = df_parsed \
+    .filter("amount > 100") \
+    .select("order_id", "customer_id", "amount")
+
+# Aggregations (with or without watermark)
+from pyspark.sql.functions import count, sum
+
+df_aggregated = df_parsed \
+    .groupBy("customer_id") \
+    .agg(
+        count("order_id").alias("order_count"),
+        sum("amount").alias("total_amount")
+    )
+```
+
+---
+
+## Writing a Stream (Output Sinks)
+
+### Write to Console (for debugging)
+
+```python
+query = df_result.writeStream \
+    .format("console") \
+    .outputMode("append") \
+    .option("truncate", False) \
+    .start()
+
+query.awaitTermination()
+```
+
+### Write to Files (Parquet/Delta)
+
+```python
+query = df_result.writeStream \
+    .format("parquet") \
+    .option("path", "s3://my-bucket/output/") \
+    .option("checkpointLocation", "s3://my-bucket/checkpoints/stream1/") \
+    .outputMode("append") \
+    .trigger(processingTime="1 minute") \
+    .start()
+```
+
+### Write to Delta Lake
+
+```python
+query = df_aggregated.writeStream \
+    .format("delta") \
+    .option("path", "s3://my-bucket/delta/order_aggs/") \
+    .option("checkpointLocation", "s3://my-bucket/checkpoints/agg-stream/") \
+    .outputMode("complete") \
+    .trigger(processingTime="30 seconds") \
+    .start()
+```
+
+### Write to Kafka
+
+```python
+from pyspark.sql.functions import to_json, struct
+
+df_to_kafka = df_result.select(
+    to_json(struct("*")).alias("value")
+)
+
+query = df_to_kafka.writeStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "kafka-broker:9092") \
+    .option("topic", "output_topic") \
+    .option("checkpointLocation", "s3://checkpoints/kafka-sink/") \
+    .start()
+```
+
+---
+
+## Output Modes
+
+Output mode defines **what data is written** to the sink after each trigger:
+
+| Mode | Description | Use case |
+|---|---|---|
+| `append` | Only new rows added since last trigger | Row-level operations (filter, select) |
+| `complete` | Full result table each trigger | Aggregations (whole result replaces previous) |
+| `update` | Only changed rows since last trigger | Aggregations (only updated rows) |
+
+```python
+# Append: only new matching rows
+df_filtered.writeStream.outputMode("append")...
+
+# Complete: all aggregated results (for running totals, counts)
+df_grouped.writeStream.outputMode("complete")...
+
+# Update: only rows that changed (efficient for large aggregation tables)
+df_grouped.writeStream.outputMode("update")...
+```
+
+---
+
+## Triggers
+
+Trigger controls how often the streaming query processes new data:
+
+```python
+# Process new data every 30 seconds
+.trigger(processingTime="30 seconds")
+
+# Process as fast as possible (default - runs mini-batches continuously)
+.trigger(processingTime="0 seconds")
+
+# Once: process all available data once, then stop (batch + stream hybrid)
+.trigger(once=True)
+
+# Available in Spark 3.3+: process one micro-batch and stop
+.trigger(availableNow=True)
+```
+
+---
+
+## Watermarks - Handling Late Data
+
+In real streams, data can arrive late (network delays, retries). **Watermarks** tell Spark how long to wait for late data before closing a time window.
+
+```python
+from pyspark.sql.functions import window, col, to_timestamp
+
+df_with_ts = df_parsed.withColumn("event_time", to_timestamp("timestamp"))
+
+# Watermark: wait up to 10 minutes for late data
+df_windowed = df_with_ts \
+    .withWatermark("event_time", "10 minutes") \
+    .groupBy(
+        window(col("event_time"), "5 minutes"),   # 5-minute tumbling window
+        col("customer_id")
+    ) \
+    .agg(sum("amount").alias("revenue"))
+
+query = df_windowed.writeStream \
+    .format("delta") \
+    .option("checkpointLocation", "s3://checkpoints/windowed/") \
+    .outputMode("append") \
+    .start()
+```
+
+### Window types:
+```python
+# Tumbling window: non-overlapping fixed windows
+window(col("event_time"), "5 minutes")
+
+# Sliding window: overlapping windows
+window(col("event_time"), "10 minutes", "5 minutes")  # 10-min window, slide every 5 min
+
+# Session window (Spark 3.2+): gaps determine window boundaries
+session_window(col("event_time"), "10 minutes")  # New window after 10 min of inactivity
+```
+
+---
+
+## Checkpointing in Streaming (Required)
+
+Unlike batch checkpointing, streaming checkpointing is **mandatory for recovery**. It stores:
+- The current offset in the source (e.g., Kafka partition offset)
+- State for stateful operations (counts, aggregations)
+
+```python
+query = df_aggregated.writeStream \
+    .format("delta") \
+    .option("checkpointLocation", "s3://my-bucket/checkpoints/my-stream/") \
+    .start()
+# If the query fails and restarts, it resumes from exactly where it left off
+```
+
+---
+
+## Complete End-to-End Example
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import from_json, col, sum, window, to_timestamp
+from pyspark.sql.types import StructType, StringType, DoubleType
+
+spark = SparkSession.builder \
+    .appName("OrderRevenueStream") \
+    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+    .getOrCreate()
+
+# Schema for incoming Kafka messages
+schema = StructType() \
+    .add("order_id", StringType()) \
+    .add("region", StringType()) \
+    .add("amount", DoubleType()) \
+    .add("event_time", StringType())
+
+# Read from Kafka
+raw_stream = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "kafka:9092") \
+    .option("subscribe", "orders") \
+    .load()
+
+# Parse JSON
+orders = raw_stream \
+    .select(from_json(col("value").cast("string"), schema).alias("d")) \
+    .select("d.*") \
+    .withColumn("event_time", to_timestamp("event_time"))
+
+# Aggregate: revenue by region per 5-minute window, watermark 10 min
+revenue_stream = orders \
+    .withWatermark("event_time", "10 minutes") \
+    .groupBy(
+        window("event_time", "5 minutes"),
+        col("region")
+    ) \
+    .agg(sum("amount").alias("total_revenue"))
+
+# Write to Delta Lake every 1 minute
+query = revenue_stream.writeStream \
+    .format("delta") \
+    .option("path", "s3://bucket/delta/revenue_by_region/") \
+    .option("checkpointLocation", "s3://bucket/checkpoints/revenue-stream/") \
+    .outputMode("append") \
+    .trigger(processingTime="1 minute") \
+    .start()
+
+query.awaitTermination()
+```
+
+---
+
+## Interview Tips 🎯
+
+> **Q: What is Structured Streaming in PySpark?**
+
+**Answer:** Structured Streaming is Spark's stream processing framework that treats a live data stream as an unbounded table. You write the same DataFrame transformations you'd use for batch processing, and Spark executes them incrementally as new data arrives in micro-batches. It supports Kafka, file sources, Delta Lake, and more.
+
+> **Q: What are output modes in Structured Streaming?**
+
+**Answer:** Output mode controls what data is written to the sink after each trigger. `append` writes only new rows (used for stateless operations like filter/select). `complete` writes the entire result table (used for aggregations where you want the full current state). `update` writes only the rows that changed since the last trigger (efficient for aggregations when you don't need the full table each time).
+
+> **Q: What is a watermark in Structured Streaming?**
+
+**Answer:** A watermark defines how long Spark should wait for late-arriving data before closing a time window. For example, `withWatermark("event_time", "10 minutes")` tells Spark that data arriving more than 10 minutes late relative to the maximum observed event time will be dropped. This is needed when computing window aggregations - without a watermark, Spark would have to keep all state indefinitely to handle infinitely late data.
+
+---
+
+## Summary
+
+- **Structured Streaming** treats streams as unbounded tables - use DataFrame API on live data
+- **Sources**: Kafka, files (S3/HDFS), socket (testing)
+- **Sinks**: console (debug), files, Kafka, Delta Lake
+- **Output modes**: `append` (new rows), `complete` (full result), `update` (changed rows)
+- **Triggers**: control micro-batch frequency (every N seconds, continuous, once)
+- **Watermarks**: handle late data in windowed aggregations
+- **Checkpointing** is mandatory for streaming - enables exactly-once recovery

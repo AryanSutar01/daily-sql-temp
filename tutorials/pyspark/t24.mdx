@@ -1,0 +1,221 @@
+## What partitionBy Does in a Window
+
+`partitionBy()` in a `WindowSpec` is NOT the same as `df.repartition()` - it defines the **logical grouping** within which the window function operates. Each partition is an isolated calculation scope.
+
+```
+Without partitionBy (entire DataFrame is one window):
+ALL rows ranked together globally
+  Alice  110000  rank=1
+  Carol  105000  rank=2
+  Bob     95000  rank=3
+  Dave    80000  rank=4
+  Eve     70000  rank=5
+
+With partitionBy("dept"):
+Ranking resets per department
+  Alice  Eng  110000  rank=1  ← rank 1 in Engineering
+  Carol  Eng  105000  rank=2
+  Bob    Eng   95000  rank=3
+  Dave   Mkt   80000  rank=1  ← rank 1 in Marketing (reset!)
+  Eve    Mkt   70000  rank=2
+```
+
+## Setup
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, rank, sum as spark_sum, avg, lag, first, last
+from pyspark.sql.window import Window
+
+spark = SparkSession.builder.appName("PartitionByWindow").getOrCreate()
+
+df = spark.createDataFrame([
+    ("Alice", "Engineering", "2024-01", 110000),
+    ("Bob",   "Engineering", "2024-02",  95000),
+    ("Carol", "Engineering", "2024-03", 105000),
+    ("Dave",  "Marketing",   "2024-01",  80000),
+    ("Eve",   "Marketing",   "2024-02",  70000),
+    ("Frank", "Marketing",   "2024-03",  75000),
+], ["name", "dept", "month", "salary"])
+```
+
+## No partitionBy - Global Window
+
+```python
+# Global ranking - all rows in one window
+global_window = Window.orderBy(col("salary").desc())
+
+df.withColumn("global_rank", rank().over(global_window)).show()
+# +-----+-----------+-------+------+-----------+
+# | name|       dept|  month|salary|global_rank|
+# +-----+-----------+-------+------+-----------+
+# |Alice|Engineering|2024-01|110000|          1|
+# |Carol|Engineering|2024-03|105000|          2|
+# |  Bob|Engineering|2024-02| 95000|          3|
+# | Dave|  Marketing|2024-01| 80000|          4|
+# |Frank|  Marketing|2024-03| 75000|          5|
+# |  Eve|  Marketing|2024-02| 70000|          6|
+# +-----+-----------+-------+------+-----------+
+```
+
+## Single-Column partitionBy
+
+```python
+# Rank within each department independently
+dept_window = Window.partitionBy("dept").orderBy(col("salary").desc())
+
+df.withColumn("dept_rank", rank().over(dept_window)).show()
+# +-----+-----------+-------+------+---------+
+# | name|       dept|  month|salary|dept_rank|
+# +-----+-----------+-------+------+---------+
+# |Alice|Engineering|2024-01|110000|        1|  ← Eng rank 1
+# |Carol|Engineering|2024-03|105000|        2|
+# |  Bob|Engineering|2024-02| 95000|        3|
+# | Dave|  Marketing|2024-01| 80000|        1|  ← Mkt rank 1 (reset)
+# |Frank|  Marketing|2024-03| 75000|        2|
+# |  Eve|  Marketing|2024-02| 70000|        3|
+# +-----+-----------+-------+------+---------+
+```
+
+## Multi-Column partitionBy
+
+```python
+# Partition by both dept AND year (if data spanned multiple years)
+yearly_dept_window = Window.partitionBy("dept", "year").orderBy("month")
+
+# Use case: running totals per dept per year
+```
+
+## Running Total with partitionBy + rowsBetween
+
+```python
+# Running sum of salary within each dept, ordered by month
+running_window = Window \
+    .partitionBy("dept") \
+    .orderBy("month") \
+    .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+
+df.withColumn("running_total",
+    spark_sum("salary").over(running_window)
+).show()
+# +-----+-----------+-------+------+-------------+
+# | name|       dept|  month|salary|running_total|
+# +-----+-----------+-------+------+-------------+
+# |Alice|Engineering|2024-01|110000|       110000|
+# |  Bob|Engineering|2024-02| 95000|       205000|
+# |Carol|Engineering|2024-03|105000|       310000|
+# | Dave|  Marketing|2024-01| 80000|        80000|  ← resets for Marketing
+# |  Eve|  Marketing|2024-02| 70000|       150000|
+# |Frank|  Marketing|2024-03| 75000|       225000|
+# +-----+-----------+-------+------+-------------+
+```
+
+## Frame Specification: rowsBetween and rangeBetween
+
+The window frame defines which rows to include in each calculation:
+
+```python
+# Frame boundaries
+Window.unboundedPreceding   # = first row in partition
+Window.currentRow           # = current row
+Window.unboundedFollowing   # = last row in partition
+
+# Common frames:
+# All rows from start to current row (running total)
+Window.partitionBy("dept").orderBy("month") \
+      .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+
+# All rows in the partition (equivalent to groupBy aggregate)
+Window.partitionBy("dept") \
+      .rowsBetween(Window.unboundedPreceding, Window.unboundedFollowing)
+
+# Rolling 3-row window (current + 2 previous rows)
+Window.partitionBy("dept").orderBy("month") \
+      .rowsBetween(-2, Window.currentRow)
+
+# Rolling window centered on current row (1 before + current + 1 after)
+Window.partitionBy("dept").orderBy("month") \
+      .rowsBetween(-1, 1)
+```
+
+### rowsBetween vs rangeBetween
+
+```python
+# rowsBetween: counts by physical row positions
+# rangeBetween: counts by value distance from current row's orderBy column
+
+data = spark.createDataFrame([
+    (1, 100), (2, 100), (3, 200), (4, 300)
+], ["id", "value"])
+
+w_rows  = Window.orderBy("id").rowsBetween(-1, 0)   # 1 physical row before
+w_range = Window.orderBy("value").rangeBetween(-50, 0)  # values within 50 below current
+
+# rowsBetween(-1, 0): always includes exactly 2 rows (current + previous)
+# rangeBetween(-50, 0): includes all rows where value >= (current - 50)
+```
+
+## Complete Example: Multiple Window Specs on Same DataFrame
+
+```python
+# Define multiple windows
+dept_salary_window   = Window.partitionBy("dept").orderBy(col("salary").desc())
+dept_month_window    = Window.partitionBy("dept").orderBy("month")
+dept_running_window  = Window.partitionBy("dept").orderBy("month") \
+                             .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+
+result = df \
+    .withColumn("salary_rank_in_dept", rank().over(dept_salary_window)) \
+    .withColumn("prev_salary",         lag("salary", 1).over(dept_month_window)) \
+    .withColumn("running_total",       spark_sum("salary").over(dept_running_window)) \
+    .withColumn("dept_avg",            avg("salary").over(Window.partitionBy("dept"))) \
+    .withColumn("pct_of_dept_total",
+        spark_round(col("salary") / spark_sum("salary").over(Window.partitionBy("dept")) * 100, 1)
+    )
+
+result.show()
+```
+
+## Key Rules for Window partitionBy
+
+```python
+# Rule 1: partitionBy without orderBy - entire partition is the frame
+# Useful for: department total, department average alongside each row
+dept_total_window = Window.partitionBy("dept")
+df.withColumn("dept_total", spark_sum("salary").over(dept_total_window)).show()
+
+# Rule 2: orderBy without partitionBy - entire DataFrame is one partition
+# Useful for: global running total, global rank
+global_running = Window.orderBy("month")
+df.withColumn("global_running_total", spark_sum("salary").over(global_running)).show()
+
+# Rule 3: Both partitionBy and orderBy - the most common combination
+# Useful for: rank within group, running total per group, lag within group
+full_window = Window.partitionBy("dept").orderBy("month")
+df.withColumn("dept_running", spark_sum("salary").over(full_window)).show()
+```
+
+## Interview Question: Percent of Department Total
+
+```python
+# Each employee's salary as % of their department's total
+Window.partitionBy("dept") - no orderBy needed (aggregate over whole partition)
+
+dept_window = Window.partitionBy("dept")
+
+df.withColumn("dept_total", spark_sum("salary").over(dept_window)) \
+  .withColumn("pct_of_dept",
+    round(col("salary") / col("dept_total") * 100, 1)
+  ) \
+  .show()
+```
+
+## Summary
+
+- `partitionBy("col")` in a WindowSpec defines the **calculation scope** - like GROUP BY but without collapsing rows
+- No `partitionBy` → entire DataFrame is one window
+- Single column `partitionBy` → calculation resets per unique value
+- Multi-column `partitionBy` → calculation resets per unique combination
+- `rowsBetween` / `rangeBetween` control which rows in the partition are included in each frame calculation
+- Combine multiple WindowSpecs in one DataFrame for rich analytical output
+- `partitionBy` without `orderBy` computes aggregate over the whole partition (e.g., dept total, dept avg)

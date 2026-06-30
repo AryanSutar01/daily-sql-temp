@@ -1,0 +1,259 @@
+## The Problem with Plain Classes
+
+Storing structured data in a plain class requires a lot of boilerplate:
+
+```python
+class Point:
+    def __init__(self, x, y, z):
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def __repr__(self):
+        return f"Point(x={self.x}, y={self.y}, z={self.z})"
+
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y and self.z == other.z
+```
+
+Python gives you two cleaner alternatives: `dataclass` and `NamedTuple`.
+
+## dataclasses
+
+The `@dataclass` decorator auto-generates `__init__`, `__repr__`, and `__eq__` from field annotations.
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Point:
+    x: float
+    y: float
+    z: float = 0.0   # default value
+
+p1 = Point(1.0, 2.0)
+p2 = Point(1.0, 2.0)
+
+print(p1)          # Point(x=1.0, y=2.0, z=0.0)
+print(p1 == p2)    # True - __eq__ is auto-generated
+```
+
+### Field Options
+
+```python
+from dataclasses import dataclass, field
+
+@dataclass
+class Order:
+    order_id: int
+    customer: str
+    items: list = field(default_factory=list)   # mutable defaults must use field()
+    total: float = field(default=0.0, repr=False)   # excluded from __repr__
+    _internal: str = field(default="", init=False)   # not in __init__
+
+o = Order(order_id=1, customer="Alice")
+print(o)   # Order(order_id=1, customer='Alice', items=[])
+```
+
+### Frozen Dataclasses (Immutable)
+
+```python
+@dataclass(frozen=True)
+class Config:
+    host: str
+    port: int
+    debug: bool = False
+
+cfg = Config(host="localhost", port=5432)
+cfg.port = 8080   # raises FrozenInstanceError - immutable
+
+# Frozen dataclasses are hashable - can be used as dict keys or in sets
+configs = {cfg: "primary"}
+```
+
+### Ordering
+
+```python
+@dataclass(order=True)
+class Product:
+    price: float
+    name: str
+
+products = [Product(29.99, "Pen"), Product(9.99, "Book"), Product(49.99, "Bag")]
+print(sorted(products))
+# [Product(price=9.99, name='Book'), Product(price=29.99, name='Pen'), Product(price=49.99, name='Bag')]
+```
+
+### Post-init Processing
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Circle:
+    radius: float
+    area: float = field(init=False)
+
+    def __post_init__(self):
+        if self.radius < 0:
+            raise ValueError("Radius cannot be negative")
+        self.area = 3.14159 * self.radius ** 2
+
+c = Circle(radius=5.0)
+print(c.area)   # 78.53975
+```
+
+### dataclass Utility Functions
+
+```python
+from dataclasses import dataclass, asdict, astuple, replace, fields
+
+@dataclass
+class User:
+    name: str
+    age: int
+    email: str
+
+u = User("Alice", 30, "alice@example.com")
+
+asdict(u)     # {'name': 'Alice', 'age': 30, 'email': 'alice@example.com'}
+astuple(u)    # ('Alice', 30, 'alice@example.com')
+
+# Create a modified copy without changing original
+u2 = replace(u, age=31)
+print(u2)   # User(name='Alice', age=31, email='alice@example.com')
+
+# Inspect fields
+for f in fields(u):
+    print(f.name, f.type)
+```
+
+## NamedTuple
+
+`NamedTuple` gives you a tuple with named fields - immutable, memory-efficient, and supports indexing.
+
+```python
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x: float
+    y: float
+    z: float = 0.0
+
+p = Point(1.0, 2.0)
+print(p)         # Point(x=1.0, y=2.0, z=0.0)
+print(p.x)       # 1.0 - named access
+print(p[0])      # 1.0 - index access (it's a tuple)
+print(p == (1.0, 2.0, 0.0))   # True - compares like a tuple
+
+# Unpack like a tuple
+x, y, z = p
+
+# Immutable - cannot reassign fields
+p.x = 5.0   # raises AttributeError
+```
+
+### Older Style (collections.namedtuple)
+
+```python
+from collections import namedtuple
+
+# functional form
+Point = namedtuple("Point", ["x", "y", "z"])
+p = Point(1.0, 2.0, 3.0)
+
+# _asdict, _replace, _fields
+print(p._asdict())          # {'x': 1.0, 'y': 2.0, 'z': 3.0}
+p2 = p._replace(z=10.0)    # immutable copy with changes
+print(Point._fields)        # ('x', 'y', 'z')
+```
+
+## dataclass vs NamedTuple - When to Use Which
+
+```
+Feature                 dataclass           NamedTuple
+-------                 ---------           ----------
+Mutable by default      Yes                 No (always immutable)
+Immutable option        frozen=True         Always
+Index access            No                  Yes (it's a tuple)
+Memory efficient        No                  Yes (tuple overhead)
+Hashable                Only if frozen      Yes
+Inheritance             Full support        Limited
+Methods                 Yes                 Yes
+Type annotations        Yes                 Yes
+Default values          Yes                 Yes
+dict conversion         asdict()            _asdict()
+```
+
+```python
+# Use NamedTuple when:
+# - Data is read-only (coordinates, config values, return values)
+# - You need tuple behaviour (unpacking, indexing, use as dict key)
+# - Memory efficiency matters
+
+# Use dataclass when:
+# - Data is mutable (state that changes over time)
+# - You need post-init logic, ordering, or inheritance
+# - You want to exclude fields from repr/init
+```
+
+## Practical Example - API Response
+
+```python
+from dataclasses import dataclass, field
+from typing import NamedTuple, List
+from datetime import datetime
+
+@dataclass
+class User:
+    id: int
+    name: str
+    email: str
+    created_at: datetime = field(default_factory=datetime.now)
+    tags: List[str] = field(default_factory=list)
+
+    def is_admin(self) -> bool:
+        return "admin" in self.tags
+
+    def add_tag(self, tag: str):
+        self.tags.append(tag)
+
+class Coordinates(NamedTuple):
+    lat: float
+    lng: float
+    altitude: float = 0.0
+
+u = User(id=1, name="Alice", email="alice@example.com")
+u.add_tag("admin")
+print(u.is_admin())   # True
+
+loc = Coordinates(12.9716, 77.5946)
+print(loc)   # Coordinates(lat=12.9716, lng=77.5946, altitude=0.0)
+```
+
+## Interview Questions
+
+**Q: What does `@dataclass` auto-generate?**
+By default it generates `__init__`, `__repr__`, and `__eq__`. With `order=True` it also generates `__lt__`, `__le__`, `__gt__`, `__ge__`. With `frozen=True` it generates `__hash__` and prevents mutation.
+
+**Q: Why can't you use a mutable default like `items: list = []` in a dataclass?**
+All instances would share the same list object - modifying one instance's list would affect all others. Use `field(default_factory=list)` instead, which creates a fresh list for each instance.
+
+**Q: What is `__post_init__`?**
+A special method called automatically after `__init__` in a dataclass. Used for validation, derived fields, or any setup that depends on the initialized values.
+
+**Q: What is the difference between dataclass and NamedTuple?**
+`NamedTuple` is always immutable and is a true tuple subclass - supports indexing and tuple comparisons. `dataclass` is mutable by default and a regular class - more flexible, supports methods, inheritance, and optional immutability via `frozen=True`.
+
+**Q: When would you use `replace()` with a dataclass?**
+When you want a modified copy of an instance without mutating the original - useful for frozen dataclasses or functional-style code.
+
+## Summary
+
+- `@dataclass` auto-generates `__init__`, `__repr__`, `__eq__` from type-annotated fields
+- `field(default_factory=...)` - required for mutable defaults like lists and dicts
+- `frozen=True` - makes a dataclass immutable and hashable
+- `__post_init__` - runs after `__init__` for validation or derived field computation
+- `asdict()`, `astuple()`, `replace()` - utility functions for conversion and copying
+- `NamedTuple` - immutable, tuple-based, supports indexing and unpacking
+- Use `NamedTuple` for read-only structured data; use `dataclass` for mutable objects with behaviour

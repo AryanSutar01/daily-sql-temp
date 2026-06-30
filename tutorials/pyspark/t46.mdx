@@ -1,0 +1,247 @@
+# Checkpointing in PySpark
+
+## What is Checkpointing?
+
+**Checkpointing** is the process of saving the current state of an RDD or DataFrame to a reliable storage system (like HDFS or cloud storage) and severing its **lineage**. Once checkpointed, Spark doesn't need to recompute the data from the original source - it reads directly from the checkpoint files.
+
+Think of it as creating a "save point" in a video game. If Spark needs to recompute (due to a failure), it restarts from the checkpoint rather than the very beginning.
+
+---
+
+## Why Checkpoint? - The Lineage Problem
+
+Every transformation in Spark adds to the **lineage** (computation history). For long pipelines or iterative algorithms, this lineage can become enormous.
+
+```python
+# Iterative ML: lineage grows with every iteration
+rdd = spark.sparkContext.parallelize([1, 2, 3, 4, 5])
+for i in range(100):
+    rdd = rdd.map(lambda x: x + 1)  # Lineage grows 100 steps deep!
+rdd.collect()
+# On failure: Spark must recompute from the very beginning!
+# Also: StackOverflow risk from very deep lineage chains
+```
+
+### Problems with long lineage:
+1. **Slow recomputation on failure** - must replay all transformations from source
+2. **StackOverflowError** - very long lineage chains can cause JVM stack overflow
+3. **Memory pressure** - the lineage DAG itself consumes memory on the driver
+
+**Checkpointing breaks the lineage** - after checkpointing, the data on disk is the new starting point.
+
+---
+
+## Types of Checkpointing
+
+### 1. Reliable Checkpointing (HDFS / Cloud Storage)
+
+Saves data to a **fault-tolerant distributed storage** (HDFS, S3, GCS, ADLS). The lineage is cut completely. This is the standard checkpointing method.
+
+```python
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("CheckpointDemo").getOrCreate()
+
+# Step 1: Set checkpoint directory (HDFS or cloud storage)
+spark.sparkContext.setCheckpointDir("hdfs://namenode/spark-checkpoints/")
+# or on cloud:
+spark.sparkContext.setCheckpointDir("s3://my-bucket/spark-checkpoints/")
+# or locally (only for testing):
+spark.sparkContext.setCheckpointDir("/tmp/spark-checkpoints/")
+```
+
+For RDDs:
+```python
+rdd = spark.sparkContext.parallelize(range(1000))
+rdd = rdd.map(lambda x: x * 2).filter(lambda x: x > 100)
+
+rdd.checkpoint()       # Mark for checkpointing
+rdd.count()            # Action triggers: compute + save to checkpoint dir
+
+# Lineage is now severed - reads from checkpoint on recompute
+print(rdd.isCheckpointed())  # True
+print(rdd.getCheckpointFile())  # hdfs://namenode/spark-checkpoints/rdd-XYZ
+```
+
+For DataFrames:
+```python
+df = spark.read.parquet("data/raw_events")
+df_cleaned = df.filter("event_type IS NOT NULL").dropna()
+
+df_checkpointed = df_cleaned.checkpoint()   # Returns new DataFrame from checkpoint
+df_checkpointed.show()
+```
+
+> **Note:** Unlike RDDs, DataFrame `checkpoint()` returns a new DataFrame - you must use the returned value.
+
+---
+
+### 2. Local Checkpointing (Experimental)
+
+Saves data to **executor local disks** instead of distributed storage. Faster but **not fault-tolerant** - if an executor is lost, the checkpoint is gone.
+
+```python
+# For RDDs only
+rdd.localCheckpoint()
+```
+
+Use only when:
+- You want lineage truncation for performance (not fault tolerance)
+- Executor loss is unlikely in your cluster
+
+---
+
+## Checkpointing vs. Caching
+
+These are often confused - they solve different problems:
+
+| Feature | Caching | Checkpointing |
+|---|---|---|
+| Storage | Memory (+ disk spill) | Disk (HDFS/cloud) |
+| Lineage | Preserved | Truncated (severed) |
+| Fault tolerance | No (recomputes on failure) | Yes (reads from disk) |
+| Speed | Fast (in-memory) | Slower (disk I/O) |
+| Use case | Reusing data in same job | Long pipelines, iterative ML |
+| Persistence | Gone after app ends | Persists after app ends |
+
+**Best practice:** Use both together for iterative workloads:
+
+```python
+# Cache for speed, checkpoint for fault tolerance and lineage truncation
+rdd.cache()
+rdd.checkpoint()
+rdd.count()  # triggers both caching and checkpointing
+```
+
+---
+
+## When to Use Checkpointing
+
+### 1. Iterative ML Algorithms
+
+ML algorithms (gradient descent, EM algorithm, etc.) iterate over data many times. The lineage grows with each iteration.
+
+```python
+spark.sparkContext.setCheckpointDir("hdfs:///checkpoints/")
+
+# PageRank-style iterative algorithm
+ranks = graph.vertices.map(lambda v: (v, 1.0))
+
+for iteration in range(50):
+    # ... complex computation ...
+    ranks = new_ranks
+    
+    # Checkpoint every 10 iterations to truncate lineage
+    if iteration % 10 == 0:
+        ranks.cache()
+        ranks.checkpoint()
+        ranks.count()  # Materialize checkpoint
+```
+
+### 2. Very Long Transformation Chains
+
+```python
+# Long ETL pipeline with many steps
+df = spark.read.parquet("data/raw")
+
+# 50+ transformations...
+for step in transformation_steps:
+    df = apply_transformation(df, step)
+    
+    # Checkpoint mid-way to prevent StackOverflow and speed up recovery
+    if step.should_checkpoint:
+        df = df.checkpoint()
+```
+
+### 3. Graph Processing (GraphX / GraphFrames)
+
+Graph algorithms naturally have deep, recursive lineage - checkpointing is essential.
+
+---
+
+## Practical Example: ML Iterative Training
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
+
+spark = SparkSession.builder.appName("IterativeML").getOrCreate()
+spark.sparkContext.setCheckpointDir("hdfs:///checkpoints/ml-job/")
+
+# Load training data
+df = spark.read.parquet("data/training_data")
+df.cache()  # Cache base data - it won't change
+
+# Initial parameters
+weights = spark.createDataFrame([(0.0, 0.0, 0.0)], ["w1", "w2", "w3"])
+
+for epoch in range(100):
+    # Compute gradient (simplified)
+    gradient = df.crossJoin(weights) \
+                 .select(
+                     F.col("feature1") * F.col("w1"),
+                     F.col("feature2") * F.col("w2")
+                 ) \
+                 .agg(F.sum("*"))
+    
+    # Update weights
+    weights = update_weights(weights, gradient)
+    
+    # Checkpoint every 20 epochs - truncate lineage
+    if epoch % 20 == 0:
+        weights.cache()
+        weights = weights.checkpoint()  # Severs lineage, returns new df
+        print(f"Checkpointed at epoch {epoch}")
+
+# Final result
+weights.show()
+
+# Clean up checkpoint directory when done (optional)
+# spark.sparkContext._jvm.org.apache.hadoop.fs.FileSystem.get(...).delete(...)
+```
+
+---
+
+## Checkpoint Directory Management
+
+```python
+# Checkpoint files persist after the application ends
+# You're responsible for cleaning them up
+
+# In production, use a structured path per job run:
+import uuid
+job_id = str(uuid.uuid4())
+spark.sparkContext.setCheckpointDir(f"hdfs:///checkpoints/job-{job_id}/")
+
+# After job completes, clean up
+# (Do this via hadoop command or programmatically)
+```
+
+---
+
+## Interview Tips 🎯
+
+> **Q: What is checkpointing in Spark and why is it needed?**
+
+**Answer:** Checkpointing saves a DataFrame or RDD to reliable distributed storage (HDFS, S3) and truncates the lineage. It's needed in two scenarios: first, in iterative algorithms (like ML training) where the lineage grows with each iteration - without checkpointing, failure requires recomputing from the very beginning, and very deep lineage can cause StackOverflow errors. Second, in very long transformation pipelines where the lineage DAG becomes too large to manage in memory.
+
+> **Q: What is the difference between caching and checkpointing?**
+
+**Answer:** Caching stores data in memory (with optional disk spill) for fast reuse within the same job, but the lineage is preserved - if a cached partition is lost, Spark recomputes it. Checkpointing saves data to fault-tolerant disk storage and **severs the lineage** - Spark reads from the checkpoint file instead of recomputing. Caching is for performance; checkpointing is for fault tolerance and lineage management. In iterative workloads, you typically use both: cache for speed and checkpoint for reliability.
+
+> **Q: Does checkpointing happen immediately when you call checkpoint()?**
+
+**Answer:** No - like most Spark operations, checkpointing is lazy. Calling `.checkpoint()` just marks the RDD or DataFrame. The actual checkpointing happens when the first action (like `.count()` or `.show()`) is executed. That's why best practice is to immediately follow `.checkpoint()` with an action to materialize it.
+
+---
+
+## Summary
+
+- **Checkpointing** saves data to reliable storage (HDFS/S3) and severs the Spark lineage
+- Solves two problems: **lineage bloat** (StackOverflow, memory) and **slow recovery on failure**
+- For RDDs: `rdd.checkpoint()` → then trigger an action
+- For DataFrames: `df = df.checkpoint()` → must use the returned DataFrame
+- **Caching ≠ Checkpointing**: cache = in-memory for speed; checkpoint = disk for fault tolerance
+- Always set a checkpoint directory: `spark.sparkContext.setCheckpointDir("hdfs:///path/")`
+- Most impactful in **iterative ML algorithms** and **very long transformation pipelines**
+- Checkpoint files persist after job ends - clean them up in production

@@ -1,0 +1,254 @@
+## What Is Serialization?
+
+Serialization converts a Python object into a format that can be stored to disk or sent over a network. Deserialization is the reverse.
+
+```
+Python object → serialize → bytes / string → store / send
+bytes / string → deserialize → Python object
+```
+
+Python has several serialization formats:
+
+```
+Format      Module      Binary?  Python-only?  Human-readable?
+------      ------      -------  ------------  ---------------
+pickle      pickle      Yes      Yes           No
+JSON        json        No       No            Yes
+YAML        pyyaml      No       No            Yes
+MessagePack msgpack     Yes      No            No
+Protocol    protobuf    Yes      No            No
+```
+
+## pickle - Python-Native Serialization
+
+`pickle` can serialize almost any Python object - functions, classes, custom objects, NumPy arrays, closures.
+
+```python
+import pickle
+
+# Serialize to bytes
+data = {"name": "Alice", "scores": [95, 88, 92], "active": True}
+serialized = pickle.dumps(data)   # bytes object
+print(type(serialized))   # <class 'bytes'>
+
+# Deserialize from bytes
+restored = pickle.loads(serialized)
+print(restored)   # {'name': 'Alice', 'scores': [95, 88, 92], 'active': True}
+print(data == restored)   # True
+```
+
+### Save and Load Files
+
+```python
+import pickle
+
+# Save to file
+model = {"weights": [0.1, 0.5, 0.3], "bias": 0.01, "accuracy": 0.95}
+
+with open("model.pkl", "wb") as f:   # write binary
+    pickle.dump(model, f)
+
+# Load from file
+with open("model.pkl", "rb") as f:   # read binary
+    loaded = pickle.load(f)
+
+print(loaded["accuracy"])   # 0.95
+```
+
+### Pickling Custom Objects
+
+```python
+import pickle
+
+class User:
+    def __init__(self, name, age, email):
+        self.name = name
+        self.age = age
+        self.email = email
+
+    def greet(self):
+        return f"Hi, I'm {self.name}"
+
+user = User("Alice", 30, "alice@example.com")
+
+# Pickle and restore
+data = pickle.dumps(user)
+restored = pickle.loads(data)
+
+print(restored.name)      # Alice
+print(restored.greet())   # Hi, I'm Alice
+```
+
+### Pickling Functions
+
+```python
+import pickle
+
+def square(x):
+    return x ** 2
+
+# Functions can be pickled (by reference, not by code)
+data = pickle.dumps(square)
+restored_fn = pickle.loads(data)
+print(restored_fn(5))   # 25
+
+# Note: the function must be importable at unpickling time
+# Lambda functions and locally-defined functions may fail
+```
+
+### Controlling Pickling with __getstate__ / __setstate__
+
+```python
+import pickle
+
+class DatabaseConnection:
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.connection = self._connect()   # cannot be pickled
+
+    def _connect(self):
+        return f"<connection to {self.host}:{self.port}>"
+
+    def __getstate__(self):
+        # Return only what should be pickled
+        state = self.__dict__.copy()
+        del state["connection"]   # remove unpicklable object
+        return state
+
+    def __setstate__(self, state):
+        # Restore state and reinitialize unpicklable part
+        self.__dict__.update(state)
+        self.connection = self._connect()
+
+db = DatabaseConnection("localhost", 5432)
+restored = pickle.loads(pickle.dumps(db))
+print(restored.host)        # localhost
+print(restored.connection)  # <connection to localhost:5432>
+```
+
+## json - Language-Agnostic, Human-Readable
+
+JSON works across all languages - ideal for APIs, config files, and data exchange.
+
+```python
+import json
+
+data = {"name": "Alice", "age": 30, "scores": [95, 88], "active": True}
+
+# Serialize to string
+json_str = json.dumps(data)
+json_pretty = json.dumps(data, indent=2)
+print(json_pretty)
+
+# Deserialize from string
+parsed = json.loads(json_str)
+print(parsed["name"])   # Alice
+
+# Save to file
+with open("data.json", "w") as f:
+    json.dump(data, f, indent=2)
+
+# Load from file
+with open("data.json") as f:
+    loaded = json.load(f)
+```
+
+### JSON Limitations
+
+```python
+# JSON supports: dict, list, str, int, float, bool, None
+# JSON does NOT support: datetime, set, custom objects, bytes, tuples
+
+import json, datetime
+
+data = {"created": datetime.datetime.now()}
+json.dumps(data)   # TypeError: Object of type datetime is not JSON serializable
+
+# Fix: custom encoder
+class CustomEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime.datetime):
+            return obj.isoformat()
+        if isinstance(obj, set):
+            return list(obj)
+        return super().default(obj)
+
+json.dumps(data, cls=CustomEncoder)
+# {"created": "2024-03-15T10:30:45.123456"}
+```
+
+## pickle vs json - When to Use Which
+
+```
+pickle                          json
+------                          ----
+Python objects only             Language-agnostic
+Binary format                   Text format (human-readable)
+Supports all Python types       Limited types (dict, list, str, int, float, bool, None)
+Fast                            Slower for large data
+UNSAFE with untrusted data      Safe
+Great for ML models, caches     Great for APIs, configs, data exchange
+```
+
+## Security Warning
+
+```python
+# NEVER unpickle data from untrusted sources
+import pickle
+import os
+
+# A malicious pickle file could run arbitrary code
+class Exploit:
+    def __reduce__(self):
+        return (os.system, ("rm -rf /",))   # executes on unpickling!
+
+malicious = pickle.dumps(Exploit())
+# pickle.loads(malicious)  - DO NOT RUN THIS
+```
+
+Use JSON or other safe formats for any data coming from external sources.
+
+## shelve - Persistent Dictionary Using pickle
+
+```python
+import shelve
+
+# shelve gives a dict-like persistent storage backed by pickle
+with shelve.open("my_database") as db:
+    db["user:1"] = {"name": "Alice", "age": 30}
+    db["user:2"] = {"name": "Bob", "age": 25}
+
+# Load data later
+with shelve.open("my_database") as db:
+    print(db["user:1"])   # {'name': 'Alice', 'age': 30}
+    for key in db:
+        print(key, db[key])
+```
+
+## Interview Questions
+
+**Q: What is pickling in Python?**
+Pickling is the process of serializing a Python object into a byte stream using the `pickle` module. It can handle almost any Python object - custom classes, functions, NumPy arrays. The reverse process (bytes → object) is called unpickling.
+
+**Q: What is the difference between `pickle` and `json`?**
+`pickle` is Python-specific, binary, and supports all Python types including custom objects. `json` is text-based, human-readable, language-agnostic, and only supports basic types (dict, list, str, int, float, bool, None). Use pickle for Python-internal persistence (ML models, caches); use JSON for APIs and data exchange between systems.
+
+**Q: What is the security risk with pickle?**
+Unpickling data from an untrusted source is dangerous - a maliciously crafted pickle file can execute arbitrary code when unpickled. Never unpickle data received from external users, APIs, or untrusted files. Use JSON or other safe formats for external data.
+
+**Q: What are `__getstate__` and `__setstate__`?**
+These dunder methods let you customize what gets pickled. `__getstate__` returns the state to be pickled (e.g. excluding database connections or file handles). `__setstate__` receives the unpickled state and restores the object, reinitializing anything that couldn't be pickled.
+
+**Q: When would you use `shelve`?**
+`shelve` provides a persistent, dictionary-like storage backed by pickle - useful for simple key-value caching, small apps, or storing Python objects without setting up a database. For anything production-grade or that needs concurrent access, use a proper database instead.
+
+## Summary
+
+- **pickle** - serialize any Python object to bytes; `dumps()`/`loads()` for bytes, `dump()`/`load()` for files
+- `__getstate__` / `__setstate__` - customize pickling for objects with unpicklable attributes
+- **NEVER** unpickle data from untrusted sources - arbitrary code execution risk
+- **json** - text-based, human-readable, language-agnostic; use for APIs and configs
+- JSON supports: dict, list, str, int, float, bool, None - use a custom `JSONEncoder` for other types
+- **pickle vs json**: use pickle for Python internals (models, caches); use JSON for cross-system exchange
+- **shelve** - persistent dict backed by pickle; simple key-value storage for Python objects

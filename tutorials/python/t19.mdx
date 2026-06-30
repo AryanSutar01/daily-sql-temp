@@ -1,0 +1,261 @@
+## What Is Async Programming?
+
+Async programming lets a single thread handle many tasks concurrently by **pausing** a task while it waits (for network, disk, etc.) and **switching** to another task in the meantime.
+
+```
+Synchronous (blocking):        Async (non-blocking):
+Task A: ----wait----done       Task A: --[pause]------done
+Task B:             ----done   Task B:   --[pause]--done
+Total: A + B time              Total: ~max(A, B) time
+```
+
+Unlike threading, async is single-threaded - no race conditions, no locks needed.
+
+## Core Concepts
+
+```python
+import asyncio
+
+# async def defines a coroutine - a function that can be paused
+async def greet(name):
+    await asyncio.sleep(1)   # await pauses this coroutine, frees the event loop
+    print(f"Hello, {name}!")
+
+# You must run a coroutine through the event loop
+asyncio.run(greet("Vishal"))
+```
+
+- `async def` - declares a coroutine function
+- `await` - pauses the coroutine until the awaitable completes
+- `asyncio.run()` - starts the event loop and runs a coroutine
+- **Event loop** - the scheduler that manages and switches between coroutines
+
+## Running Multiple Coroutines Concurrently
+
+```python
+import asyncio
+import time
+
+async def fetch(url, delay):
+    print(f"Fetching {url}...")
+    await asyncio.sleep(delay)   # simulate network wait
+    print(f"Done: {url}")
+    return f"Response from {url}"
+
+# Sequential - takes 1 + 2 + 3 = 6 seconds
+async def sequential():
+    await fetch("api.com/a", 1)
+    await fetch("api.com/b", 2)
+    await fetch("api.com/c", 3)
+
+# Concurrent with gather - takes ~3 seconds (longest task)
+async def concurrent():
+    results = await asyncio.gather(
+        fetch("api.com/a", 1),
+        fetch("api.com/b", 2),
+        fetch("api.com/c", 3),
+    )
+    print(results)
+
+asyncio.run(concurrent())
+```
+
+## asyncio.gather vs asyncio.create_task
+
+```python
+import asyncio
+
+async def task(name, delay):
+    await asyncio.sleep(delay)
+    return f"{name} done"
+
+# gather - runs all and waits for all to finish
+async def with_gather():
+    results = await asyncio.gather(
+        task("A", 1),
+        task("B", 2),
+        task("C", 3),
+    )
+    print(results)  # ['A done', 'B done', 'C done']
+
+# create_task - schedules tasks independently, more control
+async def with_tasks():
+    t1 = asyncio.create_task(task("A", 1))
+    t2 = asyncio.create_task(task("B", 2))
+    t3 = asyncio.create_task(task("C", 3))
+
+    # Do other work here while tasks run in background...
+    print("Tasks are running...")
+
+    r1 = await t1
+    r2 = await t2
+    r3 = await t3
+    print(r1, r2, r3)
+
+asyncio.run(with_tasks())
+```
+
+## Async with aiohttp - Real HTTP Requests
+
+```python
+import asyncio
+import aiohttp   # pip install aiohttp
+
+async def fetch_url(session, url):
+    async with session.get(url) as response:
+        return await response.text()
+
+async def main():
+    urls = [
+        "https://jsonplaceholder.typicode.com/posts/1",
+        "https://jsonplaceholder.typicode.com/posts/2",
+        "https://jsonplaceholder.typicode.com/posts/3",
+    ]
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_url(session, url) for url in urls]
+        results = await asyncio.gather(*tasks)
+        for r in results:
+            print(r[:80])
+
+asyncio.run(main())
+```
+
+## Async Context Managers & Iterators
+
+```python
+import asyncio
+
+# Async context manager
+class AsyncDB:
+    async def __aenter__(self):
+        print("Connecting to DB...")
+        await asyncio.sleep(0.1)
+        return self
+
+    async def __aexit__(self, *args):
+        print("Closing DB connection")
+
+    async def query(self, sql):
+        await asyncio.sleep(0.1)
+        return f"Result of: {sql}"
+
+async def main():
+    async with AsyncDB() as db:
+        result = await db.query("SELECT * FROM users")
+        print(result)
+
+# Async iterator
+class AsyncCounter:
+    def __init__(self, limit):
+        self.limit = limit
+        self.count = 0
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self.count >= self.limit:
+            raise StopAsyncIteration
+        await asyncio.sleep(0.1)
+        self.count += 1
+        return self.count
+
+async def main():
+    async for num in AsyncCounter(5):
+        print(num)   # 1 2 3 4 5
+
+asyncio.run(main())
+```
+
+## Timeouts & Error Handling
+
+```python
+import asyncio
+
+async def slow_task():
+    await asyncio.sleep(10)
+    return "done"
+
+# Timeout
+async def with_timeout():
+    try:
+        result = await asyncio.wait_for(slow_task(), timeout=2.0)
+    except asyncio.TimeoutError:
+        print("Task timed out!")
+
+# Handle errors in gather - return_exceptions=True prevents one failure stopping all
+async def safe_gather():
+    results = await asyncio.gather(
+        slow_task(),
+        asyncio.sleep(1),
+        return_exceptions=True   # failed tasks return exception objects, not raise
+    )
+    for r in results:
+        if isinstance(r, Exception):
+            print(f"Error: {r}")
+        else:
+            print(f"Success: {r}")
+
+asyncio.run(with_timeout())
+```
+
+## Async vs Threading vs Multiprocessing
+
+```
+                Async           Threading       Multiprocessing
+Single thread   Yes             No              No
+GIL limited     N/A             Yes             No
+Best for        I/O-bound       I/O-bound       CPU-bound
+Overhead        Very low        Medium          High
+Race conditions No              Yes             No (separate memory)
+Syntax          async/await     Thread objects  Process objects
+```
+
+## Common Mistakes
+
+```python
+# 1. Forgetting await - coroutine never executes
+async def bad():
+    asyncio.sleep(1)   # wrong - returns a coroutine object, doesn't run it
+    await asyncio.sleep(1)   # correct
+
+# 2. Calling asyncio.run() inside an already-running event loop (e.g. Jupyter)
+# Use: await coroutine()  directly, or nest with asyncio.get_event_loop()
+
+# 3. Using blocking calls inside async functions - blocks the entire event loop
+async def bad_fetch():
+    import requests
+    r = requests.get("https://example.com")   # BLOCKS - use aiohttp instead
+
+# 4. Not awaiting gather results
+async def bad():
+    asyncio.gather(task1(), task2())   # tasks created but never awaited
+    await asyncio.gather(task1(), task2())   # correct
+```
+
+## Interview Questions
+
+**Q: What is the event loop in asyncio?**
+The event loop is the core scheduler in asyncio. It manages a queue of coroutines, runs them one at a time, and switches to another coroutine whenever the current one hits an `await` (a pause point). Only one coroutine runs at any given moment - there's no true parallelism.
+
+**Q: What is the difference between `asyncio.gather` and `asyncio.create_task`?**
+Both run coroutines concurrently. `gather` takes coroutines directly, runs them all, and returns all results together. `create_task` schedules a coroutine as a background task immediately, giving you a handle to cancel or await it independently. Use `create_task` when you need more control over individual tasks.
+
+**Q: Can async replace threading entirely?**
+For I/O-bound tasks, async is often better - lower overhead, no race conditions, cleaner code. But async doesn't help with CPU-bound work, and some libraries only offer synchronous APIs. Threading or multiprocessing is still needed in those cases.
+
+**Q: What happens if you use a blocking call inside an async function?**
+The entire event loop is blocked - no other coroutine can run until the blocking call finishes. Always use async-compatible libraries (e.g. `aiohttp` instead of `requests`, `aiosqlite` instead of `sqlite3`) inside async code.
+
+**Q: What is `asyncio.wait_for`?**
+It wraps a coroutine with a timeout. If the coroutine doesn't complete within the given seconds, it raises `asyncio.TimeoutError`.
+
+## Summary
+
+- `async def` defines a coroutine; `await` pauses it at an I/O wait point
+- The **event loop** schedules and switches between coroutines on the same thread
+- `asyncio.gather()` - run multiple coroutines concurrently and collect all results
+- `asyncio.create_task()` - schedule a coroutine as a background task with independent control
+- `asyncio.wait_for()` - add a timeout to any coroutine
+- Async is best for **I/O-bound** work; it doesn't bypass the GIL or help with CPU-bound tasks
+- Never use blocking calls (like `requests`, `time.sleep`) inside async functions

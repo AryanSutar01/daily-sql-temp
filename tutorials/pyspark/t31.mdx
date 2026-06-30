@@ -1,0 +1,266 @@
+## Why Shared Variables?
+
+In distributed computing, variables are copied to each executor independently. If an executor modifies a local copy, that change never makes it back to the driver or other executors. Spark provides two special variable types to solve this:
+
+| Variable | Direction | Use Case |
+|---|---|---|
+| **Broadcast variable** | Driver → all executors (read-only) | Share a lookup table with all workers |
+| **Accumulator** | Executors → Driver (write-only from executors) | Count errors, track metrics across tasks |
+
+## Broadcast Variables
+
+A broadcast variable ships a **read-only** value from the driver to all executors once - avoiding the cost of serializing it with every task.
+
+### Without Broadcast - Expensive
+
+```python
+# This dict is serialized and sent with EVERY task - expensive for large dicts
+country_map = {"IN": "India", "US": "United States", "GB": "Great Britain"}
+
+df.withColumn("country_name",
+    udf(lambda code: country_map.get(code, "Unknown"), StringType())(col("country"))
+)
+# country_map gets pickled and shipped with every task!
+```
+
+### With Broadcast - Efficient
+
+```python
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("BroadcastDemo").getOrCreate()
+sc = spark.sparkContext
+
+# Broadcast once to all executors
+country_map = {"IN": "India", "US": "United States", "GB": "Great Britain", "JP": "Japan"}
+bc_country_map = sc.broadcast(country_map)
+
+df = spark.createDataFrame([
+    (1, "Alice", "IN"),
+    (2, "Bob",   "US"),
+    (3, "Carol", "GB"),
+    (4, "Dave",  "JP"),
+], ["id", "name", "country"])
+
+# Use .value to access the broadcast variable inside UDF
+from pyspark.sql.functions import udf
+from pyspark.sql.types import StringType
+
+@udf(StringType())
+def get_country_name(code):
+    return bc_country_map.value.get(code, "Unknown")  # .value accesses the data
+
+df.withColumn("country_name", get_country_name(col("country"))).show()
+# +---+-----+-------+-------------+
+# | id| name|country| country_name|
+# +---+-----+-------+-------------+
+# |  1|Alice|     IN|        India|
+# |  2|  Bob|     US|United States|
+# |  3|Carol|     GB|  Great Britain|
+# |  4| Dave|     JP|        Japan|
+# +---+-----+-------+-------------+
+```
+
+### Broadcasting Large Lookup Tables
+
+```python
+# Load small lookup table as Python dict
+lookup_pdf = spark.read.parquet("dim_product.parquet").toPandas()
+product_lookup = dict(zip(lookup_pdf["product_id"], lookup_pdf["product_name"]))
+
+# Broadcast the dict
+bc_products = sc.broadcast(product_lookup)
+
+# Use in UDF across all executors
+@udf(StringType())
+def get_product_name(pid):
+    return bc_products.value.get(pid, "Unknown Product")
+
+transactions.withColumn("product_name", get_product_name(col("product_id"))).show()
+
+# Clean up when done (frees executor memory)
+bc_products.unpersist()
+bc_products.destroy()   # removes from executor memory immediately
+```
+
+### Broadcast DataFrame vs broadcast() function
+
+There are two types of broadcast in PySpark - don't confuse them:
+
+```python
+# 1. sc.broadcast(value) - broadcasts any Python object (dict, list, model)
+#    Used inside UDFs and RDD operations
+bc_map = sc.broadcast({"a": 1, "b": 2})
+
+# 2. broadcast(df) from pyspark.sql.functions - join hint for DataFrames
+#    Used in DataFrame joins
+from pyspark.sql.functions import broadcast
+large_df.join(broadcast(small_df), "id")   # join optimization, not sc.broadcast
+```
+
+## Accumulators
+
+Accumulators let executors **write** a value that accumulates back to the driver - useful for counters and metrics.
+
+### Built-in Accumulator Types
+
+```python
+sc = spark.sparkContext
+
+# Integer accumulator
+error_count = sc.accumulator(0)
+print(error_count.value)  # 0
+
+# Long accumulator
+total_records = sc.accumulator(0)
+
+# Float/Double accumulator
+total_amount = sc.accumulator(0.0)
+```
+
+### Using Accumulators in RDD Operations
+
+```python
+# Count errors while processing logs
+error_count = sc.accumulator(0)
+skipped_count = sc.accumulator(0)
+
+def process_log_line(line):
+    global error_count, skipped_count
+    if "ERROR" in line:
+        error_count.add(1)
+        return None
+    if len(line.strip()) == 0:
+        skipped_count.add(1)
+        return None
+    return line.strip()
+
+rdd = sc.textFile("logs.txt")
+cleaned = rdd.map(process_log_line).filter(lambda x: x is not None)
+
+# Action triggers execution - accumulators are updated during this
+result = cleaned.count()
+
+# Now read accumulator values on the driver
+print(f"Processed: {result}")
+print(f"Errors: {error_count.value}")
+print(f"Skipped: {skipped_count.value}")
+```
+
+### Using Accumulators in DataFrame Operations (foreach)
+
+```python
+from pyspark.sql.functions import col
+
+null_salary_count = sc.accumulator(0)
+high_earner_count = sc.accumulator(0)
+
+def analyze_row(row):
+    if row["salary"] is None:
+        null_salary_count.add(1)
+    elif row["salary"] > 100000:
+        high_earner_count.add(1)
+
+# foreach triggers execution on each row
+df.foreach(analyze_row)
+
+print(f"Null salaries: {null_salary_count.value}")
+print(f"High earners: {high_earner_count.value}")
+```
+
+### Custom Accumulator - AccumulatorParam
+
+For complex accumulator types (e.g., collecting sets):
+
+```python
+from pyspark import AccumulatorParam
+
+class SetAccumulatorParam(AccumulatorParam):
+    def zero(self, init_value):
+        return set()
+
+    def addInPlace(self, s1, s2):
+        s1.update(s2)
+        return s1
+
+# Create set accumulator
+unique_errors = sc.accumulator(set(), SetAccumulatorParam())
+
+def find_unique_errors(line):
+    if "ERROR" in line:
+        error_type = line.split("ERROR")[1].split()[0] if "ERROR" in line else ""
+        unique_errors.add({error_type})
+
+sc.textFile("logs.txt").foreach(find_unique_errors)
+print(f"Unique error types: {unique_errors.value}")
+```
+
+## ⚠️ Accumulator Gotchas
+
+### 1. Accumulators Are Unreliable in Transformations
+
+```python
+# ❌ WRONG: accumulator in a transformation (may run multiple times)
+counter = sc.accumulator(0)
+
+def risky_map(x):
+    counter.add(1)   # This transformation may be re-executed (retries, speculative execution)
+    return x * 2
+
+rdd.map(risky_map).count()   # counter value may be > actual number of elements!
+
+# ✅ CORRECT: accumulators in actions (foreach, foreachBatch) are reliable
+rdd.foreach(lambda x: counter.add(1))
+```
+
+### 2. Read Accumulator Value Only After an Action
+
+```python
+counter = sc.accumulator(0)
+rdd = sc.parallelize([1,2,3,4,5]).map(lambda x: counter.add(1) or x)
+
+print(counter.value)    # ❌ 0 - nothing has executed yet (lazy!)
+rdd.count()             # action triggers execution
+print(counter.value)    # ✅ 5 - correct
+```
+
+### 3. No Reading from Executors
+
+```python
+counter = sc.accumulator(0)
+
+def bad_udf(x):
+    print(counter.value)   # ❌ always 0 on executors - can't read from workers!
+    counter.add(1)         # ✅ adding is fine
+    return x
+```
+
+## When to Use Each
+
+```python
+# ✅ Use sc.broadcast() when:
+# - Sharing a lookup dict / ML model / config with all executors
+# - The data is read-only and doesn't change per task
+# - The object is too large to serialize with every task
+bc_model = sc.broadcast(load_ml_model("model.pkl"))
+
+# ✅ Use Accumulator when:
+# - Counting events, errors, or special cases across a distributed job
+# - Tracking metrics without affecting output data
+# - Collecting lightweight statistics (counts, sums) for monitoring
+error_acc = sc.accumulator(0)
+
+# ❌ Don't use either for:
+# - Mutable shared state across tasks (not safe - use reduceByKey or agg instead)
+# - Large data that changes per key (use join instead of broadcast)
+```
+
+## Summary
+
+- **Broadcast variables** (`sc.broadcast(obj)`) - ship a read-only Python object to all executors once; access with `.value` inside UDFs
+- Use `bc.unpersist()` / `bc.destroy()` to free executor memory when done
+- **Accumulators** (`sc.accumulator(init)`) - executors write, driver reads; used for counters and metrics
+- Add to accumulator with `.add(value)`; read result on driver with `.value` after an action
+- Accumulators are **write-only on executors** - never read `.value` inside a task
+- Use accumulators only in **actions** (`foreach`) for reliable results - transformations can run multiple times
+- `sc.broadcast(dict)` ≠ `broadcast(df)` - the former is for any Python object, the latter is a join hint

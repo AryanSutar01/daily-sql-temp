@@ -1,0 +1,270 @@
+## JSON - JavaScript Object Notation
+
+JSON is the most common format for APIs and config files. Python's `json` module handles it natively.
+
+```python
+import json
+
+# Python types → JSON
+# dict   → object {}
+# list   → array  []
+# str    → string ""
+# int/float → number
+# bool   → true/false
+# None   → null
+```
+
+### Encoding - Python to JSON
+
+```python
+import json
+
+data = {
+    "name": "Alice",
+    "age": 30,
+    "scores": [95, 88, 92],
+    "active": True,
+    "address": None,
+}
+
+# To string
+json_str = json.dumps(data)
+# '{"name": "Alice", "age": 30, ...}'
+
+# Pretty-printed
+json_pretty = json.dumps(data, indent=2, sort_keys=True)
+print(json_pretty)
+# {
+#   "active": true,
+#   "address": null,
+#   "age": 30,
+#   ...
+# }
+
+# To file
+with open("data.json", "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+```
+
+### Decoding - JSON to Python
+
+```python
+import json
+
+# From string
+json_str = '{"name": "Alice", "age": 30, "active": true}'
+parsed = json.loads(json_str)
+print(parsed["name"])     # Alice
+print(type(parsed))       # <class 'dict'>
+
+# From file
+with open("data.json", encoding="utf-8") as f:
+    loaded = json.load(f)
+```
+
+### Handling Non-Serializable Types
+
+```python
+import json
+from datetime import datetime, date
+from decimal import Decimal
+
+data = {
+    "created_at": datetime.now(),
+    "price": Decimal("29.99"),
+    "tags": {1, 2, 3},   # set
+}
+
+# json.dumps(data)  →  TypeError!
+
+# Custom encoder
+class CustomEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        if isinstance(obj, Decimal):
+            return float(obj)
+        if isinstance(obj, set):
+            return list(obj)
+        return super().default(obj)
+
+json_str = json.dumps(data, cls=CustomEncoder, indent=2)
+
+# Or with a default function
+def serialize(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable")
+
+json.dumps(data, default=serialize)
+```
+
+### Nested JSON
+
+```python
+import json
+
+raw = '''
+{
+    "users": [
+        {"id": 1, "name": "Alice", "roles": ["admin", "editor"]},
+        {"id": 2, "name": "Bob",   "roles": ["viewer"]}
+    ],
+    "total": 2
+}
+'''
+
+data = json.loads(raw)
+print(data["total"])                        # 2
+print(data["users"][0]["name"])             # Alice
+print(data["users"][0]["roles"][0])         # admin
+
+for user in data["users"]:
+    print(f"{user['name']}: {', '.join(user['roles'])}")
+```
+
+## CSV - Comma Separated Values
+
+```python
+import csv
+```
+
+### Writing CSV
+
+```python
+import csv
+
+rows = [
+    ["Name", "Age", "Department", "Salary"],
+    ["Alice", 30, "Engineering", 90000],
+    ["Bob", 25, "Marketing", 75000],
+    ["Carol", 35, "Engineering", 95000],
+]
+
+with open("employees.csv", "w", newline="", encoding="utf-8") as f:
+    writer = csv.writer(f)
+    writer.writerows(rows)
+
+# Write dict rows using DictWriter
+employees = [
+    {"name": "Alice", "age": 30, "dept": "Engineering"},
+    {"name": "Bob",   "age": 25, "dept": "Marketing"},
+]
+
+with open("employees.csv", "w", newline="", encoding="utf-8") as f:
+    fieldnames = ["name", "age", "dept"]
+    writer = csv.DictWriter(f, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(employees)
+```
+
+### Reading CSV
+
+```python
+import csv
+
+# Basic reader - rows as lists
+with open("employees.csv", encoding="utf-8") as f:
+    reader = csv.reader(f)
+    header = next(reader)   # skip header row
+    for row in reader:
+        print(row)   # ['Alice', '30', 'Engineering', '90000']
+
+# DictReader - rows as dicts (header row becomes keys)
+with open("employees.csv", encoding="utf-8") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        print(row["name"], row["age"])   # Alice 30
+
+# Read all into list
+with open("employees.csv") as f:
+    data = list(csv.DictReader(f))
+```
+
+### Handling Edge Cases
+
+```python
+import csv
+
+# Custom delimiter and quote character
+with open("data.tsv") as f:
+    reader = csv.reader(f, delimiter="\t")   # tab-separated
+
+# Fields with commas - csv handles quoting automatically
+data = [["Alice", "New York, NY", 30]]
+with open("out.csv", "w", newline="") as f:
+    csv.writer(f).writerows(data)
+# Alice,"New York, NY",30
+
+# Fields with newlines
+with open("out.csv", "w", newline="") as f:
+    writer = csv.writer(f, quoting=csv.QUOTE_ALL)   # quote everything
+    writer.writerow(["name", "bio"])
+    writer.writerow(["Alice", "Line 1\nLine 2"])
+```
+
+### CSV + pandas (Most Common in Practice)
+
+```python
+import pandas as pd
+
+# Read
+df = pd.read_csv("employees.csv")
+df = pd.read_csv("data.csv", sep=";", encoding="utf-8", parse_dates=["date_col"])
+df = pd.read_csv("data.csv", usecols=["name", "salary"])   # only specific columns
+df = pd.read_csv("data.csv", nrows=1000)                   # only first 1000 rows
+
+# Write
+df.to_csv("output.csv", index=False, encoding="utf-8")
+df.to_csv("output.csv", sep=";", columns=["name", "salary"])
+```
+
+## JSON Lines (JSONL) - One JSON Object Per Line
+
+Used for large datasets, logs, and streaming data:
+
+```python
+import json
+
+# Write JSONL
+records = [
+    {"id": 1, "name": "Alice"},
+    {"id": 2, "name": "Bob"},
+]
+with open("data.jsonl", "w") as f:
+    for record in records:
+        f.write(json.dumps(record) + "\n")
+
+# Read JSONL
+with open("data.jsonl") as f:
+    records = [json.loads(line) for line in f]
+```
+
+## Interview Questions
+
+**Q: What is the difference between `json.dumps()` and `json.dump()`?**
+`json.dumps()` serializes a Python object to a JSON **string**. `json.dump()` serializes directly to a **file object**. Similarly, `json.loads()` parses a JSON string, and `json.load()` reads from a file.
+
+**Q: What Python types can be serialized to JSON by default?**
+dict, list, tuple (becomes array), str, int, float, bool, None. Everything else (datetime, Decimal, set, custom objects) raises `TypeError` unless you provide a custom encoder via `cls=` or `default=`.
+
+**Q: Why must you open CSV files with `newline=""`?**
+The `csv` module handles line endings itself. If you let Python's file object translate line endings (the default), you may get extra blank lines on Windows. `newline=""` disables that translation, letting `csv` handle it correctly.
+
+**Q: What is the difference between `csv.reader` and `csv.DictReader`?**
+`csv.reader` returns each row as a list of strings, accessed by index. `csv.DictReader` uses the first row as field names and returns each subsequent row as a dict, accessed by column name. `DictReader` is cleaner when you know the column names.
+
+**Q: What is JSONL and when is it useful?**
+JSONL (JSON Lines) stores one complete JSON object per line. Unlike a single JSON file (which must be parsed entirely), JSONL can be read and streamed line by line - making it ideal for large logs, event streams, and big datasets where you can't load everything into memory at once.
+
+## Summary
+
+- `json.dumps(obj)` → JSON string; `json.dump(obj, f)` → write to file
+- `json.loads(s)` → parse JSON string; `json.load(f)` → read from file
+- JSON supports: dict, list, str, int, float, bool, None - everything else needs a custom encoder
+- Use `cls=CustomEncoder` or `default=func` to handle datetime, Decimal, set, etc.
+- `csv.writer` / `csv.DictWriter` - write rows as lists or dicts
+- `csv.reader` / `csv.DictReader` - read rows as lists or dicts
+- Always open CSV files with `newline=""` to avoid platform line-ending issues
+- `pd.read_csv()` / `df.to_csv()` - most practical for data work
+- JSONL - one JSON object per line; ideal for large datasets and streaming

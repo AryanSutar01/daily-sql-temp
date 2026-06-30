@@ -1,0 +1,155 @@
+## orderBy and sort - Identical Methods
+
+`orderBy()` and `sort()` are aliases - they do the same thing: return a new DataFrame sorted by one or more columns.
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, desc, asc, asc_nulls_first, desc_nulls_last
+
+spark = SparkSession.builder.appName("SortDemo").getOrCreate()
+
+df = spark.createDataFrame([
+    (1, "Alice",  "Engineering", 95000),
+    (2, "Bob",    "Marketing",   72000),
+    (3, "Carol",  "Engineering", 110000),
+    (4, "David",  "HR",          60000),
+    (5, "Eve",    "Engineering", 105000),
+    (6, "Frank",  "Marketing",   None),
+], ["id", "name", "dept", "salary"])
+```
+
+## Basic Sorting
+
+```python
+# Ascending (default)
+df.orderBy("salary").show()
+df.sort("salary").show()              # identical
+
+# Descending
+df.orderBy("salary", ascending=False).show()
+df.orderBy(col("salary").desc()).show()   # preferred style
+df.orderBy(desc("salary")).show()         # using desc() function
+
+# Ascending explicitly
+df.orderBy(col("salary").asc()).show()
+df.orderBy(asc("salary")).show()
+```
+
+## Sort by Multiple Columns
+
+```python
+# Sort by dept ascending, then salary descending
+df.orderBy("dept", col("salary").desc()).show()
+
+# All ascending
+df.orderBy("dept", "salary").show()
+
+# All descending
+df.orderBy(col("dept").desc(), col("salary").desc()).show()
+
+# Mixed
+df.orderBy(
+    col("dept").asc(),
+    col("salary").desc(),
+    col("name").asc()
+).show()
+```
+
+## Null Handling in Sort
+
+By default, nulls sort first on ascending, last on descending. Override this:
+
+```python
+# nulls first (default for ascending)
+df.orderBy(asc_nulls_first("salary")).show()
+
+# nulls last (override for ascending)
+df.orderBy(asc_nulls_last("salary")).show()
+
+# nulls first for descending
+df.orderBy(desc_nulls_first("salary")).show()
+
+# nulls last (default for descending)
+df.orderBy(desc_nulls_last("salary")).show()
+
+# Practical: put nulls at end regardless of sort direction
+df.orderBy(col("salary").desc().nulls_last()).show()  # Spark 3.0+
+```
+
+## sortWithinPartitions - Local Sort (No Shuffle)
+
+`orderBy()` causes a full global sort - data moves across executors (expensive shuffle).
+`sortWithinPartitions()` sorts each partition independently - no shuffle, much faster:
+
+```python
+# Global sort - triggers shuffle, data reorganized across all executors
+df.orderBy("salary").write.parquet("output/")
+
+# Local sort - each partition sorted, no shuffle (fast)
+# Use when downstream process just needs data sorted within each file
+df.sortWithinPartitions("salary").write.parquet("output/")
+df.sortWithinPartitions(col("dept").asc(), col("salary").desc()).write.parquet("output/")
+```
+
+When to use `sortWithinPartitions`:
+- Before writing Parquet/ORC for better compression (similar values grouped)
+- When consumers process each partition independently
+- When global order is NOT required
+
+## Sort After groupBy
+
+```python
+from pyspark.sql.functions import count, avg
+
+# Sort aggregation results
+df.groupBy("dept").agg(
+    count("id").alias("emp_count"),
+    avg("salary").alias("avg_salary")
+).orderBy(col("avg_salary").desc()).show()
+
+# Top-N pattern
+df.groupBy("dept").agg(
+    avg("salary").alias("avg_salary")
+).orderBy(col("avg_salary").desc()).limit(3).show()
+```
+
+## SQL Equivalent
+
+```python
+df.createOrReplaceTempView("employees")
+
+spark.sql("""
+    SELECT dept, salary
+    FROM employees
+    ORDER BY dept ASC, salary DESC
+""").show()
+
+spark.sql("""
+    SELECT dept, AVG(salary) as avg_sal
+    FROM employees
+    GROUP BY dept
+    ORDER BY avg_sal DESC
+    LIMIT 3
+""").show()
+```
+
+## Performance Note
+
+`orderBy()` is a **wide transformation** - it causes a full shuffle. Every row needs to be compared globally. For large datasets:
+- Prefer `sortWithinPartitions()` when global order is not required
+- Use `limit(N).orderBy(...)` is efficient for Top-N (Spark optimizes this)
+- `orderBy` before a `write` forces all data through a single sort stage
+
+```python
+# Efficient Top-N: limit applied before full sort in optimizer
+df.orderBy(col("salary").desc()).limit(10).show()  # Spark can optimize this
+```
+
+## Summary
+
+- `orderBy()` and `sort()` are identical - use either
+- Default sort is ascending; use `.desc()`, `desc()` for descending
+- Sort by multiple columns with a mix of directions
+- Null placement: `asc_nulls_first`, `asc_nulls_last`, `desc_nulls_first`, `desc_nulls_last`
+- `orderBy()` is a global sort (shuffle); `sortWithinPartitions()` is local (no shuffle)
+- Use `sortWithinPartitions()` before writes for performance when global order isn't needed

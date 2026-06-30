@@ -1,0 +1,181 @@
+# Partitioning, repartition vs coalesce
+
+## What is Partitioning?
+
+In PySpark, a **partition** is a logical chunk of data stored in memory or on disk. When Spark reads data or performs transformations, it splits the data into multiple partitions so that each partition can be processed in **parallel** by different executor cores.
+
+Think of partitions like slices of a pizza - each worker (executor) takes one slice and processes it independently. More slices = more parallelism (up to a limit).
+
+---
+
+## Why Partitioning Matters
+
+- Controls the **degree of parallelism** in your job
+- Affects **shuffle performance** during joins and aggregations
+- Poor partitioning leads to **data skew** or **underutilization of resources**
+- Directly impacts **job execution time and cost**
+
+---
+
+## Default Partitioning
+
+When you read data, Spark assigns a default number of partitions:
+
+```python
+df = spark.read.csv("data/sales.csv", header=True)
+print(df.rdd.getNumPartitions())  # e.g., 8
+```
+
+The default is controlled by:
+- `spark.sql.shuffle.partitions` (default: **200**) - for shuffle operations
+- `spark.default.parallelism` - for RDD operations
+- Input file size and block size (HDFS block = 128MB → 1 partition per block)
+
+---
+
+## repartition()
+
+`repartition(n)` creates exactly **n partitions** using a **full shuffle** of the data. It distributes data evenly across all partitions.
+
+```python
+# Repartition to 10 partitions
+df_repartitioned = df.repartition(10)
+print(df_repartitioned.rdd.getNumPartitions())  # 10
+
+# Repartition by a column (hash partitioning)
+df_by_col = df.repartition(10, "country")
+```
+
+### When to use repartition():
+- When you want to **increase** the number of partitions
+- When you need **even data distribution** before a join or aggregation
+- When partitioning by a specific column for downstream operations
+
+### How it works internally:
+- Performs a **full shuffle** (expensive network I/O)
+- Uses **hash partitioning** by default
+- All data moves across the network
+
+---
+
+## coalesce()
+
+`coalesce(n)` reduces the number of partitions to **n** with **minimal data movement**. It avoids a full shuffle by merging existing partitions on the same node.
+
+```python
+# Reduce to 2 partitions
+df_coalesced = df.coalesce(2)
+print(df_coalesced.rdd.getNumPartitions())  # 2
+```
+
+### When to use coalesce():
+- When you want to **decrease** the number of partitions
+- Before writing output to reduce the number of output files
+- When you want to **avoid the cost of a full shuffle**
+
+### How it works internally:
+- Moves data from some partitions into others on the **same executor** (no shuffle)
+- Can result in **uneven partition sizes** (some partitions may be larger)
+
+---
+
+## repartition vs coalesce - Side by Side
+
+| Feature | `repartition(n)` | `coalesce(n)` |
+|---|---|---|
+| Direction | Increase or decrease | Only decrease |
+| Shuffle | Full shuffle (expensive) | Minimal / no shuffle |
+| Data distribution | Even (balanced) | May be uneven |
+| Use case | Before joins, fix skew | Reducing files before write |
+| Performance | Slower (network I/O) | Faster |
+
+---
+
+## Practical Example
+
+```python
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("PartitionDemo").getOrCreate()
+
+df = spark.range(0, 1000000)  # 1 million rows
+
+# Default partitions
+print("Default:", df.rdd.getNumPartitions())
+
+# Increase partitions
+df_more = df.repartition(20)
+print("After repartition:", df_more.rdd.getNumPartitions())
+
+# Reduce partitions (with shuffle)
+df_less = df.repartition(5)
+print("After repartition to 5:", df_less.rdd.getNumPartitions())
+
+# Reduce partitions (without shuffle)
+df_coalesced = df.coalesce(5)
+print("After coalesce:", df_coalesced.rdd.getNumPartitions())
+
+# Write with fewer output files
+df_coalesced.write.mode("overwrite").csv("output/sales")
+```
+
+---
+
+## Partition by Column (Output Partitioning)
+
+This is different from in-memory partitioning - it controls **how data is written to disk**:
+
+```python
+# Write data partitioned by year and month (creates folder structure)
+df.write.partitionBy("year", "month").parquet("output/partitioned_sales")
+# Creates: output/partitioned_sales/year=2024/month=01/part-00000.parquet
+```
+
+This is extremely useful for **partition pruning** - when reading back, Spark only reads relevant folders:
+
+```python
+# Only reads year=2024/month=01 files - not the entire dataset
+spark.read.parquet("output/partitioned_sales").filter("year=2024 AND month='01'")
+```
+
+---
+
+## How Many Partitions Should You Have?
+
+A general rule of thumb:
+
+```
+Ideal partition size = 100MB to 200MB per partition
+Number of partitions = Total data size / Partition size
+```
+
+Also consider:
+- **Too few partitions** → underutilizes cluster, slow jobs
+- **Too many partitions** → scheduling overhead, tiny tasks, slow jobs
+- A good starting point: `2x to 4x the number of CPU cores in your cluster`
+
+---
+
+## Interview Tips 🎯
+
+> **Q: What is the difference between repartition and coalesce?**
+
+**Answer:** `repartition(n)` performs a full shuffle to evenly redistribute data into exactly n partitions - it can increase or decrease partition count. `coalesce(n)` reduces partitions with minimal data movement by merging local partitions, avoiding a full shuffle. Use `repartition` when you need even distribution (e.g., before a join), and `coalesce` when you just want fewer output files (e.g., before writing results).
+
+> **Q: When would you use partitionBy() while writing?**
+
+**Answer:** Use `partitionBy()` when writing data that will be queried with filters on specific columns (like date, country, region). It creates a folder hierarchy on disk and enables **partition pruning**, allowing Spark to skip reading irrelevant data entirely - dramatically improving read performance on large datasets.
+
+> **Q: What happens if you coalesce to more partitions than you currently have?**
+
+**Answer:** `coalesce()` cannot increase partition count. If you pass a number larger than the current partition count, it silently returns the original partition count unchanged. You must use `repartition()` to increase partitions.
+
+---
+
+## Summary
+
+- **Partitions** are Spark's unit of parallelism - each partition is processed by one task
+- **repartition(n)** does a full shuffle for even distribution (use to increase or fix skew)
+- **coalesce(n)** merges partitions locally with no shuffle (use to reduce output files)
+- **partitionBy()** during writes creates folder-based partitioning for efficient reads
+- Aim for partition sizes of **100–200MB** for optimal performance

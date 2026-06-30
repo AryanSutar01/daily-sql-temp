@@ -1,0 +1,284 @@
+# Delta Lake - ACID on Spark, Merge, Time Travel
+
+## What is Delta Lake?
+
+**Delta Lake** is an open-source storage layer that brings **ACID transactions** and **data reliability** to data lakes built on cloud object stores (S3, GCS, ADLS) or HDFS. It sits on top of Parquet files and adds a **transaction log** that enables features like:
+
+- ACID transactions (Atomicity, Consistency, Isolation, Durability)
+- Schema enforcement and evolution
+- Time travel (query historical versions of your data)
+- MERGE / UPSERT operations
+- Audit history
+
+Delta Lake is the foundation of the **Lakehouse architecture** - combining the scalability of a data lake with the reliability of a data warehouse.
+
+---
+
+## Why Do We Need Delta Lake?
+
+Without Delta Lake, raw data lakes on object stores have serious limitations:
+
+| Problem | Without Delta Lake | With Delta Lake |
+|---|---|---|
+| Partial writes | Readers see incomplete data | Atomic writes only |
+| Failed jobs | Corrupt/incomplete files in lake | Rolled back, no corruption |
+| Schema drift | Breaking changes silently corrupt data | Schema enforcement |
+| Update/delete records | Must rewrite entire partitions | Native MERGE/UPDATE/DELETE |
+| Audit trail | No history | Full transaction log |
+| Concurrent writers | Race conditions | Optimistic concurrency control |
+
+---
+
+## Getting Started with Delta Lake
+
+### Installation
+
+```python
+# In Databricks: Delta Lake is pre-installed
+# In PySpark: add the Delta Lake package
+# spark-submit --packages io.delta:delta-core_2.12:2.4.0 your_script.py
+```
+
+```python
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder \
+    .appName("DeltaDemo") \
+    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
+    .getOrCreate()
+```
+
+---
+
+## Writing Delta Tables
+
+```python
+# Write a DataFrame as Delta format
+df = spark.read.csv("data/orders.csv", header=True, inferSchema=True)
+
+df.write \
+  .format("delta") \
+  .mode("overwrite") \
+  .save("s3://my-bucket/delta/orders")
+
+# Or as a managed table in the catalog
+df.write \
+  .format("delta") \
+  .mode("overwrite") \
+  .saveAsTable("orders_delta")
+```
+
+---
+
+## Reading Delta Tables
+
+```python
+# Read from path
+df = spark.read.format("delta").load("s3://my-bucket/delta/orders")
+
+# Read from catalog table
+df = spark.table("orders_delta")
+
+df.show()
+```
+
+---
+
+## ACID Transactions
+
+Delta Lake wraps every write operation (insert, update, delete, merge) in a transaction. If the job fails halfway, the partial write is rolled back - readers never see incomplete data.
+
+```python
+from delta.tables import DeltaTable
+
+# This write is atomic - either fully committed or fully rolled back
+df_new_orders.write \
+    .format("delta") \
+    .mode("append") \
+    .save("s3://my-bucket/delta/orders")
+```
+
+The transaction log is stored at `s3://my-bucket/delta/orders/_delta_log/`:
+```
+_delta_log/
+  00000000000000000000.json   ← Transaction 0 (initial write)
+  00000000000000000001.json   ← Transaction 1 (append)
+  00000000000000000002.json   ← Transaction 2 (merge)
+  ...
+```
+
+---
+
+## Merge / Upsert (CDC Pattern)
+
+`MERGE` is one of Delta Lake's most powerful features - it lets you upsert (insert new rows + update existing rows) in a single atomic operation. This is perfect for **CDC (Change Data Capture)** pipelines.
+
+```python
+from delta.tables import DeltaTable
+from pyspark.sql import functions as F
+
+# The existing Delta table (target)
+delta_table = DeltaTable.forPath(spark, "s3://my-bucket/delta/orders")
+
+# New/updated records to merge in (source)
+updates_df = spark.read.parquet("data/daily_updates")
+
+# MERGE operation
+delta_table.alias("target") \
+    .merge(
+        updates_df.alias("source"),
+        "target.order_id = source.order_id"   # Match condition
+    ) \
+    .whenMatchedUpdate(set={                   # If match: update these columns
+        "status": F.col("source.status"),
+        "updated_at": F.col("source.updated_at"),
+        "amount": F.col("source.amount")
+    }) \
+    .whenNotMatchedInsert(values={             # If no match: insert new row
+        "order_id": F.col("source.order_id"),
+        "customer_id": F.col("source.customer_id"),
+        "status": F.col("source.status"),
+        "amount": F.col("source.amount"),
+        "created_at": F.col("source.created_at"),
+        "updated_at": F.col("source.updated_at")
+    }) \
+    .execute()
+```
+
+### Merge with delete:
+```python
+delta_table.alias("target") \
+    .merge(updates_df.alias("source"), "target.id = source.id") \
+    .whenMatchedDelete(condition="source.is_deleted = True") \
+    .whenMatchedUpdate(set={"name": F.col("source.name")}) \
+    .whenNotMatchedInsert(values={"id": F.col("source.id"), "name": F.col("source.name")}) \
+    .execute()
+```
+
+---
+
+## Time Travel
+
+Delta Lake retains all previous versions of data. You can query any historical version by version number or timestamp.
+
+```python
+# Query by version number
+df_v0 = spark.read.format("delta") \
+             .option("versionAsOf", 0) \
+             .load("s3://my-bucket/delta/orders")
+
+df_v2 = spark.read.format("delta") \
+             .option("versionAsOf", 2) \
+             .load("s3://my-bucket/delta/orders")
+
+# Query by timestamp
+df_yesterday = spark.read.format("delta") \
+                    .option("timestampAsOf", "2024-11-01") \
+                    .load("s3://my-bucket/delta/orders")
+
+# Using SQL syntax
+spark.sql("SELECT * FROM orders_delta VERSION AS OF 3").show()
+spark.sql("SELECT * FROM orders_delta TIMESTAMP AS OF '2024-11-01'").show()
+```
+
+### View transaction history:
+```python
+delta_table = DeltaTable.forPath(spark, "s3://my-bucket/delta/orders")
+delta_table.history().show(truncate=False)
+```
+
+```
++-------+--------------------+---------+--------------------+
+|version|           timestamp|operation|    operationMetrics|
++-------+--------------------+---------+--------------------+
+|      3|2024-11-03 10:00:00|    MERGE |{numTargetRowsIns..|
+|      2|2024-11-02 08:30:00|   APPEND |{numAddedFiles: 5}  |
+|      1|2024-11-01 06:00:00|   APPEND |{numAddedFiles: 3}  |
+|      0|2024-10-31 12:00:00|    WRITE |{numAddedFiles: 10} |
++-------+--------------------+---------+--------------------+
+```
+
+---
+
+## Schema Enforcement & Evolution
+
+### Schema Enforcement (default):
+```python
+# Delta Lake rejects writes that don't match the table schema
+df_with_wrong_schema.write \
+    .format("delta") \
+    .mode("append") \
+    .save("s3://my-bucket/delta/orders")
+# AnalysisException: A schema mismatch detected when writing to the Delta table
+```
+
+### Schema Evolution (opt-in):
+```python
+# Allow new columns to be added
+df_with_new_column.write \
+    .format("delta") \
+    .mode("append") \
+    .option("mergeSchema", "true") \
+    .save("s3://my-bucket/delta/orders")
+```
+
+---
+
+## Optimize and Z-Ordering
+
+Delta Lake supports table optimization to improve query performance:
+
+```python
+# Compact small files into larger ones
+delta_table.optimize().executeCompaction()
+
+# Z-ORDER: Co-locate related data in the same files for better filtering
+delta_table.optimize().executeZOrderBy("country", "product_id")
+# After Z-ORDER, queries filtering on country + product_id read far fewer files
+```
+
+---
+
+## Vacuum (Delete Old Versions)
+
+Time travel retains old data files. Use `VACUUM` to delete files older than a retention threshold:
+
+```python
+# Default retention: 7 days
+delta_table.vacuum()
+
+# Custom retention (be careful: this limits time travel)
+delta_table.vacuum(retentionHours=168)  # 7 days
+
+# SQL syntax
+spark.sql("VACUUM orders_delta RETAIN 168 HOURS")
+```
+
+---
+
+## Interview Tips 🎯
+
+> **Q: What is Delta Lake and what problems does it solve?**
+
+**Answer:** Delta Lake is an open-source storage layer that adds ACID transactions to data lakes. It solves the reliability problems of raw object store data lakes: partial writes leaving corrupt data, no support for updates/deletes, no schema enforcement, and no audit history. It stores data as Parquet files with a transaction log (`_delta_log`) that enables atomicity, time travel, and MERGE operations.
+
+> **Q: How does MERGE work in Delta Lake?**
+
+**Answer:** The MERGE (upsert) operation in Delta Lake takes a source dataset and a target Delta table, and for each source row: if a matching row exists in the target (based on a condition like `id = source.id`), it updates the target row; if no match exists, it inserts the source row as new. This is done atomically. It's the standard pattern for CDC (Change Data Capture) pipelines where you receive daily updates and need to apply them to a master table.
+
+> **Q: What is time travel in Delta Lake and how is it implemented?**
+
+**Answer:** Time travel lets you query historical versions of a Delta table using either a version number (`VERSION AS OF 5`) or a timestamp (`TIMESTAMP AS OF '2024-01-01'`). It works because Delta Lake never deletes data files when data is updated or overwritten - it just adds new files and writes a new transaction log entry marking old files as removed. The old files remain until you run `VACUUM`. To read an old version, Delta Lake uses the transaction log to reconstruct which files were part of that version.
+
+---
+
+## Summary
+
+- **Delta Lake** adds ACID transactions, time travel, and merge to data lakes
+- **Transaction log** (`_delta_log`) is the core mechanism - tracks every change
+- **MERGE**: atomic upsert - update existing rows + insert new rows in one operation
+- **Time travel**: query any historical version by version number or timestamp
+- **Schema enforcement**: rejects bad writes; schema evolution allows new columns with `mergeSchema`
+- **VACUUM**: deletes old data files to reclaim storage (limits time travel range)
+- Delta Lake is the storage layer behind the **Lakehouse architecture** (Databricks, Apache Iceberg, etc.)

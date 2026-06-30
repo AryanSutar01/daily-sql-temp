@@ -1,0 +1,241 @@
+## What Is Pandas?
+
+Pandas is Python's primary library for working with structured (tabular) data - think spreadsheets or SQL tables in memory.
+
+```
+Two core structures:
+- Series    - a 1D labeled array (one column)
+- DataFrame - a 2D labeled table (rows + columns)
+```
+
+```python
+import pandas as pd
+import numpy as np
+```
+
+## Series
+
+A Series is a one-dimensional array with labels (index).
+
+```python
+# Create from a list
+s = pd.Series([10, 20, 30, 40, 50])
+print(s)
+# 0    10
+# 1    20
+# 2    30
+# 3    40
+# 4    50
+# dtype: int64
+
+# Custom index
+s = pd.Series([10, 20, 30], index=["a", "b", "c"])
+print(s["b"])   # 20
+
+# From a dict
+s = pd.Series({"Alice": 95, "Bob": 82, "Carol": 91})
+print(s.index)    # Index(['Alice', 'Bob', 'Carol'])
+print(s.values)   # array([95, 82, 91])
+```
+
+### Series Operations
+
+```python
+s = pd.Series([10, 20, 30, 40, 50])
+
+s + 5           # [15, 25, 35, 45, 55]
+s * 2           # [20, 40, 60, 80, 100]
+s[s > 25]       # [30, 40, 50] - boolean filter
+s.mean()        # 30.0
+s.sum()         # 150
+s.max()         # 50
+s.describe()    # count, mean, std, min, quartiles, max
+```
+
+## DataFrame
+
+A DataFrame is a 2D table of rows and columns - each column is a Series.
+
+```python
+# From a dict of lists
+df = pd.DataFrame({
+    "name": ["Alice", "Bob", "Carol", "Dave"],
+    "age": [25, 30, 35, 28],
+    "salary": [70000, 85000, 92000, 78000],
+    "department": ["Engineering", "Marketing", "Engineering", "HR"],
+})
+
+print(df)
+#     name  age  salary   department
+# 0  Alice   25   70000  Engineering
+# 1    Bob   30   85000    Marketing
+# 2  Carol   35   92000  Engineering
+# 3   Dave   28   78000           HR
+```
+
+### Basic DataFrame Attributes
+
+```python
+df.shape        # (4, 4) - rows, columns
+df.dtypes       # column data types
+df.columns      # Index(['name', 'age', 'salary', 'department'])
+df.index        # RangeIndex(start=0, stop=4, step=1)
+df.info()       # column types + non-null counts
+df.describe()   # statistics for numeric columns
+df.head(2)      # first 2 rows
+df.tail(2)      # last 2 rows
+```
+
+## Selecting Data
+
+```python
+# Select a column - returns Series
+df["name"]
+df.name         # dot notation (only if column name has no spaces)
+
+# Select multiple columns - returns DataFrame
+df[["name", "salary"]]
+
+# Select rows by position - iloc
+df.iloc[0]         # first row as Series
+df.iloc[0:2]       # first 2 rows
+df.iloc[0:2, 1:3]  # rows 0-1, columns 1-2
+
+# Select rows by label - loc
+df.loc[0]          # row with index 0
+df.loc[0:2]        # rows 0 through 2 (inclusive)
+df.loc[0:2, ["name", "salary"]]  # rows 0-2, specific columns
+```
+
+## Filtering Rows
+
+```python
+# Boolean filter
+df[df["age"] > 28]
+df[df["department"] == "Engineering"]
+
+# Multiple conditions
+df[(df["age"] > 25) & (df["salary"] > 80000)]   # AND
+df[(df["department"] == "Engineering") | (df["department"] == "HR")]   # OR
+
+# isin - match a list of values
+df[df["department"].isin(["Engineering", "Marketing"])]
+
+# query method - SQL-like syntax
+df.query("age > 28 and salary > 80000")
+df.query("department in ['Engineering', 'HR']")
+```
+
+## Adding & Modifying Columns
+
+```python
+# Add new column
+df["bonus"] = df["salary"] * 0.1
+df["senior"] = df["age"] >= 30
+
+# Conditional column with np.where
+import numpy as np
+df["level"] = np.where(df["salary"] > 80000, "Senior", "Junior")
+
+# Apply a function to a column
+df["name_upper"] = df["name"].str.upper()
+df["salary_lakhs"] = df["salary"].apply(lambda x: x / 100000)
+
+# Rename columns
+df.rename(columns={"name": "full_name", "age": "age_years"}, inplace=True)
+
+# Drop columns
+df.drop(columns=["bonus", "senior"], inplace=True)
+```
+
+## Sorting
+
+```python
+df.sort_values("salary", ascending=False)
+df.sort_values(["department", "salary"], ascending=[True, False])
+df.sort_values("salary").reset_index(drop=True)
+```
+
+## Reading & Writing Data
+
+```python
+# Read
+df = pd.read_csv("data.csv")
+df = pd.read_csv("data.csv", sep=";", encoding="utf-8")
+df = pd.read_csv("data.csv", parse_dates=["date_column"])
+df = pd.read_excel("data.xlsx", sheet_name="Sheet1")
+df = pd.read_json("data.json")
+df = pd.read_parquet("data.parquet")
+
+# from a database
+import sqlalchemy
+engine = sqlalchemy.create_engine("postgresql://user:pass@host/db")
+df = pd.read_sql("SELECT * FROM orders", engine)
+
+# Write
+df.to_csv("output.csv", index=False)
+df.to_excel("output.xlsx", index=False)
+df.to_parquet("output.parquet", index=False)
+df.to_json("output.json", orient="records")
+df.to_sql("table_name", engine, if_exists="append", index=False)
+```
+
+## Handling Missing Data
+
+```python
+df = pd.DataFrame({
+    "name": ["Alice", "Bob", None, "Dave"],
+    "age": [25, None, 35, 28],
+    "salary": [70000, 85000, 92000, None],
+})
+
+df.isnull()             # boolean mask of NaN locations
+df.isnull().sum()       # count NaN per column
+df.dropna()             # drop rows with any NaN
+df.dropna(subset=["age"])  # drop rows where age is NaN
+df.fillna(0)            # fill NaN with 0
+df.fillna({"age": df["age"].mean(), "salary": 0})  # fill per column
+df["age"].fillna(df["age"].median(), inplace=True)
+```
+
+## String Operations
+
+```python
+df["name"].str.upper()
+df["name"].str.lower()
+df["name"].str.strip()
+df["name"].str.contains("Ali")
+df["name"].str.startswith("A")
+df["name"].str.replace("Alice", "Alicia")
+df["name"].str.split(" ", expand=True)   # split into multiple columns
+df["name"].str.len()
+```
+
+## Interview Questions
+
+**Q: What is the difference between `loc` and `iloc`?**
+`loc` selects by label (index name or column name). `iloc` selects by integer position (0-based). With a default integer index they often give the same result, but they differ when you have a custom index or after filtering and resetting.
+
+**Q: What is the difference between a Series and a DataFrame?**
+A Series is one-dimensional - a single column with an index. A DataFrame is two-dimensional - a table of multiple columns, where each column is a Series sharing the same index.
+
+**Q: How do you select rows where multiple conditions are true?**
+Use `&` (AND) or `|` (OR) with boolean masks: `df[(df["age"] > 25) & (df["salary"] > 80000)]`. Each condition must be in parentheses. Alternatively use `df.query("age > 25 and salary > 80000")`.
+
+**Q: What is `inplace=True` in pandas?**
+By default, most pandas operations return a new DataFrame and leave the original unchanged. `inplace=True` modifies the original DataFrame directly without needing to reassign. However, using reassignment (`df = df.sort_values(...)`) is often preferred for clarity.
+
+**Q: How do you handle missing values in pandas?**
+Use `isnull().sum()` to count NaNs, `dropna()` to remove rows with NaN, and `fillna()` to replace NaN with a value (0, mean, median, forward fill, etc.). The best approach depends on context - imputing with the mean/median is common for numeric columns.
+
+## Summary
+
+- **Series** - 1D labeled array; each element has an index label
+- **DataFrame** - 2D table; each column is a Series sharing the same index
+- `iloc` - select by integer position; `loc` - select by label
+- Boolean filtering: `df[df["col"] > value]`; multiple: `(cond1) & (cond2)`
+- `df.query()` - SQL-like string filter syntax
+- `isnull()`, `dropna()`, `fillna()` - handle missing values
+- `str.upper()`, `str.contains()`, `str.split()` - string column operations
+- `read_csv()`, `read_parquet()`, `read_sql()` - ingest data from many sources
+- `to_csv()`, `to_parquet()`, `to_sql()` - write data to file or database

@@ -1,0 +1,165 @@
+## Creating Strings
+
+```python
+s1 = "Hello"
+s2 = 'World'
+s3 = """Multiline
+string"""
+s4 = r"C:\Users\Alice"   # raw string - backslashes are literal
+s5 = b"bytes"            # bytes, not str
+```
+
+## String Indexing & Slicing
+
+```python
+s = "Python"
+#    012345   (positive index)
+#   -654321   (negative index)
+
+s[0]     # 'P'
+s[-1]    # 'n'
+s[1:4]   # 'yth'
+s[:3]    # 'Pyt'
+s[3:]    # 'hon'
+s[::2]   # 'Pto' - every other character
+s[::-1]  # 'nohtyP' - reversed
+```
+
+## Common String Methods
+
+```python
+s = "  Hello, World!  "
+
+s.strip()          # "Hello, World!" - remove leading/trailing whitespace
+s.lstrip()         # "Hello, World!  " - left only
+s.rstrip()         # "  Hello, World!" - right only
+s.lower()          # "  hello, world!  "
+s.upper()          # "  HELLO, WORLD!  "
+s.title()          # "  Hello, World!  "
+s.capitalize()     # "  hello, world!  " - only first char capitalized
+
+s = "Hello, World!"
+s.replace("World", "Python")   # "Hello, Python!"
+s.split(", ")                  # ["Hello", "World!"]
+s.split()                      # ["Hello,", "World!"] - splits on whitespace
+",".join(["a", "b", "c"])     # "a,b,c"
+s.startswith("Hello")          # True
+s.endswith("!")                # True
+s.find("World")                # 7 - index of first occurrence; -1 if not found
+s.index("World")               # 7 - same but raises ValueError if not found
+s.count("l")                   # 3
+s.strip().lower()              # chain methods
+```
+
+## String Formatting
+
+```python
+name = "Alice"
+age = 30
+score = 95.678
+
+# f-strings (Python 3.6+) - preferred
+print(f"Name: {name}, Age: {age}")
+print(f"Score: {score:.2f}")        # 95.68 - 2 decimal places
+print(f"{'left':<10}")              # left-aligned, width 10
+print(f"{'right':>10}")             # right-aligned
+print(f"{42:05d}")                  # 00042 - zero-padded
+
+# .format()
+print("Name: {}, Age: {}".format(name, age))
+print("Name: {name}".format(name="Alice"))
+
+# % formatting (old style)
+print("Name: %s, Age: %d" % (name, age))
+```
+
+## String Checks
+
+```python
+s = "Hello123"
+s.isdigit()      # False - not all digits
+"123".isdigit()  # True
+s.isalpha()      # False - not all letters
+"Hello".isalpha()# True
+s.isalnum()      # True - letters and digits
+" ".isspace()    # True
+"hello".islower()# True
+"HELLO".isupper()# True
+"Hello".istitle()# True
+```
+
+## Immutability
+
+Strings are immutable - you cannot change individual characters:
+
+```python
+s = "Hello"
+s[0] = "J"   # TypeError - strings are immutable
+
+# Create a new string instead
+s = "J" + s[1:]   # "Jello"
+s = s.replace("H", "J")   # "Jello"
+```
+
+## String Concatenation
+
+```python
+# Concatenation with + (creates new string each time)
+result = "Hello" + ", " + "World"
+
+# Join - efficient for many strings
+words = ["Hello", "World", "Python"]
+result = " ".join(words)   # "Hello World Python"
+
+# f-string - clearest for embedding variables
+name = "Alice"
+result = f"Hello, {name}!"
+```
+
+## Useful String Patterns
+
+```python
+# Check if string contains a substring
+"Python" in "I love Python"   # True
+"Java" not in "I love Python" # True
+
+# Split and rejoin
+csv = "a,b,c,d"
+parts = csv.split(",")         # ['a', 'b', 'c', 'd']
+rejoined = ",".join(parts)     # "a,b,c,d"
+
+# Strip and split for input parsing
+line = "  Alice , 30 , Engineer  "
+fields = [f.strip() for f in line.split(",")]
+# ['Alice', '30', 'Engineer']
+
+# Multiline strings
+query = """
+    SELECT *
+    FROM users
+    WHERE active = TRUE
+"""
+```
+
+## Interview Questions
+
+**Q: Are strings mutable in Python?**
+No. Strings are immutable - once created, they cannot be changed. Any operation that appears to modify a string (like `replace` or `upper`) actually returns a new string. This makes strings hashable and safe to use as dictionary keys.
+
+**Q: What is the difference between `find()` and `index()`?**
+Both return the index of the first occurrence of a substring. `find()` returns `-1` if the substring is not found. `index()` raises a `ValueError` if the substring is not found. Use `find()` when absence is a valid case; use `index()` when absence is an error.
+
+**Q: How do you reverse a string in Python?**
+Use slicing with a step of -1: `s[::-1]`. Or `"".join(reversed(s))`. The slicing approach is most idiomatic and fastest.
+
+**Q: What is an f-string?**
+An f-string (formatted string literal, Python 3.6+) is a string prefixed with `f` that allows embedding Python expressions directly inside `{}`. It's the preferred way to format strings - readable, fast, and supports format specifiers like `{value:.2f}`.
+
+## Summary
+
+- Strings are immutable sequences of Unicode characters
+- Indexing: `s[0]`, `s[-1]`; slicing: `s[start:stop:step]`; reverse: `s[::-1]`
+- Key methods: `strip()`, `split()`, `join()`, `replace()`, `find()`, `startswith()`, `endswith()`
+- f-strings are the preferred way to format: `f"Hello, {name}!"`
+- `in` operator checks membership: `"py" in "python"` → `True`
+- Use `"separator".join(list)` for efficient multi-string concatenation

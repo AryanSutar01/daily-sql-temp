@@ -1,0 +1,194 @@
+## Lists - Ordered, Mutable Sequences
+
+```python
+# Create
+lst = [1, 2, 3, 4, 5]
+mixed = [1, "hello", 3.14, True, None]
+nested = [[1, 2], [3, 4]]
+empty = []
+
+# Access
+lst[0]     # 1
+lst[-1]    # 5
+lst[1:3]   # [2, 3]
+
+# Modify
+lst.append(6)           # [1,2,3,4,5,6]
+lst.insert(1, 99)       # [1,99,2,3,4,5,6]
+lst.extend([7, 8])      # add multiple
+lst.remove(99)          # removes first occurrence of value
+lst.pop()               # removes and returns last element
+lst.pop(0)              # removes and returns element at index 0
+lst[0] = 100            # update by index
+del lst[0]              # delete by index
+
+# Info
+len(lst)
+lst.index(3)            # find index of value (ValueError if not found)
+lst.count(3)            # count occurrences
+3 in lst                # membership check
+
+# Sorting
+lst.sort()                    # in-place sort
+lst.sort(reverse=True)
+sorted(lst)                   # returns new sorted list
+sorted(lst, key=lambda x: -x) # sort by key
+
+# Other
+lst.reverse()           # in-place reverse
+lst.copy()              # shallow copy
+lst.clear()             # removes all elements
+```
+
+## Tuples - Ordered, Immutable Sequences
+
+```python
+# Create
+t = (1, 2, 3)
+single = (1,)        # trailing comma required for single-element tuple
+empty = ()
+t = 1, 2, 3          # parentheses optional
+
+# Access - same as list
+t[0]      # 1
+t[-1]     # 3
+t[0:2]    # (1, 2)
+
+# Immutable - cannot modify
+t[0] = 99   # TypeError
+
+# Unpack
+a, b, c = (1, 2, 3)
+first, *rest = (1, 2, 3, 4, 5)  # first=1, rest=[2,3,4,5]
+
+# Convert
+list((1, 2, 3))   # [1, 2, 3]
+tuple([1, 2, 3])  # (1, 2, 3)
+```
+
+## Sets - Unordered, Unique Elements
+
+```python
+# Create
+s = {1, 2, 3, 4}
+s = set([1, 2, 2, 3])   # {1, 2, 3} - duplicates removed
+empty = set()            # NOT {} - that's an empty dict
+
+# Add / Remove
+s.add(5)
+s.remove(5)      # KeyError if not found
+s.discard(99)    # no error if not found
+
+# Membership - O(1)
+3 in s    # True
+
+# Set operations
+a = {1, 2, 3, 4}
+b = {3, 4, 5, 6}
+
+a | b    # union:        {1,2,3,4,5,6}
+a & b    # intersection: {3,4}
+a - b    # difference:   {1,2}
+a ^ b    # symmetric diff: {1,2,5,6}
+
+# Check relationships
+{1,2}.issubset({1,2,3})       # True
+{1,2,3}.issuperset({1,2})     # True
+{1,2}.isdisjoint({3,4})       # True - no common elements
+```
+
+## Dicts - Key-Value Pairs
+
+```python
+# Create
+d = {"name": "Alice", "age": 30, "city": "Mumbai"}
+d = dict(name="Alice", age=30)
+d = dict([("name", "Alice"), ("age", 30)])
+empty = {}
+
+# Access
+d["name"]           # "Alice"
+d.get("name")       # "Alice"
+d.get("missing")    # None - no KeyError
+d.get("missing", "default")   # "default"
+
+# Modify
+d["email"] = "alice@example.com"   # add/update
+del d["city"]
+d.pop("age")           # remove and return value
+d.update({"age": 31, "city": "Delhi"})   # merge
+
+# Iteration
+d.keys()     # dict_keys(['name', 'age', ...])
+d.values()   # dict_values(['Alice', 30, ...])
+d.items()    # dict_items([('name', 'Alice'), ...])
+
+for key, value in d.items():
+    print(f"{key}: {value}")
+
+# Check membership
+"name" in d       # True - checks keys
+"Alice" in d      # False - 'in' only checks keys
+
+# Other
+len(d)
+d.copy()
+d.clear()
+d.setdefault("score", 0)   # set key if not already present
+```
+
+## Choosing the Right Collection
+
+```python
+# List - ordered, duplicates allowed, mutable
+# Use when: sequence of items, order matters, need to modify
+tasks = ["buy milk", "write code", "exercise"]
+
+# Tuple - ordered, immutable, hashable
+# Use when: data shouldn't change, coordinates, dictionary keys, return multiple values
+point = (10.5, 20.3)
+def get_name_age(): return ("Alice", 30)
+
+# Set - unordered, unique, fast membership test
+# Use when: removing duplicates, membership testing, set operations
+unique_visitors = {101, 102, 103}
+if user_id in unique_visitors: ...
+
+# Dict - key-value mapping, fast lookup by key
+# Use when: associating keys with values, counting, grouping
+word_count = {"python": 42, "sql": 38}
+```
+
+## Comprehensions (Preview)
+
+```python
+squares = [x**2 for x in range(10)]
+even = {x for x in range(20) if x % 2 == 0}
+word_len = {word: len(word) for word in ["hello", "world"]}
+```
+
+## Interview Questions
+
+**Q: What is the difference between a list and a tuple?**
+Lists are mutable (can be changed) and use more memory. Tuples are immutable (cannot be changed), are slightly faster, use less memory, and are hashable - so they can be used as dictionary keys or set elements. Use tuples for data that shouldn't change.
+
+**Q: How is a set different from a list?**
+Sets are unordered and only store unique elements. They use a hash table internally, making membership testing O(1) instead of O(n) for lists. Use sets when you need uniqueness or fast `in` checks. Sets cannot hold unhashable types (lists, dicts).
+
+**Q: What is the time complexity of dictionary lookups?**
+Dictionary lookups are O(1) on average. Python dicts use a hash table - the key is hashed and the corresponding value is retrieved directly. Worst case (hash collisions) is O(n), but this is extremely rare in practice.
+
+**Q: How do you remove duplicates from a list?**
+Convert to a set: `list(set(lst))`. This loses order. To preserve order (Python 3.7+): `list(dict.fromkeys(lst))` - dicts maintain insertion order and using a key twice keeps only the first occurrence.
+
+**Q: What is the difference between `remove()` and `pop()` on a list?**
+`remove(value)` finds and removes the first occurrence of a value - raises `ValueError` if not found. `pop(index)` removes and returns the element at a given index (default: last element) - raises `IndexError` if out of range.
+
+## Summary
+
+- **List** `[]` - ordered, mutable, allows duplicates; use `.append()`, `.pop()`, `.sort()`
+- **Tuple** `()` - ordered, immutable, hashable; use for fixed data, multiple return values
+- **Set** `{}` - unordered, unique elements, O(1) membership; use `|`, `&`, `-`, `^` for set ops
+- **Dict** `{}` - key-value pairs, O(1) lookup; use `.get()`, `.items()`, `.update()`
+- Empty set must be `set()` - `{}` creates an empty dict
+- List membership `in` is O(n); set/dict membership `in` is O(1)

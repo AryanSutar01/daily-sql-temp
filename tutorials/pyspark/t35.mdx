@@ -1,0 +1,288 @@
+# PySpark on Databricks / EMR / GCP Dataproc
+
+## Overview
+
+PySpark runs in the cloud through managed platforms that handle cluster provisioning, scaling, and infrastructure. The three most common platforms are:
+
+| Platform | Cloud | Provider |
+|---|---|---|
+| **Databricks** | AWS / Azure / GCP | Databricks (founded by Spark creators) |
+| **Amazon EMR** | AWS | Amazon Web Services |
+| **GCP Dataproc** | GCP | Google Cloud Platform |
+
+Each offers a different experience with different tradeoffs in terms of ease of use, cost, features, and flexibility.
+
+---
+
+## 1. Databricks
+
+### What is Databricks?
+
+Databricks is a **unified data analytics platform** built on top of Apache Spark. It was created by the original creators of Spark and offers the most feature-rich and developer-friendly Spark experience.
+
+### Key Features
+
+- **Databricks Runtime**: Optimized Spark runtime - faster than open-source Spark (Photon engine, Delta optimizations)
+- **Notebooks**: Collaborative web-based notebooks (Python, SQL, Scala, R)
+- **Delta Lake**: First-class Delta Lake support - built in, no setup needed
+- **Unity Catalog**: Unified governance for data, models, and notebooks
+- **MLflow**: Built-in ML lifecycle tracking
+- **Databricks SQL**: SQL warehouse for BI workloads
+- **Workflows**: Orchestrate multi-task pipelines (DAGs) natively
+- **Auto-scaling clusters**: Automatically adds/removes workers based on load
+
+### Cluster Types
+
+```
+Interactive Cluster:    Persistent, multi-user, for development/notebooks
+                        Workers stay running until manually stopped
+
+Job Cluster:            Ephemeral, created for a job, terminated when done
+                        Cost-efficient for production workloads
+
+SQL Warehouse:          Serverless, optimized for SQL/BI queries
+                        Auto-scales, only pay when queries run
+```
+
+### Running PySpark on Databricks
+
+```python
+# In a Databricks notebook - SparkSession is pre-created as `spark`
+# No setup needed!
+
+df = spark.read.format("delta").load("/mnt/delta/orders")
+df.filter("status = 'completed'").groupBy("region").count().display()
+
+# Databricks-specific: display() renders charts and tables in the notebook
+```
+
+### Mounting Cloud Storage
+
+```python
+# Mount S3 bucket (AWS)
+dbutils.fs.mount(
+    source="s3a://my-bucket/data",
+    mount_point="/mnt/my-data",
+    extra_configs={"fs.s3a.access.key": "...", "fs.s3a.secret.key": "..."}
+)
+
+# Or use IAM roles (recommended for production)
+spark.read.parquet("s3://my-bucket/data/orders")
+```
+
+### Running Jobs
+
+```python
+# databricks CLI to submit a job
+databricks jobs create --json '{
+  "name": "Daily Orders ETL",
+  "tasks": [{
+    "task_key": "etl",
+    "spark_python_task": {
+      "python_file": "dbfs:/jobs/orders_etl.py"
+    },
+    "job_cluster_key": "etl-cluster"
+  }]
+}'
+```
+
+### Cost Model
+- Pay for DBUs (Databricks Units) + underlying VM cost
+- Higher cost than raw EMR/Dataproc but includes managed Delta Lake, Unity Catalog, MLflow, etc.
+- Spot/preemptible instances reduce cost significantly
+
+---
+
+## 2. Amazon EMR (Elastic MapReduce)
+
+### What is EMR?
+
+**Amazon EMR** is AWS's managed big data platform. It provisions clusters of EC2 instances with pre-installed frameworks - Spark, Hadoop, Hive, Presto, HBase, and more.
+
+### Key Features
+
+- **EMR on EC2**: Traditional cluster (master + worker nodes)
+- **EMR Serverless**: Fully serverless - no cluster management, auto-scaling, pay per use
+- **EMR on EKS**: Run Spark on Kubernetes (Amazon EKS)
+- **EMR Studio**: Web-based notebook environment
+- **Deep AWS integration**: S3 (EMRFS), Glue Catalog, Athena, IAM, CloudWatch
+- **Spot instances**: Significant cost savings (60-90% cheaper than on-demand)
+
+### Submitting PySpark Jobs to EMR
+
+```bash
+# Submit via AWS CLI (step)
+aws emr add-steps \
+    --cluster-id j-XXXXXXXXX \
+    --steps Type=spark,Name="Orders ETL",ActionOnFailure=CONTINUE,\
+Args=[--deploy-mode,cluster,--master,yarn,s3://my-bucket/scripts/orders_etl.py]
+```
+
+```python
+# PySpark script running on EMR (orders_etl.py)
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder \
+    .appName("OrdersETL") \
+    .enableHiveSupport() \
+    .getOrCreate()
+
+# S3 is the native storage on EMR (via EMRFS)
+df = spark.read.parquet("s3://my-bucket/raw/orders/")
+result = df.filter("status = 'completed'").groupBy("region").count()
+result.write.mode("overwrite").parquet("s3://my-bucket/processed/order_counts/")
+```
+
+### EMR Serverless
+
+```python
+# EMR Serverless - no cluster management at all
+# Submit jobs via API or console; auto-provisioned and terminated
+
+import boto3
+
+client = boto3.client("emr-serverless", region_name="us-east-1")
+
+response = client.start_job_run(
+    applicationId="app-xxxxxxxxxxxx",
+    executionRoleArn="arn:aws:iam::123456789:role/EMRServerlessRole",
+    jobDriver={
+        "sparkSubmit": {
+            "entryPoint": "s3://my-bucket/scripts/orders_etl.py",
+            "sparkSubmitParameters": "--conf spark.executor.memory=4G --conf spark.executor.cores=2"
+        }
+    }
+)
+```
+
+### Glue Catalog Integration
+
+```python
+# Use AWS Glue Catalog as Hive Metastore
+spark = SparkSession.builder \
+    .appName("GlueCatalogApp") \
+    .config("hive.metastore.client.factory.class",
+            "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory") \
+    .enableHiveSupport() \
+    .getOrCreate()
+
+# Now you can query Glue catalog tables directly
+spark.sql("SELECT * FROM my_glue_database.orders_table").show()
+```
+
+### Cost Model
+- Pay for EC2 instance cost (on-demand or spot)
+- No platform fee (unlike Databricks)
+- Cheapest option if you're comfortable with more manual setup
+- Spot instances can cut costs by 60-90%
+
+---
+
+## 3. GCP Dataproc
+
+### What is Dataproc?
+
+**Google Cloud Dataproc** is GCP's managed Spark and Hadoop service. It provisions clusters quickly (90 seconds) and integrates natively with GCP services like GCS, BigQuery, Pub/Sub, and Cloud Storage.
+
+### Key Features
+
+- **Fast cluster creation**: Clusters ready in ~90 seconds
+- **Dataproc Serverless**: Fully serverless Spark - no cluster management
+- **GCS as native storage**: Use `gs://` paths directly (like S3 on EMR)
+- **BigQuery connector**: Read/write BigQuery tables directly from Spark
+- **Cloud Composer integration**: Orchestrate Dataproc jobs with Apache Airflow
+- **Preemptible VMs**: Low-cost spot instances for worker nodes
+
+### Submitting PySpark Jobs to Dataproc
+
+```bash
+# Submit a PySpark job via gcloud CLI
+gcloud dataproc jobs submit pyspark \
+    --cluster=my-cluster \
+    --region=us-central1 \
+    gs://my-bucket/scripts/orders_etl.py \
+    -- --input=gs://my-bucket/raw/ --output=gs://my-bucket/processed/
+```
+
+### Dataproc Serverless (Recommended for new workloads)
+
+```bash
+# Submit serverless batch job - no cluster to manage
+gcloud dataproc batches submit pyspark \
+    gs://my-bucket/scripts/orders_etl.py \
+    --region=us-central1 \
+    --deps-bucket=gs://my-bucket/deps/ \
+    --properties=spark.executor.memory=4g,spark.executor.cores=2
+```
+
+### PySpark with BigQuery
+
+```python
+# Read from BigQuery directly into Spark
+df = spark.read \
+    .format("bigquery") \
+    .option("table", "my-project.my_dataset.orders") \
+    .load()
+
+# Write results back to BigQuery
+result.write \
+    .format("bigquery") \
+    .option("table", "my-project.my_dataset.order_aggregates") \
+    .option("temporaryGcsBucket", "my-temp-bucket") \
+    .mode("overwrite") \
+    .save()
+```
+
+### PySpark with GCS
+
+```python
+# GCS paths work natively on Dataproc
+df = spark.read.parquet("gs://my-bucket/raw/orders/")
+result.write.mode("overwrite").parquet("gs://my-bucket/processed/")
+```
+
+### Cost Model
+- Pay for GCE VM cost (preemptible or on-demand)
+- No platform fee beyond VM and storage costs
+- Serverless: pay per vCPU-second and memory-GB-second
+
+---
+
+## Platform Comparison
+
+| Feature | Databricks | EMR | Dataproc |
+|---|---|---|---|
+| Setup complexity | Low (managed) | Medium | Low-Medium |
+| Cost | Higher (DBU + VM) | Lowest (VM only) | Low (VM only) |
+| Delta Lake | Native, optimized | Available | Available |
+| Notebook experience | Best-in-class | EMR Studio (limited) | Jupyter (via component) |
+| ML support | MLflow built-in | Manual setup | Vertex AI integration |
+| Serverless option | Yes (SQL, Jobs) | EMR Serverless | Dataproc Serverless |
+| Cloud | AWS/Azure/GCP | AWS only | GCP only |
+| Best for | Teams needing managed lakehouse | Cost-conscious AWS-native teams | GCP-native teams |
+
+---
+
+## Interview Tips 🎯
+
+> **Q: What is the difference between Databricks and EMR for running PySpark?**
+
+**Answer:** Both run PySpark, but Databricks is a fully managed platform with a superior developer experience - collaborative notebooks, built-in Delta Lake, Unity Catalog, MLflow, and an optimized Spark runtime (Photon engine). EMR is AWS's more bare-bones managed Hadoop/Spark service - lower cost since you only pay for EC2, but requires more setup and management. Databricks is preferred for teams building lakehouse architectures; EMR is preferred for cost-sensitive AWS workloads where teams are comfortable with more infrastructure management.
+
+> **Q: What is Dataproc Serverless?**
+
+**Answer:** Dataproc Serverless is GCP's fully serverless Spark execution environment - you submit a PySpark script without provisioning or managing any cluster. GCP automatically provisions resources, scales them during execution, and tears them down afterward. You pay only for the vCPU and memory used during execution. It's ideal for event-driven or irregular batch jobs where you don't want idle cluster costs.
+
+> **Q: How do you read from S3 in a PySpark job running on EMR?**
+
+**Answer:** On EMR, S3 access is handled by EMRFS (EMR File System), which allows you to use `s3://` paths directly in PySpark without any additional configuration. If the EMR cluster has an IAM role with S3 permissions, you simply use: `spark.read.parquet("s3://my-bucket/data/")`. No access keys are needed when using IAM roles.
+
+---
+
+## Summary
+
+- **Databricks**: Best managed PySpark experience - built-in Delta Lake, MLflow, notebooks, Photon engine; higher cost but saves engineering time
+- **EMR**: AWS-native, lowest cost, most flexible; EMR Serverless is great for serverless workloads; integrates with Glue Catalog, Athena
+- **Dataproc**: GCP-native, fast cluster spin-up, native BigQuery integration; Dataproc Serverless for no-cluster workflows
+- All three support Parquet, Delta, Kafka, and standard PySpark APIs
+- Choose based on: **cloud provider lock-in**, **cost sensitivity**, **team expertise**, and **need for managed services vs. control**

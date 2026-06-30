@@ -1,0 +1,233 @@
+## The Core Distinction
+
+Every operation in PySpark is either a **transformation** or an **action**. This is one of the most fundamental concepts in Spark - and the most common interview question at every level.
+
+| | Transformation | Action |
+|---|---|---|
+| **What it does** | Defines a new DataFrame/RDD from an existing one | Triggers actual computation and returns a result |
+| **Execution** | Lazy - builds a plan, no work done | Eager - submits the job, work happens now |
+| **Return type** | DataFrame or RDD | Python value, file, or side effect |
+| **Example** | `filter()`, `select()`, `groupBy()` | `show()`, `count()`, `collect()`, `write` |
+
+## Transformations - Lazy Operations
+
+Transformations describe **what to do**, not **do it right now**. Spark builds up a plan (DAG) but waits.
+
+```python
+df = spark.read.csv("sales.csv", header=True, inferSchema=True)
+
+# All of these are TRANSFORMATIONS - nothing executes yet
+df_2024 = df.filter(df.year == 2024)           # step 1: filter
+df_big = df_2024.filter(df_2024.amount > 1000) # step 2: another filter
+df_grp = df_big.groupBy("region")              # step 3: group
+df_agg = df_grp.sum("amount")                  # step 4: aggregate
+df_out = df_agg.orderBy("sum(amount)", ascending=False)  # step 5: sort
+
+# Still nothing has executed.
+# Spark has only built a DAG describing these 5 steps.
+print("Plan built - no data processed yet")
+```
+
+### Narrow vs Wide Transformations
+
+This sub-distinction matters for performance and shuffle behavior:
+
+```
+Narrow Transformations:
+Each input partition produces exactly one output partition.
+No data moves between executors.
+
+  Partition 0 → [filter] → Partition 0 (subset)
+  Partition 1 → [filter] → Partition 1 (subset)
+  Partition 2 → [filter] → Partition 2 (subset)
+
+Wide Transformations (Shuffle):
+Output partitions depend on data from multiple input partitions.
+Data moves across the network between executors.
+
+  Partition 0 ─┐
+  Partition 1 ─┼→ [groupBy / join / sort] → redistributed partitions
+  Partition 2 ─┘
+  (data moved across network - expensive!)
+```
+
+**Narrow transformations** (no shuffle):
+```python
+df.filter(col("amount") > 100)          # filter rows
+df.select("id", "name", "amount")       # select columns
+df.withColumn("tax", col("amount") * 0.18)  # add column
+df.map(lambda x: ...)                   # RDD map
+df.flatMap(lambda x: ...)               # RDD flatMap
+df.union(df2)                           # union (if same partitioning)
+df.limit(100)                           # limit rows
+```
+
+**Wide transformations** (cause shuffle):
+```python
+df.groupBy("region").sum("amount")      # groupBy + aggregate
+df.orderBy("amount")                    # global sort
+df.join(other, "id", "inner")           # join
+df.distinct()                           # deduplicate
+df.repartition(50)                      # repartition
+```
+
+## Actions - Trigger Execution
+
+Actions tell Spark: **"I need the result now."** They trigger the entire DAG execution.
+
+```python
+# Continuing from above:
+result = df_out.collect()     # ← ACTION: triggers all 5 steps, returns list to driver
+
+# Or
+df_out.show()                 # ← ACTION: triggers execution, prints to console
+df_out.count()                # ← ACTION: triggers execution, returns integer
+```
+
+### Common Actions
+
+```python
+df = spark.read.parquet("sales.parquet")
+
+# --- Return data to driver ---
+df.collect()             # returns List[Row] - ALL rows! Dangerous for large data
+df.take(10)              # returns first 10 rows as List[Row]
+df.first()               # returns first row as Row object
+df.head(5)               # returns first 5 rows
+df.toPandas()            # converts entire DataFrame to pandas (driver memory!)
+
+# --- Aggregations ---
+df.count()               # returns total row count as integer
+df.describe().show()     # summary statistics
+
+# --- Display ---
+df.show()                # prints first 20 rows to console
+df.show(50)              # prints first 50 rows
+df.show(truncate=False)  # don't truncate long strings
+
+# --- Write to storage ---
+df.write.parquet("output/")       # write is an action
+df.write.csv("output/")
+df.write.saveAsTable("my_table")
+
+# --- RDD actions ---
+rdd.collect()
+rdd.count()
+rdd.reduce(lambda a, b: a + b)
+rdd.saveAsTextFile("output/")
+rdd.foreach(print)               # run function on each element (no return)
+```
+
+## The Lazy Evaluation Payoff
+
+Why is laziness good? Because Spark can **optimize the full plan** before executing anything.
+
+```python
+# Without optimization:
+# You might write this and fear it reads all columns
+df = spark.read.parquet("huge_table_with_100_columns.parquet")
+result = df.filter(df.year == 2024).select("id", "amount")
+result.show()
+
+# What actually happens:
+# Catalyst sees: "filter year=2024, then select id and amount"
+# Optimizer pushes column selection and filter DOWN to the file reader
+# Parquet only reads 'year', 'id', 'amount' columns - not all 100!
+# Only rows where year=2024 are loaded
+# This is called predicate pushdown + column pruning
+```
+
+### Another Optimization Example
+
+```python
+df = spark.read.parquet("logs.parquet")
+
+# You write 3 filters separately
+step1 = df.filter(df.status == "ERROR")
+step2 = step1.filter(df.level == "CRITICAL")
+step3 = step2.filter(df.timestamp > "2024-01-01")
+
+# Catalyst combines all 3 into a single filter pass
+# Status AND level AND timestamp - one scan
+step3.count()  # only one pass through the data
+```
+
+## Checking the DAG - `.explain()`
+
+Before running an action, view the execution plan:
+
+```python
+df = spark.read.parquet("sales.parquet")
+result = df.filter(df.amount > 1000).groupBy("region").sum("amount")
+
+# Print the physical execution plan
+result.explain()
+# == Physical Plan ==
+# AdaptiveSparkPlan isFinalPlan=false
+# +- HashAggregate(keys=[region], functions=[sum(amount)])
+#    +- Exchange hashpartitioning(region, 200), ENSURE_REQUIREMENTS, [plan_id=...]
+#       +- HashAggregate(keys=[region], functions=[partial_sum(amount)])
+#          +- Project [region, amount]
+#             +- Filter (isnotnull(amount) AND (amount > 1000))
+#                +- FileScan parquet ...
+
+# Extended version with all plans
+result.explain(True)  # shows Parsed, Analyzed, Optimized, Physical plans
+```
+
+## Common Pitfalls
+
+### 1. Calling collect() on large DataFrames
+```python
+# ❌ This brings all data to driver - crashes if data > driver memory
+all_rows = df.collect()   # DO NOT do this on millions of rows
+
+# ✅ Use actions that limit what comes back
+sample = df.take(1000)    # first 1000 rows only
+df.write.parquet("output/")  # let executors handle the data
+```
+
+### 2. Counting after each transformation (triggers full scans)
+```python
+# ❌ Each count() is a full scan
+print(df.filter(df.age > 25).count())   # scan 1
+print(df.filter(df.age < 18).count())   # scan 2
+print(df.filter(df.age == 30).count())  # scan 3
+
+# ✅ Compute all in one pass using groupBy or cache
+df.cache()
+print(df.filter(df.age > 25).count())   # scans + caches
+print(df.filter(df.age < 18).count())   # uses cache
+```
+
+### 3. Forgetting that nothing executes without an action
+```python
+df_filtered = df.filter(df.amount > 0)   # no error - nothing runs
+df_filtered = df.filter(df.nonexistent_column > 0)  # ← might not error yet!
+
+df_filtered.show()  # NOW it runs, NOW the error surfaces
+```
+
+## Summary Table
+
+| Operation | Type | Triggers Execution? | Returns |
+|---|---|---|---|
+| `filter()` | Narrow Transformation | No | DataFrame |
+| `select()` | Narrow Transformation | No | DataFrame |
+| `withColumn()` | Narrow Transformation | No | DataFrame |
+| `groupBy()` | Wide Transformation | No | GroupedData |
+| `join()` | Wide Transformation | No | DataFrame |
+| `orderBy()` | Wide Transformation | No | DataFrame |
+| `show()` | Action | ✅ Yes | (prints to console) |
+| `count()` | Action | ✅ Yes | Integer |
+| `collect()` | Action | ✅ Yes | List[Row] |
+| `write` | Action | ✅ Yes | (writes to storage) |
+
+## Summary
+
+- **Transformations** describe operations - lazy, build the DAG, return DataFrame/RDD
+- **Actions** trigger execution - eager, run the DAG, return a result or side effect
+- **Narrow transformations** process each partition independently (no shuffle)
+- **Wide transformations** require data to move across partitions (shuffle) - expensive
+- Lazy evaluation enables the **Catalyst optimizer** to rewrite and optimize the full plan
+- Never `collect()` large DataFrames to the driver - use writes or limit-based actions

@@ -1,0 +1,285 @@
+# Parquet vs ORC vs Avro - When to Use What
+
+## Why File Format Matters
+
+The file format you choose has a **massive impact** on performance, storage cost, and compatibility. For the same dataset:
+
+- A naive CSV might be 10GB
+- The same data in Parquet might be 1.5GB (7x smaller) and query 100x faster
+
+The right format depends on your access pattern, tooling, and workload type.
+
+---
+
+## The Three Formats at a Glance
+
+| Feature | Parquet | ORC | Avro |
+|---|---|---|---|
+| Storage layout | Columnar | Columnar | Row-based |
+| Compression | Very good | Best | Good |
+| Schema evolution | Good | Limited | Best |
+| Read performance | Excellent (analytical) | Excellent (analytical) | Slower for analytics |
+| Write performance | Good | Good | Very fast |
+| Splittable | Yes | Yes | Yes |
+| Ecosystem support | Widest | Hive/Hadoop | Kafka, schema registry |
+| Human-readable | No (binary) | No (binary) | No (binary) |
+| Best for | Analytics, lakes, Spark | Hive workloads | Messaging, streaming |
+
+---
+
+## 1. Apache Parquet
+
+### What is it?
+
+Parquet is a **columnar storage format** developed by Twitter and Cloudera. It is the de facto standard for big data analytics and data lakes.
+
+### How columnar storage works
+
+```
+Row-based (CSV/Avro):              Columnar (Parquet/ORC):
+┌────┬────────┬──────┐             Column 1 (id):     [1, 2, 3, 4, 5]
+│ id │  name  │ age  │             Column 2 (name):   [Alice, Bob, Carol, Dave, Eve]
+├────┼────────┼──────┤             Column 3 (age):    [25, 30, 28, 35, 22]
+│  1 │ Alice  │  25  │
+│  2 │ Bob    │  30  │             Query: SELECT avg(age) FROM users
+│  3 │ Carol  │  28  │             → Row store: reads ALL columns (id, name, age)
+│  4 │ Dave   │  35  │             → Column store: reads ONLY age column
+│  5 │ Eve    │  22  │             → 3x less I/O in this example!
+└────┴────────┴──────┘
+```
+
+### Key strengths:
+- **Column pruning**: Only reads columns in your SELECT (huge I/O savings on wide tables)
+- **Predicate pushdown**: Filters evaluated against row group statistics (min/max) - skips entire chunks without reading them
+- **Excellent compression**: Same data type per column → better compression ratios
+- **Nested data support**: Handles complex nested structures (arrays, maps, structs) natively
+
+### PySpark with Parquet
+
+```python
+# Write Parquet
+df.write \
+    .mode("overwrite") \
+    .partitionBy("year", "month") \
+    .parquet("s3://my-bucket/data/orders/")
+
+# Read Parquet
+df = spark.read.parquet("s3://my-bucket/data/orders/")
+
+# Read specific partitions (partition pruning)
+df_jan = spark.read.parquet("s3://my-bucket/data/orders/").filter("year=2024 AND month='01'")
+
+# Compression codec (default: snappy)
+df.write.option("compression", "gzip").parquet("output/")
+# Options: snappy (fast), gzip (small), lz4, zstd, none
+```
+
+### Parquet metadata and statistics
+
+```python
+# View Parquet file metadata
+from pyspark.sql.functions import input_file_name
+
+df = spark.read.parquet("data/orders")
+df.select(input_file_name()).distinct().show(truncate=False)
+```
+
+### When to use Parquet:
+- **Data lakes** (S3, GCS, ADLS) as the primary analytical format
+- **Spark, Presto, Athena, Trino, BigQuery, Snowflake** all read Parquet natively
+- Wide tables where queries only touch a few columns
+- Any OLAP / analytical workload
+- Default choice for most data engineering pipelines
+
+---
+
+## 2. Apache ORC (Optimized Row Columnar)
+
+### What is it?
+
+ORC is also a **columnar format**, originally developed by Hortonworks for Hive. It's highly optimized for the Hive ecosystem but also well-supported in Spark.
+
+### Key strengths over Parquet:
+- **Better compression** (typically 20-40% smaller than Parquet for the same data with ORC's ZLIB)
+- **Bloom filters**: More efficient predicate pushdown for point lookups
+- **Lightweight indexes**: Stripe-level statistics for even faster filtering
+- **Acid transactions in Hive**: ORC is required for Hive ACID tables
+
+### PySpark with ORC
+
+```python
+# Write ORC
+df.write \
+    .mode("overwrite") \
+    .orc("s3://my-bucket/data/orders_orc/")
+
+# Read ORC
+df = spark.read.orc("s3://my-bucket/data/orders_orc/")
+
+# With compression
+df.write.option("compression", "zlib").orc("output/")
+# Options: zlib (best compression), snappy (fast), none
+```
+
+### When to use ORC:
+- **Hive-primary ecosystems** - ORC is Hive's preferred format
+- When **maximum compression** is the top priority (storage cost reduction)
+- Hadoop / CDH / HDP clusters where Hive is the primary engine
+- Not ideal if you need wide ecosystem compatibility
+
+---
+
+## 3. Apache Avro
+
+### What is it?
+
+Avro is a **row-based serialization format** with a rich **schema system**. The schema is always included with the data (embedded in the file header), enabling excellent schema evolution.
+
+### Why row-based?
+
+Avro stores data row by row, which makes it:
+- **Fast to write** (no column transposition needed)
+- **Good for streaming** (write one row at a time)
+- **Bad for analytics** (must read entire row even if you need only one column)
+
+### Schema Evolution in Avro
+
+Avro is the gold standard for schema evolution. You can:
+- Add new optional fields (backward compatible)
+- Remove fields (forward compatible)
+- Rename fields (using aliases)
+
+```json
+// v1 schema
+{
+  "type": "record",
+  "name": "Order",
+  "fields": [
+    {"name": "order_id", "type": "string"},
+    {"name": "amount", "type": "double"}
+  ]
+}
+
+// v2 schema - added new field with default (backward compatible)
+{
+  "type": "record",
+  "name": "Order",
+  "fields": [
+    {"name": "order_id", "type": "string"},
+    {"name": "amount", "type": "double"},
+    {"name": "currency", "type": "string", "default": "USD"}  // new field
+  ]
+}
+```
+
+Old readers can still read new data (they see the default for `currency`).
+New readers can still read old data (they use the default for `currency`).
+
+### PySpark with Avro
+
+```python
+# Avro support requires the spark-avro package
+# spark-submit --packages org.apache.spark:spark-avro_2.12:3.4.0
+
+# Write Avro
+df.write.format("avro").save("s3://my-bucket/data/orders_avro/")
+
+# Read Avro
+df = spark.read.format("avro").load("s3://my-bucket/data/orders_avro/")
+
+# With custom schema
+df = spark.read \
+    .format("avro") \
+    .option("avroSchema", open("schema.avsc").read()) \
+    .load("data/orders_avro/")
+```
+
+### Avro with Kafka (Schema Registry)
+
+Avro is the standard format for Kafka messages when using Confluent Schema Registry:
+
+```python
+# In Confluent Kafka ecosystem, Avro messages are registered in Schema Registry
+# Consumers decode messages using the registered schema
+# This ensures all producers/consumers agree on the message format
+# Schema Registry prevents breaking changes from being pushed to Kafka topics
+```
+
+### When to use Avro:
+- **Kafka messages** - industry standard for Kafka with Schema Registry
+- **Event streaming** - row-oriented = efficient for one-row-at-a-time writes
+- **Schema evolution is critical** - multiple teams reading the same data with different schema versions
+- **Data serialization between services** - language-agnostic, compact binary format
+- **NOT recommended for analytical queries** - use Parquet or ORC instead
+
+---
+
+## Compression Codecs - Quick Comparison
+
+| Codec | Compression | Speed | Use case |
+|---|---|---|---|
+| Snappy | Medium | Fast | Default for Parquet; balance of speed + size |
+| GZIP | High | Slow | Archival, when size matters most |
+| ZLIB | High | Medium | ORC default; good balance |
+| LZ4 | Low | Fastest | When I/O is the bottleneck |
+| ZSTD | High | Fast | Modern choice; better than gzip at similar speeds |
+| Uncompressed | None | N/A | Testing only |
+
+---
+
+## Decision Guide: Which Format to Use
+
+```
+Is this for a message queue (Kafka) or event streaming?
+  └── YES → Avro (especially with Confluent Schema Registry)
+
+Is schema evolution across independent teams critical?
+  └── YES → Avro
+
+Is your primary engine Hive on Hadoop?
+  └── YES → ORC
+
+Is maximum compression the top priority?
+  └── YES → ORC with ZLIB
+
+Is this for a data lake or analytical store (Spark, Athena, Presto)?
+  └── YES → Parquet (safest default choice)
+
+Need widest ecosystem compatibility?
+  └── YES → Parquet (reads everywhere: Spark, Athena, BigQuery, Snowflake, Trino)
+
+Need to store nested/complex types with great compression for analytics?
+  └── YES → Parquet
+```
+
+---
+
+## Interview Tips 🎯
+
+> **Q: Why is Parquet preferred for data lakes?**
+
+**Answer:** Parquet is columnar, meaning Spark only reads the columns referenced in a query instead of entire rows - this dramatically reduces I/O on wide tables. It also supports predicate pushdown (skip entire row groups based on min/max statistics), excellent compression (same data types compress well together), and nested data structures. Most importantly, it's supported natively across virtually every modern analytics engine: Spark, Athena, Presto, Trino, BigQuery, Snowflake - making it the most portable choice.
+
+> **Q: When would you use Avro over Parquet?**
+
+**Answer:** Avro is the right choice for event streaming and Kafka-based pipelines, especially when using Confluent Schema Registry. Avro's row-based layout makes it efficient for writing one row at a time (streaming writes). Its schema evolution capabilities - adding optional fields, renaming with aliases - make it ideal when multiple independent teams are producing and consuming the same data at different schema versions. For analytical queries on stored data, Parquet is significantly faster.
+
+> **Q: What is predicate pushdown and how does Parquet support it?**
+
+**Answer:** Predicate pushdown is an optimization where filter conditions are applied at the storage level before data is read into memory. Parquet stores row group statistics (min and max value per column per row group). When you filter on a column, Spark checks these statistics first - if a row group's min-max range doesn't contain the filter value, the entire row group is skipped without being read from disk. This can reduce I/O by 90%+ on large datasets with selective filters.
+
+---
+
+## Summary
+
+| Format | Use when |
+|---|---|
+| **Parquet** | Data lakes, analytics, widest compatibility - default choice for most pipelines |
+| **ORC** | Hive-primary ecosystems, when maximum compression is critical |
+| **Avro** | Kafka streaming, schema evolution across teams, row-at-a-time writes |
+
+- **Parquet** = columnar, great compression, widest tool support → analytical default
+- **ORC** = columnar, best compression, Hive-native → Hive ecosystem
+- **Avro** = row-based, best schema evolution, streaming-friendly → Kafka / event pipelines
+- All three are **binary, splittable, compressed** - far superior to CSV/JSON for big data
+- Compression choice: **Snappy** for speed + balance, **GZIP/ZLIB** for smallest size, **ZSTD** for modern best-of-both

@@ -1,0 +1,266 @@
+## What Is a Decorator?
+
+A decorator is a function that takes a function as input and returns a new function - wrapping it to add behaviour before, after, or around it.
+
+```python
+def my_decorator(func):
+    def wrapper(*args, **kwargs):
+        print("Before the function")
+        result = func(*args, **kwargs)
+        print("After the function")
+        return result
+    return wrapper
+
+# Apply with @ syntax (syntactic sugar)
+@my_decorator
+def greet(name):
+    print(f"Hello, {name}!")
+
+greet("Alice")
+# Before the function
+# Hello, Alice!
+# After the function
+
+# @my_decorator is equivalent to:
+# greet = my_decorator(greet)
+```
+
+## functools.wraps - Preserve Metadata
+
+Without `wraps`, the wrapper replaces the original function's name and docstring:
+
+```python
+from functools import wraps
+
+def my_decorator(func):
+    @wraps(func)    # preserves __name__, __doc__, __module__ etc.
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+
+@my_decorator
+def greet(name):
+    """Greet a person by name."""
+    print(f"Hello, {name}!")
+
+print(greet.__name__)   # "greet" (not "wrapper")
+print(greet.__doc__)    # "Greet a person by name."
+```
+
+## Practical Decorator Examples
+
+### Timing
+
+```python
+import time
+from functools import wraps
+
+def timer(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        elapsed = time.time() - start
+        print(f"{func.__name__} took {elapsed:.4f}s")
+        return result
+    return wrapper
+
+@timer
+def slow_sum(n):
+    return sum(range(n))
+
+slow_sum(10_000_000)
+# slow_sum took 0.3421s
+```
+
+### Logging
+
+```python
+from functools import wraps
+import logging
+
+def log_calls(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        logging.info(f"Calling {func.__name__} with {args}, {kwargs}")
+        result = func(*args, **kwargs)
+        logging.info(f"{func.__name__} returned {result}")
+        return result
+    return wrapper
+
+@log_calls
+def add(a, b):
+    return a + b
+```
+
+### Retry
+
+```python
+import time
+from functools import wraps
+
+def retry(max_attempts=3, delay=1.0):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == max_attempts:
+                        raise
+                    print(f"Attempt {attempt} failed: {e}. Retrying in {delay}s...")
+                    time.sleep(delay)
+        return wrapper
+    return decorator
+
+@retry(max_attempts=3, delay=0.5)
+def fetch_data(url):
+    # might fail due to network issues
+    ...
+```
+
+### Caching (Memoize)
+
+```python
+from functools import wraps
+
+def memoize(func):
+    cache = {}
+    @wraps(func)
+    def wrapper(*args):
+        if args not in cache:
+            cache[args] = func(*args)
+        return cache[args]
+    return wrapper
+
+@memoize
+def fibonacci(n):
+    if n < 2:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+fibonacci(50)   # instant - results cached
+
+# Or use functools.lru_cache (built-in)
+from functools import lru_cache
+
+@lru_cache(maxsize=128)
+def fibonacci(n):
+    if n < 2:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+```
+
+## Decorators with Arguments
+
+Requires an extra layer of nesting - a function that returns a decorator:
+
+```python
+def repeat(n):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for _ in range(n):
+                result = func(*args, **kwargs)
+            return result
+        return wrapper
+    return decorator
+
+@repeat(3)
+def greet(name):
+    print(f"Hello, {name}!")
+
+greet("Alice")
+# Hello, Alice!
+# Hello, Alice!
+# Hello, Alice!
+```
+
+## Stacking Decorators
+
+Decorators are applied bottom-up (closest to function first):
+
+```python
+@timer          # applied second (outer)
+@log_calls      # applied first (inner)
+def process(n):
+    return sum(range(n))
+
+# Equivalent to:
+# process = timer(log_calls(process))
+```
+
+## Class-Based Decorators
+
+```python
+from functools import wraps
+
+class CountCalls:
+    def __init__(self, func):
+        wraps(func)(self)
+        self.func = func
+        self.count = 0
+
+    def __call__(self, *args, **kwargs):
+        self.count += 1
+        print(f"Call #{self.count} to {self.func.__name__}")
+        return self.func(*args, **kwargs)
+
+@CountCalls
+def greet(name):
+    print(f"Hello, {name}!")
+
+greet("Alice")   # Call #1 to greet
+greet("Bob")     # Call #2 to greet
+print(greet.count)   # 2
+```
+
+## Built-in Decorators
+
+```python
+class MyClass:
+    class_var = 0
+
+    @staticmethod
+    def utility():
+        return "no self, no cls - just a function in the class namespace"
+
+    @classmethod
+    def create(cls):
+        return cls()   # cls is the class itself
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value.strip()
+```
+
+## Interview Questions
+
+**Q: What is a decorator in Python?**
+A decorator is a function that takes a function as input and returns a modified version of it. The `@decorator` syntax is shorthand for `func = decorator(func)`. Decorators add behaviour (logging, timing, caching, access control) without modifying the original function.
+
+**Q: Why use `@functools.wraps`?**
+Without it, the wrapper function replaces the original's metadata - `__name__`, `__doc__`, `__module__`. This breaks `help()`, debugging, and tools that inspect function metadata. `@wraps(func)` copies these attributes from the original to the wrapper.
+
+**Q: How do you write a decorator that accepts arguments?**
+Add an outer function that accepts the arguments and returns the actual decorator: `def repeat(n): def decorator(func): def wrapper(...): ... return wrapper return decorator`. Three levels of nesting: argument-taker → decorator → wrapper.
+
+**Q: In what order are stacked decorators applied?**
+Bottom-up - the decorator closest to the function is applied first. `@A @B def f()` is `f = A(B(f))`. `B` wraps `f` first, then `A` wraps the result.
+
+**Q: What is `lru_cache` and how does it relate to decorators?**
+`@lru_cache(maxsize=128)` is a built-in decorator that caches function return values using a dictionary keyed by the arguments. It implements memoization - if the function is called with the same arguments again, the cached result is returned instead of recomputing.
+
+## Summary
+
+- A decorator wraps a function: `def deco(func): def wrapper(*a, **kw): ... return wrapper`
+- `@decorator` is shorthand for `func = decorator(func)`
+- Always use `@functools.wraps(func)` on the wrapper to preserve metadata
+- Decorators with arguments need three levels: `def deco(arg): def decorator(func): def wrapper: ...`
+- Stacking: `@A @B def f` → applied bottom-up: `A(B(f))`
+- Built-in decorators: `@property`, `@staticmethod`, `@classmethod`, `@lru_cache`, `@functools.wraps`

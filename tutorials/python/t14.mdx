@@ -1,0 +1,240 @@
+## Iterables vs Iterators
+
+```python
+# Iterable - an object you can loop over
+# Has __iter__() method that returns an iterator
+# Examples: list, tuple, str, dict, set, range, file
+
+# Iterator - object that produces values one at a time
+# Has both __iter__() and __next__() methods
+
+lst = [1, 2, 3]       # list is ITERABLE
+it = iter(lst)         # iter() creates an ITERATOR from it
+
+next(it)   # 1
+next(it)   # 2
+next(it)   # 3
+next(it)   # StopIteration - signals exhaustion
+```
+
+## How for Loops Work Under the Hood
+
+```python
+for x in [1, 2, 3]:
+    print(x)
+
+# Python does this internally:
+_iter = iter([1, 2, 3])   # get iterator
+while True:
+    try:
+        x = next(_iter)   # get next value
+        print(x)
+    except StopIteration:
+        break              # loop ends when StopIteration is raised
+```
+
+## Building a Custom Iterator
+
+```python
+class CountUp:
+    def __init__(self, start, stop):
+        self.current = start
+        self.stop = stop
+
+    def __iter__(self):
+        return self   # iterator returns itself
+
+    def __next__(self):
+        if self.current >= self.stop:
+            raise StopIteration
+        value = self.current
+        self.current += 1
+        return value
+
+for n in CountUp(1, 5):
+    print(n)
+# 1 2 3 4
+
+counter = CountUp(0, 3)
+print(next(counter))   # 0
+print(next(counter))   # 1
+```
+
+## Generators - The Simpler Way
+
+A generator function uses `yield` instead of `return`. Each call to `next()` runs until the next `yield`.
+
+```python
+def count_up(start, stop):
+    current = start
+    while current < stop:
+        yield current       # pause here, return value
+        current += 1        # resumes here on next next()
+
+gen = count_up(1, 5)
+print(next(gen))   # 1
+print(next(gen))   # 2
+print(next(gen))   # 3
+
+for n in count_up(1, 5):
+    print(n)
+# 1 2 3 4
+```
+
+## Why Generators Save Memory
+
+```python
+import sys
+
+# List comprehension - all 1M items in memory at once
+lst = [x**2 for x in range(1_000_000)]
+print(sys.getsizeof(lst))   # ~8.7 MB
+
+# Generator - one item at a time
+gen = (x**2 for x in range(1_000_000))
+print(sys.getsizeof(gen))   # ~112 bytes!
+```
+
+## Practical Generator Examples
+
+```python
+# Read a large file line by line
+def read_lines(filepath):
+    with open(filepath) as f:
+        for line in f:
+            yield line.strip()
+
+for line in read_lines("huge_file.txt"):
+    process(line)   # processes one line at a time, never loads full file
+
+# Infinite sequence
+def fibonacci():
+    a, b = 0, 1
+    while True:     # infinite - callers decide when to stop
+        yield a
+        a, b = b, a + b
+
+fib = fibonacci()
+for _ in range(10):
+    print(next(fib))
+# 0 1 1 2 3 5 8 13 21 34
+
+# Chunked processing
+def chunked(iterable, size):
+    chunk = []
+    for item in iterable:
+        chunk.append(item)
+        if len(chunk) == size:
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk
+
+for batch in chunked(range(10), 3):
+    print(batch)
+# [0, 1, 2], [3, 4, 5], [6, 7, 8], [9]
+```
+
+## Generator Expressions
+
+Compact generator syntax - like list comprehensions but lazy:
+
+```python
+# List comprehension - eager, all in memory
+squares_list = [x**2 for x in range(10)]
+
+# Generator expression - lazy, one at a time
+squares_gen = (x**2 for x in range(10))
+
+# Use in functions that accept iterables
+total = sum(x**2 for x in range(1_000_000))   # efficient - no list
+maximum = max(len(line) for line in open("file.txt"))
+any_even = any(x % 2 == 0 for x in numbers)
+```
+
+## yield from - Delegate to Sub-Generator
+
+```python
+def flatten(nested):
+    for item in nested:
+        if isinstance(item, list):
+            yield from flatten(item)   # delegate to recursive call
+        else:
+            yield item
+
+list(flatten([1, [2, [3, 4]], [5, 6]]))
+# [1, 2, 3, 4, 5, 6]
+
+# Equivalent to:
+def flatten_manual(nested):
+    for item in nested:
+        if isinstance(item, list):
+            for x in flatten_manual(item):   # manually iterate sub-generator
+                yield x
+        else:
+            yield item
+```
+
+## send() - Two-Way Communication
+
+```python
+def accumulator():
+    total = 0
+    while True:
+        value = yield total   # receive value via send()
+        total += value
+
+gen = accumulator()
+next(gen)          # prime the generator (advance to first yield)
+gen.send(10)       # 10
+gen.send(20)       # 30
+gen.send(5)        # 35
+```
+
+## itertools - Generator-Based Utilities
+
+```python
+import itertools
+
+# Infinite iterators
+itertools.count(10)              # 10, 11, 12, 13, ...
+itertools.cycle([1, 2, 3])       # 1, 2, 3, 1, 2, 3, ...
+itertools.repeat("x", 3)         # 'x', 'x', 'x'
+
+# Combinatoric generators
+list(itertools.permutations([1,2,3], 2))     # all ordered pairs
+list(itertools.combinations([1,2,3], 2))     # unordered pairs
+list(itertools.product([1,2], ["a","b"]))    # cartesian product
+
+# Chaining
+itertools.chain([1,2], [3,4], [5,6])   # 1,2,3,4,5,6 - no list created
+itertools.islice(count(0), 5)           # take first 5 from infinite
+itertools.takewhile(lambda x: x < 5, count(0))   # take while condition holds
+```
+
+## Interview Questions
+
+**Q: What is the difference between an iterable and an iterator?**
+An iterable has `__iter__()` and can produce an iterator (e.g. list, string). An iterator has both `__iter__()` and `__next__()` - it produces values one at a time and remembers its position. `iter(iterable)` creates an iterator from an iterable.
+
+**Q: What is a generator and how is it different from a regular function?**
+A generator function uses `yield` instead of `return`. Calling it returns a generator object (an iterator) without executing the body. Each call to `next()` runs the function until the next `yield`, then pauses. Generators are lazy and memory-efficient - they produce values on demand.
+
+**Q: When would you use a generator instead of a list?**
+When processing large datasets where you don't need all items in memory at once - reading large files, streaming data, infinite sequences, or pipelines. A list requires all items in memory; a generator produces one at a time.
+
+**Q: What does `yield from` do?**
+`yield from iterable` delegates to a sub-iterator - yielding each item from it one at a time. It's equivalent to `for item in iterable: yield item` but cleaner and more efficient, especially for recursive generators.
+
+**Q: What is a generator expression?**
+A generator expression `(expr for x in iter)` is like a list comprehension but returns a lazy generator instead of a list. It uses almost no memory and is perfect for one-time iteration or passing to functions like `sum()`, `any()`, `max()`.
+
+## Summary
+
+- **Iterable** - has `__iter__()`; can produce an iterator; examples: list, str, range
+- **Iterator** - has `__iter__()` and `__next__()`; stateful; raises `StopIteration` when done
+- **Generator function** - uses `yield`; returns a generator (lazy iterator) on call
+- Generator memory: `(x**2 for x in range(1M))` ≈ 112 bytes vs list ≈ 8.7 MB
+- `yield from` - delegate to sub-generator; cleaner recursive generators
+- Generator expressions `()` - lazy, one-time; list comprehensions `[]` - eager, reusable
+- `itertools` - powerful generator-based utilities: `chain`, `islice`, `product`, `cycle`

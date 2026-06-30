@@ -1,0 +1,321 @@
+# Spark Configs & Tuning (Executor Memory, Cores)
+
+## Why Tuning Matters
+
+Out of the box, Spark uses conservative default configurations. On a real cluster with large data, the defaults lead to:
+- Executors running out of memory (OOM errors)
+- Jobs being slower than they should be
+- Cluster resources sitting underutilized
+
+Understanding how to tune Spark's core configurations is one of the most valuable skills for a data engineer.
+
+---
+
+## The Spark Memory Model
+
+Before tuning, you need to understand how Spark allocates memory within each executor:
+
+```
+┌─────────────────────────────────────────────────────┐
+│                  Executor JVM Memory                 │
+│                                                       │
+│  ┌───────────────────────────────────────────────┐   │
+│  │          spark.executor.memory (e.g. 8g)       │   │
+│  │                                               │   │
+│  │  ┌───────────────────────────────────────┐   │   │
+│  │  │  Reserved Memory (~300MB hardcoded)   │   │   │
+│  │  └───────────────────────────────────────┘   │   │
+│  │                                               │   │
+│  │  ┌───────────────────────────────────────┐   │   │
+│  │  │  Unified Memory (spark.memory.fraction │   │   │
+│  │  │  default: 0.6 = 60% of usable memory) │   │   │
+│  │  │                                       │   │   │
+│  │  │  ┌─────────────┬─────────────────┐   │   │   │
+│  │  │  │ Execution   │   Storage       │   │   │   │
+│  │  │  │ Memory      │   Memory        │   │   │   │
+│  │  │  │ (joins,     │   (cache,       │   │   │   │
+│  │  │  │  sort,      │    persist)     │   │   │   │
+│  │  │  │  shuffle)   │                 │   │   │   │
+│  │  │  └─────────────┴─────────────────┘   │   │   │
+│  │  │  (dynamically shared between the two) │   │   │
+│  │  └───────────────────────────────────────┘   │   │
+│  │                                               │   │
+│  │  ┌───────────────────────────────────────┐   │   │
+│  │  │  User Memory (remaining 40%)          │   │   │
+│  │  │  (UDFs, data structures, metadata)    │   │   │
+│  │  └───────────────────────────────────────┘   │   │
+│  └───────────────────────────────────────────────┘   │
+│                                                       │
+│  + spark.executor.memoryOverhead (off-heap, ~10%)     │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## Core Configuration Parameters
+
+### 1. Executor Memory
+
+```python
+spark.conf.set("spark.executor.memory", "8g")
+# How much JVM heap memory each executor gets
+# Default: 1g (almost always too low for production)
+```
+
+**How to size it:**
+- Start with `4g–8g` per executor for typical workloads
+- Increase if you see OOM errors or high GC time
+- Leave some memory for the OS and other processes on the node
+
+### 2. Executor Cores
+
+```python
+spark.conf.set("spark.executor.cores", "4")
+# Number of CPU cores per executor = number of parallel tasks per executor
+# Default: 1 on YARN, all available on standalone
+```
+
+**How to size it:**
+- Recommended: **4–5 cores per executor** - good parallelism without too much GC contention
+- More cores per executor = more parallel tasks = more memory contention
+- 1 core = no parallelism within executor; 16 cores = too much GC overhead
+
+### 3. Number of Executors
+
+```python
+spark.conf.set("spark.executor.instances", "20")
+# Total number of executor processes across the cluster
+```
+
+**Rule of thumb:**
+```
+Total cluster cores = 200 cores, 40 nodes (5 cores each)
+Executor cores = 5
+Number of executors = 200 / 5 = 40 executors
+
+But: leave 1 executor per node for OS + YARN overhead
+Practical executors = 40 - number_of_nodes = ~35
+```
+
+### 4. Driver Memory
+
+```python
+spark.conf.set("spark.driver.memory", "4g")
+# Memory for the driver process (collects results, holds broadcast data)
+# Default: 1g - increase if using collect(), broadcast large tables
+```
+
+Increase driver memory when:
+- Using `.collect()` to pull large datasets to driver
+- Broadcasting large lookup tables
+- Running large Python UDFs
+
+### 5. Memory Overhead
+
+```python
+spark.conf.set("spark.executor.memoryOverhead", "1g")
+# Off-heap memory per executor (for Python workers, JVM overhead, native libs)
+# Default: max(384MB, 10% of executor memory)
+```
+
+Always set this explicitly for PySpark jobs (Python adds extra overhead):
+```python
+# For Python-heavy workloads (UDFs, pandas_udf)
+spark.conf.set("spark.executor.memoryOverhead", "2g")
+```
+
+---
+
+## Shuffle Configuration
+
+### Shuffle Partitions
+
+```python
+spark.conf.set("spark.sql.shuffle.partitions", "200")
+# Number of partitions after a shuffle (groupBy, join, etc.)
+# Default: 200 - often wrong for your workload
+```
+
+**Sizing guide:**
+```
+Target: 100–200MB per shuffle partition
+
+Example:
+  Shuffle data size: 50GB
+  Target partition size: 200MB
+  Ideal partitions: 50GB / 200MB = 250 partitions
+
+# Set it explicitly:
+spark.conf.set("spark.sql.shuffle.partitions", 250)
+```
+
+In Spark 3.0+ with AQE enabled, this is auto-tuned:
+```python
+spark.conf.set("spark.sql.adaptive.enabled", True)
+spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", True)
+# AQE will automatically merge small shuffle partitions at runtime
+```
+
+---
+
+## Parallelism Configuration
+
+```python
+spark.conf.set("spark.default.parallelism", "200")
+# Default parallelism for RDD operations (not DataFrame)
+# Rule of thumb: 2-3x number of total cores in cluster
+```
+
+---
+
+## Dynamic Allocation
+
+Allows Spark to automatically scale executors up and down based on workload:
+
+```python
+spark.conf.set("spark.dynamicAllocation.enabled", True)
+spark.conf.set("spark.dynamicAllocation.minExecutors", "2")
+spark.conf.set("spark.dynamicAllocation.maxExecutors", "50")
+spark.conf.set("spark.dynamicAllocation.initialExecutors", "10")
+```
+
+Useful for:
+- Shared clusters with variable workloads
+- Cost optimization (don't pay for idle executors)
+- Mixed short and long jobs
+
+---
+
+## Broadcast Join Threshold
+
+```python
+spark.conf.set("spark.sql.autoBroadcastJoinThreshold", str(50 * 1024 * 1024))
+# Size threshold for auto-broadcasting (default: 10MB)
+# Set to -1 to disable auto broadcast
+```
+
+---
+
+## Memory Tuning
+
+```python
+# Fraction of executor memory used for execution + storage (default: 0.6)
+spark.conf.set("spark.memory.fraction", "0.7")
+
+# Within the unified memory, storage fraction (default: 0.5)
+spark.conf.set("spark.memory.storageFraction", "0.3")
+# Lower this if you do few caching operations but lots of joins/sorts
+
+# Enable off-heap memory (Tungsten)
+spark.conf.set("spark.memory.offHeap.enabled", True)
+spark.conf.set("spark.memory.offHeap.size", "4g")
+```
+
+---
+
+## Setting Configs - 3 Ways
+
+### 1. SparkSession (runtime, most common)
+```python
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder \
+    .appName("MyApp") \
+    .config("spark.executor.memory", "8g") \
+    .config("spark.executor.cores", "4") \
+    .config("spark.sql.shuffle.partitions", "100") \
+    .getOrCreate()
+```
+
+### 2. spark-submit (cluster submission)
+```bash
+spark-submit \
+  --master yarn \
+  --deploy-mode cluster \
+  --executor-memory 8g \
+  --executor-cores 4 \
+  --num-executors 20 \
+  --driver-memory 4g \
+  --conf spark.sql.shuffle.partitions=200 \
+  my_app.py
+```
+
+### 3. spark-defaults.conf (cluster-wide defaults)
+```
+spark.executor.memory      8g
+spark.executor.cores       4
+spark.sql.shuffle.partitions  200
+```
+
+---
+
+## Practical Tuning Scenarios
+
+### Scenario 1: OOM Errors on Executors
+```python
+# Symptoms: executor lost, java.lang.OutOfMemoryError
+# Solutions:
+spark.conf.set("spark.executor.memory", "16g")            # More heap
+spark.conf.set("spark.executor.memoryOverhead", "2g")     # More off-heap
+spark.conf.set("spark.sql.shuffle.partitions", "400")     # Smaller partitions
+```
+
+### Scenario 2: Job is Slow Despite Large Cluster
+```python
+# Check if parallelism is underutilized
+# If you have 200 cores but only 50 tasks - wasted parallelism
+spark.conf.set("spark.sql.shuffle.partitions", "400")     # More tasks
+spark.conf.set("spark.default.parallelism", "400")
+```
+
+### Scenario 3: Many Small Tasks (Overhead)
+```python
+# If you have 2000 tasks but each finishes in <1s - too many tasks
+spark.conf.set("spark.sql.shuffle.partitions", "50")      # Fewer, larger tasks
+# Or enable AQE to auto-tune:
+spark.conf.set("spark.sql.adaptive.enabled", True)
+```
+
+---
+
+## Quick Reference: Key Configs
+
+| Config | Default | What it controls |
+|---|---|---|
+| `spark.executor.memory` | 1g | Executor heap memory |
+| `spark.executor.cores` | 1 | Parallel tasks per executor |
+| `spark.executor.instances` | varies | Total executors |
+| `spark.driver.memory` | 1g | Driver heap memory |
+| `spark.executor.memoryOverhead` | 384MB or 10% | Off-heap per executor |
+| `spark.sql.shuffle.partitions` | 200 | Post-shuffle partitions |
+| `spark.default.parallelism` | cluster cores | RDD parallelism |
+| `spark.sql.autoBroadcastJoinThreshold` | 10MB | Auto-broadcast threshold |
+| `spark.dynamicAllocation.enabled` | false | Auto-scale executors |
+| `spark.sql.adaptive.enabled` | false (true in 3.2+) | AQE |
+
+---
+
+## Interview Tips 🎯
+
+> **Q: How do you size executor memory in Spark?**
+
+**Answer:** Start by understanding the node's total RAM, subtract OS and YARN overhead (~1–2GB per node), then divide by the number of executors per node. For example, on a 64GB node with 5 executors: `(64 - 4) / 5 = 12GB` per executor. Then set `spark.executor.memoryOverhead` to ~10–15% on top of that for Python overhead. Monitor GC time in Spark UI - if GC is >10% of task time, increase memory.
+
+> **Q: What is the recommended number of cores per executor?**
+
+**Answer:** The recommended sweet spot is **4–5 cores per executor**. Fewer than 4 underutilizes the executor's memory. More than 5 increases GC overhead because all threads share the same JVM heap, and garbage collection pauses affect all of them. With 5 cores, one core can be used for OS/background tasks, leaving 4 for actual task execution.
+
+> **Q: What is spark.sql.shuffle.partitions and how do you tune it?**
+
+**Answer:** It controls how many partitions are created after a shuffle operation (groupBy, join). The default is 200, which works for medium-sized datasets. For large datasets, 200 partitions can mean each partition holds gigabytes of data, causing OOM. For small datasets, 200 partitions create too many tiny tasks. Target 100–200MB per partition: `num_partitions = total_shuffle_data_size / 150MB`. In Spark 3.0+ with AQE enabled, this is automatically optimized at runtime.
+
+---
+
+## Summary
+
+- **Executor memory** (`spark.executor.memory`): main tuning knob for OOM errors - size based on node RAM
+- **Executor cores** (`spark.executor.cores`): 4–5 is the sweet spot for parallelism vs. GC overhead
+- **Shuffle partitions** (`spark.sql.shuffle.partitions`): target 100–200MB per partition; use AQE to auto-tune
+- **Memory overhead** (`spark.executor.memoryOverhead`): always set explicitly for PySpark jobs
+- **Dynamic allocation**: auto-scales executors for variable workloads
+- Always validate configs with Spark UI - look at GC time, task distribution, and memory usage
