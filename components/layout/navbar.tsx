@@ -118,10 +118,10 @@ export function Navbar() {
             <div className="hidden md:flex items-center justify-center flex-1 space-x-8">
 
               {/* Practice Interview Question Dropdown */}
-              <div className="overflow-visible" ref={practiceRef}>
+              <div className="relative overflow-visible" ref={practiceRef}>
                 <button
                   onClick={() => setIsPracticeOpen((prev) => !prev)}
-                  className="flex items-center gap-1 text-sm text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                  className="flex items-center relative gap-1 text-sm text-zinc-400 hover:text-white transition-colors cursor-pointer"
                 >
                   Practice Interview Question
                   <ChevronDown
@@ -131,7 +131,10 @@ export function Navbar() {
                 </button>
 
                 {isPracticeOpen && (
-                  <div className="absolute top-16 -left-20 w-[580px] bg-[#0f1623] border border-[#202736] rounded-2xl shadow-2xl p-4 z-[200] grid grid-cols-2 gap-3">
+                  <div
+                      className="absolute top-full mt-3 left-0 bg-[#0f1623] border border-[#202736] rounded-2xl shadow-2xl p-4 z-[200] grid grid-cols-2 gap-3"
+                      style={{ width: 580, maxWidth: "calc(100vw - 2rem)" }}
+                  >
                     {practiceOptions.map((option) => (
                       <Link
                         key={option.href}
