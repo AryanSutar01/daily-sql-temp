@@ -5,28 +5,40 @@ import { ChevronDown } from "lucide-react";
 
 const FAQS = [
     {
-        question: "Is this for SQL beginners?",
-        answer: "Yes! We offer three difficulty levels: Basic, Intermediate, and Advanced. Beginners can start with Basic questions to build confidence before moving up.",
+        question: "What disciplines does Daily SQL cover?",
+        answer: "Daily SQL covers three core data skills: SQL (PostgreSQL), Python with Pandas, and PySpark. Every day you get 9 problems total — 3 per discipline — each available in Easy, Medium, and Advanced difficulty.",
+    },
+    {
+        question: "Is this for beginners or experienced professionals?",
+        answer: "Both. We offer Easy, Medium, and Advanced problems for each discipline. Beginners can start with Easy to build confidence, while experienced professionals use Medium and Advanced to stay sharp and interview-ready.",
     },
     {
         question: "How much time do I need each day?",
-        answer: "Just 15 minutes. Our problems are designed to be solved quickly so you can build a consistent habit without burning out.",
+        answer: "Just 15 minutes. You can tackle all 9 problems or focus on one discipline. The format is designed for busy professionals — no binge sessions required.",
     },
     {
-        question: "Is this interview-focused or job-focused?",
-        answer: "Both. The problems are based on real-world business scenarios (like revenue analysis, retention, etc.) which are exactly what top tech companies ask in interviews.",
+        question: "How is code executed? Is it safe?",
+        answer: "Every submission runs in an isolated sandbox. SQL runs in a temporary PostgreSQL schema that is created and dropped per request. Python and PySpark run in Docker containers with restricted builtins — no internet access, no OS calls. Your code never touches any real data.",
     },
     {
-        question: "What SQL dialects are supported?",
-        answer: "We support standard PostgreSQL syntax, which is the most widely used and transferable dialect in the industry.",
+        question: "Is Daily SQL free?",
+        answer: "Yes, Daily SQL is free to start. Sign up with Google or email and get immediate access to the daily problem set, streak tracking, leaderboard, and discussion threads.",
     },
     {
-        question: "Can I practice more than 3 questions per day?",
-        answer: "Currently, we release exactly 3 new questions daily to prevent 'binge-and-quit' cycles/decision fatigue. The goal is long-term consistency.",
+        question: "Can I practice more than 9 problems per day?",
+        answer: "The daily set is 9 fresh problems. This is intentional — it prevents binge-and-quit cycles and builds long-term consistency. You can also use our structured tutorial tracks (SQL, Python, PySpark) for additional learning at any time.",
     },
     {
         question: "What happens if I miss a day?",
-        answer: "Your streak will reset, but your mastery progress and solved history remain safe. Consistency is key!",
+        answer: "Your streak resets, but your full solve history, stats, and public profile stay intact. Streaks are a motivational tool, not a punishment — just start a new one!",
+    },
+    {
+        question: "Do you have learning resources, not just problems?",
+        answer: "Yes. We have full tutorial tracks for SQL (52 lessons), Python/Pandas (52 lessons), and PySpark (46 lessons). They're structured to complement the daily problems — use tutorials to learn, problems to reinforce.",
+    },
+    {
+        question: "Is this interview-focused or job-focused?",
+        answer: "Both. Problems are based on real business scenarios — revenue analysis, cohort retention, sessionization, data pipeline transformations. These are exactly what top tech companies ask in interviews and what data teams solve daily at work.",
     },
 ];
 
@@ -63,12 +75,12 @@ export function FaqSection() {
                                     >
                                         <span>{faq.question}</span>
                                         <ChevronDown
-                                            className={`h-4 w-4 text-[#7b8ca3] transition-transform duration-200 ${isOpen ? "rotate-180" : ""
+                                            className={`h-4 w-4 text-[#7b8ca3] transition-transform duration-200 shrink-0 ml-4 ${isOpen ? "rotate-180" : ""
                                                 }`}
                                         />
                                     </button>
                                     <div
-                                        className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? "max-h-40 opacity-100 pb-4" : "max-h-0 opacity-0"
+                                        className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? "max-h-48 opacity-100 pb-4" : "max-h-0 opacity-0"
                                             }`}
                                     >
                                         <p className="text-sm text-[#7b8ca3] leading-relaxed">

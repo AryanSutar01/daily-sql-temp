@@ -5,16 +5,19 @@ import {
   Calendar,
   Zap,
   Code2,
-  Clock,
   TrendingUp,
-  Target
+  Users,
+  MessageSquare,
+  Database,
+  Server,
+  Trophy
 } from "lucide-react";
 import { useRef, useState } from "react";
 
 function SpotlightCard({
   children,
   className = "",
-  spotlightColor = "rgba(77, 212, 196, 0.15)" // Teal spotlight
+  spotlightColor = "rgba(77, 212, 196, 0.15)"
 }: {
   children: React.ReactNode;
   className?: string;
@@ -56,34 +59,46 @@ function SpotlightCard({
 export function BentoGrid() {
   const features = [
     {
-      title: "New questions every day",
-      description: "Fresh problems daily. No recycled content—each morning brings new challenges tailored to real work scenarios.",
+      title: "SQL + Python + PySpark",
+      description: "One platform for all three core data skills. SQL in PostgreSQL, Python via Pandas, and PySpark with a warm SparkSession — each running in real isolated sandboxes.",
+      icon: Database,
+      accent: "text-sky-400",
+      accentBg: "bg-sky-400/10",
+    },
+    {
+      title: "9 new problems every day",
+      description: "3 problems per discipline every morning. Easy to warm up, Medium to practice, Advanced to push limits. No recycled content — fresh challenges every day.",
       icon: Calendar,
+      accent: "text-[#4DD4C4]",
+      accentBg: "bg-[#4DD4C4]/10",
     },
     {
-      title: "Three difficulty levels",
-      description: "Easy to warm up, medium to practice, advanced to push your limits. Cover the full spectrum every day.",
-      icon: Zap,
-    },
-    {
-      title: "Real-world SQL patterns",
-      description: "Window functions, CTEs, complex aggregations, date calculations. The patterns you need in production.",
+      title: "Real-world data patterns",
+      description: "Window functions, CTEs, cohort retention, sessionization, Spark transformations. The patterns that appear in real data team work — not toy puzzles.",
       icon: Code2,
+      accent: "text-amber-400",
+      accentBg: "bg-amber-400/10",
     },
     {
-      title: "15 minutes or less",
-      description: "Designed for busy schedules. Get in, practice, get out. No time wasted on irrelevant problems.",
-      icon: Clock,
-    },
-    {
-      title: "Streak & mastery tracking",
-      description: "Build consistency with daily streaks. Track your progress across SQL concepts without competitive pressure.",
+      title: "Streak & progress tracking",
+      description: "Build a daily habit with streak tracking and solve history. Your public profile shows your heatmap and stats across all three disciplines.",
       icon: TrendingUp,
+      accent: "text-[#4DD4C4]",
+      accentBg: "bg-[#4DD4C4]/10",
     },
     {
-      title: "Business-focused problems",
-      description: "Analyze revenue, calculate retention, build funnels. Problems that mirror real data team work.",
-      icon: Target,
+      title: "Leaderboard & community",
+      description: "See where you stand on the weekly leaderboard. Every problem has a discussion thread — share your approach, read alternatives, and learn from peers.",
+      icon: Trophy,
+      accent: "text-violet-400",
+      accentBg: "bg-violet-400/10",
+    },
+    {
+      title: "15 minutes is enough",
+      description: "Designed for busy schedules. Three disciplines, three difficulties — one focused session. No decision fatigue, no overwhelm.",
+      icon: Zap,
+      accent: "text-rose-400",
+      accentBg: "bg-rose-400/10",
     }
   ];
 
@@ -92,10 +107,10 @@ export function BentoGrid() {
       <div className="container mx-auto px-4">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold mb-4 text-center text-white">
-            Built for working professionals
+            Built for working data professionals
           </h2>
           <p className="text-lg text-[#7b8ca3] text-center mb-16 max-w-2xl mx-auto">
-            Every feature designed to maximize learning in minimal time
+            Every feature designed to maximize learning across SQL, Python, and PySpark — in minimal time
           </p>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -104,8 +119,8 @@ export function BentoGrid() {
                 key={index}
                 className="p-6 rounded-xl bg-[#121826] border border-[#202736] hover:border-[#4DD4C4]/30 transition-colors duration-300"
               >
-                <div className="w-10 h-10 rounded-lg bg-[#4DD4C4]/10 flex items-center justify-center mb-4">
-                  <feature.icon className="w-5 h-5 text-[#4DD4C4]" />
+                <div className={`w-10 h-10 rounded-lg ${feature.accentBg} flex items-center justify-center mb-4`}>
+                  <feature.icon className={`w-5 h-5 ${feature.accent}`} />
                 </div>
                 <h3 className="text-lg font-semibold mb-2 text-white">
                   {feature.title}
@@ -121,4 +136,3 @@ export function BentoGrid() {
     </section>
   );
 }
-

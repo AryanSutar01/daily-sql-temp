@@ -9,14 +9,43 @@ import { BentoGrid } from "@/components/landing/bento-grid";
 import { CTASection } from "@/components/landing/cta-section";
 import { FaqSection } from "@/components/landing/faq-section";
 import { ProfessionAnimation } from "@/components/landing/profession-animation";
+import { SocialProof } from "@/components/landing/social-proof";
+import { LeaderboardSection } from "@/components/landing/leaderboard-section";
+import { DisciplinesSection } from "@/components/landing/disciplines-section";
 
 export const metadata: Metadata = {
-  title: "Daily SQL - Master SQL in 15 Minutes a Day",
-  description: "A daily SQL practice platform for professionals who already know SQL and want to stay sharp. Exactly 3 SQL questions every day with real business-style problems.",
-  keywords: ["SQL", "Daily SQL", "SQL practice", "learn SQL", "SQL interview preparation", "database queries", "data analytics"],
+  title: "Daily SQL — Master SQL, Python & PySpark in 15 Minutes a Day",
+  description: "A daily practice platform for data professionals. 9 curated problems every day — SQL (PostgreSQL), Python (Pandas), and PySpark — each in Easy, Medium, and Advanced. Build consistency, track streaks, and stay interview-ready.",
+  keywords: [
+    "SQL practice",
+    "Daily SQL",
+    "PySpark practice",
+    "Python Pandas practice",
+    "data engineering practice",
+    "data analyst SQL",
+    "SQL interview preparation",
+    "PySpark interview prep",
+    "pandas interview questions",
+    "daily coding challenge",
+    "data skills practice",
+    "window functions SQL",
+    "SQL for data analysts",
+  ],
   alternates: {
     canonical: 'https://dailysql.in',
-  }
+  },
+  openGraph: {
+    title: "Daily SQL — Master SQL, Python & PySpark in 15 Minutes a Day",
+    description: "9 problems a day across SQL, Python (Pandas), and PySpark. Built for working data professionals.",
+    url: "https://dailysql.in",
+    siteName: "Daily SQL",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Daily SQL — Master SQL, Python & PySpark in 15 Minutes a Day",
+    description: "9 problems a day across SQL, Python (Pandas), and PySpark. Built for working data professionals.",
+  },
 };
 
 export default function Home() {
@@ -27,7 +56,10 @@ export default function Home() {
       <Comparison />
       <HowItWorks />
       <ProductPreview />
+      <SocialProof />
       <ProfessionAnimation />
+      <DisciplinesSection />
+      <LeaderboardSection />
       <BentoGrid />
       <TargetAudience />
       <CTASection />

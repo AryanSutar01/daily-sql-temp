@@ -12,10 +12,10 @@ export function Footer() {
       <div className="max-w-4xl mx-auto text-center px-4 py-24 md:py-32">
         <div className="space-y-6 mb-10">
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight">
-            Start building your <span className="text-[#4DD4C4]">daily SQL habit</span>
+            Start building your <span className="text-[#4DD4C4]">daily practice habit</span>
           </h2>
           <p className="text-xl text-[#7b8ca3] max-w-2xl mx-auto leading-relaxed">
-            Join thousands of data professionals who practice SQL every day. 15 minutes. 3 questions. Consistent improvement.
+            Join thousands of data professionals who practice SQL, Python, and PySpark every day. 15 minutes. 9 questions. Consistent improvement.
           </p>
         </div>
 
@@ -25,7 +25,7 @@ export function Footer() {
             className="inline-flex items-center justify-center gap-2 bg-[#4DD4C4] hover:bg-[#3dbdb0] text-[#080c16] font-bold px-8 py-4 text-lg shadow-[0_0_30px_rgba(77,212,196,0.2)] hover:shadow-[0_0_40px_rgba(77,212,196,0.3)] transition-all duration-300 rounded-lg"
           />
           <span className="text-sm text-[#7b8ca3] opacity-80">
-            Free during early access. No credit card required.
+            Start practicing for free. Upgrade anytime for advanced features.
           </span>
         </div>
       </div>
@@ -41,7 +41,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-sm text-zinc-400">
-              Stay sharp in SQL with just 15 minutes a day.
+              Stay sharp in SQL, Python, and PySpark with just 15 minutes a day.
             </p>
           </div>
 
@@ -60,8 +60,18 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/waitlist" className="hover:text-[#30B5A6] transition-colors">
-                  Join Waitlist
+                <Link href="/practice/learn/sql" className="hover:text-[#30B5A6] transition-colors">
+                  SQL Tutorials
+                </Link>
+              </li>
+              <li>
+                <Link href="/practice/learn/python" className="hover:text-[#30B5A6] transition-colors">
+                  Python Tutorials
+                </Link>
+              </li>
+              <li>
+                <Link href="/practice/learn/pyspark" className="hover:text-[#30B5A6] transition-colors">
+                  PySpark Tutorials
                 </Link>
               </li>
             </ul>
@@ -93,9 +103,15 @@ export function Footer() {
                   Terms of Service
                 </Link>
               </li>
+              <li>
+                <Link href="/refund" className="hover:text-[#30B5A6] transition-colors">
+                  Refund Policy
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
+
 
         {/* Bottom bar with Made with Love */}
         <div className="pt-8 border-t border-border/50 flex flex-col items-center justify-center space-y-4">
