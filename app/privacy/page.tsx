@@ -14,14 +14,14 @@ export default function PrivacyPolicy() {
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
                 <h1 className="text-4xl font-bold text-white mb-8">Privacy Policy</h1>
 
-                <div className="prose prose-invert max-w-none text-[#7b8ca3]">
+                <div className="prose prose-invert max-w-none text-[#7b8ca3] space-y-6">
                     <p className="mb-4">Last updated: {new Date().toLocaleDateString()}</p>
 
                     <h2 className="text-2xl font-semibold text-white mt-8 mb-4">1. Introduction</h2>
                     <p>
-                        Welcome to DailySQL. We respect your privacy and are committed to protecting your personal data.
-                        This privacy policy will inform you as to how we look after your personal data when you visit our website
-                        and tell you about your privacy rights.
+                        Welcome to Daily SQL. We respect your privacy and are committed to protecting your personal data.
+                        This privacy policy will inform you as to how we look after your personal data when you visit our website (https://dailysql.in)
+                        and use our data practice platform (covering SQL, Python, and PySpark).
                     </p>
 
                     <h2 className="text-2xl font-semibold text-white mt-8 mb-4">2. The Data We Collect</h2>
@@ -32,7 +32,7 @@ export default function PrivacyPolicy() {
                         <li><strong>Identity Data</strong> includes first name, last name, username or similar identifier.</li>
                         <li><strong>Contact Data</strong> includes email address.</li>
                         <li><strong>Technical Data</strong> includes internet protocol (IP) address, your login data, browser type and version.</li>
-                        <li><strong>Usage Data</strong> includes information about how you use our website and products (e.g., questions solved, streaks).</li>
+                        <li><strong>Usage Data</strong> includes information about how you use our website and products (e.g., questions solved, active streak, practice language preferences).</li>
                     </ul>
 
                     <h2 className="text-2xl font-semibold text-white mt-8 mb-4">3. How We Use Your Data</h2>
@@ -41,7 +41,7 @@ export default function PrivacyPolicy() {
                     </p>
                     <ul className="list-disc pl-6 space-y-2 mb-4">
                         <li>To register you as a new customer.</li>
-                        <li>To process and track your daily progress and streaks.</li>
+                        <li>To process and track your daily progress, streaks, and ranking on the leaderboard.</li>
                         <li>To manage our relationship with you.</li>
                         <li>To improve our website, products/services, marketing and customer relationships.</li>
                     </ul>
