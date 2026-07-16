@@ -10,6 +10,7 @@ import { CTASection } from "@/components/landing/cta-section";
 import { FaqSection } from "@/components/landing/faq-section";
 import { ProfessionAnimation } from "@/components/landing/profession-animation";
 import { SocialProof } from "@/components/landing/social-proof";
+import { CompanyCarousel } from "@/components/landing/company-carousel";
 import { LeaderboardSection } from "@/components/landing/leaderboard-section";
 import { DisciplinesSection } from "@/components/landing/disciplines-section";
 
@@ -52,6 +53,7 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       <Hero />
+      <CompanyCarousel />
       <Problem />
       <Comparison />
       <HowItWorks />
