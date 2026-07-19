@@ -55,6 +55,8 @@ import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { api } from "@/lib/api";
 import { Problem, DailyPractice, Dataset, ExecutionResponse } from "@/types/api";
+import { WalkthroughTour, PRACTICE_TOUR_STEPS } from "@/components/walkthrough/WalkthroughTour";
+import { useWalkthrough } from "@/hooks/useWalkthrough";
 
 SyntaxHighlighter.registerLanguage('sql', sql);
 
@@ -165,6 +167,7 @@ export function DailySetSkeleton() {
 
 export function DailySetClient() {
     const router = useRouter();
+    const { isActive: tourActive, tryAutoStart, startTour, completeTour, skipTour } = useWalkthrough();
     const params = useParams();
     const searchParams = useSearchParams();
     const urlProblemId = params.problemId as string | undefined;
@@ -436,19 +439,15 @@ export function DailySetClient() {
                         .catch(() => { });
                 }
 
-                // Welcome Toast logic
+                // Welcome Tour logic
                 if (typeof window !== 'undefined') {
                     const search = window.location.search;
                     if (search.includes('welcome=true')) {
-                        setToast({
-                            message: "Welcome to Daily SQL!",
-                            subMessage: "Your journey starts here. Good luck!",
-                            visible: true
-                        });
-                        setTimeout(() => setToast(null), 5000);
-
+                        // Clean URL first
                         const newUrl = window.location.pathname;
                         window.history.replaceState({}, '', newUrl);
+                        // Start the walkthrough (only if not seen yet)
+                        setTimeout(() => tryAutoStart(), 500);
                     }
                 }
             } catch (err) {
@@ -1117,7 +1116,7 @@ export function DailySetClient() {
                 {/* ── CENTER: Run + Submit (absolutely centered) ── */}
                 <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2.5">
                     {/* Run */}
-                    <div className="relative group">
+                    <div className="relative group" id="tour-run-button">
                         <button
                             onClick={handleRun}
                             disabled={!activeProblemId}
@@ -1149,7 +1148,15 @@ export function DailySetClient() {
                 {/* ── RIGHT: Streak + Timer + Fullscreen + Profile ── */}
                 <div className="ml-auto flex items-center gap-4">
 
-
+                    {/* Tour Help Button */}
+                    <button
+                        onClick={startTour}
+                        title="Take the Tour"
+                        className="flex items-center gap-1.5 text-zinc-500 hover:text-[#4DD4C4] transition-colors text-[11px] font-semibold"
+                    >
+                        <Info size={14} />
+                        <span className="hidden sm:inline">Tour</span>
+                    </button>
 
                     {/* Timer / Stopwatch */}
                     <div className="flex items-center gap-2">
@@ -1326,6 +1333,7 @@ export function DailySetClient() {
 
                         {/* List Content */}
                         <div
+                            id="tour-sidebar-today-tab"
                             ref={sidebarScrollRef}
                             onScroll={(e) => {
                                 if (sidebarLoaded && !sidebarCollapsed) {
@@ -1427,7 +1435,7 @@ export function DailySetClient() {
                                                     {/* Problem cards for the active discipline */}
                                                     {catProblems.length > 0 ? (
                                                         <div className="space-y-2">
-                                                            {catProblems.map(({ id }) => {
+                                                            {catProblems.map(({ id }, cardIdx) => {
                                                                 const pInfo = problems.find(p => p.id === id);
                                                                 if (!pInfo) return null;
                                                                 const dStyle = getDiffStyle(pInfo.difficulty);
@@ -1435,6 +1443,7 @@ export function DailySetClient() {
                                                                 const isActive = activeProblemId === id;
                                                                 return (
                                                                     <div
+                                                                        id={cardIdx === 0 ? 'tour-problem-card' : undefined}
                                                                         key={id}
                                                                         onClick={() => handleProblemSelect(id!)}
                                                                         className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${
@@ -1572,7 +1581,7 @@ export function DailySetClient() {
 
                         {/* Streak Footer */}
                         {!sidebarCollapsed && (
-                            <div className="p-4 border-t border-[#202736] bg-[#0d121c] shrink-0">
+                            <div id="tour-streak" className="p-4 border-t border-[#202736] bg-[#0d121c] shrink-0">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Daily Streak</span>
                                     <span className="text-sm font-bold text-white flex items-center gap-1">
@@ -1711,7 +1720,7 @@ export function DailySetClient() {
 
                                 {/* Content */}
                                 {activeDetailTab === 'question' ? (
-                                    <div className="flex-1 overflow-y-auto p-5 space-y-8 scrollbar-thin scrollbar-thumb-zinc-700">
+                                    <div id="tour-problem-description" className="flex-1 overflow-y-auto p-5 space-y-8 scrollbar-thin scrollbar-thumb-zinc-700">
                                         <div>
                                             {activeProblem && (
                                                 <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border mb-2 ${getDiffStyle(activeProblem.difficulty).color} ${getDiffStyle(activeProblem.difficulty).bg} ${getDiffStyle(activeProblem.difficulty).border}`}>
@@ -2089,7 +2098,7 @@ export function DailySetClient() {
                         </div>
 
                         {/* Monaco */}
-                        <div className="flex-1 relative overflow-hidden bg-[#0b101c]">
+                        <div id="tour-code-editor" className="flex-1 relative overflow-hidden bg-[#0b101c]">
                             <Editor
                                 height="100%"
                                 language={activeProblem?.challenge_type === 'sql' ? 'sql' : 'python'}
@@ -2317,6 +2326,14 @@ export function DailySetClient() {
                     </div>
                 </div>
             )}
+
+            {/* Walkthrough Tour Overlay */}
+            <WalkthroughTour
+                steps={PRACTICE_TOUR_STEPS}
+                isActive={tourActive}
+                onComplete={completeTour}
+                onSkip={skipTour}
+            />
         </div>
     );
 }

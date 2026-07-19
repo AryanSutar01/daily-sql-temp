@@ -7,6 +7,7 @@ import { useRef } from "react";
 import { api } from "@/lib/api";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { useWalkthrough } from "@/hooks/useWalkthrough";
 
 function polarToCartesian(centerX: number, centerY: number, radius: number, angleInDegrees: number) {
     const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
@@ -57,6 +58,7 @@ function ProfileContent() {
     const currentYear = new Date().getFullYear();
     const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
     const [leaderboard, setLeaderboard] = useState<any[]>([]);
+    const { navigateAndStart } = useWalkthrough();
 
     const [formData, setFormData] = useState({
         full_name: "",
@@ -695,9 +697,15 @@ function ProfileContent() {
                             )}
                         </div>
 
-                        <div className="w-full mt-6 relative z-10 px-2 lg:px-4">
+                        <div className="w-full mt-6 relative z-10 px-2 lg:px-4 flex flex-col gap-2">
                             <button onClick={() => setIsEditing(true)} className="w-full bg-gradient-to-r from-[#4DD4C4] to-[#34b6a5] hover:opacity-90 text-[#080c16] font-bold rounded-xl py-2.5 text-[13px] transition-all duration-300 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(77,212,196,0.2)] hover:shadow-[0_0_20px_rgba(77,212,196,0.3)] transform hover:-translate-y-0.5">
                                 <Edit2 size={14} /> Edit Profile
+                            </button>
+                            <button
+                                onClick={navigateAndStart}
+                                className="w-full bg-[#0b101c] border border-[#202736] hover:border-[#4DD4C4]/40 text-zinc-400 hover:text-[#4DD4C4] font-semibold rounded-xl py-2 text-[12px] transition-all duration-200 flex items-center justify-center gap-1.5"
+                            >
+                                <Sparkles size={12} /> Take the Tour
                             </button>
                         </div>
                     </div>
