@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Edit2, Search, Loader2, Sparkles, User, Briefcase, GraduationCap, History, BarChart2, Flame, X, Code, Camera, CheckCircle2, AlertCircle, Trophy } from "lucide-react";
+import { ArrowLeft, Edit2, Search, Loader2, Sparkles, User, Briefcase, GraduationCap, History, BarChart2, Flame, X, Code, Camera, CheckCircle2, AlertCircle, Trophy, Share2, Check } from "lucide-react";
 import { useRef } from "react";
 import { api } from "@/lib/api";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -75,7 +75,16 @@ function ProfileContent() {
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const [copied, setCopied] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleShare = () => {
+        const url = `https://dailysql.in/u/${profile?.username}`;
+        navigator.clipboard.writeText(url).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
 
     // Auto-clear toast
     useEffect(() => {
@@ -672,11 +681,6 @@ function ProfileContent() {
                         {profile.username && (
                             <div className="flex items-center gap-1.5 mt-1 text-zinc-400 font-medium">
                                 <span className="text-sm">@{profile.username}</span>
-                                {profile.username && (
-                                    <Link href={`/u/${profile.username}`} target="_blank" rel="noopener noreferrer" className="text-[#4DD4C4] hover:underline text-xs flex items-center gap-1">
-                                        View Public Page
-                                    </Link>
-                                )}
                             </div>
                         )}
                         <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-2 rounded-full bg-[#4DD4C4]/10 border border-[#4DD4C4]/20 text-[#4DD4C4] text-[12px] font-bold tracking-wide">
@@ -701,6 +705,18 @@ function ProfileContent() {
                             <button onClick={() => setIsEditing(true)} className="w-full bg-gradient-to-r from-[#4DD4C4] to-[#34b6a5] hover:opacity-90 text-[#080c16] font-bold rounded-xl py-2.5 text-[13px] transition-all duration-300 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(77,212,196,0.2)] hover:shadow-[0_0_20px_rgba(77,212,196,0.3)] transform hover:-translate-y-0.5">
                                 <Edit2 size={14} /> Edit Profile
                             </button>
+                            {profile.username && (
+                                <button
+                                    onClick={handleShare}
+                                    className={`w-full border font-semibold rounded-xl py-2 text-[12px] transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                                        copied
+                                            ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40 text-[#4DD4C4]'
+                                            : 'bg-[#0b101c] border-[#202736] hover:border-[#4DD4C4]/40 text-zinc-400 hover:text-[#4DD4C4]'
+                                    }`}
+                                >
+                                    {copied ? <><Check size={12} /> Link Copied!</> : <><Share2 size={12} /> Share Profile</>}
+                                </button>
+                            )}
                             <button
                                 onClick={navigateAndStart}
                                 className="w-full bg-[#0b101c] border border-[#202736] hover:border-[#4DD4C4]/40 text-zinc-400 hover:text-[#4DD4C4] font-semibold rounded-xl py-2 text-[12px] transition-all duration-200 flex items-center justify-center gap-1.5"
