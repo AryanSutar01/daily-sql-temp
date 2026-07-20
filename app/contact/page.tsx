@@ -92,8 +92,8 @@ export default function ContactPage() {
                     <p className="text-zinc-400 text-sm mb-3">
                       Follow us for daily tips and updates.
                     </p>
-                    <Link href="https://twitter.com/dailysql" target="_blank" className="text-[#30B5A6] hover:text-[#4DD4C4] font-medium transition-colors">
-                      @dailysql
+                    <Link href="https://twitter.com/dailysqlin" target="_blank" className="text-[#30B5A6] hover:text-[#4DD4C4] font-medium transition-colors">
+                      @dailysqlin
                     </Link>
                   </div>
                 </div>

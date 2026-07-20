@@ -142,6 +142,14 @@ export function WaitlistForm({ onSubmit, isLoading = false }: WaitlistFormProps)
         </div>
 
         {/* Mode selector */}
+        {/* Free access disclaimer */}
+        <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/8 border border-amber-500/20 px-3 py-2.5">
+          <span className="text-amber-400 text-base leading-none mt-0.5 shrink-0">⚠️</span>
+          <p className="text-[11px] text-amber-200/80 leading-relaxed">
+            <span className="font-bold text-amber-300">Free access is exclusively for community members.</span>{" "}
+            Sharing your WhatsApp ensures we can add you to the group and verify your membership.
+          </p>
+        </div>
         <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
