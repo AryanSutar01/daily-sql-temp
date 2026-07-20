@@ -153,10 +153,12 @@ export default function AdminDashboard() {
         table_name: "", schema_sql: "", seed_sql: "", column_types: "", seed_data_json: ""
     });
     const [solutionForm, setSolutionForm] = useState({
-        reference_query: "", reference_code: "", function_name: "", order_sensitive: false, notes: ""
+        reference_query: "", reference_code: "", function_name: "", starter_code: "", order_sensitive: false, notes: ""
     });
     const [wizardDatasets, setWizardDatasets] = useState<any[]>([]);
     const [testCases, setTestCases] = useState<any[]>([]);
+    const [testCaseTab, setTestCaseTab] = useState<'single'|'bulk'>('single');
+    const [bulkTestCases, setBulkTestCases] = useState<string>('');
     const [testCaseForm, setTestCaseForm] = useState({
         input_data: "", expected: "", is_hidden: true, label: "", order_index: 0
     });
@@ -739,7 +741,8 @@ export default function AdminDashboard() {
         try {
             const bodyPayload: any = {
                 order_sensitive: solutionForm.order_sensitive,
-                notes: solutionForm.notes
+                notes: solutionForm.notes,
+                ...(problemForm.challenge_type !== 'sql' ? { starter_code: solutionForm.starter_code } : {}),
             };
 
             if (problemForm.challenge_type === 'sql') {
@@ -775,32 +778,94 @@ export default function AdminDashboard() {
             }
         } catch (e) { console.error(e); }
     };
-
     const handleAddTestCase = async () => {
         if (!createdProblemId) return;
         setLoading(true);
         try {
+            // Auto-wrap array input in {"args": ...} if the user didn't write it themselves
+            let parsedInput = JSON.parse(testCaseForm.input_data);
+            if (Array.isArray(parsedInput)) {
+                parsedInput = { args: parsedInput };
+            }
+
             const payload = {
-                input_data: JSON.parse(testCaseForm.input_data),
+                input_data: parsedInput,
                 expected: JSON.parse(testCaseForm.expected),
                 is_hidden: testCaseForm.is_hidden,
                 label: testCaseForm.label || null,
-                order_index: parseInt(String(testCaseForm.order_index)) || 0
+                order_index: parseInt(String(testCaseForm.order_index)) || testCases.length + 1
             };
+
             const res = await fetchWithAuth(`${API_URL}/admin/problems/${createdProblemId}/test-cases`, {
-                method: 'POST',
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
+
             if (res.ok) {
-                showToast('success', 'Test case added!');
-                setTestCaseForm({ input_data: "", expected: "", is_hidden: true, label: "", order_index: testCases.length + 1 });
+                showToast('success', 'Test case added successfully!');
+                setTestCaseForm({ input_data: "", expected: "", is_hidden: true, label: "", order_index: payload.order_index + 1 });
                 loadTestCases(createdProblemId);
             } else {
                 const data = await res.json();
                 showToast('error', data.detail || 'Failed to add testcase');
             }
-        } catch (e: any) { showToast('error', 'Invalid JSON or error: ' + e.message); }
-        setLoading(false);
+        } catch (err: any) {
+            showToast('error', `Invalid JSON: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBulkAddTestCases = async () => {
+        if (!createdProblemId) return;
+        setLoading(true);
+        try {
+            const parsedArray = JSON.parse(bulkTestCases);
+            if (!Array.isArray(parsedArray)) {
+                throw new Error("Bulk input must be a JSON array of test cases.");
+            }
+
+            const payload = parsedArray.map((tc, idx) => {
+                let parsedInput = tc.input_data;
+                if (Array.isArray(parsedInput)) {
+                    parsedInput = { args: parsedInput };
+                } else if (typeof parsedInput === 'string') {
+                    // Try parsing if they provided stringified JSON
+                    const parsedStr = JSON.parse(parsedInput);
+                    if (Array.isArray(parsedStr)) parsedInput = { args: parsedStr };
+                    else parsedInput = parsedStr;
+                }
+
+                return {
+                    input_data: parsedInput,
+                    expected: tc.expected,
+                    is_hidden: tc.is_hidden ?? true,
+                    label: tc.label || `Bulk Case ${testCases.length + idx + 1}`,
+                    order_index: tc.order_index ?? (testCases.length + idx + 1)
+                };
+            });
+
+            const res = await fetchWithAuth(`${API_URL}/admin/problems/${createdProblemId}/test-cases/bulk`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                showToast('success', `Added ${data.inserted_count} test cases successfully!`);
+                setBulkTestCases("");
+                loadTestCases(createdProblemId);
+            } else {
+                const data = await res.json();
+                showToast('error', data.detail || 'Failed to bulk add testcases');
+            }
+        } catch (err: any) {
+            showToast('error', `Invalid JSON or missing fields: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleDeleteTestCase = async (tcId: string) => {
@@ -860,7 +925,7 @@ export default function AdminDashboard() {
         setCreatedProblemId(null);
         setProblemForm({ title: "", difficulty: "easy", description: "", estimated_time_minutes: 15, challenge_type: "sql" });
         setDatasetForm({ table_name: "", schema_sql: "", seed_sql: "", column_types: "", seed_data_json: "" });
-        setSolutionForm({ reference_query: "", reference_code: "", function_name: "", order_sensitive: false, notes: "" });
+        setSolutionForm({ reference_query: "", reference_code: "", function_name: "", starter_code: "", order_sensitive: false, notes: "" });
         setWizardDatasets([]);
         setTestCases([]);
         setTestCaseForm({ input_data: "", expected: "", is_hidden: true, label: "", order_index: 0 });
@@ -1468,58 +1533,81 @@ export default function AdminDashboard() {
                                 <p className="text-sm text-zinc-500">Add test cases for this problem. You can specify inputs and expected outputs.</p>
                                 
                                 <div className="space-y-3 p-4 bg-[#0b101c] rounded-lg border border-[#202736]/60">
-                                    <h3 className="text-sm font-semibold text-white">Add New Test Case</h3>
-                                    
-                                    <input 
-                                        className="w-full bg-[#121826] border border-[#202736] p-2.5 rounded text-xs text-white" 
-                                        placeholder="Label / Title (e.g. Example 1)" 
-                                        value={testCaseForm.label} 
-                                        onChange={e => setTestCaseForm({ ...testCaseForm, label: e.target.value })} 
-                                    />
-                                    
-                                    <div>
-                                        <label className="block text-[10px] text-zinc-500 mb-1">Input arguments JSON (must be dictionary with "args" key, e.g. {"{"}"args": [[2,7,11,15], 9]{"}"})</label>
-                                        <textarea 
-                                            className="w-full bg-[#121826] border border-[#202736] p-2.5 rounded font-mono text-xs text-white h-16 focus:outline-none focus:border-[#4DD4C4]" 
-                                            placeholder={`{\n  "args": [[2, 7, 11, 15], 9]\n}`}
-                                            value={testCaseForm.input_data} 
-                                            onChange={e => setTestCaseForm({ ...testCaseForm, input_data: e.target.value })} 
-                                        />
-                                    </div>
-                                    
-                                    <div>
-                                        <label className="block text-[10px] text-zinc-500 mb-1">Expected return value JSON (e.g. [0, 1] or true or 42)</label>
-                                        <textarea 
-                                            className="w-full bg-[#121826] border border-[#202736] p-2.5 rounded font-mono text-xs text-white h-16 focus:outline-none focus:border-[#4DD4C4]" 
-                                            placeholder={`[0, 1]`}
-                                            value={testCaseForm.expected} 
-                                            onChange={e => setTestCaseForm({ ...testCaseForm, expected: e.target.value })} 
-                                        />
+                                    <div className="flex gap-4 border-b border-[#202736] pb-2 mb-4">
+                                        <button onClick={() => setTestCaseTab('single')} className={`text-sm font-bold pb-2 -mb-2.5 transition-colors ${testCaseTab === 'single' ? 'text-[#4DD4C4] border-b-2 border-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}>Single</button>
+                                        <button onClick={() => setTestCaseTab('bulk')} className={`text-sm font-bold pb-2 -mb-2.5 transition-colors ${testCaseTab === 'bulk' ? 'text-[#4DD4C4] border-b-2 border-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}>Bulk JSON</button>
                                     </div>
 
-                                    <div className="flex gap-4">
-                                        <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+                                    {testCaseTab === 'single' ? (
+                                        <>
                                             <input 
-                                                type="checkbox" 
-                                                checked={testCaseForm.is_hidden} 
-                                                onChange={e => setTestCaseForm({ ...testCaseForm, is_hidden: e.target.checked })} 
-                                                className="rounded border-[#202736]"
+                                                className="w-full bg-[#121826] border border-[#202736] p-2.5 rounded text-xs text-white" 
+                                                placeholder="Label / Title (e.g. Example 1)" 
+                                                value={testCaseForm.label} 
+                                                onChange={e => setTestCaseForm({ ...testCaseForm, label: e.target.value })} 
                                             />
-                                            Hidden test case (used for grading, not shown to user unless failed)
-                                        </label>
-                                        <input 
-                                            type="number" 
-                                            className="w-20 bg-[#121826] border border-[#202736] p-1 rounded text-xs text-white" 
-                                            placeholder="Order index" 
-                                            value={testCaseForm.order_index} 
-                                            onChange={e => setTestCaseForm({ ...testCaseForm, order_index: parseInt(e.target.value) || 0 })} 
-                                        />
-                                    </div>
+                                            
+                                            <div>
+                                                <label className="block text-[10px] text-zinc-500 mb-1">Input arguments (JSON Array e.g. <span className="text-[#4DD4C4]">[[2,7,11,15], 9]</span>)</label>
+                                                <textarea 
+                                                    className="w-full bg-[#121826] border border-[#202736] p-2.5 rounded font-mono text-xs text-white h-16 focus:outline-none focus:border-[#4DD4C4]" 
+                                                    placeholder={`[[2, 7, 11, 15], 9]`}
+                                                    value={testCaseForm.input_data} 
+                                                    onChange={e => setTestCaseForm({ ...testCaseForm, input_data: e.target.value })} 
+                                                />
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block text-[10px] text-zinc-500 mb-1">Expected return value JSON (e.g. [0, 1] or true or 42)</label>
+                                                <textarea 
+                                                    className="w-full bg-[#121826] border border-[#202736] p-2.5 rounded font-mono text-xs text-white h-16 focus:outline-none focus:border-[#4DD4C4]" 
+                                                    placeholder={`[0, 1]`}
+                                                    value={testCaseForm.expected} 
+                                                    onChange={e => setTestCaseForm({ ...testCaseForm, expected: e.target.value })} 
+                                                />
+                                            </div>
 
-                                    <Button onClick={handleAddTestCase} disabled={loading || !testCaseForm.input_data || !testCaseForm.expected} className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold text-xs mt-2">
-                                        Add Test Case
-                                    </Button>
+                                            <div className="flex gap-4">
+                                                <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={testCaseForm.is_hidden} 
+                                                        onChange={e => setTestCaseForm({ ...testCaseForm, is_hidden: e.target.checked })} 
+                                                        className="rounded border-[#202736]"
+                                                    />
+                                                    Hidden test case (used for grading, not shown to user unless failed)
+                                                </label>
+                                                <input 
+                                                    type="number" 
+                                                    className="w-20 bg-[#121826] border border-[#202736] p-1 rounded text-xs text-white" 
+                                                    placeholder="Order" 
+                                                    value={testCaseForm.order_index || testCases.length + 1} 
+                                                    onChange={e => setTestCaseForm({ ...testCaseForm, order_index: parseInt(e.target.value) || 0 })} 
+                                                />
+                                            </div>
+
+                                            <Button onClick={handleAddTestCase} disabled={loading || !testCaseForm.input_data || !testCaseForm.expected} className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold text-xs mt-2">
+                                                Add Test Case
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div>
+                                                <label className="block text-[10px] text-zinc-500 mb-1">Paste a JSON array of test cases. You don't need to specify {"{"}args: ...{"}"}.</label>
+                                                <textarea 
+                                                    className="w-full bg-[#121826] border border-[#202736] p-2.5 rounded font-mono text-[10px] text-white h-64 focus:outline-none focus:border-[#4DD4C4] custom-scrollbar" 
+                                                    placeholder={`[\n  {\n    "input_data": [[2, 7, 11, 15], 9],\n    "expected": [0, 1],\n    "is_hidden": false,\n    "label": "Example 1"\n  },\n  {\n    "input_data": [[3, 2, 4], 6],\n    "expected": [1, 2],\n    "is_hidden": true\n  }\n]`}
+                                                    value={bulkTestCases} 
+                                                    onChange={e => setBulkTestCases(e.target.value)} 
+                                                />
+                                            </div>
+                                            <Button onClick={handleBulkAddTestCases} disabled={loading || !bulkTestCases} className="w-full bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-xs mt-2">
+                                                Bulk Add Test Cases
+                                            </Button>
+                                        </>
+                                    )}
                                 </div>
+
 
                                 <div className="space-y-2 mt-4">
                                     <h3 className="text-sm font-semibold text-white">Added Test Cases ({testCases.length})</h3>
@@ -1556,14 +1644,25 @@ export default function AdminDashboard() {
                                 <p className="text-sm text-zinc-500">Enter the reference query or code that produces the correct result.</p>
                                 
                                 {problemForm.challenge_type === 'python_dsa' && (
-                                    <div>
-                                        <label className="block text-xs text-zinc-500 mb-1">Function Name (must match your solution signature, e.g. twoSum)</label>
-                                        <input 
-                                            className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white font-mono focus:border-[#4DD4C4] focus:outline-none" 
-                                            placeholder="twoSum" 
-                                            value={solutionForm.function_name} 
-                                            onChange={e => setSolutionForm({ ...solutionForm, function_name: e.target.value })} 
-                                        />
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-xs text-zinc-500 mb-1">Function Name (must match your solution signature, e.g. <span className="font-mono text-[#4DD4C4]">countOnes</span>)</label>
+                                            <input 
+                                                className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white font-mono focus:border-[#4DD4C4] focus:outline-none" 
+                                                placeholder="countOnes" 
+                                                value={solutionForm.function_name} 
+                                                onChange={e => setSolutionForm({ ...solutionForm, function_name: e.target.value })} 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-zinc-500 mb-1">Starter Code shown to users — write the <span className="font-mono text-[#4DD4C4]">def</span> line with full params (e.g. <span className="font-mono text-[#4DD4C4]">def countOnes(nums: List[int]) -&gt; int:</span>)</label>
+                                            <input 
+                                                className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white font-mono focus:border-[#4DD4C4] focus:outline-none" 
+                                                placeholder="def countOnes(nums: List[int]) -> int:" 
+                                                value={solutionForm.starter_code} 
+                                                onChange={e => setSolutionForm({ ...solutionForm, starter_code: e.target.value })} 
+                                            />
+                                        </div>
                                     </div>
                                 )}
 

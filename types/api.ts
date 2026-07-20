@@ -35,6 +35,8 @@ export interface Problem {
     description: string;
     estimated_time_minutes: number;
     challenge_type?: string;  // 'sql' | 'python' | 'pyspark' | 'python_dsa'
+    function_name?: string | null;  // DSA only: the function the user must implement
+    starter_code?: string | null;   // DSA only: the full stub shown to users (with params)
 }
 
 export interface Dataset {

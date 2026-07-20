@@ -348,8 +348,12 @@ export function DailySetClient() {
         setShowHint(false);
         setExpectedOutput(null);
         try {
+            const p = problems.find(x => x.id === id);
+            const isDsa = p?.challenge_type === 'python_dsa';
+
             const [datasets, savedSol] = await Promise.all([
-                api.getDatasets(id),
+                // DSA problems have no datasets table — skip the call to avoid a 404
+                isDsa ? Promise.resolve([]) : api.getDatasets(id),
                 api.getSavedSolution(id).catch(() => ({ submitted_query: null }))
             ]);
             const normalizedDatasets = datasets.map(ds => ({
@@ -365,13 +369,18 @@ export function DailySetClient() {
             } else if (savedSol?.submitted_query) {
                 setCode(savedSol.submitted_query);
             } else {
-                const p = problems.find(x => x.id === id);
                 const firstDsName = datasets[0]?.table_name || 'table_name';
-                if (p?.challenge_type === 'python_dsa') {
-                    // DSA stub — function name comes from the problem description or a sensible default
-                    const fnMatch = p.description?.match(/def\s+(\w+)\s*\(/);
-                    const fnName = fnMatch ? fnMatch[1] : 'solution';
-                    setCode(`from typing import List, Optional\n\ndef ${fnName}():\n    # Write your solution here\n    pass\n`);
+                if (isDsa) {
+                    if (p?.starter_code) {
+                        // Admin defined a full stub with params — use it directly
+                        setCode(`from typing import List, Optional\n\n${p.starter_code}\n    # Write your solution here\n    pass\n`);
+                    } else {
+                        // Fall back: build a minimal stub from function_name or description regex
+                        const fnName = p?.function_name
+                            || p?.description?.match(/def\s+(\w+)\s*\(/)?.[1]
+                            || 'solution';
+                        setCode(`from typing import List, Optional\n\ndef ${fnName}():\n    # Write your solution here\n    pass\n`);
+                    }
                 } else if (p?.challenge_type === 'python') {
                     const dfList = datasets.map(d => `'${d.table_name}_df'`).join(', ');
                     const dfLabel = datasets.length > 1
@@ -389,9 +398,12 @@ export function DailySetClient() {
                     setCode(`-- Write your query for: ${p?.title}\nSELECT * FROM ${firstDsName};\n`);
                 }
             }
-            api.getExpectedOutput(id)
-                .then(data => setExpectedOutput(data))
-                .catch(() => setExpectedOutput(null));
+            // DSA problems show test results in the output panel — no tabular expected output to fetch
+            if (!isDsa) {
+                api.getExpectedOutput(id)
+                    .then(data => setExpectedOutput(data))
+                    .catch(() => setExpectedOutput(null));
+            }
             setProblemVotes(null);
             setCommentCount(0);
             setActiveDetailTab('question');
@@ -1793,6 +1805,7 @@ export function DailySetClient() {
                                             </div>
                                         </div>
 
+                                        {!isDsaProblem && (
                                         <div>
                                             <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
                                                 <Database size={11} /> Datasets
@@ -1865,7 +1878,9 @@ export function DailySetClient() {
                                                 );
                                             })}
                                         </div>
+                                        )}
 
+                                        {!isDsaProblem && (
                                         <div>
                                             <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Expected Output</h3>
                                             <div className="h-px w-full bg-[#202736] mb-3" />
@@ -1894,6 +1909,7 @@ export function DailySetClient() {
                                                 return <div className="p-3 bg-[#131924] rounded-lg border border-[#202736] text-xs text-zinc-500 font-mono italic">Loading...</div>;
                                             })()}
                                         </div>
+                                        )}
 
                                         {hintText && (
                                             <div>
