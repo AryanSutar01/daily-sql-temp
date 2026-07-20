@@ -1285,7 +1285,7 @@ export function DailySetClient() {
     const handleShare = (platform: 'twitter' | 'linkedin' | 'copy') => {
         if (!activeProblemId) return;
         const url = `${window.location.origin}/practice/daily/${activeProblemId}`;
-        const text = `Check out this SQL question: ${activeProblem?.title} on DailySQL!`;
+        const text = `Just solved "${activeProblem?.title}" on @dailysqlin — daily SQL, Python & PySpark practice! 🔥`;
 
         if (platform === 'twitter') {
             window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
@@ -1568,26 +1568,52 @@ export function DailySetClient() {
                 >
                     <div className={`flex-1 flex flex-col h-full ${sidebarCollapsed ? 'overflow-visible' : 'overflow-hidden'}`}>
                         {/* Header / Tabs */}
-                        <div className={`h-[52px] border-b border-[#202736] bg-[#0d121c] flex ${sidebarCollapsed ? 'flex-col justify-center' : 'justify-between'} items-center px-4 shrink-0 transition-all`}>
+                        <div className={`h-[52px] border-b border-[#202736] bg-[#0d121c] flex ${sidebarCollapsed ? 'flex-col justify-center' : 'flex-row'} items-center px-3 shrink-0 transition-all gap-1.5`}>
                             {!sidebarCollapsed ? (
                                 <>
-                                    <span className="font-semibold text-xs tracking-wide text-zinc-300">
-                                        {activeSidebarTab === 'today' ? "Today's Practice" : "Problem List"}
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                        {activeSidebarTab === 'list' && (
-                                            <span className="text-[10px] text-zinc-500 font-bold bg-[#131924] px-2 py-0.5 rounded border border-[#202736]">
-                                                {problems.length}
-                                            </span>
-                                        )}
-                                        <button
-                                            onClick={() => setSidebarCollapsed(true)}
-                                            className="p-1 hover:bg-[#202736] rounded text-zinc-500 hover:text-white transition-colors"
-                                            title="Collapse Sidebar"
-                                        >
-                                            <ChevronLeft size={14} />
-                                        </button>
-                                    </div>
+                                    {/* Discipline tabs inline in header */}
+                                    {activeSidebarTab === 'today' ? (
+                                        <div className="flex gap-0.5 flex-1 overflow-hidden">
+                                            {([{ id: 'sql', label: 'SQL', Icon: Database, color: 'text-sky-400', bg: 'bg-sky-400/10', border: 'border-sky-400/40' }, { id: 'python', label: 'Python', Icon: Code2, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/40' }, { id: 'pyspark', label: 'PySpark', Icon: Server, color: 'text-violet-400', bg: 'bg-violet-400/10', border: 'border-violet-400/40' }] as const).map(({ id, label, Icon, color, bg, border }) => (
+                                                <button
+                                                    key={id}
+                                                    onClick={() => setActiveDisciplineTab(id)}
+                                                    className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-[10px] font-bold border transition-all ${
+                                                        activeDisciplineTab === id
+                                                            ? `${bg} ${color} ${border}`
+                                                            : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.03] border-transparent'
+                                                    }`}
+                                                >
+                                                    <Icon size={11} />
+                                                    {label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="flex gap-0.5 flex-1 overflow-hidden">
+                                            {([{ id: 'all', label: 'All' }, { id: 'sql', label: 'SQL' }, { id: 'python', label: 'Python' }, { id: 'pyspark', label: 'PySpark' }] as const).map(({ id, label }) => (
+                                                <button
+                                                    key={id}
+                                                    onClick={() => setTypeFilter(id)}
+                                                    className={`flex-1 flex items-center justify-center py-1.5 rounded text-[10px] font-bold border transition-all ${
+                                                        typeFilter === id
+                                                            ? 'bg-[#4DD4C4]/10 text-[#4DD4C4] border-[#4DD4C4]/40'
+                                                            : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.03] border-transparent'
+                                                    }`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {/* Collapse button */}
+                                    <button
+                                        onClick={() => setSidebarCollapsed(true)}
+                                        className="p-1.5 hover:bg-[#202736] rounded text-zinc-500 hover:text-white transition-colors shrink-0"
+                                        title="Collapse Sidebar"
+                                    >
+                                        <ChevronLeft size={13} />
+                                    </button>
                                 </>
                             ) : (
                                 <button
@@ -1657,7 +1683,7 @@ export function DailySetClient() {
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {/* ── Discipline Tab Switcher ── */}
+                                        {/* ── Discipline Tab content (tabs are now in header) ── */}
                                         {(() => {
                                             const DISC_TABS = [
                                                 { id: 'sql' as const, label: 'SQL', Icon: Database, color: 'text-sky-400', bg: 'bg-sky-400/10', border: 'border-sky-400/30' },
