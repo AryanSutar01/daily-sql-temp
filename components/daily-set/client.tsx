@@ -3,6 +3,8 @@ import {
     Play,
     CheckCircle2,
     Database,
+    Code2,
+    Server,
     Loader2,
     Flame,
     AlertCircle,
@@ -53,6 +55,8 @@ import sql from 'react-syntax-highlighter/dist/esm/languages/prism/sql';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { api } from "@/lib/api";
 import { Problem, DailyPractice, Dataset, ExecutionResponse } from "@/types/api";
+import { WalkthroughTour, PRACTICE_TOUR_STEPS } from "@/components/walkthrough/WalkthroughTour";
+import { useWalkthrough } from "@/hooks/useWalkthrough";
 
 SyntaxHighlighter.registerLanguage('sql', sql);
 
@@ -163,6 +167,7 @@ export function DailySetSkeleton() {
 
 export function DailySetClient() {
     const router = useRouter();
+    const { isActive: tourActive, tryAutoStart, startTour, completeTour, skipTour } = useWalkthrough();
     const params = useParams();
     const searchParams = useSearchParams();
     const urlProblemId = params.problemId as string | undefined;
@@ -172,6 +177,7 @@ export function DailySetClient() {
     // ── Data State ──────────────────────────────────────
     const [streak, setStreak] = useState<number>(0);
     const [activeSidebarTab, setActiveSidebarTab] = useState<'today' | 'list'>('today');
+    const [activeDisciplineTab, setActiveDisciplineTab] = useState<'sql' | 'python' | 'pyspark'>('sql');
     const [searchQuery, setSearchQuery] = useState('');
     const [problems, setProblems] = useState<Problem[]>([]);
     const [dailySet, setDailySet] = useState<DailyPractice | null>(null);
@@ -438,19 +444,15 @@ export function DailySetClient() {
                         .catch(() => { });
                 }
 
-                // Welcome Toast logic
+                // Welcome Tour logic
                 if (typeof window !== 'undefined') {
                     const search = window.location.search;
                     if (search.includes('welcome=true')) {
-                        setToast({
-                            message: "Welcome to Daily SQL!",
-                            subMessage: "Your journey starts here. Good luck!",
-                            visible: true
-                        });
-                        setTimeout(() => setToast(null), 5000);
-
+                        // Clean URL first
                         const newUrl = window.location.pathname;
                         window.history.replaceState({}, '', newUrl);
+                        // Start the walkthrough (only if not seen yet)
+                        setTimeout(() => tryAutoStart(), 500);
                     }
                 }
             } catch (err) {
@@ -1162,7 +1164,7 @@ export function DailySetClient() {
                 {/* ── CENTER: Run + Submit (absolutely centered) ── */}
                 <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2.5">
                     {/* Run */}
-                    <div className="relative group">
+                    <div className="relative group" id="tour-run-button">
                         <button
                             onClick={handleRun}
                             disabled={!activeProblemId}
@@ -1200,7 +1202,15 @@ export function DailySetClient() {
                 {/* ── RIGHT: Streak + Timer + Fullscreen + Profile ── */}
                 <div className="ml-auto flex items-center gap-4">
 
-
+                    {/* Tour Help Button */}
+                    <button
+                        onClick={startTour}
+                        title="Take the Tour"
+                        className="flex items-center gap-1.5 text-zinc-500 hover:text-[#4DD4C4] transition-colors text-[11px] font-semibold"
+                    >
+                        <Info size={14} />
+                        <span className="hidden sm:inline">Tour</span>
+                    </button>
 
                     {/* Timer / Stopwatch */}
                     <div className="flex items-center gap-2">
@@ -1377,6 +1387,7 @@ export function DailySetClient() {
 
                         {/* List Content */}
                         <div
+                            id="tour-sidebar-today-tab"
                             ref={sidebarScrollRef}
                             onScroll={(e) => {
                                 if (sidebarLoaded && !sidebarCollapsed) {
@@ -1430,50 +1441,95 @@ export function DailySetClient() {
                                         })}
                                     </div>
                                 ) : (
-                                    <div className="space-y-4">
-                                        {dailySet ? (
-                                            ([
-                                                { label: 'SQL Challenges', keys: ['easy', 'medium', 'advanced'] },
-                                                { label: 'Python Challenges', keys: ['python_easy', 'python_medium', 'python_advanced'] },
-                                                { label: 'PySpark Challenges', keys: ['pyspark_easy', 'pyspark_medium', 'pyspark_advanced'] },
-                                                { label: 'DSA Challenges', keys: ['dsa_easy', 'dsa_medium', 'dsa_advanced'] }
-                                            ] as const).map((category) => {
-                                                const catProblems = category.keys
-                                                    .map(k => ({ key: k, id: dailySet[k as keyof DailyPractice] }))
-                                                    .filter(item => !!item.id && problems.some(p => p.id === item.id));
+                                    <div className="space-y-3">
+                                        {/* ── Discipline Tab Switcher ── */}
+                                        {(() => {
+                                            const DISC_TABS = [
+                                                { id: 'sql' as const,     label: 'SQL',     Icon: Database, color: 'text-sky-400',    bg: 'bg-sky-400/10',    border: 'border-sky-400/30' },
+                                                { id: 'python' as const,  label: 'Python',  Icon: Code2,    color: 'text-amber-400',  bg: 'bg-amber-400/10',  border: 'border-amber-400/30' },
+                                                { id: 'pyspark' as const, label: 'PySpark', Icon: Server,   color: 'text-violet-400', bg: 'bg-violet-400/10', border: 'border-violet-400/30' },
+                                            ];
+                                            const DISC_KEYS: Record<string, Array<keyof DailyPractice>> = {
+                                                sql:     ['easy', 'medium', 'advanced'],
+                                                python:  ['python_easy', 'python_medium', 'python_advanced', 'dsa_easy', 'dsa_medium', 'dsa_advanced'],
+                                                pyspark: ['pyspark_easy', 'pyspark_medium', 'pyspark_advanced'],
+                                            };
+                                            const activeKeys = DISC_KEYS[activeDisciplineTab];
+                                            const activeTabMeta = DISC_TABS.find(t => t.id === activeDisciplineTab)!;
 
-                                                if (catProblems.length === 0) return null;
+                                            const catProblems = dailySet
+                                                ? activeKeys
+                                                    .map(k => ({ key: k, id: dailySet[k] as string | undefined }))
+                                                    .filter(item => !!item.id && problems.some(p => p.id === item.id))
+                                                : [];
 
-                                                return (
-                                                    <div key={category.label} className="space-y-2">
-                                                        <div className="text-[10px] font-bold text-[#4DD4C4]/70 uppercase tracking-wider px-1">
-                                                            {category.label}
-                                                        </div>
-                                                        {catProblems.map(({ key, id }) => {
-                                                            const pInfo = problems.find(p => p.id === id);
-                                                            if (!pInfo) return null;
-                                                            const dStyle = getDiffStyle(pInfo.difficulty);
-                                                            const isSolved = solvedIds.has(id!);
-                                                            const isActive = activeProblemId === id;
+                                            return (
+                                                <>
+                                                    {/* Tab buttons */}
+                                                    <div className="flex gap-1 mb-1">
+                                                        {DISC_TABS.map(({ id, label, Icon }) => {
+                                                            const isActive = id === activeDisciplineTab;
+                                                            const meta = DISC_TABS.find(t => t.id === id)!;
                                                             return (
-                                                                <div key={id}
-                                                                    onClick={() => handleProblemSelect(id!)}
-                                                                    className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${isActive ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40' : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'}`}
+                                                                <button
+                                                                    key={id}
+                                                                    onClick={() => setActiveDisciplineTab(id)}
+                                                                    className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-md text-[10px] font-semibold transition-all border ${
+                                                                        isActive
+                                                                            ? `${meta.bg} ${meta.color} ${meta.border}`
+                                                                            : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.03] border-transparent'
+                                                                    }`}
                                                                 >
-                                                                    <div className="flex justify-between items-center">
-                                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>{dStyle.label}</span>
-                                                                        <CheckCircle2 size={14} className={isSolved ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
-                                                                    </div>
-                                                                    <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'}`}>{pInfo.title}</div>
-                                                                </div>
+                                                                    <Icon size={12} />
+                                                                    {label}
+                                                                </button>
                                                             );
                                                         })}
                                                     </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <div className="text-xs text-zinc-500 italic p-4 text-center border border-[#202736] rounded bg-[#131924]">No daily set found.</div>
-                                        )}
+
+                                                    {/* Problem cards for the active discipline */}
+                                                    {catProblems.length > 0 ? (
+                                                        <div className="space-y-2">
+                                                            {catProblems.map(({ id }, cardIdx) => {
+                                                                const pInfo = problems.find(p => p.id === id);
+                                                                if (!pInfo) return null;
+                                                                const dStyle = getDiffStyle(pInfo.difficulty);
+                                                                const isSolved = solvedIds.has(id!);
+                                                                const isActive = activeProblemId === id;
+                                                                return (
+                                                                    <div
+                                                                        id={cardIdx === 0 ? 'tour-problem-card' : undefined}
+                                                                        key={id}
+                                                                        onClick={() => handleProblemSelect(id!)}
+                                                                        className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${
+                                                                            isActive
+                                                                                ? `${activeTabMeta.bg} ${activeTabMeta.border}`
+                                                                                : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'
+                                                                        }`}
+                                                                    >
+                                                                        <div className="flex justify-between items-center">
+                                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
+                                                                                {dStyle.label}
+                                                                            </span>
+                                                                            <CheckCircle2 size={14} className={isSolved ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
+                                                                        </div>
+                                                                        <div className={`text-sm font-medium transition-colors line-clamp-2 ${
+                                                                            isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'
+                                                                        }`}>
+                                                                            {pInfo.title}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-xs text-zinc-500 italic p-4 text-center border border-[#202736] rounded bg-[#131924]">
+                                                            {dailySet ? `No ${activeDisciplineTab.toUpperCase()} problems today.` : 'No daily set found.'}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 )
                             ) : (
@@ -1580,7 +1636,7 @@ export function DailySetClient() {
 
                         {/* Streak Footer */}
                         {!sidebarCollapsed && (
-                            <div className="p-4 border-t border-[#202736] bg-[#0d121c] shrink-0">
+                            <div id="tour-streak" className="p-4 border-t border-[#202736] bg-[#0d121c] shrink-0">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Daily Streak</span>
                                     <span className="text-sm font-bold text-white flex items-center gap-1">
@@ -1719,7 +1775,7 @@ export function DailySetClient() {
 
                                 {/* Content */}
                                 {activeDetailTab === 'question' ? (
-                                    <div className="flex-1 overflow-y-auto p-5 space-y-8 scrollbar-thin scrollbar-thumb-zinc-700">
+                                    <div id="tour-problem-description" className="flex-1 overflow-y-auto p-5 space-y-8 scrollbar-thin scrollbar-thumb-zinc-700">
                                         <div>
                                             {activeProblem && (
                                                 <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border mb-2 ${getDiffStyle(activeProblem.difficulty).color} ${getDiffStyle(activeProblem.difficulty).bg} ${getDiffStyle(activeProblem.difficulty).border}`}>
@@ -2097,7 +2153,7 @@ export function DailySetClient() {
                         </div>
 
                         {/* Monaco */}
-                        <div className="flex-1 relative overflow-hidden bg-[#0b101c]">
+                        <div id="tour-code-editor" className="flex-1 relative overflow-hidden bg-[#0b101c]">
                             <Editor
                                 height="100%"
                                 language={activeProblem?.challenge_type === 'sql' ? 'sql' : 'python'}
@@ -2407,6 +2463,14 @@ export function DailySetClient() {
                     </div>
                 </div>
             )}
+
+            {/* Walkthrough Tour Overlay */}
+            <WalkthroughTour
+                steps={PRACTICE_TOUR_STEPS}
+                isActive={tourActive}
+                onComplete={completeTour}
+                onSkip={skipTour}
+            />
         </div>
     );
 }

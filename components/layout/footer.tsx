@@ -32,7 +32,7 @@ export function Footer() {
 
       {/* Main Footer Content */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-8 mb-12">
           {/* Brand */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center space-x-2">
@@ -40,9 +40,15 @@ export function Footer() {
                 Daily SQL
               </span>
             </Link>
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-zinc-400 max-w-xs">
               Stay sharp in SQL, Python, and PySpark with just 15 minutes a day.
             </p>
+            <Link
+              href="mailto:contact@dailysql.in"
+              className="inline-flex items-center gap-2 text-sm text-[#30B5A6] hover:text-[#4DD4C4] transition-colors"
+            >
+              contact@dailysql.in
+            </Link>
           </div>
 
           {/* Product */}
@@ -77,22 +83,15 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Company */}
+          {/* Legal */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-white">Company</h3>
+            <h3 className="text-sm font-semibold text-white">Legal</h3>
             <ul className="space-y-2 text-sm text-zinc-400">
               <li>
                 <Link href="/contact" className="hover:text-[#30B5A6] transition-colors">
                   Contact
                 </Link>
               </li>
-            </ul>
-          </div>
-
-          {/* Legal */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-white">Legal</h3>
-            <ul className="space-y-2 text-sm text-zinc-400">
               <li>
                 <Link href="/privacy" className="hover:text-[#30B5A6] transition-colors">
                   Privacy Policy
@@ -112,9 +111,8 @@ export function Footer() {
           </div>
         </div>
 
-
         {/* Bottom bar with Made with Love */}
-        <div className="pt-8 border-t border-border/50 flex flex-col items-center justify-center space-y-4">
+        <div className="pt-8 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-zinc-500 flex items-center gap-2">
             Made with <Heart size={14} className="text-[#30B5A6] fill-[#30B5A6]" /> by engineers, for engineers.
           </p>
