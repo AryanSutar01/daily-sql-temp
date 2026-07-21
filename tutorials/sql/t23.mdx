@@ -1,4 +1,39 @@
+## Numeric Functions: Hardware FPU vs. Software Arithmetic
+
+When you run numeric functions in SQL, you must understand *where* the math is actually being computed, because it dictates both speed and accuracy.
+
+### Hardware Math (FLOAT / DOUBLE PRECISION)
+
+If you run `ROUND()`, `POWER()`, or `SQRT()` on a `FLOAT` or `DOUBLE PRECISION` column, the database passes the raw 64-bit IEEE 754 binary floating-point value directly to the server's CPU **Floating Point Unit (FPU)**. 
+- **Speed**: Blisteringly fast (hardware-level parallel SIMD instructions).
+- **Accuracy Hazard**: Susceptible to IEEE 754 precision loss. `0.1 + 0.2` evaluated at the hardware level will yield `0.30000000000000004`. If you use `FLOAT` for financial data, your numeric functions will compound these rounding errors, destroying financial integrity.
+
+### Software Math (NUMERIC / DECIMAL)
+
+If you run numeric functions on a `DECIMAL(10,2)` column, the server's FPU is completely bypassed. `DECIMAL` types are processed using a software-level **Arbitrary Precision Arithmetic** library built into the database engine (similar to Java's `BigDecimal`).
+- **Speed**: Significantly slower (up to 10x slower than FLOAT for complex operations like `POWER()` or logarithms), because the database must compute the math byte-by-byte in software to guarantee exactness.
+- **Accuracy Guarantee**: Mathematically perfect for base-10 operations. `0.1 + 0.2` always equals `0.3`.
+
+### The Integer Division Trap
+
+In languages like Python 3, `17 / 5` yields `3.4`. In relational databases (like PostgreSQL and SQL Server), if both operands are integers, the database strictly applies **Integer Division**, truncating the decimal and returning `3`.
+
+```sql
+-- The classic interview trap:
+SELECT count(shipped) / count(total) AS completion_rate FROM orders;
+-- If 800 shipped and 1000 total: 800 / 1000 = 0 (Not 0.8!)
+
+-- The fix: Force the hardware to upcast one integer to a FLOAT/NUMERIC
+SELECT count(shipped)::FLOAT / count(total) FROM orders;
+-- Or simply multiply by 1.0
+SELECT count(shipped) * 1.0 / count(total) FROM orders;
+```
+
+---
+
 ## Common Numeric Functions
+
+Numeric functions in SQL operate on scalar values and return scalar results. A critical quirk to internalize: PostgreSQL's `ROUND()` uses **banker's rounding** (round-half-to-even), so `ROUND(2.5)` returns 2 (rounds to even), while `ROUND(3.5)` returns 4. This prevents systematic upward bias in large datasets. Standard rounding is `ROUND(x + 0.0000001)` to force traditional half-up behavior if needed. The distinction between `TRUNC` and `FLOOR` matters for negative numbers: `TRUNC(-3.9)` returns `-3` (towards zero), while `FLOOR(-3.9)` returns `-4` (towards negative infinity).
 
 ```sql
 -- Absolute value
@@ -25,6 +60,8 @@ SELECT TRUNC(3.456, 2);   -- 3.45  (PostgreSQL: truncate to 2 decimal places)
 ```
 
 ## Modulo - Remainder
+
+`MOD(a, b)` or `a % b` returns the remainder after integer division. Its primary production use cases are determining parity (even/odd), consistent hash-based sharding, and deterministic sampling. When used for sharding (`user_id % N = shard_id`), it distributes rows deterministically and uniformly across N shards — the same user always routes to the same shard. For sampling, `WHERE id % 100 < 1` gives a deterministic 1% sample that doesn't change between runs, unlike `ORDER BY RANDOM() LIMIT N` which is non-deterministic and requires a full sort.
 
 ```sql
 SELECT MOD(10, 3);        -- 1  (10 ÷ 3 = 3 remainder 1)
@@ -59,6 +96,8 @@ FROM investments;
 
 ## Logarithms and Exponentials
 
+`LN(x)` computes the natural logarithm (base e), used in statistics and compound growth models. `LOG(x)` in PostgreSQL is log base 10 (not base 2). For log base N, use `LOG(base, value)` in PostgreSQL. In analytics, log scales are used to normalize skewed distributions — `LOG(revenue + 1)` compresses the wide range of revenue values, making visualizations and ML features more tractable. The `+1` prevents `LOG(0)` which is undefined.
+
 ```sql
 SELECT EXP(1);            -- 2.718... (e^1)
 SELECT LN(2.718);         -- ~1.0 (natural log)
@@ -67,6 +106,8 @@ SELECT LOG(2, 1024);      -- 10 (log base 2 of 1024, PostgreSQL)
 ```
 
 ## Random Numbers
+
+`RANDOM()` in PostgreSQL returns a double-precision float uniformly distributed in `[0, 1)`. Note that `ORDER BY RANDOM()` for sampling is **extremely slow** on large tables because it assigns a random number to every row, then sorts all of them. For large-scale sampling, use `TABLESAMPLE BERNOULLI(1)` (1% sample) which operates at the storage block level and avoids a full sort. For reproducible random sequences (e.g., A/B test assignment), use `setseed(0.42)` before calling `RANDOM()` to seed the PRNG.
 
 ```sql
 SELECT RANDOM();                          -- random float between 0 and 1
@@ -90,6 +131,8 @@ SELECT 17 :: INT / 5;     -- 3 (integer division via casting)
 ```
 
 ## GREATEST and LEAST
+
+`GREATEST` and `LEAST` accept variadic arguments and return the maximum or minimum value across them. A crucial behavioral difference from `MAX`/`MIN`: both `GREATEST` and `LEAST` return `NULL` if **any** argument is `NULL` (in most databases). This differs from aggregate `MAX(col)`, which ignores NULLs. Use `COALESCE` to provide fallback values: `GREATEST(COALESCE(a, 0), COALESCE(b, 0))`. These functions are invaluable for enforcing business rules directly in SQL — capping discounts, enforcing minimum prices, and clamping scores to valid ranges.
 
 ```sql
 SELECT GREATEST(10, 20, 5, 15);   -- 20

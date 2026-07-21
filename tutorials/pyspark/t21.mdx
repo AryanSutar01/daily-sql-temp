@@ -1,3 +1,42 @@
+## How Deduplication Works Internally
+
+`distinct()` and `dropDuplicates()` are **wide transformations** — they require a shuffle. Here is why: to determine whether a row is a duplicate, Spark must compare it against all other rows with the same key. But those other rows might live on completely different executor nodes in a distributed cluster. The only way to co-locate potential duplicates is to shuffle them to the same executor first.
+
+### The Shuffle-Based Deduplication Process
+
+```
+Input partitions (distributed across executors):
+┌──────────────────┐    ┌──────────────────┐
+│ Partition 0      │    │ Partition 1       │
+│ (1, Alice, Eng)  │    │ (1, Alice, Eng)  │ ← duplicate of P0!
+│ (2, Bob, Mkt)    │    │ (3, Carol, Eng)  │
+└──────────────────┘    └──────────────────┘
+Executors cannot see across partition boundaries yet.
+
+After shuffle by hash(all columns):
+┌──────────────────┐    ┌──────────────────┐
+│ Partition A      │    │ Partition B       │
+│ (1, Alice, Eng)  │    │ (2, Bob, Mkt)    │
+│ (1, Alice, Eng)  │ ← both copies here!  │ (3, Carol, Eng)  │
+└──────────────────┘    └──────────────────┘
+Now each partition can identify and drop its own duplicates.
+```
+
+The hash function guarantees that identical rows (or rows with identical key columns) are always routed to the same post-shuffle partition. From there, deduplication is a local operation.
+
+### Why "Which Row is Kept" is Non-Deterministic
+
+When multiple rows are duplicates (by key), Spark keeps one — but **which one** is not guaranteed without explicit ordering. The row that arrives first at the post-shuffle partition is kept. Because network delivery order is non-deterministic, repeated runs of the same job may keep different rows. This is why:
+
+1. `orderBy().dropDuplicates()` is **still not fully deterministic** across all Spark versions — the sort happens before the shuffle, but the shuffle can reorder rows within the same sort key
+2. Using `row_number()` with a `Window` function is the **only fully deterministic approach** — it explicitly assigns a rank and you filter on rank == 1
+
+### distinct() vs dropDuplicates() — The Same Operation
+
+`distinct()` is simply `dropDuplicates()` called with no arguments (uses all columns as the key). There is no performance difference.
+
+---
+
 ## Setup
 
 ```python

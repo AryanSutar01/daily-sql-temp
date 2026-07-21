@@ -1,3 +1,27 @@
+## Physical Storage: JSONB, GIN, and TOAST
+
+Storing unstructured data in a relational database requires specialized physical storage mechanisms to maintain performance.
+
+### Binary Parsing (JSON vs JSONB)
+
+If you use the standard `JSON` data type, the database stores the exact raw text you inserted (including whitespace). When you query `attributes->'color'`, the engine must physically parse the entire JSON string at runtime. For millions of rows, this CPU overhead is crippling.
+
+**JSONB (JSON Binary)** completely eliminates this overhead. During `INSERT`, the database pre-parses the JSON string, strips whitespace, and converts it into a custom binary format. Keys are hashed and stored in a binary tree structure inside the column. When you query `attributes->'color'`, the engine does a $O(1)$ binary lookup, bypassing the parser entirely.
+
+### GIN Indexes and Containment
+
+You cannot build a standard B-Tree index on a JSONB column because B-Trees sort single values, not nested graphs. Instead, databases use a **GIN (Generalized Inverted Index)**.
+Similar to how a search engine indexes the web, a GIN index shreds the JSON document into individual key-value pairs (e.g., `"color": "red"`) and maps each pair to a list of Row IDs that contain it. This is why GIN indexes excel at the `@>` (containment) operator.
+
+### TOAST: Out-of-Line Storage
+
+A standard PostgreSQL disk page is 8KB. What happens if you insert a 5MB JSON API response into a column? 
+The database uses a system called **TOAST (The Oversized-Attribute Storage Technique)**. It compresses the 5MB JSON object, chops it into 2KB chunks, and stores those chunks in a completely separate, hidden TOAST table. The main table row simply stores a tiny pointer to the TOAST chunks. 
+
+**Architectural Rule**: Because of TOAST, `SELECT id FROM table` is lightning fast even if the table has massive JSON columns. However, `SELECT *` forces the database to follow the TOAST pointers, decompress the chunks, and reassemble the JSON for every row, triggering massive I/O amplification.
+
+---
+
 ## Why JSON in SQL?
 
 Sometimes data doesn't fit neatly into columns - user preferences, product attributes, API responses, event metadata. JSON columns let you store flexible data alongside structured relational data.
@@ -22,6 +46,8 @@ ALTER TABLE products ADD COLUMN attributes JSONB;
 
 ## Inserting JSON Data
 
+When inserting JSON into a JSONB column, PostgreSQL expects a well-formed JSON string. The engine will parse the string, compress it into the binary format, and sort the keys. Alternatively, you can use `jsonb_build_object()` to construct the JSON programmatically from relational columns or variables. This function is extremely useful when converting relational rows into JSON APIs directly inside the database layer, bypassing the need for ORM serialization.
+
 ```sql
 -- Insert a JSONB column
 INSERT INTO users (name, settings) VALUES
@@ -42,6 +68,8 @@ INSERT INTO products (name, attributes) VALUES (
 ```
 
 ## Querying JSON Fields
+
+Accessing JSON data requires understanding the difference between the `->` and `->>` operators. The `->` operator returns a JSONB object — useful when the target value is a nested JSON object or array that you intend to drill further into. The `->>` operator extracts the target value and casts it to native SQL `TEXT`. You must use `->>` when comparing against string literals in a `WHERE` clause, otherwise you will get a type mismatch error between `jsonb` and `text`.
 
 ```sql
 -- -> returns JSON value (keeps JSON type)
@@ -66,6 +94,8 @@ SELECT * FROM products WHERE attributes @> '{"brand": "Dell"}';
 ```
 
 ## JSON Array Operations
+
+JSONB columns can store arrays of objects, which is tempting for representing one-to-many relationships (e.g., an order's line items). PostgreSQL provides several functions for working with these arrays: `jsonb_array_length()` counts elements, and `jsonb_array_elements()` is a set-returning function that "unnests" the array, producing one row per array element. Used with a `LATERAL` join, this transforms a single row containing a JSON array into a properly normalized set of rows — effectively joining structured and semi-structured data in a single query.
 
 ```sql
 -- Array of objects stored in JSONB
@@ -92,6 +122,8 @@ LATERAL jsonb_array_elements(items) AS item;
 
 ## Modifying JSON Data
 
+JSONB values are immutable in PostgreSQL — you cannot mutate a specific key in place at the storage level. Instead, `jsonb_set(target, path, new_value)` returns a *new* JSONB value with the modification applied. When used in an `UPDATE SET` clause, the database writes the new complete value back to the row. The `||` (concatenation/merge) operator is the fast shortcut for adding or overriding top-level keys, while the `-` operator removes a key. For deeply nested modifications, `jsonb_set` is the correct tool as it accepts a path array like `'{address, city}'`.
+
 ```sql
 -- Set a key (returns new JSONB - doesn't modify in place)
 SELECT settings || '{"theme": "blue"}' FROM users;    -- merge/override
@@ -115,6 +147,8 @@ WHERE id = 1;
 
 ## Indexing JSON (GIN Index)
 
+Without an index, any query filtering on a JSONB field (`WHERE settings->>'theme' = 'dark'`) forces a full sequential scan, evaluating every row's JSONB binary tree. A `GIN` (Generalized Inverted Index) indexes the entire JSONB document — it extracts every key-value pair from every row and builds a lookup structure. This makes `@>` (containment) and `?` (key existence) queries very fast. For simple equality checks on a known key path, an expression index (`(settings->>'theme')`) is even more efficient as it builds a standard B-Tree over that single extracted value.
+
 ```sql
 -- GIN index enables fast containment queries
 CREATE INDEX idx_users_settings ON users USING GIN (settings);
@@ -129,6 +163,8 @@ SELECT * FROM users WHERE settings ->> 'theme' = 'dark';  -- uses index
 ```
 
 ## Aggregating JSON
+
+SQL's `jsonb_agg()` is a powerful aggregation function that collects a set of rows into a JSON array — perfect for building nested API responses directly in SQL, eliminating the need for application-layer data shaping. `jsonb_object_agg(key, value)` constructs a key-value JSON object from rows. These functions are especially useful in reporting APIs and GraphQL backends where you need to send a single structured JSON object, not dozens of flat rows, to the client.
 
 ```sql
 -- Aggregate rows into a JSON array
@@ -153,6 +189,8 @@ FROM (
 ```
 
 ## MySQL JSON
+
+MySQL 5.7+ added JSON support, but it uses a completely different syntax from PostgreSQL. Instead of the `->` and `->>` operators, MySQL uses the `JSON_EXTRACT(column, '$.path')` function syntax, where `$` represents the document root. The `->>`shorthand is available in MySQL 5.7.13+ as equivalent to `JSON_UNQUOTE(JSON_EXTRACT(...))`. MySQL's JSON type stores data as a validated, binary-optimized format (similar to JSONB), but it lacks PostgreSQL's GIN index support — use generated virtual columns with standard indexes as a workaround.
 
 ```sql
 -- MySQL 5.7+ has JSON support

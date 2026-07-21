@@ -1,3 +1,83 @@
+## NULL: Three-Valued Logic and Physical Storage
+
+NULL is the most misunderstood concept in SQL. It is not a value — it is the **absence of a value**. This distinction has profound implications for query correctness that trip up engineers at every level.
+
+### The Truth Tables of Three-Valued Logic
+
+SQL uses TRUE, FALSE, and UNKNOWN (represented by NULL propagation). The WHERE clause only passes rows where the condition evaluates to **TRUE** — UNKNOWN is treated like FALSE.
+
+```
+AND truth table:
+  TRUE  AND TRUE    = TRUE
+  TRUE  AND FALSE   = FALSE
+  TRUE  AND UNKNOWN = UNKNOWN   ← row excluded!
+  FALSE AND UNKNOWN = FALSE
+  UNKNOWN AND UNKNOWN = UNKNOWN
+
+OR truth table:
+  TRUE  OR TRUE    = TRUE
+  TRUE  OR FALSE   = TRUE
+  TRUE  OR UNKNOWN = TRUE       ← unknown doesn't matter if other is TRUE
+  FALSE OR UNKNOWN = UNKNOWN
+  UNKNOWN OR UNKNOWN = UNKNOWN
+
+NOT truth table:
+  NOT TRUE    = FALSE
+  NOT FALSE   = TRUE
+  NOT UNKNOWN = UNKNOWN         ← NOT NULL = NULL (unknown!)
+```
+
+This explains the classic bug:
+```sql
+-- Find users NOT in city 'Delhi'
+SELECT * FROM users WHERE city != 'Delhi';
+-- ❌ WRONG: users where city IS NULL are excluded!
+-- city = NULL: NULL != 'Delhi' = UNKNOWN → row excluded
+
+-- ✅ CORRECT: explicitly handle NULLs
+SELECT * FROM users WHERE city != 'Delhi' OR city IS NULL;
+```
+
+### How NULL is Physically Stored in a Row
+
+Every row in a PostgreSQL heap page contains a **null bitmap** — a compact bit vector with one bit per column:
+
+```
+Physical row layout for: [id=1, name='Alice', phone=NULL, city='Mumbai']
+
+Row header: [xmin, xmax, ctid, infomask, ...]
+Null bitmap: [0, 0, 1, 0]   ← 1 = NULL for that column position
+             id  nm  ph  cy
+Data area:   [1] ['Alice'] [  ] ['Mumbai']
+                           ↑ no bytes stored for NULL!
+```
+
+Key properties:
+- **NULL takes no data bytes** — only the 1-bit flag in the null bitmap
+- A row with many NULL columns is **smaller** than a dense row (except for the bitmap overhead)
+- The bitmap adds 1 byte for every 8 columns (negligible)
+
+### NULL in B-Tree Indexes
+
+By default, PostgreSQL **includes NULL values in B-tree indexes** (stored at the end or beginning depending on ASC/DESC NULLS settings). MySQL's InnoDB also indexes NULLs.
+
+```sql
+-- This index CAN satisfy: WHERE phone IS NULL
+CREATE INDEX idx_users_phone ON users(phone);
+
+-- PostgreSQL EXPLAIN:
+-- Index Scan using idx_users_phone on users
+-- Index Cond: (phone IS NULL)
+
+-- However, a partial index excluding NULLs is smaller and faster
+-- for queries that only care about non-NULL values:
+CREATE INDEX idx_users_phone_notnull ON users(phone)
+WHERE phone IS NOT NULL;
+-- Smaller index → faster scans → less memory needed for index caching
+```
+
+---
+
 ## What is NULL?
 
 NULL means **unknown**, **missing**, or **not applicable**. It is not:

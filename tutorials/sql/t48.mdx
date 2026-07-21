@@ -1,3 +1,18 @@
+## The Physical Engine: Moving Windows and Spooling
+
+Calculating Running Totals and Moving Averages relies on the **Window Spool** physical operator. Understanding how this operator buffers data in RAM is critical for analytical query performance.
+
+### Cumulative vs Sliding Frames
+
+When you calculate a Running Total (`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`), the database maintains a single accumulator in memory. As it streams through the sorted rows, it adds the current value to the accumulator. This is an extremely fast $O(N)$ operation with minimal memory overhead.
+
+However, when you calculate a Moving Average (`ROWS BETWEEN 6 PRECEDING AND CURRENT ROW`), the database must maintain a **Sliding Buffer** of the last 7 rows in memory. It adds the new row, subtracts the oldest row, and recalculates the average. 
+If the window frame requires sorting *within* the frame, or if the buffer size is massive (e.g., `ROWS BETWEEN 10000 PRECEDING`), the Window Spool operator can quickly exhaust `work_mem`. When the spool spills to disk, the sliding window calculation degrades to $O(N^2)$ I/O reads, crippling the query.
+
+**Architectural Rule**: Always define explicit, narrow window frames for analytical queries. Defaulting to `UNBOUNDED PRECEDING` for aggregations that don't need it will cause unnecessary memory pressure.
+
+---
+
 ## Running Total (Cumulative Sum)
 
 A running total accumulates values row by row. Each row shows the sum of all rows up to and including itself.
@@ -56,6 +71,8 @@ ORDER BY category, month;
 
 ## Running Count
 
+A running count works exactly like a running total, but instead of summing a dollar amount, it accumulates a count of rows. The trick with `SUM(COUNT(*)) OVER (ORDER BY date)` uses a **nested window function** — the inner `COUNT(*)` computes the daily new user count per group, and the outer `SUM() OVER()` accumulates it as a running total. This pattern works because aggregation (`GROUP BY`) always executes before window functions in SQL's logical processing order.
+
 ```sql
 -- Cumulative new user count by day
 SELECT
@@ -68,6 +85,8 @@ ORDER BY date;
 ```
 
 ## Running Percentage
+
+Combining a running total with the grand total gives you a running percentage — the cumulative share of the total captured up to each day. The formula divides the running sum by the overall total (`SUM(rev) OVER ()`, which has no ORDER BY so it always returns the entire partition's total). This is essential for cumulative distribution analysis, like determining what percentage of annual revenue is achieved by each date.
 
 ```sql
 -- Each day's revenue as % of total and as running %
@@ -115,6 +134,8 @@ The `ROWS BETWEEN 6 PRECEDING AND CURRENT ROW` frame includes the current row + 
 
 ## Centered Moving Average
 
+A standard trailing moving average (`6 PRECEDING AND CURRENT ROW`) is biased toward the past — every data point is influenced only by what came before it. A **centered moving average** balances equal numbers of preceding and following rows around the current data point, reducing lag. It is commonly used in time-series analysis to identify true trends. The trade-off is that the first and last `N` rows of your dataset will have `NULL` values because they don't have enough neighboring rows to complete the window.
+
 ```sql
 -- 7-day centered moving average (3 before + current + 3 after)
 SELECT
@@ -150,6 +171,8 @@ FROM (
 
 ## Window Frame Options
 
+The window frame clause (`ROWS BETWEEN ... AND ...`) is the heart of window function precision. It defines exactly which rows are included in the calculation relative to the current row. Understanding the difference between `ROWS` and `RANGE` is critical: `ROWS` counts physical rows, while `RANGE` counts logical values (all rows with the same ORDER BY value). For most time-series analytics, `ROWS` is the safer and more predictable choice.
+
 ```sql
 -- All rows from start to current row (running total)
 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
@@ -171,6 +194,8 @@ ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
 ```
 
 ## Complete Analytics Dashboard Query
+
+This is a production-grade analytics query that combines multiple window function patterns in a single statement: cumulative totals for a progress view, 7-day moving averages to smooth daily noise, and day-over-day percentage change to track momentum. Notice that `LAG(revenue) OVER (ORDER BY date)` is called twice — a modern query optimizer will evaluate it once and reuse the result, but if you want to be explicit about efficiency, you can wrap the whole thing in a CTE and reference the LAG value once.
 
 ```sql
 WITH daily AS (

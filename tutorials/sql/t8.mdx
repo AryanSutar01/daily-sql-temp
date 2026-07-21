@@ -1,10 +1,55 @@
----
-title: "DISTINCT & Aliases"
-description: "Remove duplicate rows with DISTINCT and make queries more readable using column and table aliases."
-section: "Foundations"
-level: "Beginner"
-tags: ["Concept"]
-order: 8
+## DISTINCT: The Physical Cost of Duplicate Elimination
+
+Adding `DISTINCT` to a query changes the entire execution plan. The database must physically identify and eliminate duplicates, which requires either significant memory (hashing) or significant CPU/disk I/O (sorting).
+
+### How the Database Eliminates Duplicates
+
+When the optimizer sees `DISTINCT`, it chooses one of two physical operators:
+
+```
+Strategy 1: HashAggregate (Memory Intensive)
+  - Read each row and hash the selected columns.
+  - Check the hash table: if the hash exists, discard the row.
+  - If it doesn't exist, add it and emit the row.
+  - Pros: O(N) time complexity, very fast if hash table fits in memory.
+  - Cons: Fails or spills to disk if the number of unique combinations is massive.
+
+Strategy 2: Sort / Unique (CPU & I/O Intensive)
+  - Sort the entire result set by the selected columns (O(N log N)).
+  - Scan the sorted list sequentially.
+  - If the current row is identical to the previous row, discard it.
+  - Pros: Works gracefully for datasets larger than memory.
+  - Cons: Sorting is computationally expensive and slow.
+```
+
+If you apply `DISTINCT` on an already-indexed column (e.g., `SELECT DISTINCT category_id`), the optimizer can perform an **Index Only Scan**, reading the unique values directly from the B-tree structure without hitting the table at all — an incredibly fast optimization.
+
+### The "DISTINCT to Fix a JOIN" Anti-Pattern
+
+A common mistake is using `DISTINCT` to fix a query that returns unexpected duplicate rows due to a fan-out JOIN (e.g., joining a user to their orders and getting the user multiple times). 
+
+```sql
+-- The Anti-Pattern:
+SELECT DISTINCT u.id, u.name 
+FROM users u JOIN orders o ON u.id = o.customer_id;
+
+-- What happens physically:
+-- 1. The database computes the FULL join (creating millions of intermediate rows).
+-- 2. It then performs an expensive HashAggregate or Sort to throw away 99% of those rows.
+-- Extremely inefficient!
+
+-- The Architectural Fix (EXISTS / Semi-Join):
+SELECT u.id, u.name 
+FROM users u 
+WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = u.id);
+
+-- What happens physically (Semi-Join):
+-- 1. The database scans users.
+-- 2. For each user, it looks up the orders index.
+-- 3. AS SOON AS it finds ONE order, it emits the user and moves to the next user.
+-- No intermediate duplication, no expensive sorting or hashing required!
+```
+
 ---
 
 ## DISTINCT

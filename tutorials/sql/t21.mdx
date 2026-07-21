@@ -1,3 +1,44 @@
+## String Manipulation: Storage and CPU Overhead
+
+Strings in relational databases are highly dynamic data structures. Unlike a standard 4-byte `INTEGER` that always occupies exactly 4 bytes in a CPU register, strings (`VARCHAR`, `TEXT`) are variable-length arrays of bytes. Manipulating them carries hidden architectural costs.
+
+### Out-of-Line Storage (TOAST)
+
+Database pages are typically 8KB in size. If you store a massive JSON string or a blog post in a `TEXT` column, it will exceed the 8KB limit. 
+
+To handle this, databases use mechanisms like **TOAST (The Oversized-Attribute Storage Technique)** in PostgreSQL. If a string is too large, the database compresses it and moves it to a completely different, hidden physical table. The main table row only stores a tiny pointer to the TOAST table.
+When you run a string function like `SUBSTRING()` or `REPLACE()` on a TOASTed column, the database must:
+1. Follow the pointer to the TOAST table.
+2. Read the compressed chunks from disk.
+3. Decompress the data in memory.
+4. Allocate new memory for the manipulated output.
+This makes heavy string manipulation on massive text columns extremely CPU and Memory I/O intensive.
+
+### The Memory Copy Penalty
+
+Because strings are immutable in SQL memory structures, functions like `CONCAT(a, b)` or `UPPER(a)` do not modify the string in place. 
+
+If you call `UPPER(description)` on a 2MB text field, the database must allocate a *new* 2MB block of RAM in `work_mem`, copy the bytes over while capitalizing them, and then garbage collect the old memory. Doing this across millions of rows causes severe memory pressure and cache thrashing.
+
+### Defeating Indexes (And How to Fix It)
+
+As discussed in earlier tutorials, wrapping a column in a function destroys **sargability**. 
+
+```sql
+-- This requires a Full Table Scan. The B-Tree index on `email` is useless.
+SELECT * FROM users WHERE LOWER(email) = 'alice@example.com';
+```
+
+If you must frequently search on manipulated strings, you must create a **Functional Index** (or Expression Index). 
+
+```sql
+-- Creating an index on the exact function signature:
+CREATE INDEX idx_users_lower_email ON users (LOWER(email));
+```
+Instead of indexing the raw string, the database pre-computes `LOWER(email)` during the `INSERT`/`UPDATE` phase and stores the *result* in the B-Tree. The query planner recognizes the signature match and seamlessly utilizes the index, converting a multi-second full scan into a sub-millisecond lookup.
+
+---
+
 ## Why String Functions?
 
 Real-world data is messy. Names have extra spaces, emails have inconsistent casing, phone numbers have dashes. String functions let you clean, transform, and extract exactly what you need.

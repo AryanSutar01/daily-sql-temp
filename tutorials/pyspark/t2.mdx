@@ -1,10 +1,60 @@
----
-title: "Spark Architecture (Driver, Executor, Cluster)"
-description: "Understand how Spark distributes work across a cluster - the roles of the Driver, Executors, Cluster Manager, and how they coordinate."
-section: "Spark Foundations"
-level: "Foundation"
-tags: ["Interview", "Concept"]
-order: 2
+## Driver Internal Subsystems: What Happens During Job Planning
+
+When you call an action, the Driver executes a complex sequence involving three distinct scheduler subsystems. Understanding these explains most Spark performance and reliability issues.
+
+### The DAGScheduler: Logical → Stage Graph
+
+The `DAGScheduler` takes your RDD/DataFrame lineage and converts it into a **stage graph**:
+
+1. Walks the lineage backwards from the final RDD
+2. Every wide dependency (shuffle) → new `ShuffleMapStage`
+3. Terminal stage → `ResultStage` (collects results to Driver or writes to output)
+4. Identifies which stages can run in parallel (independent branches of the DAG)
+5. Submits `TaskSet`s to the `TaskScheduler`
+
+```
+DAGScheduler output for: filter → groupBy → orderBy → show()
+
+ShuffleMapStage 0:  FileScan + Filter  (produces shuffle data)
+ShuffleMapStage 1:  HashAggregate      (reads stage 0, produces shuffle data)
+ResultStage 2:      Sort + Collect     (reads stage 1, returns results to Driver)
+
+Stage 1 cannot start until Stage 0 is 100% complete.
+Stage 2 cannot start until Stage 1 is 100% complete.
+```
+
+### The TaskScheduler: Data Locality-Aware Placement
+
+The `TaskScheduler` receives a `TaskSet` and assigns each task to an executor. It uses **data locality** to minimize network transfer — preferring executors that already have the data in memory:
+
+```
+Locality levels (best to worst):
+  PROCESS_LOCAL:  data is in the same JVM (cached partition on this executor)
+  NODE_LOCAL:     data is on the same physical machine (HDFS local block)
+  RACK_LOCAL:     data is on a machine in the same server rack
+  ANY:            data must come over the network from another rack
+```
+
+The TaskScheduler waits a configurable delay (`spark.locality.wait`, default 3s) for a better-locality slot before falling back to the next level. For shuffle reads, locality is always ANY (data must come from map-side executor over network).
+
+### The Heartbeat Protocol and Dead Executor Detection
+
+Every executor sends a **heartbeat** to the Driver every `spark.executor.heartbeatInterval` (default 10 seconds). Each heartbeat contains:
+- Task progress updates (bytes read, rows processed)
+- Accumulated accumulator values
+- Storage status of cached blocks
+
+If the Driver doesn't receive a heartbeat within `spark.network.timeout` (default 120 seconds):
+```
+Driver declares executor DEAD
+  ├── All tasks on dead executor → FAILED
+  ├── DAGScheduler re-submits failed tasks to other executors
+  ├── If the executor had shuffle data → entire ShuffleMapStage re-runs
+  └── If the executor had cached data → data is recomputed on demand
+```
+
+This is why `OOMKiller` (out-of-memory kill) on an executor causes partial job re-execution — the Driver detects the heartbeat timeout and re-runs lost stages.
+
 ---
 
 ## The Big Picture

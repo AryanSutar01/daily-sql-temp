@@ -1,4 +1,38 @@
+## How lag and lead Work in Spark's Window Execution Model
+
+`lag()` and `lead()` are **offset window functions** — they access values from rows that are a fixed distance away from the current row within an ordered partition. Understanding the internal mechanism explains why they **require an explicit `orderBy()`** and why the first/last rows produce nulls.
+
+### The Ordered Buffer Model
+
+When Spark processes a window function, it:
+1. Groups rows into partitions (via `partitionBy`)
+2. Sorts each partition (via `orderBy`)
+3. For each row, evaluates the function using the sorted partition as a buffer
+
+For `lag(col, n)`, Spark looks `n` positions **backward** in the sorted buffer. For `lead(col, n)`, it looks `n` positions **forward**. When the offset goes beyond the partition boundary, there is no row there — the result is `null` (or the default value if specified).
+
+```
+Partition buffer for product="Laptop", sorted by month:
+Position  Month      Revenue
+   0      2024-01    120000   ← lag(1) = null (no row at position -1)
+   1      2024-02    135000   ← lag(1) = 120000 (position 0)
+   2      2024-03    115000   ← lag(1) = 135000 (position 1)
+   3      2024-04    150000   ← lag(1) = 115000 (position 2)
+                               lead(1) = null for position 3 (no position 4)
+```
+
+### Why orderBy is Mandatory for lag/lead
+
+Without `orderBy()`, the rows in each partition have no defined sequence — "the previous row" has no meaning. Spark requires `orderBy()` for all offset functions. Omitting it causes a runtime error or produces non-deterministic results depending on the Spark version.
+
+### Partition Reset Behaviour
+
+Each `partitionBy()` group starts fresh. The lag/lead buffer is reset at every partition boundary — so the first row of each new partition always produces `null` for `lag()`, and the last row of each partition always produces `null` for `lead()`.
+
+---
+
 ## Setup
+
 
 ```python
 from pyspark.sql import SparkSession

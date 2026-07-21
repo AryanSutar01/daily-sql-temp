@@ -1,3 +1,76 @@
+## WHERE and Predicate Evaluation: Sargability
+
+The performance difference between a fast query and a slow one often comes down to a single concept: **sargability** — whether the WHERE clause predicate can use an index.
+
+### What is Sargability?
+
+"SARG" stands for **Search ARGument able**. A predicate is sargable if the database can use an index to evaluate it efficiently. Non-sargable predicates force a **full table scan** — reading every row.
+
+```
+Sargable predicates (can use index):
+  WHERE id = 42                    ← direct equality, index seek
+  WHERE salary > 50000             ← range scan on index
+  WHERE name BETWEEN 'A' AND 'M'   ← range scan on index
+  WHERE email LIKE 'alice%'        ← leading-string prefix scan on index
+  WHERE created_at >= '2024-01-01' ← range scan on timestamp index
+
+Non-sargable predicates (full table scan):
+  WHERE YEAR(created_at) = 2024    ← function applied to indexed column
+  WHERE UPPER(name) = 'ALICE'      ← function on column (case-insensitive issue)
+  WHERE salary * 1.2 > 60000       ← arithmetic on column
+  WHERE name LIKE '%alice%'        ← leading wildcard (no prefix for B-tree scan)
+  WHERE id != 42                   ← NOT EQUAL forces full scan
+  WHERE id NOT IN (1, 2, 3)        ← NOT IN often can't use index efficiently
+```
+
+### Why Functions on Columns Break Indexes
+
+An index stores a sorted list of the **original column values**. When you apply a function, the database must evaluate the function for every row and cannot use the pre-sorted index:
+
+```sql
+-- Index on created_at exists: idx_orders_created_at
+-- B-tree: [..., '2023-12-31', '2024-01-01', '2024-01-02', ...]
+
+-- ❌ Non-sargable: YEAR() applied to every row (full scan)
+SELECT * FROM orders WHERE YEAR(created_at) = 2024;
+-- The database must compute YEAR() for 10M rows, compare, return matches
+
+-- ✅ Sargable: range comparison on original column values (index scan)
+SELECT * FROM orders
+WHERE created_at >= '2024-01-01' AND created_at < '2025-01-01';
+-- Index B-tree seek to '2024-01-01', scan forward to '2025-01-01'
+-- Reads only the matching 1.2M rows, skips the other 8.8M
+```
+
+### The NOT IN NULL Trap: Internal Logic
+
+Understanding why `NOT IN` with a nullable column returns zero rows requires understanding three-valued logic:
+
+```sql
+-- users table: id = [1, 2, 3, 4, 5]
+-- orders.customer_id = [1, 2, NULL]
+
+SELECT * FROM users WHERE id NOT IN (1, 2, NULL);
+
+-- This expands to:
+-- WHERE id != 1 AND id != 2 AND id != NULL
+-- For id=3: 3 != 1 (TRUE) AND 3 != 2 (TRUE) AND 3 != NULL (UNKNOWN)
+-- TRUE AND TRUE AND UNKNOWN = UNKNOWN → row excluded!
+-- For id=4,5: same → all rows excluded!
+
+-- NOT IN with ANY null in the list → ZERO rows returned
+```
+
+**The correct pattern is NOT EXISTS:**
+```sql
+SELECT * FROM users u
+WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = u.id);
+-- NOT EXISTS handles NULLs correctly because it checks row existence
+-- A NULL customer_id in orders does NOT create a matching row for the subquery
+```
+
+---
+
 ## The WHERE Clause
 
 `WHERE` filters rows before they are returned. Only rows where the condition evaluates to TRUE are included in the result.

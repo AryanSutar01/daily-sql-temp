@@ -1,3 +1,40 @@
+## Physical Execution of Set Operations
+
+Set operations combine multiple query results, but their performance impact depends heavily on whether they require the database engine to perform **deduplication**.
+
+### UNION ALL: The O(N) Append Operation
+
+`UNION ALL` is computationally trivial. The database executes Query A, streams the rows to the client, then executes Query B and streams those rows to the client.
+
+- **Complexity**: $O(N)$
+- **Memory**: $O(1)$ (No memory overhead)
+- **Pipeline**: Non-blocking. Rows flow to the client immediately as they are generated.
+
+### UNION: The Pipeline Breaker
+
+`UNION` (without ALL) must guarantee that the final result contains no duplicates. To do this, it cannot stream rows immediately — it is a **Pipeline Breaker**. The engine must collect all rows from Query A and Query B into memory and deduplicate them before returning the first row to the client.
+
+The optimizer chooses between two physical strategies for `UNION`:
+
+1. **HashAggregate (Hash Set)**
+   The engine builds an in-memory hash table of every row. If a row's hash already exists, it is discarded. 
+   - **Cost**: Fast ($O(N)$), but fails if the result set exceeds `work_mem` (causes disk spill).
+
+2. **Sort / Unique (Sort Set)**
+   The engine performs an external merge sort on all columns of the result set, then scans the sorted list to drop adjacent duplicates.
+   - **Cost**: Slow ($O(N \log N)$) and heavy on CPU/Disk I/O, but scales to massive datasets.
+
+**Architectural Rule**: Never use `UNION` if you know the two sets are already mutually exclusive (e.g., `WHERE status='active' UNION WHERE status='inactive'`). You are forcing the database to perform an expensive Hash or Sort operation to look for duplicates that mathematically cannot exist. Always use `UNION ALL` in this scenario.
+
+### INTERSECT and EXCEPT Physical Plans
+
+`INTERSECT` and `EXCEPT` are typically executed physically as **Hash Joins** or **Merge Joins**, but with a specific semi-join or anti-join flag.
+
+- **INTERSECT**: Physically executed as a `Hash Semi Join`. It builds a hash table of Query B, then streams Query A. If A exists in the hash table, it emits the row.
+- **EXCEPT**: Physically executed as a `Hash Anti Join`. It builds a hash table of Query B, then streams Query A. If A *does not* exist in the hash table, it emits the row.
+
+---
+
 ## Set Operations
 
 Set operations combine the results of two or more SELECT queries into one result set. The queries must have:

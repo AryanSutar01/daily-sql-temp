@@ -1,5 +1,89 @@
 # Structured Streaming Basics
 
+## How Structured Streaming Executes: The Micro-Batch Engine
+
+Structured Streaming does not process data as individual events — it batches incoming data into small time intervals and runs a Spark batch job on each interval. Understanding this model clarifies latency characteristics, fault tolerance, and stateful operation semantics.
+
+### The Micro-Batch Execution Cycle
+
+```
+Trigger interval: every 5 seconds (default: as fast as possible)
+
+Cycle 1:
+  1. Source query: "what new data arrived since last batch?"
+     → Kafka: read offsets [partition0: 100→150, partition1: 200→260]
+  2. Construct logical plan for this batch's data
+  3. Run Spark batch job on the new data slice
+  4. Write output to sink (console, Parquet, Delta, etc.)
+  5. Commit new offsets to checkpoint WAL:
+     → Write {"partition0": 150, "partition1": 260} to checkpoint dir
+  
+Cycle 2 (5 seconds later):
+  1. Source query: read from committed offsets (partition0:150, partition1:260)
+     → Get only the NEW records since last cycle
+  2. Run batch job on new slice
+  ...
+```
+
+The **WAL (Write-Ahead Log)** in the checkpoint directory ensures exactly-at-most-once delivery: if the job crashes mid-cycle, the uncommitted offsets mean the next restart will re-read from the last committed position.
+
+### Stateful Operations and the State Store
+
+Window aggregations (`window("timestamp", "5 minutes")`) and `groupBy` in streaming require **state** — partial aggregation results that accumulate across micro-batches:
+
+```
+Micro-batch 1:  events [10:00, 10:01, 10:03]
+  State store after batch 1: {window "10:00-10:05": count=3}
+
+Micro-batch 2:  events [10:02, 10:04, 10:06]
+  State store after batch 2: {window "10:00-10:05": count=5,
+                               window "10:05-10:10": count=1}
+  
+Output: count for "10:00-10:05" window is now 5 (merged across batches)
+```
+
+The State Store is stored on **HDFS/S3** (via the checkpoint directory), not in executor memory — it persists across restarts and cluster failures. It uses RocksDB (Spark 3.2+) for high-throughput key-value operations.
+
+### Watermarking: Handling Late-Arriving Data
+
+Events often arrive **out of order** due to network delays. Without watermarking, Spark would keep all historical state forever (OOM risk). Watermarking defines how long to wait for late data:
+
+```python
+df.withWatermark("event_time", "10 minutes") \
+  .groupBy(window("event_time", "5 minutes")).count()
+
+Effect:
+  At processing time T:
+    Watermark threshold = max(event_time seen) - 10 minutes
+    Windows older than threshold are CLOSED and emitted
+    Windows newer than threshold are still open (waiting for late data)
+    
+Example:
+  Current max event_time = 10:30
+  Watermark = 10:30 - 10 min = 10:20
+  Window [10:00-10:05]: older than 10:20 → EMIT FINAL RESULT + drop state
+  Window [10:20-10:25]: within watermark → keep open (late data expected)
+```
+
+Without a watermark, state for all windows accumulates forever → OOM. With watermark, the State Store periodically purges old windows, keeping memory bounded.
+
+### Continuous Processing Mode (Experimental)
+
+The default micro-batch mode has a minimum latency equal to the trigger interval. For sub-second latency requirements, Spark 2.3+ offers **continuous processing**:
+
+```python
+# Micro-batch: 1-minute latency minimum
+query = df.writeStream.trigger(processingTime="1 minute").start()
+
+# Continuous: ~1ms latency (experimental, limited operations)
+query = df.writeStream.trigger(continuous="1 second").start()
+# Note: only supports map/filter operations (no aggregations)
+```
+
+Continuous mode runs persistent tasks that poll the source continuously, rather than starting new batch jobs on each trigger. The trade-off: only stateless operations (map, filter) are supported.
+
+---
+
 ## What is Structured Streaming?
 
 **Structured Streaming** is Spark's built-in stream processing engine. It lets you write the same DataFrame/SQL code you use for batch processing, and run it on **continuously arriving data** - treating a live data stream as an unbounded table that keeps growing.

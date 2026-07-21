@@ -1,5 +1,65 @@
 # PySpark with Kafka
 
+## Kafka Internals: Offsets, Consumer Groups, and Exactly-Once Semantics
+
+Before you can use PySpark to consume Kafka, you must understand how Kafka tracks position and ensures message delivery. These mechanics directly determine how you configure your Spark streaming job.
+
+### How Kafka Tracks Progress: The Offset Model
+
+Unlike a traditional message queue that deletes consumed messages, Kafka retains all messages in a **persistent append-only log**. Consumers track their own progress via **offsets** — a monotonically increasing integer per partition:
+
+```
+Kafka Topic: "orders"  (3 partitions)
+
+Partition 0:  [msg0][msg1][msg2][msg3][msg4] ...
+               offset=0   1     2     3     4
+                                       ↑
+                          Consumer A has read up to here (offset=3)
+                          Next message to read: offset=4
+
+Partition 1:  [msg0][msg1][msg2] ...
+Partition 2:  [msg0][msg1][msg2][msg3] ...
+```
+
+**Offset commits** are how a consumer tells Kafka: "I have successfully processed up to offset N". If the consumer crashes and restarts, it asks Kafka: "What was my last committed offset?" and resumes from there.
+
+### Consumer Groups and Partition Assignment
+
+Spark Structured Streaming creates a **consumer group** when it connects to Kafka. Kafka assigns each partition to exactly one consumer in the group:
+
+```
+Consumer Group: "spark-orders-consumer"
+  Task 0 (Spark executor) → reads Partition 0
+  Task 1 (Spark executor) → reads Partition 1
+  Task 2 (Spark executor) → reads Partition 2
+
+Degree of parallelism = number of Kafka partitions
+(If you have 3 partitions, you get 3 parallel readers regardless of executor count)
+```
+
+This is why increasing Spark parallelism beyond the number of Kafka partitions has **no effect** on read throughput. To scale throughput, you must increase Kafka partition count.
+
+### How PySpark Achieves Exactly-Once with Checkpointing
+
+PySpark Structured Streaming achieves exactly-once semantics via its **WAL-based checkpoint mechanism**:
+
+```
+Micro-batch execution cycle:
+  1. Read checkpoint → find last committed Kafka offset range
+  2. Fetch messages from Kafka within that range
+  3. Process messages → write output
+  4. Commit output (e.g., write to Delta Lake)
+  5. Write new offset range to checkpoint WAL (Write-Ahead Log)
+  6. If step 4 fails → step 5 never runs → on restart, step 1 returns previous offset
+     → messages are re-read and re-processed (at-least-once by default)
+  7. To achieve exactly-once: output sink must support idempotent writes
+     (Delta Lake MERGE, database upserts, etc.)
+```
+
+Without `checkpointLocation`, Spark cannot track offsets across restarts — it starts from the beginning (`earliest`) or only new messages (`latest`) depending on config.
+
+---
+
 ## What is Kafka?
 
 **Apache Kafka** is a distributed event streaming platform. It acts as a high-throughput, fault-tolerant message bus where **producers** publish events (messages) to **topics**, and **consumers** read from those topics.

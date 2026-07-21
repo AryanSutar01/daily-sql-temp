@@ -1,5 +1,108 @@
 # Spark Configs & Tuning (Executor Memory, Cores)
 
+## The Executor Memory Model: How Spark Uses Every Byte
+
+Specifying `--executor-memory 8g` does not give 8GB to your computations — Spark imposes a strict memory hierarchy that you must understand to size executors correctly.
+
+### The Complete Memory Breakdown
+
+```
+YARN/Kubernetes container request: executor-memory + memoryOverhead
+  = 8GB + max(384MB, 8GB × 10%) = 8GB + 800MB = 8.8GB total container
+
+Inside the JVM (8GB heap):
+├── Reserved Memory: 300MB (always, cannot be configured)
+│   → Spark internal objects, task metadata, etc.
+│
+├── User Memory: (8192MB - 300MB) × (1 - spark.memory.fraction)
+│   = 7892MB × 0.25 = ~1973MB
+│   → Your Python UDFs, custom serializers, TaskContext objects
+│   → If you exceed this: OOM in user code!
+│
+└── Spark Memory: 7892MB × spark.memory.fraction (default 0.75)
+    = ~5919MB
+    ├── Storage Memory: 5919MB × spark.memory.storageFraction (default 0.5)
+    │   = ~2960MB
+    │   → Cached DataFrames, broadcast variables (BlockManager)
+    │
+    └── Execution Memory: 5919MB × (1 - 0.5)
+        = ~2960MB  (but can borrow from Storage if available)
+        → Active shuffle buffers, sort arrays, join hash tables
+        → If you exceed this: SPILL to disk (slow but not OOM)
+
+Off-heap (memoryOverhead = 800MB):
+  → Python worker process memory (for UDFs)
+  → JVM overhead: thread stacks, code cache, metaspace
+  → Native libraries (BLAS for MLlib, Arrow buffers)
+  If Python UDFs allocate large data: increase memoryOverhead!
+```
+
+### The Core-to-Memory Ratio Problem
+
+```python
+# ❌ Common anti-pattern: too many cores per executor
+# spark.executor.cores=10, spark.executor.memory=8g
+# → 10 threads share 2960MB execution memory
+# → Each thread gets only 296MB for shuffle/sort/join
+# → Large joins SPILL to disk frequently
+
+# ✅ Better: 4-5 cores per executor (Databricks recommendation)
+spark.conf.set("spark.executor.cores", "4")
+spark.conf.set("spark.executor.memory", "8g")
+# → 4 threads share 2960MB = ~740MB each
+# → Most joins and aggregations fit in memory without spilling
+```
+
+### G1GC for Large Executor Heaps
+
+Java's default GC (ParallelGC) pauses the JVM during collection — for Spark executors with 8GB+ heaps, a full GC can pause an executor for 10-30 seconds, causing the Driver to flag it as unresponsive:
+
+```
+ParallelGC on 16GB heap:
+  Full GC triggered when heap exhausted
+  All JVM threads STOP (stop-the-world pause)
+  GC scans entire 16GB heap
+  Duration: 5-30 seconds
+  Spark Driver: heartbeat timeout → marks executor as DEAD
+  → Executor lost, all its tasks re-scheduled (wasted compute!)
+
+G1GC (Garbage First):
+  Divides heap into 1MB regions
+  Collects incrementally (short pauses per cycle)
+  Max pause target: 200ms (configurable)
+  → No multi-second pauses → no executor heartbeat timeouts
+```
+
+Enable G1GC:
+```python
+spark = SparkSession.builder \
+    .config("spark.executor.extraJavaOptions",
+            "-XX:+UseG1GC -XX:G1HeapRegionSize=16M "
+            "-XX:InitiatingHeapOccupancyPercent=35 "
+            "-XX:MaxGCPauseMillis=200") \
+    .getOrCreate()
+```
+
+### The Right Number of Executor Cores per Node
+
+A common rule of thumb for a 32-core, 256GB node:
+
+```
+Leave 1 core for OS + YARN NodeManager → 31 available
+Leave 1 core per executor for OS overhead → use 5 cores/executor
+(31 - 1) / 5 = 6 executors per node
+
+Memory per executor:
+  (256GB - OS overhead ~8GB) / 6 = ~41GB per executor
+  With overhead: 41GB × 0.9 = ~37GB JVM heap
+
+Result: 6 executors × 5 cores × 37GB heap
+  → ~30 tasks running in parallel on this node
+  → ~6GB execution memory per task → comfortable for most joins
+```
+
+---
+
 ## Why Tuning Matters
 
 Out of the box, Spark uses conservative default configurations. On a real cluster with large data, the defaults lead to:

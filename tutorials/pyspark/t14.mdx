@@ -1,3 +1,74 @@
+## How Joins Work Inside Spark
+
+A join in a distributed system is fundamentally different from a join in a single-node database. In Spark, the two DataFrames to be joined live as separate partitions spread across different executor nodes. To match rows by key, rows with the same key must end up on the same executor. This is the core challenge — and the source of most join performance problems.
+
+Spark has **three physical join strategies**, and the Catalyst optimizer chooses between them based on data size and available statistics:
+
+### Strategy 1: Broadcast Hash Join (BHJ)
+
+When one DataFrame is **small enough to fit in each executor's memory**, Spark broadcasts a complete copy to every executor. Each executor then performs the join locally against its own partition of the large DataFrame — **no shuffle required**.
+
+```
+Broadcast Hash Join:
+                    ┌───────────────────────────────────┐
+Small table         │ departments (4 rows, ~1KB)         │
+(departments) ─────►│ → sent to EVERY executor as a     │
+                    │   hash map in memory               │
+                    └──────────┬────────────────────────┘
+                               │ broadcast
+                    ┌──────────▼──────────┐  ┌──────────────────────┐
+Large table         │ Executor 1          │  │ Executor 2           │
+(employees)         │ employees partition │  │ employees partition  │
+                    │ → local hash lookup │  │ → local hash lookup  │
+                    └─────────────────────┘  └──────────────────────┘
+No data movement for employees — zero shuffle!
+```
+
+This is the **fastest join strategy**. Threshold is controlled by `spark.sql.autoBroadcastJoinThreshold` (default 10MB).
+
+### Strategy 2: Shuffle Hash Join (SHJ)
+
+When both DataFrames are too large to broadcast, Spark uses hash partitioning to ensure all rows with the same join key land on the same executor:
+
+```
+Shuffle Hash Join:
+Both DataFrames shuffled by hash(join_key):
+  employees with dept_id=10 → Executor A
+  departments with dept_id=10 → Executor A   ← same executor!
+  employees with dept_id=20 → Executor B
+  departments with dept_id=20 → Executor B   ← same executor!
+
+Each executor builds a hash map from the smaller side,
+then probes it with the larger side.
+→ One full shuffle of both DataFrames (expensive network I/O)
+```
+
+### Strategy 3: Sort-Merge Join (SMJ)
+
+The default for large-to-large joins. Both DataFrames are shuffled by join key, then sorted. Sorted partitions are merged using a two-pointer scan — no in-memory hash map needed, memory-efficient for very large joins:
+
+```
+Sort-Merge Join:
+1. Shuffle both DataFrames by hash(join_key) → same keys on same executor
+2. Sort each partition by join key
+3. Merge using a two-pointer scan (like merging two sorted arrays)
+→ Two shuffles + two sorts (most expensive, but handles any data size)
+```
+
+### How Catalyst Chooses
+
+```python
+# View which strategy Catalyst selected
+employees.join(departments, on="dept_id").explain()
+
+# Look for these in Physical Plan:
+# BroadcastHashJoin   → fastest (one side broadcast)
+# ShuffledHashJoin    → medium (both shuffled, hash map)
+# SortMergeJoin       → safest (both shuffled + sorted)
+```
+
+---
+
 ## Setup
 
 ```python

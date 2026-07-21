@@ -1,3 +1,72 @@
+## How Spark Handles Nested and Complex Data Internally
+
+Nested JSON, struct columns, and maps are the norm for real-world data pipelines (API responses, Kafka event payloads, CDC records). Understanding the internal mechanics helps you avoid the most expensive parsing patterns.
+
+### The JSON Parsing Cost: Per Row vs Per Batch
+
+When your data arrives as JSON strings (from Kafka, REST APIs, or raw files), Spark must **parse each JSON string into Tungsten's native row format**. This is a fundamentally expensive operation:
+
+```
+JSON string:
+  '{"user_id": 1, "name": "Alice", "address": {"city": "Mumbai", "zip": "400001"}}'
+
+Parsing per row:
+  1. Scan bytes for '{', ':', '"', '}' tokens (JSON lexer)
+  2. For each key: string comparison to schema field names
+  3. For each value: type cast to target Spark type
+  4. For nested objects: recursive descent parsing
+  5. Assemble into Tungsten UnsafeRow binary format
+
+For 100M rows: 100M independent JSON parse operations
+→ This is CPU-bound and slow — typically the bottleneck in Kafka→Spark pipelines
+```
+
+### from_json vs get_json_object: Choosing the Right Tool
+
+`from_json(col, schema)` parses the entire JSON string into a fully typed `StructType` column **once**. `get_json_object(col, "$.field")` extracts a single path from the JSON string:
+
+```python
+# from_json: parse ONCE, access many fields (preferred for structured JSON)
+schema = StructType([
+    StructField("user_id", LongType()),
+    StructField("name", StringType()),
+    StructField("address", StructType([
+        StructField("city", StringType()),
+        StructField("zip", StringType())
+    ]))
+])
+df.withColumn("parsed", from_json(col("json_str"), schema)) \
+  .select("parsed.user_id", "parsed.name", "parsed.address.city")
+# JSON parsed ONCE → fields accessed as struct fields (fast, type-safe)
+
+# get_json_object: re-parses JSON for EVERY field access (expensive)
+df.withColumn("user_id", get_json_object(col("json_str"), "$.user_id")) \
+  .withColumn("name",    get_json_object(col("json_str"), "$.name")) \
+  .withColumn("city",    get_json_object(col("json_str"), "$.address.city"))
+# JSON parsed 3 TIMES per row → 3x the parsing cost
+```
+
+**Rule**: Always use `from_json` when accessing more than one field from a JSON column. Use `get_json_object` only for truly one-off extractions.
+
+### Nested Struct Memory Layout
+
+A `StructType` column in Tungsten is stored as an **embedded UnsafeRow** within the outer row:
+
+```
+Outer row: [id=1 | json_parsed={...} | timestamp=...]
+                         ↓
+Embedded struct:  [null_bits | city_offset | zip_offset | "Mumbai" | "400001"]
+                   (same UnsafeRow layout, just at a different memory address)
+```
+
+Accessing `parsed.address.city` requires:
+1. Read outer row offset for `json_parsed` field
+2. Jump to embedded struct at that offset
+3. Read offset for `city` within embedded struct
+4. Jump to `city` string data
+
+Each dot-notation access in `col("a.b.c")` is a **three-pointer dereference**. For deeply nested data with many fields, this adds up. The solution is to `select` the specific leaf fields you need early in the pipeline — this **flattens** the nested structure and subsequent access is a single direct read.
+
 ## Why Complex Types Matter
 
 Real-world data from APIs, Kafka, and event logs is rarely flat. JSON payloads, nested objects, and arrays are the norm:

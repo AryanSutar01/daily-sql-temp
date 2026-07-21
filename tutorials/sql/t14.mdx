@@ -1,3 +1,48 @@
+## Outer Joins vs. The Query Optimizer
+
+While `LEFT JOIN` and `INNER JOIN` look similar in syntax, they have drastically different implications for the database's internal query optimizer. 
+
+### Outer Joins Restrict Join Reordering
+
+One of the optimizer's most powerful abilities is **Join Reordering**. If you write `A INNER JOIN B INNER JOIN C`, the optimizer can choose to join `(B+C)` first, then join `A`, if it determines that `B+C` filters out the most rows early. 
+
+Outer joins destroy this flexibility:
+- `A LEFT JOIN B LEFT JOIN C` forces a rigid, left-to-right execution path. The optimizer *must* evaluate `A`, then outer join `B`, then outer join `C` to guarantee mathematical correctness.
+- **Architectural Impact**: Heavy use of `LEFT JOIN`s limits the optimizer's ability to find the fastest physical execution plan. Use `INNER JOIN` unless you explicitly need to preserve unmatched rows.
+
+### The Anti-Join (The "Not Exists" Pattern)
+
+The most famous use case for a `LEFT JOIN` is finding rows that *don't* exist in a related table (e.g., users without orders).
+
+```sql
+SELECT u.id 
+FROM users u 
+LEFT JOIN orders o ON u.id = o.customer_id
+WHERE o.id IS NULL;
+```
+
+Modern database optimizers recognize this specific pattern (`LEFT JOIN ... WHERE right.key IS NULL`) and rewrite it internally into a physical **Anti-Join** operator.
+An Anti-Join is highly optimized: instead of scanning the entire right table and building NULL rows in memory, it scans the right table index, and the *moment* it finds a match, it stops looking and immediately discards the left row. It only emits left rows where the index probe fails completely.
+
+### Predicate Pushdown Limitations
+
+Predicate pushdown is when the database applies `WHERE` filters *before* doing the expensive JOIN work.
+
+```sql
+-- INNER JOIN: Filter on right table
+SELECT * FROM users u INNER JOIN orders o ON u.id = o.customer_id
+WHERE o.status = 'shipped';
+-- Optimizer: "I will filter orders to 'shipped' BEFORE doing the join!" (Fast)
+
+-- LEFT JOIN: Filter in ON clause
+SELECT * FROM users u LEFT JOIN orders o ON u.id = o.customer_id 
+                                        AND o.status = 'shipped';
+-- Optimizer: "I MUST join every user first, THEN apply the filter to the right side to determine if I emit data or NULLs." 
+-- The filter CANNOT be pushed down prior to the join structure. (Slower)
+```
+
+---
+
 ## Why Outer JOINs?
 
 INNER JOIN only returns rows with matches in both tables. But often you want ALL rows from one table - even if they have no match. That's what outer JOINs are for.

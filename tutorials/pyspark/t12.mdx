@@ -1,3 +1,59 @@
+## How groupBy Works Inside Spark
+
+`groupBy()` is one of the most important — and most expensive — operations in Spark. It is a **wide transformation** that requires a shuffle. Understanding the internal mechanism helps you write efficient aggregations and debug performance problems.
+
+### The Two-Stage Aggregation Model
+
+When you call `df.groupBy("dept").agg(sum("salary"))`, Spark does **not** immediately shuffle all rows to group them. Instead it uses a two-stage strategy:
+
+```
+Stage 1 — Partial Aggregation (Map-Side):
+Each partition independently aggregates its own rows.
+No data moves. Each partition produces partial results.
+
+Executor 1, Partition 0:              Executor 2, Partition 1:
+  Raw: Engineering:95000              Raw: Engineering:105000
+       Marketing:72000                     HR:60000
+  Partial: Engineering→95000          Partial: Engineering→105000
+           Marketing→72000                    HR→60000
+
+Stage 2 — Shuffle + Final Aggregation (Reduce-Side):
+All partial results for the same key are shuffled to the same executor.
+Final aggregation merges the partial results.
+
+After shuffle → all "Engineering" rows arrive together:
+  Engineering: 95000 + 110000 + 105000 + 90000 = 400000
+```
+
+The key insight: **Stage 1 dramatically reduces the data volume before the shuffle**. Instead of shuffling every raw row, Spark shuffles only the pre-aggregated partial sums — often 100x less data.
+
+### Why spark.sql.shuffle.partitions Matters
+
+The number of post-shuffle partitions is controlled by `spark.sql.shuffle.partitions` (default: 200). For small datasets, 200 partitions means 200 tiny tasks — overhead dominates. For huge datasets, 200 partitions might be too few:
+
+```python
+# For small/medium data — reduce shuffle partitions
+spark.conf.set("spark.sql.shuffle.partitions", "10")
+
+# For very large data — increase
+spark.conf.set("spark.sql.shuffle.partitions", "500")
+
+# Spark 3.0+ AQE can adjust this automatically
+spark.conf.set("spark.sql.adaptive.enabled", "true")
+```
+
+### count("col") vs count("*") — The NULL Trap
+
+`count("column_name")` counts only **non-null** values in that column. `count("*")` or `count(lit(1))` counts **all rows** including those with nulls. This distinction is critical for correct aggregations:
+
+```python
+# If salary has 2 null rows in Engineering:
+df.groupBy("dept").agg(count("salary"))  # Engineering → 2 (nulls excluded!)
+df.groupBy("dept").agg(count("*"))       # Engineering → 4 (all rows)
+```
+
+---
+
 ## Setup
 
 ```python

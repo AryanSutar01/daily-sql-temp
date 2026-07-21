@@ -1,20 +1,52 @@
+## How Python Stores Variables in Memory
+
+Before understanding `is` vs `==`, you need a clear mental model of how Python stores values. In Python, **variables are not boxes that hold values** — they are **labels (names) attached to objects**. The objects live on the heap. The name lives in a namespace dictionary (a Python `dict`).
+
+```
+x = 42
+y = x
+
+Memory layout:
+  Heap: [ int object: value=42, refcount=2 ]
+                  ↑               ↑
+  Namespace:  name "x"        name "y"
+```
+
+Both `x` and `y` point to the exact same object at the exact same memory address. `id()` returns that address as an integer. When two names point to the same object, `x is y` is `True`.
+
+```python
+x = [1, 2, 3]
+y = [1, 2, 3]   # a DIFFERENT list object with the same contents
+
+id(x)   # e.g. 140234567890
+id(y)   # DIFFERENT address — different object
+x is y  # False — different identity
+x == y  # True  — same value (calls list.__eq__)
+```
+
+This distinction is not academic. It determines whether mutations to one name affect the other.
+
 ## The Core Difference
 
 ```python
-# == checks VALUE equality - are the contents the same?
-# is  checks IDENTITY    - are they the SAME OBJECT in memory?
+# == checks VALUE equality — are the contents the same? (calls __eq__)
+# is  checks IDENTITY    — are they the SAME OBJECT in memory? (compares id())
 
 a = [1, 2, 3]
 b = [1, 2, 3]
 
-a == b   # True  - same values
-a is b   # False - different objects in memory
+a == b   # True  — same values
+a is b   # False — different objects in memory
 
-c = a
-a is c   # True  - c points to the SAME object as a
+c = a    # c is bound to the SAME object as a
+a is c   # True  — same identity
 ```
 
-## id() - Memory Address
+Every Python object has three things: a **type**, a **value**, and an **identity** (memory address). `==` compares values; `is` compares identity. Two objects can be equal (`==`) without being identical (`is`).
+
+## id() — Memory Address of an Object
+
+`id()` returns the unique integer identity of an object — its memory address in CPython. Two objects that are `is`-equal always have the same `id()`. The converse is also true: if `id(a) == id(b)`, then `a is b`.
 
 ```python
 a = [1, 2, 3]
@@ -22,133 +54,150 @@ b = [1, 2, 3]
 c = a
 
 print(id(a))   # e.g. 140234567890
-print(id(b))   # different address - different object
-print(id(c))   # same as id(a) - same object
+print(id(b))   # different address — different object
+print(id(c))   # same as id(a) — same object
 
-a is b   # False - different id
-a is c   # True  - same id
+a is b   # False — different id
+a is c   # True  — same id
 ```
 
-## The None Special Case
+**Important caveat**: in CPython, deleted objects can have their memory reused by new objects. So `id()` values can be reused after an object is garbage collected. Never store `id()` values for later comparison — only use `id()` for understanding the memory model.
 
-Always use `is` (not `==`) to compare with `None`, `True`, and `False`:
+## The None, True, False Singletons
+
+`None`, `True`, and `False` are **singletons** — Python guarantees that exactly one instance of each exists in the entire interpreter. Because they are singletons, the correct check is always `is` (identity), not `==` (equality).
 
 ```python
 x = None
 
-# Correct
+# Correct — identity check against the one None singleton
 if x is None:
     print("x is None")
 
 if x is not None:
     print("x has a value")
 
-# Wrong - works but misleading and can cause issues
+# Wrong — works but misleading and potentially unsafe
 if x == None:
     print("technically works but bad practice")
 ```
 
-Why? `None` is a singleton - there is exactly one `None` object in Python. `is None` checks object identity, which is the precise and intended check. A custom class could override `__eq__` to return `True` when compared to `None`, which would fool `== None`.
+**Why `is None` is safer than `== None`**: a custom class can override `__eq__` to return `True` for anything, including comparisons with `None`. `is None` bypasses `__eq__` entirely — it is a pure pointer comparison and cannot be fooled:
 
-## Integer Caching - A Common Trap
+```python
+class AlwaysEqual:
+    def __eq__(self, other):
+        return True   # returns True for comparison with ANYTHING
 
-Python caches small integers (typically -5 to 256) as singletons:
+obj = AlwaysEqual()
+obj == None    # True  — __eq__ returns True for everything
+obj is None    # False — obj is NOT the None singleton
+obj == 42      # True  — __eq__ again
+```
+
+This is exactly why linters (pylint, flake8, mypy) flag `== None` as a warning.
+
+## Integer Caching — CPython Implementation Detail
+
+CPython pre-allocates integer objects for the range **-5 to 256** at interpreter startup. These objects are singletons — there is exactly one integer object for each value in this range, and all assignments to these values share the same object.
 
 ```python
 a = 100
 b = 100
-a is b   # True - both point to the cached integer object
+a is b   # True — both point to the same cached integer object
 
 a = 1000
 b = 1000
-a is b   # False - outside the cache range, new objects created
-
-# In interactive mode (REPL) vs script - behavior may differ!
+a is b   # False — outside the cache range, two NEW objects are created
+          # (in a module; behavior may differ in the REPL)
 ```
+
+**Why this cache exists**: small integers are used extremely frequently (loop counters, list indices, simple computations). Pre-allocating them avoids millions of heap allocations during normal program execution — a significant performance optimization.
+
+**The trap**: `a is 100` may return `True` by coincidence for cached values, leading developers to think `is` works for integer comparison. Then their code breaks when the value exceeds 256. **Never use `is` to compare integer values — always use `==`.**
 
 ```python
-# This is why you should NEVER use 'is' for integer comparison
+# NEVER do this
 x = 1000
-x is 1000   # may be True in REPL (same literal), False in a module
-x == 1000   # always True - use this
+x is 1000   # may be True in the REPL (same literal optimized), False in a module
+
+# ALWAYS do this
+x == 1000   # always True — value comparison is correct and reliable
 ```
 
-## String Interning - Another Trap
+## String Interning — Another CPython Optimization
 
-Python interns (reuses) short strings that look like identifiers:
+Python automatically **interns** (reuses) string objects that look like identifiers — strings consisting only of letters, digits, and underscores, with no spaces or special characters. Interned strings share a single object, so `is` comparisons return `True`.
 
 ```python
 a = "hello"
 b = "hello"
-a is b   # True - interned (Python reuses the string object)
+a is b   # True — "hello" is interned (looks like an identifier)
 
 a = "hello world"
 b = "hello world"
-a is b   # False in most cases - spaces prevent interning
+a is b   # False in most contexts — spaces prevent automatic interning
 
 # Explicitly intern a string
 import sys
 a = sys.intern("hello world")
 b = sys.intern("hello world")
-a is b   # True
+a is b   # True — both forced to share the same object
 ```
 
-## Mutable Objects - is vs ==
+**Why interning exists**: in production Python code, the same string literals (column names, dictionary keys, attribute names) appear thousands of times. Interning ensures they share a single object, reducing memory usage and making identity comparisons (used internally by Python's attribute lookup) extremely fast — a single pointer comparison instead of a character-by-character comparison.
+
+`sys.intern()` is used in performance-critical code when the same string will be used many times as a dictionary key. It makes `key is interned_key` a valid fast-path check instead of a full string comparison.
+
+## Mutable Objects — The Critical Danger
+
+The most impactful real-world consequence of identity vs equality is with mutable objects. When you assign a mutable object to another name, you create an alias — a second name pointing to the same object. Mutating through either name changes the object.
 
 ```python
-# Lists
 a = [1, 2, 3]
 b = [1, 2, 3]
-c = a
+c = a           # alias — c IS a (same object)
 
-a == b   # True  - same values
-a is b   # False - different objects
-a is c   # True  - c is an alias for a
+a == b   # True  — same values
+a is b   # False — different objects
+a is c   # True  — c is an alias for a
 
-# Modifying through an alias
+# Mutating through an alias affects the original
 c.append(4)
-print(a)   # [1, 2, 3, 4] - a changed too, because c is a
+print(a)   # [1, 2, 3, 4] — a changed! because c is a
+print(b)   # [1, 2, 3]    — b unchanged
 
-# Modifying b doesn't affect a
+# Mutating b does NOT affect a (different objects)
 b.append(99)
-print(a)   # [1, 2, 3, 4] - unchanged
+print(a)   # [1, 2, 3, 4] — unchanged
 ```
 
-## Custom __eq__ - Why == Can Be Deceiving
+This behavior causes bugs in production code when developers assume `b = a` makes a copy. To get an independent copy, you must explicitly copy:
 
 ```python
-class AlwaysEqual:
-    def __eq__(self, other):
-        return True
-
-obj = AlwaysEqual()
-obj == None    # True - __eq__ returns True for everything
-obj is None    # False - obj is not the None singleton
-obj == 42      # True
-obj == "abc"   # True
+import copy
+shallow = a.copy()       # new list, same elements (beware of nested mutables)
+deep    = copy.deepcopy(a)  # fully independent, recursive copy
 ```
-
-This is exactly why `is None` is safer than `== None`.
 
 ## When to Use Which
 
 ```python
 # USE is for:
-x is None          # checking for None
-x is not None      # checking for not None
-x is True          # checking boolean singletons (rare)
+x is None          # checking for None — always
+x is not None      # checking for not None — always
+x is True          # checking boolean singletons (rare — usually just 'if x:')
 x is False
 
 # USE == for:
 x == 0             # value comparison
 x == "hello"       # string content comparison
 x == [1, 2, 3]     # list content comparison
-x == some_object   # any value equality
 
 # NEVER use is for:
-x is 100           # wrong - integer caching is implementation detail
-x is "hello"       # wrong - string interning is implementation detail
-x is []            # always False - new list is a new object
+x is 100           # wrong — integer caching is an implementation detail
+x is "hello"       # wrong — string interning is an implementation detail
+x is []            # always False — a new empty list is a new object every time
 ```
 
 ## Quick Reference
@@ -157,48 +206,52 @@ x is []            # always False - new list is a new object
 x = None
 y = None
 
-x is y      # True  - both are the None singleton
-x == y      # True  - None == None
+x is y      # True  — both are the None singleton
+x == y      # True  — None == None
 
 a = [1, 2]
 b = [1, 2]
-a == b      # True  - same content
-a is b      # False - different objects
+a == b      # True  — same content
+a is b      # False — different objects
 
-a = b       # now b is an alias
-a is b      # True  - same object
+a = b       # now b is an alias — same object
+a is b      # True
 
 import copy
 a = [1, 2]
 b = copy.copy(a)
-a == b      # True  - same content
-a is b      # False - copy() creates a new object
+a == b      # True  — same content
+a is b      # False — copy() creates a new object
 ```
 
 ## Interview Questions
 
 **Q: What is the difference between `is` and `==` in Python?**
-`==` checks value equality - whether two objects have the same content (calls `__eq__`). `is` checks identity - whether two variables point to the exact same object in memory (compares `id()`). Two objects can be equal (`==`) without being identical (`is`).
+`==` checks **value equality** — whether two objects have the same content. It calls the `__eq__` method, which can be overridden. `is` checks **object identity** — whether two variable names point to the exact same object in memory, compared via `id()`. `is` cannot be overridden and is always a pointer comparison. Two objects can be `==` (same value) without being `is` (same identity).
 
 **Q: Why should you use `is None` instead of `== None`?**
-`None` is a singleton - there is exactly one `None` object. `is None` checks identity, which is semantically correct and unambiguous. `== None` calls `__eq__`, which a custom class could override to return `True` unexpectedly. Use `is None` for clarity and safety.
+`None` is a singleton — there is exactly one `None` object in the Python interpreter. `is None` is a pointer comparison against that singleton — unambiguous, cannot be overridden, and semantically correct. `== None` calls `__eq__`, which a custom class could override to return `True` unexpectedly. Linters flag `== None` as a code smell for this reason.
 
 **Q: Why does `1000 is 1000` sometimes return True and sometimes False?**
-Python caches small integers (-5 to 256) as singletons - within that range, `is` comparisons return `True`. For numbers outside this range, Python may or may not create the same object depending on context (REPL vs module, compile-time vs runtime). This is an implementation detail - never rely on `is` for integer comparison; always use `==`.
+CPython caches small integers (-5 to 256) as singletons. Within that range, `is` comparisons may coincidentally return `True`. For values outside this range, Python may create different objects depending on context (literals in the same code block may be optimized by the compiler; at runtime they are not). This is a CPython implementation detail — never rely on `is` for integer comparison. Always use `==`.
 
-**Q: What is string interning?**
-Python automatically interns strings that look like identifiers (no spaces, alphanumeric). Interned strings are reused - all references point to the same object. Strings with spaces or special characters are typically not interned. Again, this is an implementation detail - always use `==` to compare string values.
+**Q: What is string interning and when is it useful?**
+Python automatically interns strings that look like identifiers (no spaces, alphanumeric). Interned strings share a single object, making `is` comparisons valid. Explicit interning via `sys.intern()` is used for performance optimization — when the same string will be used as a dictionary key millions of times, interning makes key lookup faster via pointer comparison instead of character-by-character comparison.
 
 **Q: What happens when you write `c = a` for a list?**
-`c` and `a` become aliases - they both point to the same list object in memory. Modifying the list through `c` also changes what `a` sees. To create an independent copy, use `b = a[:]` (slice copy), `b = list(a)`, or `b = copy.copy(a)`.
+`c` and `a` become **aliases** — both names point to the same list object. Mutating the list through `c` (e.g., `c.append(4)`) also affects what `a` sees because they are the same object. To create an independent copy: `b = a.copy()` for a flat list, or `b = copy.deepcopy(a)` for nested structures.
+
+**Q: What does `id()` return and when can you rely on it?**
+`id()` returns the memory address of an object as an integer — unique for an object during its lifetime. Use it to understand the memory model and verify object identity. **Do not** store `id()` values for later comparison — CPython reuses addresses after garbage collection, so a stored `id` can become invalid or point to a different object.
 
 ## Summary
 
-- `==` - value equality; calls `__eq__`; compares contents
-- `is` - object identity; compares memory addresses via `id()`
-- Two objects can be `==` without being `is` (same value, different objects)
-- Always use `is None` / `is not None` - never `== None`
-- Python caches small integers (-5 to 256) - `is` works for them by coincidence, never rely on it
-- Python interns short identifier-like strings - same trap: use `==` for string comparison
-- `c = a` creates an alias, not a copy - both point to the same object
-- Use `copy.copy()` or slicing to create independent copies
+- Variables are **names (labels) bound to objects** — not boxes containing values
+- `==` — value equality; calls `__eq__`; can be overridden
+- `is` — object identity; compares `id()`; cannot be overridden; pure pointer comparison
+- `is None` / `is not None` — **always** use identity for None, True, False singletons
+- CPython caches integers **-5 to 256** — `is` works for them by coincidence; never rely on it
+- String interning — short identifier-like strings share objects automatically; `sys.intern()` for explicit interning
+- `c = a` on mutable objects creates an **alias**, not a copy — mutations affect both names
+- Use `.copy()` for shallow copy; `copy.deepcopy()` for full independence
+- `id()` returns the memory address — same `id` means same object (`is` is True)

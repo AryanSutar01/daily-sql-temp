@@ -1,3 +1,27 @@
+## The Physical B-Tree: Depth and the Write Penalty
+
+When you create an index, the database allocates a completely separate data structure on disk, almost always a **B-Tree (Balanced Tree)**. Understanding the physical structure of the B-Tree is crucial for understanding its performance limits.
+
+### Node Architecture and Logarithmic Depth
+
+A B-Tree consists of 8KB disk pages organized hierarchically:
+1. **Root Node:** The top page, cached permanently in RAM.
+2. **Branch Nodes:** Internal routing pages that narrow down the search space.
+3. **Leaf Nodes:** The bottom pages containing the actual indexed values and a physical pointer (Row ID or Heap TID) to the exact disk location of the row in the main table.
+
+Because B-Trees have a massive branching factor (hundreds of keys per node), they are incredibly shallow. Even a table with 1 billion rows typically has a B-Tree depth of only 4 or 5 levels. 
+**Lookup Time**: $O(\log_b N)$. To find a row in a 1-billion-row table, the engine only reads 4 or 5 disk pages. It is near-instantaneous.
+
+### The Write Penalty (Index Amplification)
+
+The devastating trade-off of indexes is the **Write Penalty**. 
+If a table has 5 indexes, every single `INSERT` or `DELETE` statement must physically modify 6 different locations on disk (the main table + the 5 index structures). 
+Worse, if you update an indexed column (e.g., `UPDATE users SET status = 'active'`), the database must delete the old entry from the `status` B-Tree and insert the new entry into a different leaf node, potentially triggering cascading B-Tree rebalancing operations.
+
+**Architectural Rule**: Every index accelerates reads but exponentially penalizes writes. Heavily indexed tables will destroy database throughput during bulk inserts. In OLTP systems, audit and delete unused indexes relentlessly.
+
+---
+
 ## What is an Index?
 
 An index is a separate data structure that the database maintains alongside a table. It allows the database to find rows without scanning every row (a full table scan).
@@ -8,6 +32,8 @@ With index:    Jump directly to matching rows → O(log n)
 ```
 
 ## Creating and Dropping Indexes
+
+Creating an index in PostgreSQL does not block reads by default, but a standard `CREATE INDEX` takes a full table lock that blocks writes for the duration of the build. For production tables with millions of rows, use `CREATE INDEX CONCURRENTLY` — it takes significantly longer but builds the index without blocking inserts or updates. Indexes created with `UNIQUE` enforce uniqueness as a constraint at the storage level, equivalent to a `UNIQUE` constraint on the column.
 
 ```sql
 -- Basic index
@@ -55,6 +81,8 @@ In practice, B-Tree is usually preferred even for equality - it's versatile and 
 
 ## Composite Index - Column Order Matters
 
+A composite index on `(customer_id, created_at)` physically sorts the B-Tree first by `customer_id`, then by `created_at` within each customer. This means the leftmost columns act as a prefix — queries filtering only on `customer_id` can use the index perfectly. Queries filtering only on `created_at` cannot, because the tree is not sorted by `created_at` at the top level. Always design composite indexes to match the access pattern of your most frequent queries, and put the column with the highest filter selectivity first to maximize rows eliminated per node traversal.
+
 ```sql
 CREATE INDEX idx_orders_customer_date ON orders(customer_id, created_at);
 ```
@@ -70,6 +98,8 @@ WHERE created_at > '2024-01'                         -- ❌ skips leftmost col
 **Rule:** Design composite indexes to match your most common query patterns - most selective column first.
 
 ## Partial Index - Index a Subset of Rows
+
+A partial index includes a `WHERE` clause that filters which rows are indexed. This is one of the most powerful and underused index types. If 90% of your users are `'inactive'`, a standard index on `email` wastes storage on those rows and forces the query planner to read them. A partial index with `WHERE status = 'active'` is dramatically smaller (only 10% of the rows), fits more of itself in RAM, and is faster to traverse. The planner will use it automatically when the query's `WHERE` clause is compatible with the index predicate.
 
 ```sql
 -- Only index active users (if 90% are inactive, don't waste space on them)
@@ -100,6 +130,8 @@ INCLUDE (amount, created_at);   -- PostgreSQL 11+ INCLUDE syntax
 ```
 
 ## GIN Index - Full-Text Search, Arrays, JSONB
+
+A B-Tree can only index simple scalar values (integers, strings, dates). A GIN (Generalized Inverted Index) index is designed for **composite values** — full-text documents, JSONB objects, and arrays — where a single row can contain multiple indexable elements. GIN shreds each value into individual lexemes (for text) or key-value pairs (for JSONB) and builds an inverted map from each element to the list of rows containing it, identical in structure to a search engine's index. This makes containment queries (`@>`) and full-text match queries (`@@`) extremely fast on large datasets.
 
 ```sql
 -- Full-text search
@@ -148,6 +180,8 @@ WHERE customer_id = 101
 ```
 
 ## EXPLAIN - Verify Index Usage
+
+After creating an index, always run `EXPLAIN ANALYZE` to verify the planner actually uses it. The planner may choose a sequential scan over an index scan if the table is small, if statistics are stale, or if it estimates that the index scan would actually read more disk pages than a sequential scan (this can happen for low-selectivity queries). If the index is being ignored, check: (1) whether the predicate is sargable, (2) whether statistics are fresh (`ANALYZE table_name`), and (3) whether `random_page_cost` is configured correctly for SSD vs HDD.
 
 ```sql
 EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'alice@email.com';

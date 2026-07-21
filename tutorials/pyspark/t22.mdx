@@ -1,3 +1,65 @@
+## How Window Functions Execute Internally
+
+Window functions are a special case in Spark's execution model — they require a **shuffle plus a sort** before any window computation can begin, making them fundamentally expensive wide transformations.
+
+### The Window Execution Pipeline
+
+```
+Input: 1M rows across 200 partitions
+  partitionBy("department"), orderBy("salary")
+
+Step 1: SHUFFLE (Wide transformation)
+  Each row is hashed by department value → hash("engineering") % 200
+  All rows with the same department MUST land on the same partition
+  Cost: full data shuffle across the network
+
+Step 2: SORT (within each partition)
+  Each partition sorts its rows by salary DESC/ASC
+  This is required for ordered window functions (rank, lag, lead, etc.)
+  Cost: in-memory sort per partition
+
+Step 3: WINDOW FUNCTION EVALUATION
+  For each row, a "window frame" is defined relative to that row
+  The function evaluates against rows in that frame
+
+Step 4: OUTPUT
+  Each row gets its computed window value as a new column
+  Row count is preserved (unlike groupBy which collapses rows)
+```
+
+### The Window Buffer: How Frames Are Computed
+
+For functions like `rank()`, `lag()`, `lead()`, Spark maintains a **sorted row buffer** per window partition:
+
+```
+partition = "engineering", sorted by salary:
+
+Buffer:   [50000, 60000, 70000, 80000, 90000, 100000]
+          row 0  row 1  row 2  row 3  row 4  row 5
+
+rank() for row 3 (salary=80000):
+  Count how many rows have salary <= 80000: rows 0,1,2,3 → rank = 4
+
+lag(salary, 1) for row 3:
+  Access buffer[row_index - 1] = buffer[2] = 70000
+
+lead(salary, 2) for row 3:
+  Access buffer[row_index + 2] = buffer[5] = 100000
+```
+
+The entire buffer for a window partition must fit in executor memory. Very large partitions (millions of rows with the same `partitionBy` key) can cause OOM errors — this is the window function equivalent of data skew.
+
+### Why Window Functions Cannot Be Pushed to the Source
+
+Unlike `filter` (which Catalyst pushes to the Parquet reader), window functions cannot be pushed down. They require:
+1. All rows of a partition to be present (full shuffle needed)
+2. Rows in sorted order (post-shuffle sort needed)
+3. Access to neighbouring rows (row-by-row buffer traversal)
+
+This means a window function always creates at least **two stages**: one for the shuffle, one for the evaluation.
+
+---
+
 ## What Are Window Functions?
 
 Window functions compute a value for each row **based on a group of related rows** (the "window") - without collapsing those rows into one like `groupBy` does.

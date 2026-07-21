@@ -1,3 +1,100 @@
+## How the Database Engine Physically Stores Types
+
+Choosing a data type is not just about semantic correctness — it directly determines **how many bytes are written to disk**, how many rows fit in a storage page, and how fast comparisons execute.
+
+### Storage Pages: The Fundamental Unit of Disk I/O
+
+Every RDBMS reads and writes data in **pages** (also called blocks), typically 8KB (PostgreSQL default). A page holds multiple rows:
+
+```
+8KB page = 8192 bytes
+
+If each row is 100 bytes → page holds ~80 rows
+If each row is 200 bytes → page holds ~40 rows
+
+A query scanning 1 million rows:
+  100-byte rows: 1M/80 = ~12,500 page reads (I/O operations)
+  200-byte rows: 1M/40 = ~25,000 page reads
+  → Twice the disk I/O for double the row size!
+```
+
+This is why type selection is a **performance decision**, not just a correctness decision. Undersized types pack more rows per page → fewer I/O operations → faster full table scans.
+
+### The IEEE 754 Float Representation Problem
+
+`FLOAT` and `REAL` use the IEEE 754 binary floating-point standard. This standard represents numbers in **binary fractions** — and many decimal fractions have no exact binary representation:
+
+```
+0.1 in binary = 0.0001100110011... (infinitely repeating)
+
+The database stores the closest representable value:
+  0.1 → 0.1000000000000000055511151231257827021181583404541015625
+
+When you add 0.1 + 0.2:
+  0.1000...055 + 0.2000...111 = 0.3000...166
+
+The displayed result: 0.30000000000000004 (not 0.30!)
+```
+
+For money:
+```sql
+-- Float arithmetic (WRONG for money):
+SELECT 0.1 + 0.2;                    -- 0.30000000000000004
+SELECT 1.30 * 100.0;                 -- might be 129.99999...
+
+-- DECIMAL arithmetic (EXACT):
+SELECT CAST(0.1 AS DECIMAL(10,2)) + CAST(0.2 AS DECIMAL(10,2));  -- 0.30
+SELECT CAST(1.30 AS DECIMAL(10,2)) * 100;  -- 130.00
+```
+
+DECIMAL stores numbers as **base-10 packed decimal digits** — no binary conversion, no rounding errors. The cost: slightly slower arithmetic (requires BCD operations vs native CPU floating-point instructions).
+
+### VARCHAR Internals: The Length Prefix
+
+`VARCHAR(n)` is stored with a **length prefix** that enables the database to locate where one value ends and the next begins:
+
+```
+VARCHAR storage format:
+  [1-2 bytes: actual length L][L bytes: actual string data]
+
+Storing 'Alice' in VARCHAR(100):
+  [5][A][l][i][c][e] = 6 bytes total (1 prefix + 5 data)
+
+Storing '' (empty string) in VARCHAR(100):
+  [0] = 1 byte total (just the length prefix)
+
+Storing 'A' * 100 in VARCHAR(100):
+  [100][A*100] = 102 bytes total (2 prefix + 100 data)
+```
+
+`CHAR(n)` by contrast always stores exactly N bytes, padding with spaces:
+```
+'Hi' in CHAR(10):
+  [H][i][ ][ ][ ][ ][ ][ ][ ][ ] = 10 bytes (always)
+  → Trailing spaces trimmed on retrieval in most databases
+```
+
+### TIMESTAMP vs TIMESTAMPTZ: The Timezone Storage Difference
+
+```
+TIMESTAMP: stores the literal value you provide
+  INSERT: '2024-06-15 10:30:00'
+  Stored: exactly '2024-06-15 10:30:00' (no timezone info)
+  Retrieved on cluster in UTC: '2024-06-15 10:30:00' (but is this IST? UTC? EST?)
+  → Ambiguous! Timezone context is lost.
+
+TIMESTAMPTZ: stores UTC epoch internally, converts on display
+  INSERT in session with timezone='Asia/Kolkata': '2024-06-15 10:30:00'
+  Stored internally: '2024-06-15 05:00:00 UTC' (subtract IST offset)
+  Retrieved in session with timezone='America/New_York': '2024-06-15 01:00:00'
+  Retrieved in session with timezone='Asia/Kolkata': '2024-06-15 10:30:00'
+  → Always correct regardless of where the application runs!
+```
+
+**Rule**: Production systems always use `TIMESTAMPTZ`. `TIMESTAMP` is appropriate only when you explicitly want timezone-naive storage (e.g., "meeting at 9am regardless of where the attendee is").
+
+---
+
 ## Why Data Types Matter
 
 Every column in a SQL table must have a data type. Choosing the right type matters for:

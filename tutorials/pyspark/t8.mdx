@@ -1,3 +1,65 @@
+## The DAG Scheduler: From Lineage to Tasks
+
+When you call an action, the DAG Scheduler takes your transformation lineage and converts it into a sequence of executable stages. This conversion process determines the overall job cost.
+
+### Stage Identification Algorithm
+
+The DAG Scheduler uses a **reverse traversal** of the RDD dependency graph. Starting from the final RDD (the one being acted upon), it walks backwards through the lineage:
+
+1. When it encounters a **narrow dependency** → stay in the current stage
+2. When it encounters a **wide dependency (shuffle)** → end the current stage, create a new parent stage
+
+```
+Your transformation chain (forward):
+  FileScan → filter → select → groupBy → count → orderBy → show()
+
+DAG Scheduler (walks backward from show()):
+  show()    ← action
+    └── orderBy()   ← shuffle → new Stage 3
+          └── count()
+                └── groupBy() ← shuffle → new Stage 2
+                      └── select()
+                            └── filter()
+                                  └── FileScan  ← Stage 1 starts here
+```
+
+### Task Parallelism Model
+
+Each stage contains one task per partition. With 200 partitions and 40 executor cores:
+
+```
+Stage 1 (200 tasks, 40 cores):
+  [Task 0..39 run in parallel]
+  [Task 40..79 run in parallel]   ← 5 waves total
+  [Task 40..199 run in parallel]
+  
+Stage boundary → shuffle write to disk
+Stage boundary → network transfer
+  
+Stage 2 (200 tasks, 40 cores):
+  [reads shuffle data, runs aggregation]
+```
+
+The **total wall-clock time** of a stage = time for its slowest task (the straggler). This is why data skew (uneven partition sizes) is so damaging — 199 fast tasks wait for 1 slow task.
+
+### What Happens Inside a Narrow Transformation Stage
+
+Within a stage, Spark uses **pipelining** — multiple narrow transformations are fused into a single pass through the data:
+
+```
+Instead of:
+  Pass 1: Read partition → apply filter → write to memory
+  Pass 2: Read from memory → apply select → write to memory
+  Pass 3: Read from memory → apply withColumn → write to shuffle files
+
+Spark actually does:
+  Single pass: Read partition → filter → select → withColumn → write to shuffle files
+```
+
+Tungsten's whole-stage code generation compiles these fused operations into a single JVM method — no intermediate object creation between steps. This is a **10–100x speedup** for CPU-bound operations.
+
+---
+
 ## The Core Distinction
 
 Every operation in PySpark is either a **transformation** or an **action**. This is one of the most fundamental concepts in Spark - and the most common interview question at every level.

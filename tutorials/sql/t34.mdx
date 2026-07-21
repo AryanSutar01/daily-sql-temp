@@ -1,8 +1,38 @@
+## Temporary Tables: Local Memory and WAL Bypass
+
+From a physical storage perspective, Temporary Tables are radically different from standard Heap tables. They are engineered to provide maximum throughput for intermediate batch processing.
+
+### Bypassing the WAL (Write-Ahead Log)
+
+In PostgreSQL, every standard `INSERT`, `UPDATE`, or `DELETE` must be written to the **Write-Ahead Log (WAL)** before it is committed to disk, ensuring ACID durability in case of a power failure. 
+
+Because Temporary Tables are designed to be destroyed when the session ends, the database **bypasses WAL logging completely** for temp tables. Writing 10 million rows to a Temporary Table is blisteringly fast because the engine skips the synchronous disk flush required for crash recovery. It simply writes the data directly to disk buffers.
+
+### Backend-Local Memory Allocation
+
+A standard table utilizes the database's global Shared Buffers, meaning memory is synchronized and locked across all active connections. 
+A Temporary Table is allocated in **Backend-Local Memory** (`temp_buffers`). 
+1. It is entirely invisible to other connections.
+2. It requires zero locking mechanisms to read or write (no `AccessShareLock`).
+3. If the temp table exceeds local memory limits, it spills directly to isolated temporary files on disk.
+
+### The Catalog Bloat Hazard
+
+The primary danger of Temporary Tables is **Catalog Bloat**. Even though the table data is temporary, the *metadata* (table name, column types) must be registered in the system's global catalog (e.g., `pg_class`, `pg_attribute`).
+
+If an application executes a query 100 times per second, and that query creates and drops a Temporary Table each time, the database must write and delete rows in the system catalog 100 times per second. This causes severe fragmentation in the global catalog, eventually slowing down the entire database instance. 
+
+**Architectural Rule**: Use Temporary Tables for massive batch jobs or complex multi-step data transformations running periodically. Never use them for high-frequency OLTP queries; use CTEs (which do not write to the catalog) instead.
+
+---
+
 ## What are Temporary Tables?
 
 Temporary tables store data only for the duration of the current session (or transaction). They're automatically dropped when the session ends. They behave exactly like regular tables but are invisible to other sessions.
 
 ## CREATE TEMPORARY TABLE
+
+A temporary table is created like a normal table but lives in a session-private schema (`pg_temp_<session_id>`) that is invisible to other connections. You can add indexes, run joins, and use CTEs against it just like a real table. In PostgreSQL, temp tables bypass WAL logging (no crash recovery needed since they're session-scoped) and use backend-local memory buffers, making writes significantly faster than equivalent writes to permanent tables. The table is dropped automatically when the session disconnects, but you can also drop it explicitly to free memory during a long session.
 
 ```sql
 -- Create a temp table
@@ -31,6 +61,8 @@ DROP TABLE IF EXISTS temp_high_value_orders;
 ```
 
 ## CREATE TEMP TABLE AS SELECT (Faster)
+
+`CREATE TEMP TABLE ... AS SELECT` is a single-statement pattern that creates the table with columns inferred from the query's result set and immediately populates it. This is faster than a two-step `CREATE TABLE` + `INSERT INTO ... SELECT` because it avoids re-parsing the column definitions. Crucially, unlike a CTE, a temp table **materializes** the result to disk (or local memory buffers) and creates statistics that the planner can use. Adding a `CREATE INDEX ON temp_stats(customer_id)` after population allows subsequent joins to use an index scan instead of a sequential scan.
 
 ```sql
 -- Create and populate in one step

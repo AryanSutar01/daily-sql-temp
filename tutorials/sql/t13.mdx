@@ -1,3 +1,58 @@
+## How JOINs Actually Execute: Physical Join Algorithms
+
+When you write an `INNER JOIN`, you are describing the *logical* result you want. The database optimizer translates this into a *physical* execution plan. Understanding the three physical join algorithms is mandatory for senior engineering interviews and database performance tuning.
+
+### 1. Nested Loop Join (NLJ)
+The simplest algorithm. For every row in Table A, the database scans Table B to find matches.
+```
+FOREACH row_a IN table_a:
+  FOREACH row_b IN table_b:
+    IF row_a.id == row_b.customer_id THEN EMIT
+
+Cost: O(N * M) 
+```
+**When is it used?** 
+NLJ is terrible for large tables, but it is **extremely fast if the inner table is indexed**. If `table_b.customer_id` has an index, the inner loop becomes an O(log M) B-tree lookup instead of a full scan. The optimizer chooses NLJ when joining a small table to a large indexed table.
+
+### 2. Hash Join
+The go-to algorithm for joining large, unindexed datasets.
+```
+Phase 1: Build Phase
+  Scan the smaller table (Table A)
+  Build an in-memory Hash Table using the join key (row_a.id)
+
+Phase 2: Probe Phase
+  Scan the larger table (Table B)
+  For each row, hash row_b.customer_id and look it up in the Hash Table
+  IF match found THEN EMIT
+
+Cost: O(N + M) reads, plus O(N) memory for the hash table.
+```
+**When is it used?**
+When both tables are large and neither has a usable index on the join key. 
+**The danger:** If the Hash Table exceeds `work_mem`, it spills to disk (Grace Hash Join), causing massive I/O bottlenecks.
+
+### 3. Sort-Merge Join
+Used when both tables are already sorted by the join key (or if sorting them in memory is cheaper than building a hash table).
+```
+Phase 1: Sort
+  Sort Table A by join key
+  Sort Table B by join key (Skip if an index already provides sorted order!)
+
+Phase 2: Merge
+  Iterate through both sorted lists simultaneously (like zipping a zipper)
+  IF row_a.id == row_b.customer_id THEN EMIT
+
+Cost: O(N log N + M log M) for sorting, plus O(N + M) for merging.
+```
+**When is it used?**
+When joining massive tables that don't fit in memory (so Hash Join would spill to disk), or when the optimizer needs the final output to be sorted anyway (e.g., you have an `ORDER BY` on the join key).
+
+### The Optimizer's Job
+The query planner uses table statistics (row counts, histograms) to estimate the cost of all three algorithms and picks the cheapest one. **Missing indexes or outdated statistics will cause the optimizer to choose the wrong algorithm**, leading to queries that take hours instead of milliseconds.
+
+---
+
 ## What is an INNER JOIN?
 
 An INNER JOIN returns rows that have **matching values in both tables**. If a row in either table has no match in the other, it is excluded from the result.

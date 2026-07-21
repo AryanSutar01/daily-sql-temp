@@ -1,3 +1,44 @@
+## CROSS JOIN: Cartesian Products and Memory Explosion
+
+A `CROSS JOIN` creates a **Cartesian Product**. In mathematical set theory, the Cartesian product of two sets A and B (denoted A × B) is the set of all ordered pairs where the first element is from A and the second is from B.
+
+### The O(N * M) Complexity Trap
+
+In database engineering, Cartesian products represent a severe performance hazard because their computational complexity and memory footprint scale multiplicatively: $O(N \times M)$.
+
+```
+Table A: 10,000 rows (10 MB data)
+Table B: 10,000 rows (10 MB data)
+
+Query: SELECT * FROM A CROSS JOIN B;
+
+Result Set: 10,000 × 10,000 = 100,000,000 rows!
+Memory/Network cost: 100M rows × ~1KB per row = 100 GB of data generated!
+```
+
+This query will likely crash your database client, saturate your network interface, or trigger an Out Of Memory (OOM) kill on the database server. You should never execute an unconstrained `CROSS JOIN` on large tables without a `LIMIT`.
+
+### How the Query Planner Handles Implicit Cross Joins
+
+An **implicit cross join** occurs when you list tables separated by commas but forget the `JOIN ... ON` condition.
+
+```sql
+-- Implicit Cross Join:
+SELECT u.name, o.total 
+FROM users u, orders o 
+WHERE u.id = o.customer_id;
+```
+
+**The Planner Rewrite**: The database query planner is smart enough to realize you don't actually want a Cartesian product here. During the AST analysis phase, the planner detects the `WHERE u.id = o.customer_id` predicate and automatically **rewrites the AST** to treat this exactly like an `INNER JOIN`.
+
+However, if you forget the `WHERE` clause entirely:
+```sql
+SELECT u.name, o.total FROM users u, orders o;
+```
+The planner has no filter predicates to push down. It is forced to execute a physical `Nested Loop Join` with no index constraints, resulting in a full Cartesian explosion.
+
+---
+
 ## What is a CROSS JOIN?
 
 A CROSS JOIN returns every possible combination of rows from two tables - called the **cartesian product**. If Table A has 3 rows and Table B has 4 rows, the result has 3 × 4 = 12 rows.
