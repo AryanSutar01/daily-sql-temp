@@ -155,8 +155,8 @@ export function DailySetSkeleton() {
                             <div className="w-32 h-5 bg-[#202736] rounded animate-pulse" />
                         </div>
                         <div className="flex-1 p-4">
-                             <div className="w-1/3 h-4 bg-[#202736] rounded animate-pulse mb-3" />
-                             <div className="w-1/4 h-4 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-1/3 h-4 bg-[#202736] rounded animate-pulse mb-3" />
+                            <div className="w-1/4 h-4 bg-[#202736] rounded animate-pulse" />
                         </div>
                     </div>
                 </div>
@@ -198,6 +198,8 @@ export function DailySetClient() {
     const [activeDatasets, setActiveDatasets] = useState<Dataset[]>([]);
     const [showHint, setShowHint] = useState<boolean>(false);
     const [expectedOutput, setExpectedOutput] = useState<{ columns: string[]; rows: any[][] } | null>(null);
+    const [activeSampleTab, setActiveSampleTab] = useState<number>(0);
+    const [activeOutputTab, setActiveOutputTab] = useState<'test' | 'submit'>('test');
 
     const SQL_TEMPLATE = "\n\n```sql\nSELECT * FROM users;\n```";
 
@@ -347,8 +349,23 @@ export function DailySetClient() {
         setActiveDatasets([]);
         setShowHint(false);
         setExpectedOutput(null);
+        setActiveSampleTab(0);
+        setActiveOutputTab('test');
         try {
-            const p = problems.find(x => x.id === id);
+            let p = problems.find(x => x.id === id);
+            if (!p) {
+                try {
+                    p = await api.getProblem(id);
+                    setProblems(prev => {
+                        if (!prev.some(x => x.id === id)) {
+                            return [...prev, p!];
+                        }
+                        return prev;
+                    });
+                } catch (err) {
+                    console.error("Failed to load problem metadata from API", err);
+                }
+            }
             const isDsa = p?.challenge_type === 'python_dsa';
 
             const [datasets, savedSol] = await Promise.all([
@@ -695,15 +712,15 @@ export function DailySetClient() {
     const filteredProblems = problems.filter(p => {
         const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesDifficulty = difficultyFilter === 'all' || p.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
-        
+
         const pType = p.challenge_type || 'sql';
         const matchesType = typeFilter === 'all' || pType.toLowerCase() === typeFilter.toLowerCase();
-        
+
         const isSolved = solvedIds.has(p.id);
-        const matchesStatus = statusFilter === 'all' || 
-            (statusFilter === 'solved' && isSolved) || 
+        const matchesStatus = statusFilter === 'all' ||
+            (statusFilter === 'solved' && isSolved) ||
             (statusFilter === 'unsolved' && !isSolved);
-            
+
         return matchesSearch && matchesDifficulty && matchesType && matchesStatus;
     });
     const descriptionText = activeProblem?.description || '';
@@ -803,6 +820,187 @@ export function DailySetClient() {
 
     const isDsaProblem = activeProblem?.challenge_type === 'python_dsa';
 
+    // ── DSA Test Results Panel ─────────────────────────────────────────────
+    const renderDsaPanel = () => {
+        if (!isDsaProblem || !executionResult?.test_summary) return null;
+        const summary = executionResult.test_summary!;
+        const sampleTests = summary.results.filter(tc => !tc.is_hidden);
+        const hiddenTests = summary.results.filter(tc => tc.is_hidden);
+        const firstFailing = summary.results.find(tc => !tc.passed);
+
+        const formatValue = (val: any): string => {
+            if (val === undefined || val === null) return 'null';
+            return JSON.stringify(val);
+        };
+
+        const formatInput = (input: any): string => {
+            if (!input || typeof input !== 'object' || Array.isArray(input)) {
+                return formatValue(input);
+            }
+            return Object.entries(input)
+                .map(([k, v]) => `${k} = ${formatValue(v)}`)
+                .join('\n');
+        };
+
+        const TestDataRow = ({ label, value, color }: { label: string; value: any; color: string }) => (
+            <div className="flex flex-col gap-0.5">
+                <span className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold">{label}</span>
+                <pre className={`text-[11px] font-mono ${color} bg-[#080c16] border border-[#202736] rounded-md px-3 py-2 whitespace-pre-wrap break-all leading-relaxed`}>{typeof value === 'string' ? value : formatValue(value)}</pre>
+            </div>
+        );
+
+        if (activeOutputTab === 'test') {
+            return (
+                <div className="space-y-4">
+                    {/* ── Sample Pass / Fail count badge ── */}
+                    <div className="flex items-center gap-3">
+                        <div className={`text-xs font-bold px-2.5 py-1 rounded-full ${sampleTests.every(r => r.passed) ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                                'bg-red-500/10 text-red-400 border border-red-500/20'
+                            }`}>
+                            {sampleTests.filter(r => r.passed).length} / {sampleTests.length} sample cases passed
+                        </div>
+                        {executionResult.status === 'run_result' && (
+                            <span className="text-[10px] text-zinc-500 italic">Sample tests only · Press Submit to run all tests</span>
+                        )}
+                    </div>
+
+                    {/* ── Sample Test Cases (Tabbed) ── */}
+                    {sampleTests.length > 0 && (
+                        <div className="space-y-3">
+                            <div className="flex flex-wrap gap-1.5 border-b border-[#202736]/40 pb-2">
+                                {sampleTests.map((tc, idx) => {
+                                    const isActive = activeSampleTab === idx;
+                                    return (
+                                        <button
+                                            key={idx}
+                                            onClick={() => setActiveSampleTab(idx)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 border ${isActive
+                                                    ? 'bg-[#182235] text-[#4DD4C4] border-[#4DD4C4]/30 shadow-md shadow-[#4DD4C4]/5'
+                                                    : 'bg-[#0d121c] text-zinc-400 hover:text-zinc-200 border-[#202736]/50 hover:bg-[#131924]'
+                                                }`}
+                                        >
+                                            {tc.passed ? (
+                                                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+                                            ) : (
+                                                <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                                            )}
+                                            {tc.label ? tc.label : `Case ${idx + 1}`}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {(() => {
+                                const tc = sampleTests[activeSampleTab] || sampleTests[0];
+                                if (!tc) return null;
+                                return (
+                                    <div
+                                        className={`rounded-xl border p-3.5 flex flex-col gap-3 ${tc.passed
+                                                ? 'bg-green-500/5 border-green-500/20'
+                                                : 'bg-red-500/5 border-red-500/20'
+                                            }`}
+                                    >
+                                        {/* Input */}
+                                        {tc.input_data !== undefined && tc.input_data !== null && (
+                                            <TestDataRow label="Input" value={formatInput(tc.input_data)} color="text-zinc-300" />
+                                        )}
+
+                                        {/* Expected */}
+                                        {tc.expected !== undefined && tc.expected !== 'hidden' && (
+                                            <TestDataRow label="Expected Output" value={tc.expected} color="text-green-300" />
+                                        )}
+
+                                        {/* Actual (got) */}
+                                        {tc.got !== undefined && (
+                                            <TestDataRow
+                                                label="Actual Output"
+                                                value={tc.got}
+                                                color={tc.passed ? 'text-green-300' : 'text-red-300'}
+                                            />
+                                        )}
+
+                                        {/* Error */}
+                                        {tc.error && (
+                                            <TestDataRow label="Error" value={tc.error} color="text-red-400" />
+                                        )}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ── Submission Results Tab ──
+        if (executionResult.status === 'run_result') {
+            return (
+                <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-3">
+                    <div className="w-12 h-12 rounded-xl bg-zinc-800/20 flex items-center justify-center border border-[#202736] text-zinc-500 mb-2">
+                        <Sparkles size={22} className="opacity-80" />
+                    </div>
+                    <h3 className="text-sm font-bold text-zinc-300">No Submission Result</h3>
+                    <p className="text-zinc-500 text-xs max-w-xs leading-relaxed">You only executed Sample tests. Click the Submit button to run your solution against the complete validation suite.</p>
+                </div>
+            );
+        }
+
+        return (
+            <div className="space-y-4">
+                {/* ── Summary Badge ── */}
+                <div className="flex items-center gap-3">
+                    <div className={`text-xs font-bold px-2.5 py-1 rounded-full ${executionResult.status === 'correct' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                            'bg-red-500/10 text-red-400 border border-red-500/20'
+                        }`}>
+                        {summary.passed} / {summary.total} test cases passed
+                    </div>
+                </div>
+
+                {firstFailing ? (
+                    <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3.5 flex flex-col gap-3">
+                        <div className="flex items-center gap-2">
+                            <XCircle size={13} className="text-red-400 shrink-0" />
+                            <span className="text-xs font-bold text-red-400">
+                                {firstFailing.is_hidden ? "Hidden Test Failed" : "Sample Test Failed"}
+                            </span>
+                            {firstFailing.is_hidden ? (
+                                <span className="ml-auto text-[9px] text-zinc-600 uppercase tracking-wider border border-[#202736] rounded px-1.5 py-0.5">Hidden</span>
+                            ) : (
+                                <span className="ml-auto text-[9px] text-[#4DD4C4] uppercase tracking-wider border border-[#4DD4C4]/20 rounded px-1.5 py-0.5">{firstFailing.label || "Sample"}</span>
+                            )}
+                        </div>
+
+                        {/* Input (only if not hidden) */}
+                        {!firstFailing.is_hidden && firstFailing.input_data !== undefined && firstFailing.input_data !== null && (
+                            <TestDataRow label="Input" value={formatInput(firstFailing.input_data)} color="text-zinc-300" />
+                        )}
+
+                        {/* Expected */}
+                        {firstFailing.expected !== undefined && firstFailing.expected !== 'hidden' && (
+                            <TestDataRow label="Expected Output" value={firstFailing.expected} color="text-green-300" />
+                        )}
+
+                        {/* Actual */}
+                        {firstFailing.got !== undefined && (
+                            <TestDataRow label="Actual Output" value={firstFailing.got} color="text-red-300" />
+                        )}
+
+                        {/* Error */}
+                        {firstFailing.error && (
+                            <TestDataRow label="Error" value={firstFailing.error} color="text-red-400" />
+                        )}
+                    </div>
+                ) : (
+                    <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-5 flex flex-col items-center justify-center text-center space-y-2">
+                        <CheckCircle2 size={24} className="text-green-400" />
+                        <h4 className="text-sm font-bold text-green-400">Submission Accepted!</h4>
+                        <p className="text-zinc-500 text-xs max-w-xs leading-relaxed">Your code successfully passes all standard validation checks and hidden edge-case testing constraints.</p>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     const handleRun = async () => {
         if (!activeProblemId) return;
         if (authStatus === 'unauthenticated') { setError("LOGIN_REQUIRED"); return; }
@@ -816,6 +1014,9 @@ export function DailySetClient() {
             const mode = isDsaProblem ? 'run' : 'submit';
             const res = await api.execute(activeProblemId, code, mode);
             setExecutionResult(res);
+            if (isDsaProblem) {
+                setActiveOutputTab('test');
+            }
             if (res.status === 'error' && res.error === 'PROFILE_REQUIRED') { setError("PROFILE_REQUIRED"); return; }
             if (res.status === 'error' && res.error) setError(res.error);
         } catch (err: any) {
@@ -840,6 +1041,9 @@ export function DailySetClient() {
             try {
                 const res = await api.execute(activeProblemId, code, 'submit');
                 setExecutionResult(res);
+                if (isDsaProblem) {
+                    setActiveOutputTab('submit');
+                }
                 if (res.status === 'error' && res.error === 'PROFILE_REQUIRED') { setError("PROFILE_REQUIRED"); return; }
                 if (res.status === 'error' && res.error) { setError(res.error); return; }
                 if (res.status === 'correct') {
@@ -1194,15 +1398,14 @@ export function DailySetClient() {
                             onClick={handleSubmit}
                             disabled={isDsaProblem ? (!activeProblemId || isRunning) : executionResult?.status !== 'correct'}
                             title={isDsaProblem ? 'Submit against all test cases' : 'Submit solution'}
-                            className={`flex items-center gap-1.5 px-4 py-2 rounded text-sm font-bold transition-colors ${
-                                isDsaProblem
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded text-sm font-bold transition-colors ${isDsaProblem
                                     ? (!activeProblemId || isRunning)
                                         ? 'bg-zinc-700 cursor-not-allowed text-zinc-500'
                                         : 'bg-[#4DD4C4]/15 border border-[#4DD4C4]/40 text-[#4DD4C4] hover:bg-[#4DD4C4]/25 shadow-[0_0_8px_rgba(77,212,196,0.15)]'
                                     : executionResult?.status === 'correct'
                                         ? 'bg-[#4DD4C4]/15 border border-[#4DD4C4]/40 text-[#4DD4C4] hover:bg-[#4DD4C4]/25 shadow-[0_0_8px_rgba(77,212,196,0.15)]'
                                         : 'text-zinc-600 border border-[#202736] cursor-not-allowed'
-                            }`}
+                                }`}
                         >
                             <UploadCloud size={14} />
                             Submit
@@ -1457,13 +1660,13 @@ export function DailySetClient() {
                                         {/* ── Discipline Tab Switcher ── */}
                                         {(() => {
                                             const DISC_TABS = [
-                                                { id: 'sql' as const,     label: 'SQL',     Icon: Database, color: 'text-sky-400',    bg: 'bg-sky-400/10',    border: 'border-sky-400/30' },
-                                                { id: 'python' as const,  label: 'Python',  Icon: Code2,    color: 'text-amber-400',  bg: 'bg-amber-400/10',  border: 'border-amber-400/30' },
-                                                { id: 'pyspark' as const, label: 'PySpark', Icon: Server,   color: 'text-violet-400', bg: 'bg-violet-400/10', border: 'border-violet-400/30' },
+                                                { id: 'sql' as const, label: 'SQL', Icon: Database, color: 'text-sky-400', bg: 'bg-sky-400/10', border: 'border-sky-400/30' },
+                                                { id: 'python' as const, label: 'Python', Icon: Code2, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/30' },
+                                                { id: 'pyspark' as const, label: 'PySpark', Icon: Server, color: 'text-violet-400', bg: 'bg-violet-400/10', border: 'border-violet-400/30' },
                                             ];
                                             const DISC_KEYS: Record<string, Array<keyof DailyPractice>> = {
-                                                sql:     ['easy', 'medium', 'advanced'],
-                                                python:  ['python_easy', 'python_medium', 'python_advanced', 'dsa_easy', 'dsa_medium', 'dsa_advanced'],
+                                                sql: ['easy', 'medium', 'advanced'],
+                                                python: ['python_easy', 'python_medium', 'python_advanced', 'dsa_easy', 'dsa_medium', 'dsa_advanced'],
                                                 pyspark: ['pyspark_easy', 'pyspark_medium', 'pyspark_advanced'],
                                             };
                                             const activeKeys = DISC_KEYS[activeDisciplineTab];
@@ -1486,11 +1689,10 @@ export function DailySetClient() {
                                                                 <button
                                                                     key={id}
                                                                     onClick={() => setActiveDisciplineTab(id)}
-                                                                    className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-md text-[10px] font-semibold transition-all border ${
-                                                                        isActive
+                                                                    className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-md text-[10px] font-semibold transition-all border ${isActive
                                                                             ? `${meta.bg} ${meta.color} ${meta.border}`
                                                                             : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.03] border-transparent'
-                                                                    }`}
+                                                                        }`}
                                                                 >
                                                                     <Icon size={12} />
                                                                     {label}
@@ -1513,11 +1715,10 @@ export function DailySetClient() {
                                                                         id={cardIdx === 0 ? 'tour-problem-card' : undefined}
                                                                         key={id}
                                                                         onClick={() => handleProblemSelect(id!)}
-                                                                        className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${
-                                                                            isActive
+                                                                        className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${isActive
                                                                                 ? `${activeTabMeta.bg} ${activeTabMeta.border}`
                                                                                 : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'
-                                                                        }`}
+                                                                            }`}
                                                                     >
                                                                         <div className="flex justify-between items-center">
                                                                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
@@ -1525,9 +1726,8 @@ export function DailySetClient() {
                                                                             </span>
                                                                             <CheckCircle2 size={14} className={isSolved ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
                                                                         </div>
-                                                                        <div className={`text-sm font-medium transition-colors line-clamp-2 ${
-                                                                            isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'
-                                                                        }`}>
+                                                                        <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'
+                                                                            }`}>
                                                                             {pInfo.title}
                                                                         </div>
                                                                     </div>
@@ -1586,7 +1786,7 @@ export function DailySetClient() {
                                                         <div className="border-t border-[#202736]/50 pt-2">
                                                             <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Category</div>
                                                             <div className="flex flex-wrap gap-1">
-                                                                {[{val:'all',label:'All'},{val:'sql',label:'SQL'},{val:'python',label:'Python'},{val:'pyspark',label:'PySpark'},{val:'python_dsa',label:'DSA'}].map((cat) => (
+                                                                {[{ val: 'all', label: 'All' }, { val: 'sql', label: 'SQL' }, { val: 'python', label: 'Python' }, { val: 'pyspark', label: 'PySpark' }, { val: 'python_dsa', label: 'DSA' }].map((cat) => (
                                                                     <button
                                                                         key={cat.val}
                                                                         onClick={() => setTypeFilter(cat.val)}
@@ -1806,109 +2006,109 @@ export function DailySetClient() {
                                         </div>
 
                                         {!isDsaProblem && (
-                                        <div>
-                                            <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                                                <Database size={11} /> Datasets
-                                            </h3>
-                                            <div className="h-px w-full bg-[#202736] mb-3" />
-                                            {activeDatasets.map((ds, idx) => {
-                                                const colOrder = getColumnOrder(ds.schema_sql, ds.sample_rows[0], ds.seed_data_json);
-                                                return (
-                                                    <div key={idx} className="mb-6 last:mb-0 space-y-3">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="h-4 w-1 bg-[#4DD4C4] rounded-full" />
-                                                            <span className="text-xs font-bold text-zinc-300 font-mono uppercase tracking-wider">{ds.table_name}</span>
-                                                        </div>
-
-                                                        {/* Schema */}
-                                                        <div className="border border-[#202736] rounded-xl overflow-hidden max-w-sm bg-[#080c16] shadow-lg">
-                                                            <table className="w-full text-[10px] text-left border-collapse">
-                                                                <thead className="bg-[#131924] text-zinc-400">
-                                                                    <tr>
-                                                                        <th className="px-4 py-2.5 border-b border-[#202736] font-bold uppercase tracking-wider text-[9px]">Column</th>
-                                                                        <th className="px-4 py-2.5 border-b border-[#202736] font-bold uppercase tracking-wider text-[9px]">Type</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody className="divide-y divide-[#202736]/30">
-                                                                    {colOrder.map(col => (
-                                                                        <tr key={col} className="hover:bg-white/[0.02] transition-colors group">
-                                                                            <td className="px-4 py-2 font-mono font-medium text-zinc-300 group-hover:text-[#4DD4C4] transition-colors">{col}</td>
-                                                                            <td className="px-4 py-2">
-                                                                                <span className="bg-[#4DD4C4]/5 text-[#4DD4C4]/80 px-1.5 py-0.5 rounded border border-[#4DD4C4]/20 text-[8px] font-bold font-mono uppercase">
-                                                                                    {ds.column_types?.[col] || 'string'}
-                                                                                </span>
-                                                                            </td>
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-
-                                                        {/* Sample Data */}
-                                                        <div className="border border-[#202736] rounded-xl overflow-hidden shadow-2xl bg-[#080c16]">
-                                                            <div className="bg-[#131924] px-4 py-2 text-[9px] font-bold text-[#4DD4C4] uppercase tracking-widest border-b border-[#202736] flex items-center justify-between">
-                                                                <span className="flex items-center gap-2">
-                                                                    <div className="w-1 h-1 rounded-full bg-[#4DD4C4]" />
-                                                                    Sample Rows
-                                                                </span>
-                                                                <span className="text-[8px] text-zinc-500 font-normal">Showing first {ds.sample_rows.length} rows</span>
-                                                            </div>
-                                                            <div className="overflow-x-auto custom-scrollbar">
-                                                                <table className="w-full text-[10px] text-left border-collapse">
-                                                                    <thead className="bg-[#0b101c] text-zinc-500">
-                                                                        <tr>
-                                                                            {colOrder.map(h => (
-                                                                                <th key={h} className="px-4 py-2.5 border-b border-[#202736] font-mono font-bold text-[9px] uppercase tracking-wider">{h}</th>
-                                                                            ))}
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody className="divide-y divide-[#202736]/20">
-                                                                        {ds.sample_rows.map((row: any, i: number) => (
-                                                                            <tr key={i} className="hover:bg-[#4DD4C4]/5 transition-colors group">
-                                                                                {colOrder.map((col: string) => (
-                                                                                    <td key={col} className="px-4 py-2.5 text-zinc-400 font-mono group-hover:text-zinc-200 transition-colors">{row[col]?.toString() ?? ''}</td>
-                                                                                ))}
-                                                                            </tr>
-                                                                        ))}
-                                                                    </tbody>
-                                                                </table>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                        )}
-
-                                        {!isDsaProblem && (
-                                        <div>
-                                            <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Expected Output</h3>
-                                            <div className="h-px w-full bg-[#202736] mb-3" />
-                                            {(() => {
-                                                const output = executionResult?.expected || expectedOutput;
-                                                if (output && output.columns.length > 0) {
+                                            <div>
+                                                <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                                                    <Database size={11} /> Datasets
+                                                </h3>
+                                                <div className="h-px w-full bg-[#202736] mb-3" />
+                                                {activeDatasets.map((ds, idx) => {
+                                                    const colOrder = getColumnOrder(ds.schema_sql, ds.sample_rows[0], ds.seed_data_json);
                                                     return (
-                                                        <div className="border border-[#202736] rounded-xl overflow-hidden shadow-lg bg-[#080c16]">
-                                                            <div className="overflow-x-auto custom-scrollbar">
+                                                        <div key={idx} className="mb-6 last:mb-0 space-y-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="h-4 w-1 bg-[#4DD4C4] rounded-full" />
+                                                                <span className="text-xs font-bold text-zinc-300 font-mono uppercase tracking-wider">{ds.table_name}</span>
+                                                            </div>
+
+                                                            {/* Schema */}
+                                                            <div className="border border-[#202736] rounded-xl overflow-hidden max-w-sm bg-[#080c16] shadow-lg">
                                                                 <table className="w-full text-[10px] text-left border-collapse">
                                                                     <thead className="bg-[#131924] text-zinc-400">
-                                                                        <tr>{output.columns.map(h => <th key={h} className="px-4 py-2.5 border-b border-[#202736] font-mono font-bold text-[9px] uppercase tracking-wider">{h}</th>)}</tr>
+                                                                        <tr>
+                                                                            <th className="px-4 py-2.5 border-b border-[#202736] font-bold uppercase tracking-wider text-[9px]">Column</th>
+                                                                            <th className="px-4 py-2.5 border-b border-[#202736] font-bold uppercase tracking-wider text-[9px]">Type</th>
+                                                                        </tr>
                                                                     </thead>
-                                                                    <tbody className="divide-y divide-[#202736]/20">
-                                                                        {output.rows.map((row: any, i: number) => (
-                                                                            <tr key={i} className="hover:bg-green-400/[0.03] transition-colors group">
-                                                                                {row.map((cell: any, j: number) => <td key={j} className="px-4 py-2.5 text-green-400/80 font-mono group-hover:text-green-400 transition-colors">{cell?.toString()}</td>)}
+                                                                    <tbody className="divide-y divide-[#202736]/30">
+                                                                        {colOrder.map(col => (
+                                                                            <tr key={col} className="hover:bg-white/[0.02] transition-colors group">
+                                                                                <td className="px-4 py-2 font-mono font-medium text-zinc-300 group-hover:text-[#4DD4C4] transition-colors">{col}</td>
+                                                                                <td className="px-4 py-2">
+                                                                                    <span className="bg-[#4DD4C4]/5 text-[#4DD4C4]/80 px-1.5 py-0.5 rounded border border-[#4DD4C4]/20 text-[8px] font-bold font-mono uppercase">
+                                                                                        {ds.column_types?.[col] || 'string'}
+                                                                                    </span>
+                                                                                </td>
                                                                             </tr>
                                                                         ))}
                                                                     </tbody>
                                                                 </table>
+                                                            </div>
+
+                                                            {/* Sample Data */}
+                                                            <div className="border border-[#202736] rounded-xl overflow-hidden shadow-2xl bg-[#080c16]">
+                                                                <div className="bg-[#131924] px-4 py-2 text-[9px] font-bold text-[#4DD4C4] uppercase tracking-widest border-b border-[#202736] flex items-center justify-between">
+                                                                    <span className="flex items-center gap-2">
+                                                                        <div className="w-1 h-1 rounded-full bg-[#4DD4C4]" />
+                                                                        Sample Rows
+                                                                    </span>
+                                                                    <span className="text-[8px] text-zinc-500 font-normal">Showing first {ds.sample_rows.length} rows</span>
+                                                                </div>
+                                                                <div className="overflow-x-auto custom-scrollbar">
+                                                                    <table className="w-full text-[10px] text-left border-collapse">
+                                                                        <thead className="bg-[#0b101c] text-zinc-500">
+                                                                            <tr>
+                                                                                {colOrder.map(h => (
+                                                                                    <th key={h} className="px-4 py-2.5 border-b border-[#202736] font-mono font-bold text-[9px] uppercase tracking-wider">{h}</th>
+                                                                                ))}
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-[#202736]/20">
+                                                                            {ds.sample_rows.map((row: any, i: number) => (
+                                                                                <tr key={i} className="hover:bg-[#4DD4C4]/5 transition-colors group">
+                                                                                    {colOrder.map((col: string) => (
+                                                                                        <td key={col} className="px-4 py-2.5 text-zinc-400 font-mono group-hover:text-zinc-200 transition-colors">{row[col]?.toString() ?? ''}</td>
+                                                                                    ))}
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     );
-                                                }
-                                                return <div className="p-3 bg-[#131924] rounded-lg border border-[#202736] text-xs text-zinc-500 font-mono italic">Loading...</div>;
-                                            })()}
-                                        </div>
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {!isDsaProblem && (
+                                            <div>
+                                                <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Expected Output</h3>
+                                                <div className="h-px w-full bg-[#202736] mb-3" />
+                                                {(() => {
+                                                    const output = executionResult?.expected || expectedOutput;
+                                                    if (output && output.columns.length > 0) {
+                                                        return (
+                                                            <div className="border border-[#202736] rounded-xl overflow-hidden shadow-lg bg-[#080c16]">
+                                                                <div className="overflow-x-auto custom-scrollbar">
+                                                                    <table className="w-full text-[10px] text-left border-collapse">
+                                                                        <thead className="bg-[#131924] text-zinc-400">
+                                                                            <tr>{output.columns.map(h => <th key={h} className="px-4 py-2.5 border-b border-[#202736] font-mono font-bold text-[9px] uppercase tracking-wider">{h}</th>)}</tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-[#202736]/20">
+                                                                            {output.rows.map((row: any, i: number) => (
+                                                                                <tr key={i} className="hover:bg-green-400/[0.03] transition-colors group">
+                                                                                    {row.map((cell: any, j: number) => <td key={j} className="px-4 py-2.5 text-green-400/80 font-mono group-hover:text-green-400 transition-colors">{cell?.toString()}</td>)}
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return <div className="p-3 bg-[#131924] rounded-lg border border-[#202736] text-xs text-zinc-500 font-mono italic">Loading...</div>;
+                                                })()}
+                                            </div>
                                         )}
 
                                         {hintText && (
@@ -2228,20 +2428,67 @@ export function DailySetClient() {
 
                                 <div className="flex flex-col bg-[#0d121c] shrink-0 overflow-hidden" style={{ height: outputHeight }}>
                                     <div className="h-10 border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0">
-                                        <span className="text-xs font-bold uppercase tracking-widest text-white font-mono flex items-center gap-2">
-                                            <TerminalSquare size={14} /> {isDsaProblem ? 'Test Results' : 'Query Output'}
-                                        </span>
-                                        <span className={`text-xs font-bold font-mono flex items-center gap-1.5 ${
-                                            executionResult?.status === 'correct' ? 'text-green-400' :
-                                            executionResult?.status === 'incorrect' ? 'text-red-400' :
-                                            executionResult?.status === 'run_result' ? 'text-[#4DD4C4]' :
-                                            'text-zinc-400'
-                                        }`}>
-                                            {executionResult?.status === 'correct' ? <><CheckCircle2 size={14} /> {isDsaProblem ? `All Tests Passed` : `Success (${executionResult.user?.execution_time_ms}ms)`}</> :
-                                                executionResult?.status === 'incorrect' ? <><XCircle size={14} /> {isDsaProblem ? `Tests Failed` : `Incorrect Result`}</> :
-                                                executionResult?.status === 'run_result' ? <><Play size={12} fill="currentColor" /> Sample Tests</> :
-                                                    error ? <><AlertCircle size={14} /> Execution Error</> :
-                                                        "Executing..."}
+                                        {isDsaProblem ? (
+                                            <div className="flex items-center h-full">
+                                                <button
+                                                    onClick={() => setActiveOutputTab('test')}
+                                                    className={`h-full px-4 text-xs font-mono font-bold border-b-2 flex items-center gap-1.5 transition-all ${activeOutputTab === 'test'
+                                                            ? 'border-[#4DD4C4] text-[#4DD4C4] bg-[#4DD4C4]/5'
+                                                            : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                                                        }`}
+                                                >
+                                                    <TerminalSquare size={13} /> Test Results
+                                                </button>
+                                                <button
+                                                    onClick={() => setActiveOutputTab('submit')}
+                                                    className={`h-full px-4 text-xs font-mono font-bold border-b-2 flex items-center gap-1.5 transition-all ${activeOutputTab === 'submit'
+                                                            ? 'border-[#4DD4C4] text-[#4DD4C4] bg-[#4DD4C4]/5'
+                                                            : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                                                        }`}
+                                                >
+                                                    <Sparkles size={13} /> Submission
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs font-bold uppercase tracking-widest text-white font-mono flex items-center gap-2">
+                                                <TerminalSquare size={14} /> Query Output
+                                            </span>
+                                        )}
+                                        <span className={`text-xs font-bold font-mono flex items-center gap-1.5 ${isDsaProblem ? (
+                                                activeOutputTab === 'test' ? (
+                                                    executionResult?.test_summary
+                                                        ? (executionResult.test_summary.results.filter(r => !r.is_hidden).every(r => r.passed) ? 'text-green-400' : 'text-red-400')
+                                                        : 'text-zinc-400'
+                                                ) : (
+                                                    executionResult && executionResult.status !== 'run_result'
+                                                        ? (executionResult.status === 'correct' ? 'text-green-400' : 'text-red-400')
+                                                        : 'text-zinc-400'
+                                                )
+                                            ) : (
+                                                executionResult?.status === 'correct' ? 'text-green-400' :
+                                                    executionResult?.status === 'incorrect' ? 'text-red-400' : 'text-zinc-400'
+                                            )
+                                            }`}>
+                                            {isDsaProblem ? (
+                                                activeOutputTab === 'test' ? (
+                                                    executionResult?.test_summary ? (
+                                                        executionResult.test_summary.results.filter(r => !r.is_hidden).every(r => r.passed)
+                                                            ? <><CheckCircle2 size={14} /> All Samples Passed</>
+                                                            : <><XCircle size={14} /> Samples Failed</>
+                                                    ) : isRunning ? "Executing..." : "Ready"
+                                                ) : (
+                                                    executionResult && executionResult.status !== 'run_result' ? (
+                                                        executionResult.status === 'correct'
+                                                            ? <><CheckCircle2 size={14} /> Submission Accepted</>
+                                                            : <><XCircle size={14} /> Submission Failed</>
+                                                    ) : isRunning ? "Executing..." : "No Submission"
+                                                )
+                                            ) : (
+                                                executionResult?.status === 'correct' ? <><CheckCircle2 size={14} /> Success ({executionResult.user?.execution_time_ms}ms)</> :
+                                                    executionResult?.status === 'incorrect' ? <><XCircle size={14} /> Incorrect Result</> :
+                                                        error ? <><AlertCircle size={14} /> Execution Error</> :
+                                                            "Executing..."
+                                            )}
                                         </span>
                                     </div>
 
@@ -2280,64 +2527,7 @@ export function DailySetClient() {
                                                 <div className="p-4 bg-[#080c16] border border-red-500/20 rounded-lg text-red-200/90 leading-relaxed whitespace-pre-wrap">{error}</div>
                                             </div>
                                         ) : isDsaProblem && executionResult?.test_summary ? (
-                                            // ── DSA Test Case Results Panel ──
-                                            <div className="space-y-2">
-                                                <div className="flex items-center gap-3 mb-3">
-                                                    <div className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                                                        executionResult.status === 'correct' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                                                        'bg-red-500/10 text-red-400 border border-red-500/20'
-                                                    }`}>
-                                                        {executionResult.test_summary.passed} / {executionResult.test_summary.total} passed
-                                                    </div>
-                                                    {executionResult.status === 'run_result' && (
-                                                        <span className="text-[10px] text-zinc-500 italic">Sample test cases only · Press Submit to run all tests</span>
-                                                    )}
-                                                </div>
-                                                {executionResult.test_summary.results.map((tc, idx) => (
-                                                    <div
-                                                        key={idx}
-                                                        className={`rounded-lg border p-3 text-xs font-mono flex flex-col gap-1.5 ${
-                                                            tc.passed
-                                                                ? 'bg-green-500/5 border-green-500/20'
-                                                                : 'bg-red-500/5 border-red-500/20'
-                                                        }`}
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            {tc.passed
-                                                                ? <CheckCircle2 size={12} className="text-green-400 shrink-0" />
-                                                                : <XCircle size={12} className="text-red-400 shrink-0" />}
-                                                            <span className={`font-bold ${ tc.passed ? 'text-green-400' : 'text-red-400'}`}>
-                                                                {tc.label ? tc.label : `Case ${idx + 1}`}
-                                                            </span>
-                                                            {tc.is_hidden && (
-                                                                <span className="ml-auto text-[9px] text-zinc-600 uppercase tracking-wider border border-[#202736] rounded px-1.5 py-0.5">Hidden</span>
-                                                            )}
-                                                        </div>
-                                                        {!tc.is_hidden && !tc.passed && (
-                                                            <>
-                                                                {tc.got !== undefined && (
-                                                                    <div className="flex gap-2 text-[10px]">
-                                                                        <span className="text-zinc-500 w-16 shrink-0">Got:</span>
-                                                                        <span className="text-red-300 break-all">{JSON.stringify(tc.got)}</span>
-                                                                    </div>
-                                                                )}
-                                                                {tc.expected !== undefined && tc.expected !== 'hidden' && (
-                                                                    <div className="flex gap-2 text-[10px]">
-                                                                        <span className="text-zinc-500 w-16 shrink-0">Expected:</span>
-                                                                        <span className="text-green-300 break-all">{JSON.stringify(tc.expected)}</span>
-                                                                    </div>
-                                                                )}
-                                                                {tc.error && (
-                                                                    <div className="flex gap-2 text-[10px]">
-                                                                        <span className="text-zinc-500 w-16 shrink-0">Error:</span>
-                                                                        <span className="text-red-300 break-all">{tc.error}</span>
-                                                                    </div>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
+                                            renderDsaPanel()
                                         ) : executionResult?.user ? (
                                             <div className="rounded-xl border border-[#202736] overflow-hidden bg-[#080c16] shadow-2xl">
                                                 <div className="overflow-x-auto custom-scrollbar">
@@ -2385,11 +2575,10 @@ export function DailySetClient() {
                                             <button
                                                 onClick={handleSubmit}
                                                 disabled={!activeProblemId || isRunning}
-                                                className={`px-6 py-2 rounded text-xs font-bold transition-all flex items-center gap-1.5 ${
-                                                    !activeProblemId || isRunning
+                                                className={`px-6 py-2 rounded text-xs font-bold transition-all flex items-center gap-1.5 ${!activeProblemId || isRunning
                                                         ? 'bg-[#18212f] text-zinc-500 cursor-not-allowed border border-[#202736]'
                                                         : 'bg-[#4DD4C4] text-[#080C16] hover:bg-[#3dbdb0] shadow-[0_0_10px_rgba(77,212,196,0.2)]'
-                                                }`}
+                                                    }`}
                                             >
                                                 {isRunning ? <Loader2 size={12} className="animate-spin" /> : <UploadCloud size={12} />}
                                                 SUBMIT ALL

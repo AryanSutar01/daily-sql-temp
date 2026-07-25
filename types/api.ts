@@ -8,6 +8,7 @@ export interface TestCaseResult {
     passed: boolean;
     label?: string | null;
     is_hidden: boolean;
+    input_data?: any;
     got?: any;
     expected: any | "hidden" | "✓ correct";
     error?: string | null;
