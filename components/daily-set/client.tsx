@@ -366,6 +366,16 @@ export function DailySetClient() {
                     console.error("Failed to load problem metadata from API", err);
                 }
             }
+            if (p) {
+                const pType = p.challenge_type || 'sql';
+                if (pType === 'python_dsa' || pType === 'python') {
+                    setActiveDisciplineTab('python');
+                } else if (pType === 'pyspark') {
+                    setActiveDisciplineTab('pyspark');
+                } else if (pType === 'sql') {
+                    setActiveDisciplineTab('sql');
+                }
+            }
             const isDsa = p?.challenge_type === 'python_dsa';
 
             const [datasets, savedSol] = await Promise.all([
@@ -463,8 +473,17 @@ export function DailySetClient() {
                 if (urlTab === 'today' || urlTab === 'list') {
                     setActiveSidebarTab(urlTab as 'today' | 'list');
                 } else if (urlProblemId && daily) {
-                    const isDaily = [daily.easy, daily.medium, daily.advanced].includes(urlProblemId);
-                    setActiveSidebarTab(isDaily ? 'today' : 'list');
+                    const isSql = [daily.easy, daily.medium, daily.advanced].includes(urlProblemId);
+                    const isPython = [daily.python_easy, daily.python_medium, daily.python_advanced, daily.dsa_easy, daily.dsa_medium, daily.dsa_advanced].includes(urlProblemId);
+                    const isPyspark = [daily.pyspark_easy, daily.pyspark_medium, daily.pyspark_advanced].includes(urlProblemId);
+                    if (isSql || isPython || isPyspark) {
+                        setActiveSidebarTab('today');
+                        if (isSql) setActiveDisciplineTab('sql');
+                        else if (isPython) setActiveDisciplineTab('python');
+                        else if (isPyspark) setActiveDisciplineTab('pyspark');
+                    } else {
+                        setActiveSidebarTab('list');
+                    }
                 }
                 // Fetch solved IDs only when authenticated
                 if (isAuthed) {
@@ -499,9 +518,15 @@ export function DailySetClient() {
         if (urlProblemId) {
             loadProblemData(urlProblemId);
         } else {
-            // Auto-select first problem if on today's set
             if (activeSidebarTab === 'today' && dailySet) {
-                const firstId = dailySet.easy || dailySet.medium || dailySet.advanced;
+                let firstId: string | null | undefined = null;
+                if (activeDisciplineTab === 'python') {
+                    firstId = dailySet.python_easy || dailySet.python_medium || dailySet.python_advanced || dailySet.dsa_easy || dailySet.dsa_medium || dailySet.dsa_advanced;
+                } else if (activeDisciplineTab === 'pyspark') {
+                    firstId = dailySet.pyspark_easy || dailySet.pyspark_medium || dailySet.pyspark_advanced;
+                } else {
+                    firstId = dailySet.easy || dailySet.medium || dailySet.advanced;
+                }
                 if (firstId) {
                     router.replace(`/practice/daily/${firstId}?tab=today${sidebarCollapsed ? '&collapsed=true' : ''}`);
                     return;
@@ -510,7 +535,7 @@ export function DailySetClient() {
             setActiveProblemId(null);
             setViewingDetails(false);
         }
-    }, [urlProblemId, isLoading, loadProblemData, activeSidebarTab, dailySet, router]);
+    }, [urlProblemId, isLoading, loadProblemData, activeSidebarTab, dailySet, router, activeDisciplineTab]);
 
     // Timer tick
     useEffect(() => {
@@ -714,7 +739,10 @@ export function DailySetClient() {
         const matchesDifficulty = difficultyFilter === 'all' || p.difficulty.toLowerCase() === difficultyFilter.toLowerCase();
 
         const pType = p.challenge_type || 'sql';
-        const matchesType = typeFilter === 'all' || pType.toLowerCase() === typeFilter.toLowerCase();
+        const matchesType = typeFilter === 'all' || 
+            (typeFilter === 'python' 
+                ? (pType.toLowerCase() === 'python' || pType.toLowerCase() === 'python_dsa')
+                : pType.toLowerCase() === typeFilter.toLowerCase());
 
         const isSolved = solvedIds.has(p.id);
         const matchesStatus = statusFilter === 'all' ||
