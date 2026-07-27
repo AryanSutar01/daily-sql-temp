@@ -30,10 +30,10 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
 
 export const api = {
     // Execution
-    execute: (problem_id: string, query: string) =>
+    execute: (problem_id: string, query: string, mode: 'run' | 'submit' = 'submit') =>
         fetchApi<ExecutionResponse>('/execute', {
             method: 'POST',
-            body: JSON.stringify({ problem_id, query }),
+            body: JSON.stringify({ problem_id, query, mode }),
         }),
 
     // Daily Practice

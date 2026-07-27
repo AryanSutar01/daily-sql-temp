@@ -91,7 +91,7 @@ interface ScheduleEntry {
 }
 
 type Tab = 'problems' | 'create' | 'schedule' | 'feedback' | 'members' | 'analytics';
-type CreateStep = 'problem' | 'datasets' | 'solution' | 'preview' | 'done';
+type CreateStep = 'problem' | 'datasets' | 'test-cases' | 'solution' | 'preview' | 'done';
 
 export default function AdminDashboard() {
     const [secret, setSecret] = useState("");
@@ -153,9 +153,15 @@ export default function AdminDashboard() {
         table_name: "", schema_sql: "", seed_sql: "", column_types: "", seed_data_json: ""
     });
     const [solutionForm, setSolutionForm] = useState({
-        reference_query: "", reference_code: "", order_sensitive: false, notes: ""
+        reference_query: "", reference_code: "", function_name: "", starter_code: "", order_sensitive: false, notes: ""
     });
     const [wizardDatasets, setWizardDatasets] = useState<any[]>([]);
+    const [testCases, setTestCases] = useState<any[]>([]);
+    const [testCaseTab, setTestCaseTab] = useState<'single'|'bulk'>('single');
+    const [bulkTestCases, setBulkTestCases] = useState<string>('');
+    const [testCaseForm, setTestCaseForm] = useState({
+        input_data: "", expected: "", is_hidden: true, label: "", order_index: 0
+    });
     const [scheduleForm, setScheduleForm] = useState({
         date: new Date().toISOString().split('T')[0],
         easy_problem_id: "",
@@ -166,7 +172,10 @@ export default function AdminDashboard() {
         python_advanced_problem_id: "",
         pyspark_easy_problem_id: "",
         pyspark_medium_problem_id: "",
-        pyspark_advanced_problem_id: ""
+        pyspark_advanced_problem_id: "",
+        dsa_easy_problem_id: "",
+        dsa_medium_problem_id: "",
+        dsa_advanced_problem_id: ""
     });
 
     // Feedback
@@ -295,7 +304,16 @@ export default function AdminDashboard() {
             if (probRes.ok) {
                 const p = await probRes.json();
                 setSelectedProblem(p);
-                setEditForm({ ...p, solution: p.solution || { reference_query: '', order_sensitive: false, notes: '' } });
+                setEditForm({ ...p, solution: p.solution || { reference_query: '', reference_code: '', function_name: '', order_sensitive: false, notes: '' } });
+                
+                // Fetch test cases if python_dsa
+                if (p?.challenge_type === 'python_dsa') {
+                    const tcRes = await fetchWithAuth(`${API_URL}/admin/problems/${id}/test-cases`);
+                    if (tcRes.ok) {
+                        const tcData = await tcRes.json();
+                        setTestCases(tcData);
+                    }
+                }
             }
 
             const comRes = await fetchWithAuth(`${API_URL}/admin/problems/${id}/comments`);
@@ -400,6 +418,9 @@ export default function AdminDashboard() {
                 bodyPayload.reference_query = editForm.solution.reference_query;
             } else {
                 bodyPayload.reference_code = editForm.solution.reference_code;
+                if (editForm.challenge_type === 'python_dsa') {
+                    bodyPayload.function_name = editForm.solution.function_name;
+                }
             }
 
             const res = await fetchWithAuth(`${API_URL}/admin/problems/${selectedProblem.id}/solution`, {
@@ -633,7 +654,11 @@ export default function AdminDashboard() {
             const data = await res.json();
             if (res.ok) {
                 if (!isUpdate) setCreatedProblemId(data.problem_id);
-                setCreateStep('datasets');
+                if (problemForm.challenge_type === 'python_dsa') {
+                    setCreateStep('test-cases');
+                } else {
+                    setCreateStep('datasets');
+                }
                 showToast('success', isUpdate ? 'Problem details updated!' : `Problem created! ID: ${data.problem_id.slice(0, 8)}...`);
                 loadProblems();
             } else {
@@ -716,13 +741,17 @@ export default function AdminDashboard() {
         try {
             const bodyPayload: any = {
                 order_sensitive: solutionForm.order_sensitive,
-                notes: solutionForm.notes
+                notes: solutionForm.notes,
+                ...(problemForm.challenge_type !== 'sql' ? { starter_code: solutionForm.starter_code } : {}),
             };
 
             if (problemForm.challenge_type === 'sql') {
                 bodyPayload.reference_query = solutionForm.reference_query;
             } else {
                 bodyPayload.reference_code = solutionForm.reference_code;
+                if (problemForm.challenge_type === 'python_dsa') {
+                    bodyPayload.function_name = solutionForm.function_name;
+                }
             }
 
             const res = await fetchWithAuth(`${API_URL}/admin/problems/${createdProblemId}/solution`, {
@@ -735,6 +764,123 @@ export default function AdminDashboard() {
             } else {
                 const data = await res.json();
                 showToast('error', data.detail || 'Failed to save solution');
+            }
+        } catch (e: any) { showToast('error', e.message); }
+        setLoading(false);
+    };
+
+    // TEST CASES CRUD
+    const loadTestCases = async (problemId: string) => {
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/problems/${problemId}/test-cases`);
+            if (res.ok) {
+                setTestCases(await res.json());
+            }
+        } catch (e) { console.error(e); }
+    };
+    const handleAddTestCase = async () => {
+        if (!createdProblemId) return;
+        setLoading(true);
+        try {
+            // Auto-wrap array input in {"args": ...} if the user didn't write it themselves
+            let parsedInput = JSON.parse(testCaseForm.input_data);
+            if (Array.isArray(parsedInput)) {
+                parsedInput = { args: parsedInput };
+            }
+
+            const payload = {
+                input_data: parsedInput,
+                expected: JSON.parse(testCaseForm.expected),
+                is_hidden: testCaseForm.is_hidden,
+                label: testCaseForm.label || null,
+                order_index: parseInt(String(testCaseForm.order_index)) || testCases.length + 1
+            };
+
+            const res = await fetchWithAuth(`${API_URL}/admin/problems/${createdProblemId}/test-cases`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                showToast('success', 'Test case added successfully!');
+                setTestCaseForm({ input_data: "", expected: "", is_hidden: true, label: "", order_index: payload.order_index + 1 });
+                loadTestCases(createdProblemId);
+            } else {
+                const data = await res.json();
+                showToast('error', data.detail || 'Failed to add testcase');
+            }
+        } catch (err: any) {
+            showToast('error', `Invalid JSON: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBulkAddTestCases = async () => {
+        if (!createdProblemId) return;
+        setLoading(true);
+        try {
+            const parsedArray = JSON.parse(bulkTestCases);
+            if (!Array.isArray(parsedArray)) {
+                throw new Error("Bulk input must be a JSON array of test cases.");
+            }
+
+            const payload = parsedArray.map((tc, idx) => {
+                let parsedInput = tc.input_data;
+                if (Array.isArray(parsedInput)) {
+                    parsedInput = { args: parsedInput };
+                } else if (typeof parsedInput === 'string') {
+                    // Try parsing if they provided stringified JSON
+                    const parsedStr = JSON.parse(parsedInput);
+                    if (Array.isArray(parsedStr)) parsedInput = { args: parsedStr };
+                    else parsedInput = parsedStr;
+                }
+
+                return {
+                    input_data: parsedInput,
+                    expected: tc.expected,
+                    is_hidden: tc.is_hidden ?? true,
+                    label: tc.label || `Bulk Case ${testCases.length + idx + 1}`,
+                    order_index: tc.order_index ?? (testCases.length + idx + 1)
+                };
+            });
+
+            const res = await fetchWithAuth(`${API_URL}/admin/problems/${createdProblemId}/test-cases/bulk`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                showToast('success', `Added ${data.inserted_count} test cases successfully!`);
+                setBulkTestCases("");
+                loadTestCases(createdProblemId);
+            } else {
+                const data = await res.json();
+                showToast('error', data.detail || 'Failed to bulk add testcases');
+            }
+        } catch (err: any) {
+            showToast('error', `Invalid JSON or missing fields: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteTestCase = async (tcId: string) => {
+        if (!createdProblemId) return;
+        setLoading(true);
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/problems/${createdProblemId}/test-cases/${tcId}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                showToast('success', 'Test case deleted');
+                loadTestCases(createdProblemId);
+            } else {
+                const data = await res.json();
+                showToast('error', data.detail || 'Failed to delete testcase');
             }
         } catch (e: any) { showToast('error', e.message); }
         setLoading(false);
@@ -755,6 +901,9 @@ export default function AdminDashboard() {
                 pyspark_easy_problem_id: scheduleForm.pyspark_easy_problem_id || null,
                 pyspark_medium_problem_id: scheduleForm.pyspark_medium_problem_id || null,
                 pyspark_advanced_problem_id: scheduleForm.pyspark_advanced_problem_id || null,
+                dsa_easy_problem_id: scheduleForm.dsa_easy_problem_id || null,
+                dsa_medium_problem_id: scheduleForm.dsa_medium_problem_id || null,
+                dsa_advanced_problem_id: scheduleForm.dsa_advanced_problem_id || null,
             };
             const res = await fetchWithAuth(`${API_URL}/admin/daily-practice`, {
                 method: 'POST',
@@ -776,7 +925,10 @@ export default function AdminDashboard() {
         setCreatedProblemId(null);
         setProblemForm({ title: "", difficulty: "easy", description: "", estimated_time_minutes: 15, challenge_type: "sql" });
         setDatasetForm({ table_name: "", schema_sql: "", seed_sql: "", column_types: "", seed_data_json: "" });
-        setSolutionForm({ reference_query: "", reference_code: "", order_sensitive: false, notes: "" });
+        setSolutionForm({ reference_query: "", reference_code: "", function_name: "", starter_code: "", order_sensitive: false, notes: "" });
+        setWizardDatasets([]);
+        setTestCases([]);
+        setTestCaseForm({ input_data: "", expected: "", is_hidden: true, label: "", order_index: 0 });
     };
 
     const handleAddMember = async () => {
@@ -1289,13 +1441,22 @@ export default function AdminDashboard() {
                     <div className="max-w-3xl mx-auto space-y-8">
                         {/* Stepper */}
                         <div className="flex items-center justify-center gap-2">
-                            {['problem', 'datasets', 'solution', 'preview', 'done'].map((step, i) => (
+                            {(problemForm.challenge_type === 'python_dsa'
+                                ? ['problem', 'test-cases', 'solution', 'preview', 'done']
+                                : ['problem', 'datasets', 'solution', 'preview', 'done']
+                            ).map((step, i) => (
                                 <div key={step} className="flex items-center">
                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${createStep === step ? 'bg-[#4DD4C4] text-black' :
-                                        ['problem', 'datasets', 'solution', 'preview', 'done'].indexOf(createStep) > i ? 'bg-green-500 text-white' :
+                                        (problemForm.challenge_type === 'python_dsa'
+                                            ? ['problem', 'test-cases', 'solution', 'preview', 'done']
+                                            : ['problem', 'datasets', 'solution', 'preview', 'done']
+                                        ).indexOf(createStep) > i ? 'bg-green-500 text-white' :
                                             'bg-[#202736] text-zinc-500'
                                         }`}>
-                                        {['problem', 'datasets', 'solution', 'preview', 'done'].indexOf(createStep) > i ? <CheckCircle2 size={16} /> : i + 1}
+                                        {(problemForm.challenge_type === 'python_dsa'
+                                            ? ['problem', 'test-cases', 'solution', 'preview', 'done']
+                                            : ['problem', 'datasets', 'solution', 'preview', 'done']
+                                        ).indexOf(createStep) > i ? <CheckCircle2 size={16} /> : i + 1}
                                     </div>
                                     {i < 4 && <ChevronRight size={16} className="mx-2 text-zinc-600" />}
                                 </div>
@@ -1304,7 +1465,8 @@ export default function AdminDashboard() {
                         <div className="text-center text-sm text-zinc-500">
                             {createStep === 'problem' && 'Step 1: Define the problem'}
                             {createStep === 'datasets' && 'Step 2: Add table schemas'}
-                            {createStep === 'solution' && 'Step 3: Set reference query'}
+                            {createStep === 'test-cases' && 'Step 2: Add test cases'}
+                            {createStep === 'solution' && 'Step 3: Set reference query/code'}
                             {createStep === 'preview' && 'Step 4: Preview & Verify'}
                             {createStep === 'done' && '✓ Problem published!'}
                         </div>
@@ -1323,6 +1485,7 @@ export default function AdminDashboard() {
                                     <option value="sql">SQL Challenge</option>
                                     <option value="python">Python (Pandas) Challenge</option>
                                     <option value="pyspark">PySpark Challenge</option>
+                                    <option value="python_dsa">Python DSA (Algorithms & Data Structures)</option>
                                 </select>
                                 <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-32 text-white focus:border-[#4DD4C4] focus:outline-none" placeholder="Problem description (supports Markdown)..." value={problemForm.description} onChange={e => setProblemForm({ ...problemForm, description: e.target.value })} />
                                 <div className="flex gap-4">
@@ -1363,23 +1526,160 @@ export default function AdminDashboard() {
                             </div>
                         )}
 
+                        {/* Step 2.5: Test Cases (DSA only) */}
+                        {createStep === 'test-cases' && (
+                            <div className="bg-[#121826] p-6 rounded-xl border border-[#202736] space-y-4">
+                                <h2 className="text-xl font-bold flex items-center gap-2"><Database size={20} className="text-[#4DD4C4]" /> Add Test Cases</h2>
+                                <p className="text-sm text-zinc-500">Add test cases for this problem. You can specify inputs and expected outputs.</p>
+                                
+                                <div className="space-y-3 p-4 bg-[#0b101c] rounded-lg border border-[#202736]/60">
+                                    <div className="flex gap-4 border-b border-[#202736] pb-2 mb-4">
+                                        <button onClick={() => setTestCaseTab('single')} className={`text-sm font-bold pb-2 -mb-2.5 transition-colors ${testCaseTab === 'single' ? 'text-[#4DD4C4] border-b-2 border-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}>Single</button>
+                                        <button onClick={() => setTestCaseTab('bulk')} className={`text-sm font-bold pb-2 -mb-2.5 transition-colors ${testCaseTab === 'bulk' ? 'text-[#4DD4C4] border-b-2 border-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}>Bulk JSON</button>
+                                    </div>
+
+                                    {testCaseTab === 'single' ? (
+                                        <>
+                                            <input 
+                                                className="w-full bg-[#121826] border border-[#202736] p-2.5 rounded text-xs text-white" 
+                                                placeholder="Label / Title (e.g. Example 1)" 
+                                                value={testCaseForm.label} 
+                                                onChange={e => setTestCaseForm({ ...testCaseForm, label: e.target.value })} 
+                                            />
+                                            
+                                            <div>
+                                                <label className="block text-[10px] text-zinc-500 mb-1">Input arguments (JSON Array e.g. <span className="text-[#4DD4C4]">[[2,7,11,15], 9]</span>)</label>
+                                                <textarea 
+                                                    className="w-full bg-[#121826] border border-[#202736] p-2.5 rounded font-mono text-xs text-white h-16 focus:outline-none focus:border-[#4DD4C4]" 
+                                                    placeholder={`[[2, 7, 11, 15], 9]`}
+                                                    value={testCaseForm.input_data} 
+                                                    onChange={e => setTestCaseForm({ ...testCaseForm, input_data: e.target.value })} 
+                                                />
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block text-[10px] text-zinc-500 mb-1">Expected return value JSON (e.g. [0, 1] or true or 42)</label>
+                                                <textarea 
+                                                    className="w-full bg-[#121826] border border-[#202736] p-2.5 rounded font-mono text-xs text-white h-16 focus:outline-none focus:border-[#4DD4C4]" 
+                                                    placeholder={`[0, 1]`}
+                                                    value={testCaseForm.expected} 
+                                                    onChange={e => setTestCaseForm({ ...testCaseForm, expected: e.target.value })} 
+                                                />
+                                            </div>
+
+                                            <div className="flex gap-4">
+                                                <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={testCaseForm.is_hidden} 
+                                                        onChange={e => setTestCaseForm({ ...testCaseForm, is_hidden: e.target.checked })} 
+                                                        className="rounded border-[#202736]"
+                                                    />
+                                                    Hidden test case (used for grading, not shown to user unless failed)
+                                                </label>
+                                                <input 
+                                                    type="number" 
+                                                    className="w-20 bg-[#121826] border border-[#202736] p-1 rounded text-xs text-white" 
+                                                    placeholder="Order" 
+                                                    value={testCaseForm.order_index || testCases.length + 1} 
+                                                    onChange={e => setTestCaseForm({ ...testCaseForm, order_index: parseInt(e.target.value) || 0 })} 
+                                                />
+                                            </div>
+
+                                            <Button onClick={handleAddTestCase} disabled={loading || !testCaseForm.input_data || !testCaseForm.expected} className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold text-xs mt-2">
+                                                Add Test Case
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div>
+                                                <label className="block text-[10px] text-zinc-500 mb-1">Paste a JSON array of test cases. You don't need to specify {"{"}args: ...{"}"}.</label>
+                                                <textarea 
+                                                    className="w-full bg-[#121826] border border-[#202736] p-2.5 rounded font-mono text-[10px] text-white h-64 focus:outline-none focus:border-[#4DD4C4] custom-scrollbar" 
+                                                    placeholder={`[\n  {\n    "input_data": [[2, 7, 11, 15], 9],\n    "expected": [0, 1],\n    "is_hidden": false,\n    "label": "Example 1"\n  },\n  {\n    "input_data": [[3, 2, 4], 6],\n    "expected": [1, 2],\n    "is_hidden": true\n  }\n]`}
+                                                    value={bulkTestCases} 
+                                                    onChange={e => setBulkTestCases(e.target.value)} 
+                                                />
+                                            </div>
+                                            <Button onClick={handleBulkAddTestCases} disabled={loading || !bulkTestCases} className="w-full bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-xs mt-2">
+                                                Bulk Add Test Cases
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
+
+
+                                <div className="space-y-2 mt-4">
+                                    <h3 className="text-sm font-semibold text-white">Added Test Cases ({testCases.length})</h3>
+                                    {testCases.length === 0 && <p className="text-xs text-zinc-500">No test cases added yet.</p>}
+                                    <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                                        {testCases.map((tc, idx) => (
+                                            <div key={tc.id || idx} className="bg-[#0b101c] p-3 rounded-lg border border-[#202736] flex items-center justify-between text-xs font-mono">
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-white">{tc.label || `Test Case #${idx + 1}`}</span>
+                                                        <span className={`text-[9px] px-1.5 py-0.2 rounded border ${tc.is_hidden ? 'bg-purple-950/40 text-purple-400 border-purple-900/50' : 'bg-green-950/40 text-green-400 border-green-900/50'}`}>
+                                                            {tc.is_hidden ? 'Hidden' : 'Sample'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-zinc-500">Input: <span className="text-zinc-300">{JSON.stringify(tc.input_data)}</span></div>
+                                                    <div className="text-zinc-500">Expected: <span className="text-[#4DD4C4]">{JSON.stringify(tc.expected)}</span></div>
+                                                </div>
+                                                <button onClick={() => handleDeleteTestCase(tc.id)} className="text-zinc-500 hover:text-red-400"><Trash2 size={14} /></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <Button onClick={() => setCreateStep('solution')} className="w-full border border-[#4DD4C4] text-[#4DD4C4] hover:bg-[#4DD4C4]/10 bg-transparent font-bold">
+                                    Continue to Solution →
+                                </Button>
+                            </div>
+                        )}
+
                         {/* Step 3: Solution */}
                         {createStep === 'solution' && (
                             <div className="bg-[#121826] p-6 rounded-xl border border-[#202736] space-y-4">
                                 <h2 className="text-xl font-bold flex items-center gap-2"><Code size={20} className="text-[#4DD4C4]" /> Expected Solution</h2>
                                 <p className="text-sm text-zinc-500">Enter the reference query or code that produces the correct result.</p>
-                                {problemForm.challenge_type === 'sql' ? (
-                                    <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-40 font-mono text-sm text-white" placeholder="SELECT ... FROM ... WHERE ..." value={solutionForm.reference_query} onChange={e => setSolutionForm({ ...solutionForm, reference_query: e.target.value })} />
-                                ) : (
-                                    <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-40 font-mono text-sm text-white" placeholder={`# Write reference solution\n# Assign your final DataFrame to 'result'\n\nresult = ...`} value={solutionForm.reference_code} onChange={e => setSolutionForm({ ...solutionForm, reference_code: e.target.value })} />
+                                
+                                {problemForm.challenge_type === 'python_dsa' && (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-xs text-zinc-500 mb-1">Function Name (must match your solution signature, e.g. <span className="font-mono text-[#4DD4C4]">countOnes</span>)</label>
+                                            <input 
+                                                className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white font-mono focus:border-[#4DD4C4] focus:outline-none" 
+                                                placeholder="countOnes" 
+                                                value={solutionForm.function_name} 
+                                                onChange={e => setSolutionForm({ ...solutionForm, function_name: e.target.value })} 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-zinc-500 mb-1">Starter Code shown to users — write the <span className="font-mono text-[#4DD4C4]">def</span> line with full params (e.g. <span className="font-mono text-[#4DD4C4]">def countOnes(nums: List[int]) -&gt; int:</span>)</label>
+                                            <input 
+                                                className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white font-mono focus:border-[#4DD4C4] focus:outline-none" 
+                                                placeholder="def countOnes(nums: List[int]) -> int:" 
+                                                value={solutionForm.starter_code} 
+                                                onChange={e => setSolutionForm({ ...solutionForm, starter_code: e.target.value })} 
+                                            />
+                                        </div>
+                                    </div>
                                 )}
-                                <label className="flex items-center gap-3 text-zinc-400 cursor-pointer">
-                                    <input type="checkbox" checked={solutionForm.order_sensitive} onChange={e => setSolutionForm({ ...solutionForm, order_sensitive: e.target.checked })} className="w-4 h-4 rounded" />
-                                    Order Sensitive (row order must match exactly)
-                                </label>
-                                <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-20 text-white" placeholder="Notes (optional hints, edge cases...)" value={solutionForm.notes} onChange={e => setSolutionForm({ ...solutionForm, notes: e.target.value })} />
+
+                                {problemForm.challenge_type === 'sql' ? (
+                                    <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-40 font-mono text-sm text-white focus:outline-none focus:border-[#4DD4C4]" placeholder="SELECT ... FROM ... WHERE ..." value={solutionForm.reference_query} onChange={e => setSolutionForm({ ...solutionForm, reference_query: e.target.value })} />
+                                ) : (
+                                    <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-40 font-mono text-sm text-white focus:outline-none focus:border-[#4DD4C4]" placeholder={problemForm.challenge_type === 'python_dsa' ? `def twoSum(nums: list[int], target: int) -> list[int]:\n    # Reference implementation\n    pass` : `# Write reference solution\n# Assign your final DataFrame to 'result'\n\nresult = ...`} value={solutionForm.reference_code} onChange={e => setSolutionForm({ ...solutionForm, reference_code: e.target.value })} />
+                                )}
+                                {problemForm.challenge_type !== 'python_dsa' && (
+                                    <label className="flex items-center gap-3 text-zinc-400 cursor-pointer">
+                                        <input type="checkbox" checked={solutionForm.order_sensitive} onChange={e => setSolutionForm({ ...solutionForm, order_sensitive: e.target.checked })} className="w-4 h-4 rounded" />
+                                        Order Sensitive (row order must match exactly)
+                                    </label>
+                                )}
+                                <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-20 text-white focus:outline-none focus:border-[#4DD4C4]" placeholder="Notes (optional hints, edge cases...)" value={solutionForm.notes} onChange={e => setSolutionForm({ ...solutionForm, notes: e.target.value })} />
                                 <div className="flex gap-3">
-                                    <Button onClick={handleAddSolution} disabled={!(problemForm.challenge_type === 'sql' ? solutionForm.reference_query : solutionForm.reference_code) || loading} className="flex-1 bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold">
+                                    <Button onClick={handleAddSolution} disabled={!(problemForm.challenge_type === 'sql' ? solutionForm.reference_query : solutionForm.reference_code) || (problemForm.challenge_type === 'python_dsa' && !solutionForm.function_name) || loading} className="flex-1 bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold disabled:opacity-50">
                                         {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : <ChevronRight size={16} className="mr-2" />}
                                         Preview Problem
                                     </Button>
@@ -1410,7 +1710,7 @@ export default function AdminDashboard() {
                                             <span className="text-xs text-zinc-500 font-medium flex items-center gap-1.5"><Clock size={12} className="text-zinc-600" /> {problemForm.estimated_time_minutes} min</span>
                                             <div className="h-3 w-px bg-zinc-800" />
                                             <span className="text-xs text-zinc-500 font-medium">
-                                                {problemForm.challenge_type === 'sql' ? 'PostgreSQL' : problemForm.challenge_type === 'python' ? 'Python (Pandas)' : 'PySpark'}
+                                                {problemForm.challenge_type === 'sql' ? 'PostgreSQL' : problemForm.challenge_type === 'python' ? 'Python (Pandas)' : problemForm.challenge_type === 'python_dsa' ? 'Python DSA' : 'PySpark'}
                                             </span>
                                         </div>
 
@@ -1509,6 +1809,30 @@ export default function AdminDashboard() {
                                                         </div>
                                                     );
                                                 })}
+                                            </div>
+                                        )}
+
+                                        {/* Test Cases Section (DSA only) */}
+                                        {problemForm.challenge_type === 'python_dsa' && testCases.length > 0 && (
+                                            <div className="space-y-4 pt-2">
+                                                <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 font-sans flex items-center gap-1.5">
+                                                    <Database size={11} /> Test Cases ({testCases.length})
+                                                </h3>
+                                                <div className="h-px w-full bg-[#181f2b]" />
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {testCases.map((tc, idx) => (
+                                                        <div key={idx} className="bg-[#0b101c] p-3 rounded-lg border border-[#202736]/60 text-xs font-mono">
+                                                            <div className="flex items-center justify-between mb-1.5">
+                                                                <span className="font-semibold text-zinc-300">{tc.label || `Test Case #${idx + 1}`}</span>
+                                                                <span className={`text-[9px] px-1 py-0.2 rounded border ${tc.is_hidden ? 'bg-purple-950/40 text-purple-400 border-purple-900/50' : 'bg-green-950/40 text-green-400 border-green-900/50'}`}>
+                                                                    {tc.is_hidden ? 'Hidden' : 'Sample'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-zinc-500">Input: <span className="text-zinc-300">{JSON.stringify(tc.input_data)}</span></div>
+                                                            <div className="text-zinc-500">Expected: <span className="text-[#4DD4C4]">{JSON.stringify(tc.expected)}</span></div>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -1662,6 +1986,33 @@ export default function AdminDashboard() {
                                             >
                                                 <option value="">Select...</option>
                                                 {problems.filter(p => p.difficulty === diff && p.challenge_type === 'pyspark').map(p => (
+                                                    <option key={p.id} value={p.id}>{p.title} {!p.is_active ? '(DRAFT)' : ''}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Python DSA Section */}
+                            <div className="space-y-4 pt-4 border-t border-[#202736]/40">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                        <Code size={16} className="text-[#4DD4C4]" /> Python DSA
+                                    </h3>
+                                    <span className="text-[10px] bg-zinc-500/10 text-zinc-400 px-2 py-0.5 rounded border border-zinc-500/20 font-bold uppercase font-mono">Optional</span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {(['easy', 'medium', 'advanced'] as const).map(diff => (
+                                        <div key={diff} className="space-y-1">
+                                            <label className="block text-xs text-zinc-400 capitalize">{diff}</label>
+                                            <select
+                                                className="w-full bg-[#0b101c] border border-[#202736] p-2 rounded-lg text-xs text-white focus:border-[#4DD4C4] focus:outline-none"
+                                                value={scheduleForm[`dsa_${diff}_problem_id` as keyof typeof scheduleForm] || ""}
+                                                onChange={e => setScheduleForm({ ...scheduleForm, [`dsa_${diff}_problem_id`]: e.target.value })}
+                                            >
+                                                <option value="">Select...</option>
+                                                {problems.filter(p => p.difficulty === diff && p.challenge_type === 'python_dsa').map(p => (
                                                     <option key={p.id} value={p.id}>{p.title} {!p.is_active ? '(DRAFT)' : ''}</option>
                                                 ))}
                                             </select>
@@ -2313,4 +2664,4 @@ export default function AdminDashboard() {
         </div>
     );
 }
-// redeploy
+// redep
