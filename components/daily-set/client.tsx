@@ -1706,26 +1706,8 @@ export function DailySetClient() {
 
                                             return (
                                                 <>
-                                                    {/* Tab buttons */}
-                                                    <div className="flex gap-1 mb-1">
-                                                        {DISC_TABS.map(({ id, label, Icon }) => {
-                                                            const isActive = id === activeDisciplineTab;
-                                                            const meta = DISC_TABS.find(t => t.id === id)!;
-                                                            return (
-                                                                <button
-                                                                    key={id}
-                                                                    onClick={() => setActiveDisciplineTab(id)}
-                                                                    className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-md text-[10px] font-semibold transition-all border ${isActive
-                                                                            ? `${meta.bg} ${meta.color} ${meta.border}`
-                                                                            : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.03] border-transparent'
-                                                                        }`}
-                                                                >
-                                                                    <Icon size={12} />
-                                                                    {label}
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
+
+
 
                                                     {/* Problem cards for the active discipline */}
                                                     {catProblems.length > 0 ? (
