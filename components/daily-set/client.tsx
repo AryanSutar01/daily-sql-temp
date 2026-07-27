@@ -512,30 +512,34 @@ export function DailySetClient() {
         loadData();
     }, []);
 
-    // Sync state with URL problemId
+    // Sync state when URL problemId changes or data finishes loading
     useEffect(() => {
         if (isLoading) return;
         if (urlProblemId) {
             loadProblemData(urlProblemId);
-        } else {
-            if (activeSidebarTab === 'today' && dailySet) {
-                let firstId: string | null | undefined = null;
-                if (activeDisciplineTab === 'python') {
-                    firstId = dailySet.python_easy || dailySet.python_medium || dailySet.python_advanced || dailySet.dsa_easy || dailySet.dsa_medium || dailySet.dsa_advanced;
-                } else if (activeDisciplineTab === 'pyspark') {
-                    firstId = dailySet.pyspark_easy || dailySet.pyspark_medium || dailySet.pyspark_advanced;
-                } else {
-                    firstId = dailySet.easy || dailySet.medium || dailySet.advanced;
-                }
-                if (firstId) {
-                    router.replace(`/practice/daily/${firstId}?tab=today${sidebarCollapsed ? '&collapsed=true' : ''}`);
-                    return;
-                }
-            }
-            setActiveProblemId(null);
-            setViewingDetails(false);
         }
-    }, [urlProblemId, isLoading, loadProblemData, activeSidebarTab, dailySet, router, activeDisciplineTab]);
+    }, [urlProblemId, isLoading, loadProblemData]);
+
+    // When on /practice/daily (no problemId selected in URL), auto-select first problem of active discipline
+    useEffect(() => {
+        if (isLoading || urlProblemId) return;
+        if (activeSidebarTab === 'today' && dailySet) {
+            let firstId: string | null | undefined = null;
+            if (activeDisciplineTab === 'python') {
+                firstId = dailySet.python_easy || dailySet.python_medium || dailySet.python_advanced || dailySet.dsa_easy || dailySet.dsa_medium || dailySet.dsa_advanced;
+            } else if (activeDisciplineTab === 'pyspark') {
+                firstId = dailySet.pyspark_easy || dailySet.pyspark_medium || dailySet.pyspark_advanced;
+            } else {
+                firstId = dailySet.easy || dailySet.medium || dailySet.advanced;
+            }
+            if (firstId) {
+                router.replace(`/practice/daily/${firstId}?tab=today${sidebarCollapsed ? '&collapsed=true' : ''}`);
+                return;
+            }
+        }
+        setActiveProblemId(null);
+        setViewingDetails(false);
+    }, [urlProblemId, isLoading, activeSidebarTab, dailySet, router, activeDisciplineTab, sidebarCollapsed]);
 
     // Timer tick
     useEffect(() => {
