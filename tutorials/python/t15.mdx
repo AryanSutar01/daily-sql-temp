@@ -1,266 +1,243 @@
-## What Is a Decorator?
+## Decorators: Higher-Order Functions and Closure Mechanics in CPython
 
-A decorator is a function that takes a function as input and returns a new function - wrapping it to add behaviour before, after, or around it.
+At its core, a **Decorator** is a higher-order function that takes another function as its input, extends or modifies its behavior, and returns a new function. 
+
+Conceptually, decorators implement the **Decorator Design Pattern** dynamically. They allow you to add functionality to an existing function from the outside, without permanently modifying the internal structure of that function. This is heavily used for cross-cutting concerns like logging, authentication, caching, and telemetry.
+
+To truly understand decorators, you must understand how Python treats functions in memory.
+
+### Functions are First-Class Objects (PyFunctionObject)
+
+In CPython, a function is not just a block of code; it is a full-fledged object allocated on the heap, defined internally as `PyFunctionObject`. Because it is an object, it can be passed around, assigned to variables, and returned from other functions.
+
+When you define a function, Python compiles the body into a bytecode object (`PyCodeObject`) and binds it to a function object along with its execution environment (globals, defaults, closures).
 
 ```python
 def my_decorator(func):
+    # 'func' is a reference to a PyFunctionObject on the heap
     def wrapper(*args, **kwargs):
-        print("Before the function")
-        result = func(*args, **kwargs)
-        print("After the function")
+        print("Before execution: Acquiring resources...")
+        # The original function is executed here via the reference
+        result = func(*args, **kwargs)  
+        print("After execution: Releasing resources...")
         return result
+    
+    # We return the new 'wrapper' function object, which now acts as the interceptor
     return wrapper
 
-# Apply with @ syntax (syntactic sugar)
+# Syntactic sugar for: greet = my_decorator(greet)
 @my_decorator
 def greet(name):
     print(f"Hello, {name}!")
-
-greet("Alice")
-# Before the function
-# Hello, Alice!
-# After the function
-
-# @my_decorator is equivalent to:
-# greet = my_decorator(greet)
 ```
 
-## functools.wraps - Preserve Metadata
+When the interpreter encounters the `@my_decorator` syntax, it compiles `greet`, passes the resulting function object into `my_decorator`, and binds the name `greet` in the local namespace to the returned `wrapper` function object. 
 
-Without `wraps`, the wrapper replaces the original function's name and docstring:
+### The Closure Memory Model and Cell Objects
+
+How does the `wrapper` function remember the original `func` after `my_decorator` has finished executing and its local scope has been destroyed?
+
+The answer is **Closures**. When Python compiles the `wrapper` function, it realizes that `wrapper` references a variable (`func`) that was defined in its enclosing scope (`my_decorator`). 
+
+Instead of storing `func` on the standard execution stack, the interpreter allocates a **Cell Object** on the heap. This cell object holds a reference to the original function. The `wrapper` function's `__closure__` attribute contains a tuple of these cell objects. This guarantees that as long as the `wrapper` exists, the original function is kept alive by the garbage collector via reference counting.
+
+## The Metadata Loss Problem and `functools.wraps`
+
+When you decorate a function, you are fundamentally replacing the original function object with the inner `wrapper` function object. 
+
+This introduces a severe architectural side effect: you lose all metadata associated with the original function.
 
 ```python
-from functools import wraps
-
-def my_decorator(func):
-    @wraps(func)    # preserves __name__, __doc__, __module__ etc.
-    def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
+def simple_decorator(func):
+    def wrapper():
+        """This is the wrapper docstring."""
+        return func()
     return wrapper
 
-@my_decorator
-def greet(name):
-    """Greet a person by name."""
-    print(f"Hello, {name}!")
+@simple_decorator
+def calculate_tax():
+    """Calculates the state tax rate."""
+    pass
 
-print(greet.__name__)   # "greet" (not "wrapper")
-print(greet.__doc__)    # "Greet a person by name."
+print(calculate_tax.__name__)  # Prints: "wrapper"
+print(calculate_tax.__doc__)   # Prints: "This is the wrapper docstring."
 ```
 
-## Practical Decorator Examples
+If you attempt to print `calculate_tax.__name__`, it will print `"wrapper"`. This breaks debugging tools, IDE auto-completion, profiling tools, and web frameworks (like Flask or FastAPI) that rely on function names for URL routing.
 
-### Timing
+### The Solution: `@functools.wraps`
+
+To solve this, Python provides `@functools.wraps`. This is a decorator *for your decorator*. Under the hood, it invokes the `update_wrapper` function, which mathematically copies critical attributes from the original function object onto the wrapper function object:
+
+- `__module__`: The module where the function was defined.
+- `__name__`: The name of the function.
+- `__qualname__`: The fully qualified name (useful for nested functions or methods).
+- `__annotations__`: The type hints.
+- `__doc__`: The docstring.
+- `__dict__`: Any custom attributes assigned to the function.
 
 ```python
-import time
 from functools import wraps
+import time
 
-def timer(func):
-    @wraps(func)
+def robust_timer(func):
+    @wraps(func)  # Prevents metadata loss by copying __name__, __doc__, etc.
     def wrapper(*args, **kwargs):
-        start = time.time()
+        start = time.perf_counter()
         result = func(*args, **kwargs)
-        elapsed = time.time() - start
-        print(f"{func.__name__} took {elapsed:.4f}s")
+        duration = time.perf_counter() - start
+        print(f"[{func.__name__}] executed in {duration:.4f}s")
         return result
     return wrapper
-
-@timer
-def slow_sum(n):
-    return sum(range(n))
-
-slow_sum(10_000_000)
-# slow_sum took 0.3421s
 ```
 
-### Logging
+Always use `@wraps` in production code. It is an industry-standard mandate for writing maintainable decorators.
+
+## Execution Order: Stacking Decorators
+
+When multiple decorators are applied to a single function (known as stacking), they are evaluated **bottom-up** (inside-out). The decorator closest to the function definition executes first, wrapping the core function. The next decorator up then wraps that resulting wrapper, and so on.
+
+```python
+@timer        # 2. Wraps the output of log_calls
+@log_calls    # 1. Wraps the core function first
+def process_data():
+    pass
+
+# Architectural equivalent in memory:
+# process_data = timer(log_calls(process_data))
+```
+
+During execution, however, the flow is **top-down** on the way in, and **bottom-up** on the way out, forming a Russian-doll structure of execution contexts. 
+1. `timer` wrapper starts.
+2. `timer` calls the function it holds (`log_calls` wrapper).
+3. `log_calls` wrapper starts.
+4. `log_calls` calls the core function.
+5. `log_calls` wrapper finishes.
+6. `timer` wrapper finishes.
+
+## Parameterized Decorators (Decorators with Arguments)
+
+If you want to pass arguments to a decorator itself (e.g., `@retry(max_attempts=3)`), the architectural complexity increases. You cannot simply pass `max_attempts` into the decorator alongside `func` because the `@` syntax implicitly passes *only* the function.
+
+To achieve this, you must construct a **Decorator Factory**—a function that accepts the parameters and returns the actual decorator. This requires a **three-level nested scope**.
 
 ```python
 from functools import wraps
-import logging
-
-def log_calls(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        logging.info(f"Calling {func.__name__} with {args}, {kwargs}")
-        result = func(*args, **kwargs)
-        logging.info(f"{func.__name__} returned {result}")
-        return result
-    return wrapper
-
-@log_calls
-def add(a, b):
-    return a + b
-```
-
-### Retry
-
-```python
 import time
-from functools import wraps
 
-def retry(max_attempts=3, delay=1.0):
+def retry(max_attempts: int, delay_seconds: float = 1.0):
+    """Level 1: The Factory. Receives the configuration arguments."""
+    
     def decorator(func):
+        """Level 2: The actual Decorator. Receives the target function."""
+        
         @wraps(func)
         def wrapper(*args, **kwargs):
+            """Level 3: The Wrapper. Receives the runtime arguments."""
             for attempt in range(1, max_attempts + 1):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
                     if attempt == max_attempts:
-                        raise
-                    print(f"Attempt {attempt} failed: {e}. Retrying in {delay}s...")
-                    time.sleep(delay)
-        return wrapper
-    return decorator
-
-@retry(max_attempts=3, delay=0.5)
-def fetch_data(url):
-    # might fail due to network issues
-    ...
+                        raise e
+                    print(f"Attempt {attempt} failed: {e}. Retrying in {delay_seconds}s...")
+                    time.sleep(delay_seconds)
+                    
+        return wrapper  # Factory returns the configured decorator
+    return decorator    # Decorator returns the wrapper
 ```
 
-### Caching (Memoize)
+When Python parses `@retry(max_attempts=3)`, it immediately executes the `retry` function, which returns the `decorator` function. That returned `decorator` function is then immediately invoked with the target function as its argument.
+
+## Class-Based Decorators and State
+
+Functions are not the only way to build decorators. Any callable object (an object that implements the `__call__` dunder method) can act as a decorator. Class-based decorators are exceptional when your decorator needs to maintain complex state (like rate limiting counts or caching architectures).
 
 ```python
-from functools import wraps
+import time
 
-def memoize(func):
-    cache = {}
-    @wraps(func)
-    def wrapper(*args):
-        if args not in cache:
-            cache[args] = func(*args)
-        return cache[args]
-    return wrapper
-
-@memoize
-def fibonacci(n):
-    if n < 2:
-        return n
-    return fibonacci(n-1) + fibonacci(n-2)
-
-fibonacci(50)   # instant - results cached
-
-# Or use functools.lru_cache (built-in)
-from functools import lru_cache
-
-@lru_cache(maxsize=128)
-def fibonacci(n):
-    if n < 2:
-        return n
-    return fibonacci(n-1) + fibonacci(n-2)
-```
-
-## Decorators with Arguments
-
-Requires an extra layer of nesting - a function that returns a decorator:
-
-```python
-def repeat(n):
-    def decorator(func):
+class RateLimiter:
+    def __init__(self, max_calls_per_second: int):
+        self.max_calls = max_calls_per_second
+        self.calls = []
+        
+    def __call__(self, func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            for _ in range(n):
-                result = func(*args, **kwargs)
-            return result
+            now = time.time()
+            # Clean up old calls from the state history
+            self.calls = [t for t in self.calls if now - t < 1.0]
+            
+            if len(self.calls) >= self.max_calls:
+                raise RuntimeError(f"Rate limit exceeded for {func.__name__}")
+                
+            self.calls.append(now)
+            return func(*args, **kwargs)
+            
         return wrapper
-    return decorator
 
-@repeat(3)
-def greet(name):
-    print(f"Hello, {name}!")
-
-greet("Alice")
-# Hello, Alice!
-# Hello, Alice!
-# Hello, Alice!
+# The class is instantiated immediately, returning an instance.
+# That instance's __call__ method acts as the decorator.
+@RateLimiter(max_calls_per_second=5)
+def fetch_api_data():
+    pass
 ```
 
-## Stacking Decorators
+### The Descriptor Protocol Trap with Class Decorators
 
-Decorators are applied bottom-up (closest to function first):
+If you write a class-based decorator without an internal wrapper (i.e., the class instance itself replaces the function), it will break when applied to class methods. 
 
-```python
-@timer          # applied second (outer)
-@log_calls      # applied first (inner)
-def process(n):
-    return sum(range(n))
+When you access a method on a class instance (e.g., `obj.my_method()`), Python uses the **Descriptor Protocol** (`__get__`) to bind the instance (`self`) to the function, converting it into a *bound method*. If you replace the method with a generic class instance, that instance does not natively implement `__get__`, so `self` is never injected!
 
-# Equivalent to:
-# process = timer(log_calls(process))
-```
-
-## Class-Based Decorators
+To fix this, class-based decorators applied to methods must explicitly implement the descriptor protocol:
 
 ```python
-from functools import wraps
-
-class CountCalls:
+class MethodSafeDecorator:
     def __init__(self, func):
-        wraps(func)(self)
         self.func = func
-        self.count = 0
-
+        
     def __call__(self, *args, **kwargs):
-        self.count += 1
-        print(f"Call #{self.count} to {self.func.__name__}")
+        print("Executing...")
         return self.func(*args, **kwargs)
-
-@CountCalls
-def greet(name):
-    print(f"Hello, {name}!")
-
-greet("Alice")   # Call #1 to greet
-greet("Bob")     # Call #2 to greet
-print(greet.count)   # 2
+        
+    def __get__(self, instance, owner):
+        # Explicitly bind the instance to the function to simulate bound methods
+        from functools import partial
+        if instance is None:
+            return self
+        return partial(self.__call__, instance)
 ```
 
-## Built-in Decorators
+## Performance Implications
 
-```python
-class MyClass:
-    class_var = 0
-
-    @staticmethod
-    def utility():
-        return "no self, no cls - just a function in the class namespace"
-
-    @classmethod
-    def create(cls):
-        return cls()   # cls is the class itself
-
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, value):
-        self._name = value.strip()
-```
+Decorators are not free. Every decorated function incurs the overhead of an additional function call (the wrapper) and argument unpacking (`*args, **kwargs`). In highly optimized, CPU-bound inner loops executed millions of times per second, this micro-overhead (typically ~50-100 nanoseconds per call) can accumulate into noticeable latency. For 99% of applications, however, the architectural cleanliness outweighs the performance cost.
 
 ## Interview Questions
 
-**Q: What is a decorator in Python?**
-A decorator is a function that takes a function as input and returns a modified version of it. The `@decorator` syntax is shorthand for `func = decorator(func)`. Decorators add behaviour (logging, timing, caching, access control) without modifying the original function.
+**Q: What is a decorator under the hood, mathematically speaking?**
+A decorator is syntactic sugar for functional composition. `@deco` followed by `def f():` is mathematically translated by the interpreter into `f = deco(f)`. It evaluates the original function object, passes it as an argument to the decorator function, and assigns the returned reference to the original variable name in the current namespace.
 
-**Q: Why use `@functools.wraps`?**
-Without it, the wrapper function replaces the original's metadata - `__name__`, `__doc__`, `__module__`. This breaks `help()`, debugging, and tools that inspect function metadata. `@wraps(func)` copies these attributes from the original to the wrapper.
+**Q: Explain how the memory model (closures) allows decorators to work.**
+When a decorator returns an inner wrapper function, that wrapper maintains a reference to the original function via a closure. In CPython, this is stored in a heap-allocated Cell Object referenced by the wrapper's `__closure__` attribute. This prevents the garbage collector from destroying the original function object when the decorator's local scope exits.
 
-**Q: How do you write a decorator that accepts arguments?**
-Add an outer function that accepts the arguments and returns the actual decorator: `def repeat(n): def decorator(func): def wrapper(...): ... return wrapper return decorator`. Three levels of nesting: argument-taker → decorator → wrapper.
+**Q: Why is `@functools.wraps` mandatory in production decorators?**
+Because a decorator physically replaces the original function object with a new wrapper function object. Without `wraps`, introspection tools lose the original function's `__name__`, `__doc__`, and type annotations. `wraps` dynamically copies the `__dict__` and metadata from the original function to the wrapper to preserve transparency.
 
-**Q: In what order are stacked decorators applied?**
-Bottom-up - the decorator closest to the function is applied first. `@A @B def f()` is `f = A(B(f))`. `B` wraps `f` first, then `A` wraps the result.
+**Q: In what order do stacked decorators execute, and in what order are they evaluated?**
+They are evaluated bottom-up (closest to the function first). The bottom decorator wraps the core function, the next decorator wraps the first wrapper, and so on. However, during runtime execution, the outermost (top) wrapper executes first, delegating downwards until the core function is reached, and then the return values bubble back upwards.
 
-**Q: What is `lru_cache` and how does it relate to decorators?**
-`@lru_cache(maxsize=128)` is a built-in decorator that caches function return values using a dictionary keyed by the arguments. It implements memoization - if the function is called with the same arguments again, the cached result is returned instead of recomputing.
+**Q: How do you build a parameterized decorator?**
+You must introduce a third level of functional scope, creating a Decorator Factory. The outermost function (Level 1) receives the configuration parameters. It returns the actual decorator (Level 2), which receives the target function. The decorator returns the wrapper (Level 3), which handles the runtime arguments and closure state.
+
+**Q: Why do simple class-based decorators often fail when applied to object methods?**
+Because object methods rely on the Descriptor Protocol (`__get__`) to automatically bind the instance object as the first argument (`self`). A standard function inherently implements `__get__`, but a custom class instance does not unless explicitly defined. Therefore, the instance replaces the method, `__get__` is never invoked, and `self` is missing from the arguments, causing a `TypeError`.
 
 ## Summary
 
-- A decorator wraps a function: `def deco(func): def wrapper(*a, **kw): ... return wrapper`
-- `@decorator` is shorthand for `func = decorator(func)`
-- Always use `@functools.wraps(func)` on the wrapper to preserve metadata
-- Decorators with arguments need three levels: `def deco(arg): def decorator(func): def wrapper: ...`
-- Stacking: `@A @B def f` → applied bottom-up: `A(B(f))`
-- Built-in decorators: `@property`, `@staticmethod`, `@classmethod`, `@lru_cache`, `@functools.wraps`
+- **Decorator:** A higher-order function that takes a target function, wraps it, and returns the wrapper.
+- **Syntactic Sugar:** `@deco` directly translates to `func = deco(func)`.
+- **Closures & Memory:** The wrapper function keeps the original function alive via heap-allocated Cell Objects.
+- **`functools.wraps`:** Essential utility to copy `__name__`, `__doc__`, and annotations to the wrapper.
+- **Stacking Order:** Evaluated bottom-up; executed outside-in (top-down).
+- **Parameterized Decorators:** Require three levels of nested scope (Factory -> Decorator -> Wrapper).
+- **Class Decorators:** Ideal for stateful decorators, but require implementing `__get__` to work flawlessly on class methods.

@@ -1,3 +1,97 @@
+## How DML Achieves Atomicity: The Write-Ahead Log
+
+`INSERT`, `UPDATE`, and `DELETE` look simple on the surface — but ensuring they are **atomic** (all-or-nothing) even when the server crashes mid-operation requires a sophisticated logging mechanism.
+
+### The Write-Ahead Log (WAL) Protocol
+
+Every database that supports ACID uses a **WAL** (PostgreSQL calls it WAL; MySQL InnoDB calls it the redo log). The protocol is:
+
+```
+Rule: NEVER write data to disk before writing the log record first.
+
+When you run: UPDATE accounts SET balance = balance - 1000 WHERE id = 1;
+
+Step 1: Write WAL record (to WAL buffer → WAL file):
+  LSN 00001: BEGIN TRANSACTION txn_id=42
+  LSN 00002: UPDATE accounts, page=5, slot=3
+             OLD: balance=5000
+             NEW: balance=4000
+
+Step 2: Modify the data page IN MEMORY (buffer pool):
+  accounts table, page 5, slot 3: balance = 4000
+
+Step 3: COMMIT:
+  LSN 00003: COMMIT txn_id=42
+  WAL buffer flushed to disk (fsync)
+  → Commit is durable once WAL is on disk!
+  
+Step 4: (Asynchronously, later) Modified page flushed to data file
+
+Crash recovery:
+  Server crashes after step 3 but data page not yet on disk:
+  On restart: read WAL log, replay all committed transactions
+  → Database is consistent! (REDO)
+  
+  Server crashes after step 1 but before step 3 (no commit):
+  On restart: read WAL log, find uncommitted transaction 42
+  → Rollback: UNDO the partial changes using OLD values in WAL
+```
+
+This is why `COMMIT` might feel "slow" — the commit is only acknowledged after the WAL record is fsynced to disk. The data page may still be in memory (unflushed) — that's fine because WAL can recover it.
+
+### MVCC: How Reads and Writes Don't Block Each Other
+
+Modern databases use **MVCC (Multi-Version Concurrency Control)** to allow readers and writers to operate simultaneously without locks:
+
+```
+accounts table with MVCC (PostgreSQL conceptual):
+
+Row tuple: [xmin, xmax, balance]
+  xmin: transaction ID that CREATED this version
+  xmax: transaction ID that DELETED this version (or 0 if still current)
+
+Initial state (committed by transaction 1):
+  [xmin=1, xmax=0, balance=5000]  ← current version
+
+Transaction 42 runs: UPDATE SET balance = 4000
+  New version created: [xmin=42, xmax=0, balance=4000]
+  Old version marked: [xmin=1, xmax=42, balance=5000]
+
+During transaction 42 (not yet committed):
+  Transaction 50 runs SELECT: sees [xmin=1, xmax=0, balance=5000]
+  → Transaction 50 reads the OLD version (balance=5000)
+  → No lock needed! Reader doesn't wait for writer!
+
+Transaction 42 commits:
+  Transaction 60 runs SELECT: sees [xmin=42, xmax=0, balance=4000]
+  → Now reads the NEW version (balance=4000)
+```
+
+**Key insight**: In MVCC, readers NEVER block writers, and writers NEVER block readers. This is fundamentally different from pessimistic locking systems. The trade-off: **dead rows** (old versions) accumulate and must be cleaned up by the `VACUUM` process (PostgreSQL) or purge thread (MySQL InnoDB).
+
+### Row-Level Locking for DML
+
+DML operations lock at the **row level** (not the table), which is why:
+
+```sql
+-- Transaction A:
+UPDATE orders SET status = 'shipped' WHERE id = 100;  -- locks ROW 100 only
+
+-- Transaction B (simultaneously):
+UPDATE orders SET status = 'cancelled' WHERE id = 200;  -- locks ROW 200
+-- → Both run in parallel! Different rows, no conflict.
+
+-- Transaction C:
+UPDATE orders SET status = 'cancelled' WHERE id = 100;
+-- → WAITS for Transaction A to release its lock on row 100
+-- → Then updates (overwriting Transaction A's result)
+-- Or may deadlock if A and C are waiting for each other
+```
+
+**Deadlock** occurs when Transaction A holds Lock X and waits for Lock Y, while Transaction B holds Lock Y and waits for Lock X. Databases detect this via lock dependency graphs and kill one transaction automatically.
+
+---
+
 ## DML - Data Manipulation Language
 
 DML commands work with the **actual data** inside tables. Unlike DDL, all DML can be wrapped in a transaction and rolled back.

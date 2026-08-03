@@ -1,3 +1,35 @@
+## Pattern Matching and Index Traversals
+
+When you use the `LIKE` operator, you are interacting with the database's string matching engine. The performance of this operation depends entirely on where you place your wildcards and how the underlying B-Tree index is structured.
+
+### The Left-Anchored Optimization (Prefix Search)
+
+Standard B-Tree indexes are sorted alphanumerically. If you search for `LIKE 'Smith%'`, the query planner can execute an incredibly fast **Index Range Scan**. 
+The engine traverses the B-Tree to find the first occurrence of `Smith`, and then scans sequentially forward until it hits `Smiti`, at which point it stops. This is highly performant.
+
+### The Index-Defeating Trap (Suffix/Contains Search)
+
+If you place a wildcard at the *beginning* of your pattern (`LIKE '%Smith'`), you completely defeat the B-Tree index. 
+
+Because the B-Tree is sorted by the *start* of the string, the engine has no way to jump to words ending in "Smith". It must perform a **Full Table Scan**, executing a CPU-intensive string matching algorithm on every single row in the table. On a 100-million row table, this query will lock up I/O and take seconds or minutes to complete.
+
+### The Architectural Solution: Trigram Indexes
+
+In modern architectures, if you need to support fast `%search%` patterns (like a search bar on a website), you cannot rely on B-Trees. You must implement a specialized index structure.
+
+In PostgreSQL, the industry standard is the **pg_trgm** extension, which allows you to build a **GIN (Generalized Inverted Index)** over trigrams (3-letter sequences).
+
+```sql
+-- Creating a Trigram Index for fast wildcard searches:
+CREATE INDEX idx_users_name_trgm ON users USING gin (name gin_trgm_ops);
+
+-- Now, this query becomes an instant Index Scan instead of a Full Table Scan!
+SELECT * FROM users WHERE name ILIKE '%smith%';
+```
+A Trigram index breaks "smith" down into `{smi, mit, ith}`, and uses the Inverted Index to instantly find all table rows containing those exact 3-letter combinations, filtering out false positives afterwards.
+
+---
+
 ## LIKE - Pattern Matching
 
 `LIKE` filters strings based on a pattern. Two special wildcard characters:
@@ -29,12 +61,16 @@ SELECT * FROM users WHERE name LIKE '_a%';
 
 ## NOT LIKE
 
+`NOT LIKE` inverts the pattern match, returning rows where the column does **not** match the pattern. Under the hood, this is still evaluated as a full B-Tree range scan for patterns with leading wildcards, or an index range scan for trailing wildcards. It is equivalent to applying `NOT (column LIKE pattern)` but is more readable. Use `NOT LIKE` to filter out known bad patterns (e.g., test email addresses, bot-generated usernames) during data cleaning.
+
 ```sql
 SELECT * FROM users WHERE email NOT LIKE '%@gmail.com';
 SELECT * FROM products WHERE name NOT LIKE '%refurbished%';
 ```
 
 ## Case Sensitivity
+
+Case sensitivity in `LIKE` comparisons is not a SQL standard issue — it is a **collation** issue. The collation defines how characters are compared and sorted. In MySQL, most collations are case-insensitive by default (e.g., `utf8_general_ci` where `ci` = case-insensitive), so `LIKE 'alice%'` matches 'Alice'. In PostgreSQL, the default collation is case-sensitive, requiring either uppercase normalization (`LOWER(name) LIKE 'alice%'`) or the PostgreSQL-specific `ILIKE` operator. In SQL Server, case sensitivity depends on the database's or column's collation setting.
 
 ```sql
 -- MySQL: LIKE is case-insensitive by default
@@ -69,6 +105,8 @@ Regular expressions provide far more power than LIKE for complex pattern matchin
 
 ### PostgreSQL
 
+PostgreSQL's regex operators are the most expressive in the SQL ecosystem. The `~` operator uses POSIX Extended Regular Expressions, which are the same regex flavor used by `grep -E` and most Unix tools. Unlike `LIKE`, regex operators are always evaluated as sequential scans unless you have a `pg_trgm` GIN index. The `~*` case-insensitive variant is equivalent to `LOWER(column) ~ LOWER(pattern)` but is more efficient. Always validate your regex patterns against edge cases: an overly permissive email regex might accept `a@b` as valid.
+
 ```sql
 -- ~ operator: matches regex (case-sensitive)
 -- ~* operator: matches regex (case-insensitive)
@@ -89,6 +127,8 @@ SELECT * FROM products WHERE name ~* 'wireless|bluetooth';
 
 ### MySQL
 
+MySQL uses `REGEXP` (or its alias `RLIKE`) for regular expression matching. MySQL's regex engine uses Henry Spencer's regex library, which supports most POSIX Extended RE syntax. A key difference from PostgreSQL: MySQL's `REGEXP` is **case-insensitive by default** (respecting the column's collation). To force case-sensitive matching in MySQL, use `REGEXP BINARY`. MySQL 8.0+ upgraded to the ICU regex library, adding Unicode-aware regex classes like `\d`, `\w`, and full look-ahead/look-behind support.
+
 ```sql
 -- REGEXP or RLIKE operator
 SELECT * FROM users WHERE email REGEXP '^[^@]+@[^@]+\.[^@]{2,}$';
@@ -97,6 +137,8 @@ SELECT * FROM users WHERE phone REGEXP '^[0-9]{10}$';
 ```
 
 ## REGEXP_REPLACE - Replace by Pattern
+
+`REGEXP_REPLACE` is a function that returns a new string with all pattern matches replaced by a substitution string. The `'g'` flag (PostgreSQL) enables **global** replacement — all occurrences, not just the first. Without `'g'`, only the first match is replaced. This function is essential for data cleaning pipelines: normalizing phone numbers (strip everything except digits), cleaning HTML from user-generated content, or collapsing whitespace in address fields. It is evaluated per-row and cannot be index-optimized.
 
 ```sql
 -- Remove all non-digit characters from phone
@@ -111,6 +153,8 @@ SELECT REGEXP_REPLACE(content, '<[^>]+>', '', 'g') AS plain_text FROM articles;
 ```
 
 ## REGEXP_MATCHES / REGEXP_SUBSTR - Extract by Pattern
+
+`REGEXP_MATCH` (PostgreSQL) returns an array of captured groups from the first match. The `[1]` array subscript extracts the first captured group — in this case, the domain from an email address. This is the SQL equivalent of `str.match(/pattern/)[1]` in JavaScript. MySQL's `REGEXP_SUBSTR` extracts the matched substring itself (not a capture group) and is available from MySQL 8.0+. These functions are invaluable for parsing semi-structured strings that were stored in a single column without normalization.
 
 ```sql
 -- PostgreSQL: extract matching groups

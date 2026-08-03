@@ -1,3 +1,28 @@
+## Physical Execution: Aggregation vs. Spooling
+
+While `GROUP BY` and `PARTITION BY` look similar conceptually, their internal physical execution paths are completely different.
+
+### GROUP BY: The HashAggregate
+
+When the optimizer sees a `GROUP BY`, it typically employs a **HashAggregate** algorithm. 
+1. It builds an in-memory hash table where the keys are the grouped columns (e.g., `department`).
+2. As it streams through the table, it updates the running state (e.g., the `SUM` or `COUNT`) directly in the hash table.
+3. The original rows are discarded immediately after the hash table is updated.
+**Memory Footprint:** Very small ($O(K)$ where $K$ is the number of unique groups). It streams beautifully over massive datasets.
+
+### PARTITION BY: The Window Spool
+
+When the optimizer sees `PARTITION BY`, it cannot discard the original rows, because it must return them. It uses a **Window Spool** algorithm.
+1. It must first **Sort** the entire dataset by the partition key ($O(N \log N)$ complexity).
+2. It allocates a memory buffer to hold the *entire* partition of rows.
+3. It computes the aggregate over the buffered rows.
+4. It streams the buffered rows out to the client, attaching the computed aggregate to each row.
+**Memory Footprint:** Massive ($O(M)$ where $M$ is the size of the largest partition). If a single partition (e.g., all rows where `status = 'active'`) exceeds the database's `work_mem`, it spills to disk, causing severe I/O bottlenecks.
+
+**Architectural Rule:** Never use a Window Function (`PARTITION BY`) if a `GROUP BY` will suffice. The memory overhead and mandatory sorting phase of window functions make them substantially slower and more resource-intensive.
+
+---
+
 ## The Core Difference
 
 This is one of the most frequently asked SQL interview questions.
@@ -10,6 +35,8 @@ This is one of the most frequently asked SQL interview questions.
 | Can mix with individual row data | ❌ No | ✅ Yes |
 
 ## GROUP BY - Collapses Rows
+
+`GROUP BY` is a **destructive** aggregation — it permanently collapses multiple rows into a single summary row. Each group produces exactly one output row. As a result, you lose all individual row detail: you cannot mix aggregated values (`AVG(salary)`) with non-aggregated columns (`name`, `hire_date`) unless those columns are also part of the `GROUP BY` key. This is enforced by SQL's logical processing order — by the time `SELECT` executes, the individual rows no longer exist.
 
 ```sql
 -- GROUP BY: 3 rows (one per department)
@@ -26,6 +53,8 @@ GROUP BY department;
 You lose all individual row data. You cannot also show `name` or `salary` unless you aggregate them.
 
 ## PARTITION BY - Keeps All Rows
+
+`PARTITION BY` is a **non-destructive** windowing operation. It divides the input rows into logical groups (partitions) for the purpose of calculation, but crucially keeps every original row in the output. The aggregate value is computed *over* the partition and appended to each row as an additional column. This is why window functions can appear in `SELECT` alongside individual row columns like `name` and `salary` — the individual rows are never collapsed.
 
 ```sql
 -- PARTITION BY: all rows retained, avg_salary added alongside

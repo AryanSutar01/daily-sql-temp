@@ -1,3 +1,19 @@
+## The Transaction Manager and Connection Pooling
+
+A transaction is not just a logical grouping of SQL statements; it is a physical state tracked by the database's **Transaction Manager**. Every active transaction consumes server memory, locks, and an active connection slot.
+
+### The "Idle in Transaction" Danger
+
+Modern web applications use Connection Pooling (like PgBouncer). When your application sends `BEGIN`, the database binds an active connection to your transaction. 
+If your application code does something slow *inside* the transaction block (like making an HTTP request to Stripe, or waiting for user input), the transaction becomes **"Idle in transaction"**.
+1. The database connection is held hostage and cannot be returned to the pool.
+2. If this happens concurrently, the pool is exhausted, and the entire application crashes because new requests cannot get a database connection.
+3. Long-running transactions prevent the database from cleaning up old row versions (MVCC vacuuming), causing massive table bloat.
+
+**Architectural Rule**: Transactions must be entirely database-bound and execute as fast as physically possible. Never wrap network calls, file I/O, or complex application-side computations inside a `BEGIN / COMMIT` block. 
+
+---
+
 ## What is a Transaction?
 
 A transaction is a sequence of SQL statements that execute as a single unit. Either all succeed (COMMIT) or none have any effect (ROLLBACK).
@@ -38,6 +54,8 @@ ROLLBACK;
 ```
 
 ## START TRANSACTION (Standard SQL)
+
+`BEGIN`, `BEGIN WORK`, and `START TRANSACTION` are all equivalent in PostgreSQL. They mark the start of a transaction boundary. Once a transaction is open, all subsequent DML statements (`INSERT`, `UPDATE`, `DELETE`) are part of the same atomic unit. In PostgreSQL, DDL (`CREATE TABLE`, `ALTER TABLE`) can also be wrapped in a transaction and rolled back — this is a unique and powerful feature not available in MySQL or SQL Server, where DDL auto-commits immediately.
 
 ```sql
 -- These are all equivalent:
@@ -81,6 +99,8 @@ To group statements, explicitly use `BEGIN` / `COMMIT`.
 
 ## Real-World: Order Placement
 
+Order placement is the canonical transaction example because it requires multiple tables to remain perfectly consistent. If the payment insert succeeds but the stock decrement fails, you would have a paid order with no inventory reduction — a real financial discrepancy. Wrapping all steps in a single transaction guarantees that either all succeed (the happy path) or all are rolled back (the failure path). The database's WAL ensures this guarantee survives even a server crash between steps.
+
 ```sql
 -- Complete order placement as one atomic operation
 BEGIN;
@@ -114,6 +134,8 @@ COMMIT;
 
 ### PostgreSQL PL/pgSQL
 
+In PL/pgSQL stored procedures, transaction control requires the `EXCEPTION ... WHEN OTHERS THEN ROLLBACK` pattern. This is analogous to a try/catch block in application code. A critical architectural detail: in PostgreSQL, a runtime error within a transaction automatically puts the transaction into an **aborted state** — you cannot execute any more SQL until you issue a `ROLLBACK`. Any attempt to run another query while in this aborted state will receive the error "ERROR: current transaction is aborted, commands ignored until end of transaction block".
+
 ```sql
 DO $$
 BEGIN
@@ -129,6 +151,8 @@ $$;
 ```
 
 ### Application Code Pattern (Node.js)
+
+The application-layer transaction pattern uses `try/catch/finally` to guarantee the connection is always released back to the pool, even on error. This is critical because a connection pool is a finite resource — a leaked connection (one not returned via `client.release()`) permanently reduces the pool's capacity until the server is restarted. The `ROLLBACK` in the catch block ensures the database transaction is properly aborted rather than left in an "idle in transaction" state, which holds locks indefinitely.
 
 ```javascript
 const client = await pool.connect();

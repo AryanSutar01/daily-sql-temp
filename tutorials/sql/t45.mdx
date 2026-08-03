@@ -1,3 +1,27 @@
+## Architecture: Why Partitioning is Mandatory at Scale
+
+Partitioning is a physical storage strategy designed to overcome the memory limits of **B-Tree Indexes**.
+
+### The B-Tree Memory Bound
+
+When a table reaches 100 million rows, its B-Tree index becomes massive (e.g., 10GB+). If the database's available RAM (`shared_buffers`) is only 8GB, the index no longer fits in memory. 
+Every `INSERT` or `SELECT` forces the database to evict a page from RAM and read a new B-Tree page from the physical disk (Cache Thrashing). Performance falls off a cliff. 
+
+By partitioning the table by month, you break the single 10GB B-Tree into twelve 800MB B-Trees. The active month's index stays permanently cached in RAM, restoring $O(\log N)$ memory-speed lookups.
+
+### Partition Pruning (Planning vs Execution)
+
+The Query Optimizer uses **Partition Pruning** to eliminate partitions. 
+- **Static Pruning (Planning Time):** If you write `WHERE created_at = '2024-01-05'`, the planner immediately excludes 11 partitions before execution even begins.
+- **Dynamic Pruning (Execution Time):** If you join a partitioned table (`orders.created_at = events.created_at`), the planner cannot know the dates in advance. Modern executors evaluate the join dynamically, pruning partitions on the fly as rows stream in.
+
+### The Sharding Abstraction (Consistent Hashing)
+
+While partitioning happens on one machine, **Sharding** distributes data across multiple independent database servers (horizontal scaling). 
+To distribute data evenly without a centralized bottleneck, distributed databases (like Citus, Vitess, or Cassandra) use **Consistent Hashing**. They hash the Shard Key (e.g., `hash(user_id)`) to map it to a logical ring, which is then mapped to physical nodes. This ensures that when you add a new database node, only a fraction of the data needs to be rebalanced across the network.
+
+---
+
 ## Partitioning
 
 Partitioning splits a single large table into smaller physical pieces (partitions) while presenting them as one logical table. Queries that filter by the partition key only scan relevant partitions - dramatically reducing I/O.
@@ -14,6 +38,8 @@ Query: SELECT * FROM orders WHERE created_at >= '2024-01-01'
 ```
 
 ## Range Partitioning (Most Common)
+
+Range partitioning is the most widely deployed strategy for time-series data. In PostgreSQL, you define the parent table with `PARTITION BY RANGE (column)` and then create child tables, each responsible for a specific value range (e.g., one year per partition). The parent table is a logical routing layer — it contains no rows itself. When you `INSERT` a row, the database automatically routes it to the correct child partition based on the `created_at` value. You must create partitions in advance; rows that don't fit any partition are rejected with an error unless you define a default partition.
 
 ```sql
 CREATE TABLE orders (
@@ -79,6 +105,8 @@ CREATE TABLE events_3 PARTITION OF events FOR VALUES WITH (MODULUS 4, REMAINDER 
 
 ## Partition Management
 
+One of the most operationally powerful features of partitioned tables is how they change the cost of data lifecycle management. To archive or delete an old year's worth of orders, instead of running `DELETE FROM orders WHERE created_at < '2022-01-01'` (which locks rows one-by-one and generates massive WAL), you `DROP TABLE orders_2021` — an instantaneous metadata operation. `DETACH PARTITION` is even better for archiving: it converts the partition back into a standalone table, keeping the data accessible without it being part of the main partitioned table anymore.
+
 ```sql
 -- Add a new year's partition
 CREATE TABLE orders_2026 PARTITION OF orders
@@ -104,6 +132,8 @@ ORDER BY pg_relation_size(child.oid) DESC;
 ```
 
 ## Partition Pruning - The Key Benefit
+
+Partition pruning is the query planner's ability to determine at plan time which partitions *cannot* contain rows matching the query's `WHERE` clause, and skip reading them entirely. For pruning to work, the `WHERE` clause must filter on the **partition key**. If you query by `customer_id` but the table is partitioned by `created_at`, the planner has no choice but to scan every partition. Always design your partition key to match your most frequent query pattern. Verify pruning is working with `EXPLAIN` and look for `"Partitions:"` in the output showing only a subset of partitions.
 
 ```sql
 -- Always include the partition key in WHERE for pruning to work:

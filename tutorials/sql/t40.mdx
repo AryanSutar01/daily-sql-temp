@@ -1,3 +1,24 @@
+## The Optimizer Physics: Why These Rules Work
+
+SQL is declarative: you tell the database *what* you want, and the optimizer figures out *how* to get it. Most SQL optimization rules exist to help the optimizer shrink the dataset earlier in the physical execution pipeline.
+
+### Predicate Pushdown and Memory Spills
+
+The most powerful optimization in a relational engine is **Predicate Pushdown**. The engine attempts to push `WHERE` clauses as close to the disk read as possible. 
+If you join two 10-million row tables, the optimizer wants to use a **Hash Join**. It must build an in-memory Hash Table of one side of the join. If you filter the data early (via a CTE or subquery), the engine only loads a few thousand rows into RAM. 
+
+If you fail to filter early, the engine must load 10 million rows into RAM. If this exceeds the `work_mem` configuration limit, the Hash Join violently **spills to disk**, breaking the execution into temporary batch files and slowing the query down by orders of magnitude.
+
+### The Heap Fetch Penalty (`SELECT *`)
+
+When you use an index (like `idx_users_email`), the B-Tree leaf node only contains the `email` string and a physical disk pointer (Row ID). 
+
+If you write `SELECT email FROM users WHERE email = 'a@b.com'`, the engine executes an **Index-Only Scan**. It grabs the email directly from the B-Tree and returns it to the client. The main table on disk (the Heap) is completely ignored. 
+
+If you write `SELECT * FROM users WHERE email = 'a@b.com'`, the engine finds the row in the index, but then is forced to execute a **Heap Fetch** — generating a random disk I/O request to jump to the main table just to retrieve the remaining columns. `SELECT *` fundamentally destroys the ability of the database to use Index-Only Scans.
+
+---
+
 ## The Golden Rule
 
 **Measure before you optimize.** Run `EXPLAIN ANALYZE` first. Optimization without measurement leads to wasted effort and sometimes makes things worse.
@@ -45,6 +66,8 @@ WHERE created_at >= '2024-06-01' AND created_at < '2024-07-01'
 
 ## 3. SELECT Only What You Need
 
+`SELECT *` is the silent killer of query performance. It forces the database to fetch every column from every matched row, making Index Only Scans impossible — a covering index cannot serve the query if the query demands columns the index doesn't store. Excessive column fetching also increases network bandwidth between the database and application server, bloats the result set in application memory, and slows JSON serialization. Always project only the columns you need.
+
 ```sql
 -- ❌ Fetches every column (10+ cols) - more data transfer, prevents index-only scans
 SELECT * FROM orders WHERE customer_id = 101;
@@ -54,6 +77,8 @@ SELECT order_id, total, created_at FROM orders WHERE customer_id = 101;
 ```
 
 ## 4. Use EXISTS Instead of COUNT for Existence Checks
+
+When you only need to know *whether* any matching row exists, `COUNT(*)` is wasteful — it forces the database to scan and count every matching row before comparing to 0. `EXISTS` short-circuits: it stops scanning the inner query the moment a single matching row is found. On a table with 10 million orders where 5 million match, `COUNT(*) > 0` reads all 5 million rows, while `EXISTS` stops at row 1. The performance difference can be orders of magnitude on large datasets.
 
 ```sql
 -- ❌ Counts all matches even though we only need to know "does any exist"
@@ -81,6 +106,8 @@ SELECT * FROM orders WHERE product_id = 5 AND customer_id != 1;
 
 ## 6. Use NOT EXISTS Instead of NOT IN
 
+`NOT IN` with a subquery has a critical NULL trap: if the subquery returns even a single NULL value, `NOT IN` returns no rows at all due to SQL's three-valued logic (`x NOT IN (1, NULL)` = UNKNOWN for all x). `NOT EXISTS` is both NULL-safe and typically faster because it maps directly to an Anti-Join physical operator, which can stop as soon as a non-match is confirmed. This is one of the most important correctness/performance substitutions in production SQL.
+
 ```sql
 -- ❌ NOT IN breaks with NULLs and is often slower
 SELECT * FROM users WHERE id NOT IN (SELECT customer_id FROM orders);
@@ -91,6 +118,8 @@ WHERE NOT EXISTS (SELECT 1 FROM orders WHERE customer_id = u.id);
 ```
 
 ## 7. Avoid Leading Wildcards in LIKE
+
+A B-Tree index stores values in sorted order. A trailing-wildcard pattern like `'Kumar%'` allows the database to jump directly to the first entry starting with 'Kumar' and scan forward — an efficient range scan. A leading-wildcard pattern like `'%Kumar'` provides no starting point in the sorted tree, forcing a full sequential scan across every row. For substring and suffix searching at scale, the correct architectural solution is a GIN index over trigrams (`pg_trgm` extension), which can support `LIKE '%Kumar%'` efficiently.
 
 ```sql
 -- ❌ Leading wildcard: full table scan (can't use index)
@@ -105,6 +134,8 @@ WHERE to_tsvector(name) @@ to_tsquery('Kumar')
 
 ## 8. Avoid Implicit Type Conversion
 
+When the data types of a predicate value and a column don't match, the database must cast one side to match the other. When the column is cast (e.g., `CAST(customer_id AS TEXT) = '101'`), the index on `customer_id` becomes unusable because the index stores integers, not strings. Always match your literal values to the column's declared type — use integer literals for integer columns and properly formatted date strings for timestamp columns.
+
 ```sql
 -- ❌ customer_id is INT, string comparison forces type conversion
 WHERE customer_id = '101'
@@ -114,6 +145,8 @@ WHERE customer_id = 101
 ```
 
 ## 9. Limit Large Result Sets
+
+Fetching millions of rows from a database to the application layer and filtering in application code is a catastrophic anti-pattern. Every fetched row consumes network bandwidth, connection buffer memory, and application heap space. The database's predicate engine is designed for exactly this filtering task — it has indexes, vectorized execution, and operates where the data lives. Always push filtering, sorting, and pagination into the SQL layer, and always paginate large results.
 
 ```sql
 -- ❌ Returns 10M rows to application, then app filters
@@ -127,6 +160,8 @@ LIMIT 100;
 ```
 
 ## 10. Batch Large Updates and Deletes
+
+A single `DELETE FROM logs WHERE created_at < '2023-01-01'` on a 50-million-row table will take minutes. During that time, it holds an exclusive lock on every deleted row, blocking any concurrent transactions that need to read or modify those rows. Worse, the WAL (Write-Ahead Log) for a single massive delete can fill up disk space. The correct pattern is to batch the operation into small chunks — 10,000 rows at a time — committing each batch independently. This releases locks between batches, allows other transactions to proceed, and prevents WAL bloat.
 
 ```sql
 -- ❌ Locks the table for the entire duration on 10M rows

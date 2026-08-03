@@ -1,5 +1,69 @@
 # PySpark MLlib Basics
 
+## How Distributed Machine Learning Works in MLlib
+
+Before using MLlib, you need to understand **how training is distributed** across the cluster. MLlib algorithms don't work like their scikit-learn equivalents — they must handle the fact that training data is split across hundreds of partitions on different machines.
+
+### The Map-Reduce Training Pattern
+
+Most MLlib algorithms use a **map-reduce** pattern for each training iteration:
+
+```
+Iteration N of Gradient Descent:
+
+MAP phase (runs on each executor):
+  Each executor has its local partition of training data
+  For each row: compute gradient using current model parameters
+  Sum gradients within the partition → local_gradient
+  
+REDUCE phase (aggregated to Driver):
+  Collect local_gradient from all executors
+  Sum all local_gradients → global_gradient
+  Update model parameters: weights -= learning_rate × global_gradient
+  Broadcast updated weights back to all executors
+
+Repeat for Iteration N+1
+```
+
+This means for a model with 100M training rows across 200 partitions:
+- Each executor processes 500K rows locally (no network transfer for data)
+- Only **gradient vectors** are sent over the network (small, regardless of data size)
+- The model parameters (weights) are broadcast back to all executors each iteration
+
+### Why MLlib is Only for Large Data
+
+The map-reduce training overhead — broadcasting parameters, collecting gradients — has a **fixed cost per iteration** that is independent of data size. For small datasets (< a few GB), this overhead dominates the actual computation:
+
+```
+Total training time = N_iterations × (computation_time + network_overhead)
+
+10GB dataset with scikit-learn:  computation=2s,  overhead=0s  → 20s total
+10GB dataset with MLlib (50 execs): comp=0.04s each, overhead=2s/iter → 200s total
+
+100GB dataset with scikit-learn:  doesn't fit in RAM → impossible
+100GB dataset with MLlib (50 execs): comp=2s, overhead=2s/iter → 400s total (feasible)
+```
+
+### VectorAssembler and the Dense/Sparse Representation
+
+MLlib requires all features to be packed into a single column of type `DenseVector` or `SparseVector`. This is because the underlying linear algebra (matrix multiplication, gradient computation) requires contiguous memory for BLAS (Basic Linear Algebra Subprograms) operations:
+
+```
+Row representation for ML:
+  label: 1.0
+  features: DenseVector([23.0, 55000.0, 12.0, 7.0])
+  
+Stored in Tungsten off-heap as:
+  [1.0 | 23.0 | 55000.0 | 12.0 | 7.0]  ← contiguous memory block
+  
+BLAS operates on this memory directly:
+  dot product, matrix multiply → no object creation, no GC pressure
+```
+
+`SparseVector` is used automatically for high-cardinality one-hot encoded features (e.g., 10,000 product IDs → only non-zero values stored), saving memory and speeding up matrix operations.
+
+---
+
 ## What is MLlib?
 
 **MLlib** is Apache Spark's built-in machine learning library. It provides scalable ML algorithms, feature engineering utilities, and model evaluation tools that run in a distributed fashion across a Spark cluster.

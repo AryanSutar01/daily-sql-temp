@@ -1,3 +1,83 @@
+## Aggregate Functions: How the Database Engine Computes Them
+
+Aggregate functions look simple in SQL, but their physical implementation determines both correctness (in the presence of NULLs) and performance (especially with DISTINCT).
+
+### HashAggregate: The Physical Implementation of GROUP BY
+
+When you write `GROUP BY`, the database typically uses a **HashAggregate** operator:
+
+```
+Query: SELECT city, COUNT(*), SUM(salary) FROM employees GROUP BY city;
+
+HashAggregate execution:
+  1. Read rows one by one from the source (sequential scan or index scan)
+  
+  2. For each row [city='Mumbai', salary=80000]:
+     Compute hash of group key: hash('Mumbai') = 42
+     Look up hash table slot 42:
+       If not found: create new entry {city='Mumbai', count=0, sum=0}
+       Increment: {city='Mumbai', count=1, sum=80000}
+  
+  3. For each row [city='Delhi', salary=60000]:
+     hash('Delhi') = 17
+     Create: {city='Delhi', count=1, sum=60000}
+  
+  4. For each row [city='Mumbai', salary=95000]:
+     hash('Mumbai') = 42
+     Found! Increment: {city='Mumbai', count=2, sum=175000}
+  
+  5. After all rows processed:
+     Emit one result row per hash table entry:
+     ('Mumbai', 2, 175000), ('Delhi', 1, 60000), ...
+```
+
+**Memory requirement**: The hash table must fit in `work_mem` (PostgreSQL). If it doesn't fit, the database spills to disk using a Grace Hash Join variant — dramatically slower. For large GROUP BY operations on high-cardinality columns, increase `work_mem`.
+
+### Two-Phase Aggregation: Partial + Final
+
+For distributed databases and even single-node query optimization, aggregation is often split into **two phases** to minimize data movement:
+
+```
+Two-phase COUNT(*) by city on a partitioned table:
+
+Phase 1 (Partial HashAggregate — one per partition):
+  Partition 1 scan: {Mumbai: 3000, Delhi: 1500, Pune: 800}
+  Partition 2 scan: {Mumbai: 2500, Delhi: 900,  Pune: 1200}
+
+Phase 2 (Final HashAggregate — merge partial results):
+  Merge Mumbai: 3000 + 2500 = 5500
+  Merge Delhi:  1500 + 900  = 2400
+  Merge Pune:   800  + 1200 = 2000
+
+Result: {Mumbai: 5500, Delhi: 2400, Pune: 2000}
+```
+
+This is why EXPLAIN plans for GROUP BY often show TWO HashAggregate nodes — one partial and one final. Partial aggregation dramatically reduces the data transferred between query stages.
+
+### The Cost of COUNT(DISTINCT col)
+
+`COUNT(DISTINCT col)` requires tracking all unique values seen so far — this cannot be computed incrementally like COUNT(*):
+
+```sql
+-- COUNT(*): O(1) memory per group
+SELECT city, COUNT(*) FROM employees GROUP BY city;
+-- For each city: just keep a running counter (1 integer per group)
+
+-- COUNT(DISTINCT dept): O(cardinality) memory per city!
+SELECT city, COUNT(DISTINCT dept) FROM employees GROUP BY city;
+-- For each city: must keep ALL unique dept values seen
+-- If Mumbai has employees in 50 departments:
+--   Hash set for Mumbai: {Engineering, Sales, Marketing, ..., HR} = 50 entries
+-- Across all cities: potentially millions of values in memory
+
+-- At very large scale: use HyperLogLog for approximate COUNT(DISTINCT)
+-- PostgreSQL extension: CREATE EXTENSION hll;
+-- SELECT city, hll_cardinality(hll_add_agg(hll_hash_text(dept)))
+-- Returns approximate count with ~2% error but uses O(log log N) memory
+```
+
+---
+
 ## What Are Aggregate Functions?
 
 Aggregate functions collapse multiple rows into a single summary value. Instead of returning one row per record, they return one value per group.

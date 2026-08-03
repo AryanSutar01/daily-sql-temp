@@ -1,3 +1,61 @@
+## The JVM–Python Serialization Boundary: Why It Matters
+
+The fundamental performance difference between RDD and DataFrame APIs comes down to **where computation happens** relative to the JVM–Python boundary.
+
+### What Happens With a Python RDD Lambda
+
+When you write `rdd.map(lambda x: x * 2)`, the execution path is:
+
+```
+JVM Executor Task
+    │
+    ▼
+Serialize each row into Python pickle bytes
+    │  (serialization is CPU-intensive)
+    ▼
+Send over Unix socket to Python worker process (subprocess)
+    │  (forked per-task, has startup cost)
+    ▼
+Python process deserializes bytes → executes lambda → re-serializes result
+    │  (Python GIL limits concurrency)
+    ▼
+Result bytes sent back over socket to JVM
+    │
+    ▼
+JVM deserializes result and continues pipeline
+```
+
+This round-trip happens **for every partition**, not every row — but a 1GB partition with 10M rows still means pickling 10M Python objects. The pickle serialization alone typically takes 3–10x the actual computation time.
+
+### What Happens With a DataFrame Operation
+
+When you write `df.filter(col("amount") > 100)`, no Python code runs during execution:
+
+```
+Catalyst Optimizer (runs at query planning time in JVM)
+    │
+    ▼
+Generates optimized physical plan:
+  Filter (amount#5 > 100)
+    │
+    ▼
+Tungsten compiles this to JVM bytecode:
+  for (row in partition) {
+    if (row.getLong(5) > 100) emit(row);
+  }
+    │
+    ▼
+Executes entirely in JVM — Python process is idle during computation
+```
+
+The Python process only submits the query plan. The actual data processing runs in the JVM without ever crossing the language boundary. This is why DataFrame is typically **10–100x faster** than RDD with Python lambdas.
+
+### The Exception: Python UDFs
+
+When you create a Python UDF with `@udf`, you **re-introduce the serialization boundary** even for DataFrame operations. Spark must serialize each row to Python, execute the Python function, and serialize the result back. This is why: **always prefer built-in `pyspark.sql.functions` over Python UDFs** — built-ins execute in the JVM, UDFs don't.
+
+---
+
 ## The Three Abstractions
 
 Spark provides three APIs for working with data. Understanding the differences is one of the most common Spark interview topics.

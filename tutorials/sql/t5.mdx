@@ -1,3 +1,94 @@
+## SQL's Logical Processing Order: The Most Critical Concept
+
+The single most important concept in SQL that 90% of beginners misunderstand: **the order you write SQL clauses is NOT the order they execute**. This explains dozens of confusing behaviors — from why you can't use a SELECT alias in WHERE, to why GROUP BY must come before HAVING.
+
+### The Logical Processing Order
+
+```
+Written order (how you type it):
+  SELECT     col, AGG(col)
+  FROM       table
+  WHERE      condition
+  GROUP BY   col
+  HAVING     condition
+  ORDER BY   col
+  LIMIT      n;
+
+Logical execution order (how the database processes it):
+  Step 1: FROM       → which table(s)? resolve joins
+  Step 2: WHERE      → filter rows from the raw source
+  Step 3: GROUP BY   → group the filtered rows
+  Step 4: HAVING     → filter groups (can use aggregate functions)
+  Step 5: SELECT     → compute output columns + aliases
+  Step 6: DISTINCT   → remove duplicates (after SELECT)
+  Step 7: ORDER BY   → sort (can reference SELECT aliases!)
+  Step 8: LIMIT      → take first N rows
+```
+
+This order explains several "gotchas":
+
+```sql
+-- WHY this fails: WHERE runs at Step 2, before SELECT (Step 5)
+-- annual_salary alias doesn't exist yet at Step 2!
+SELECT salary * 12 AS annual_salary
+FROM employees
+WHERE annual_salary > 600000;  -- ❌ ERROR: column "annual_salary" doesn't exist
+
+-- WHY this works: ORDER BY runs AFTER SELECT (Step 7)
+SELECT salary * 12 AS annual_salary
+FROM employees
+ORDER BY annual_salary DESC;  -- ✅ Works! ORDER BY can see SELECT aliases
+
+-- WHY WHERE can't use aggregate functions (GROUP BY happens after WHERE):
+SELECT dept, AVG(salary)
+FROM employees
+WHERE AVG(salary) > 80000;  -- ❌ ERROR: aggregate functions not allowed in WHERE
+-- WHERE sees individual rows (Step 2), not groups (Step 3)
+
+-- HAVING is the correct place for aggregate conditions:
+SELECT dept, AVG(salary) AS avg_sal
+FROM employees
+GROUP BY dept
+HAVING AVG(salary) > 80000;  -- ✅ HAVING runs after GROUP BY (Step 4 > Step 3)
+```
+
+### How the Database Actually Executes: Physical vs Logical Order
+
+The **logical order** above is the semantic contract — what results you should get. The database optimizer may execute in a completely different physical order for performance:
+
+```
+Logical:  FROM → WHERE → GROUP BY → SELECT
+Physical (optimizer may choose):
+  1. Use an index on dept to skip most rows (skipping WHERE full scan)
+  2. Apply WHERE predicate as rows come from the index
+  3. Accumulate groups into a hash table (HashAggregate)
+  4. Project only needed columns (no full row materialization)
+
+The RESULT is the same as the logical order, but execution is different.
+```
+
+This is the key distinction: SQL describes **what** you want (declarative), not **how** to get it. The optimizer decides the physical "how."
+
+### COUNT(*) vs COUNT(col) vs COUNT(DISTINCT col) Internals
+
+```sql
+-- COUNT(*): counts ALL rows including NULLs — fastest
+SELECT COUNT(*) FROM orders;
+-- Internally: just increment a counter for each row, no column read needed
+
+-- COUNT(col): counts only NON-NULL values in that column
+SELECT COUNT(customer_id) FROM orders;
+-- Internally: read customer_id column, check null bit, skip if null
+
+-- COUNT(DISTINCT col): count unique non-null values
+SELECT COUNT(DISTINCT customer_id) FROM orders;
+-- Internally: build a hash set of all customer_ids, then count the set size
+-- Most expensive: requires memory for the hash set (can OOM on large tables)
+-- For very large cardinalities: use HyperLogLog approximation instead
+```
+
+---
+
 ## The SELECT Statement
 
 `SELECT` is the most-used SQL command. It retrieves data from one or more tables. Every data query starts with SELECT.

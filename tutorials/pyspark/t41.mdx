@@ -1,5 +1,80 @@
 # Execution Plan with explain()
 
+## Reading Execution Plans: A Systematic Approach
+
+`explain()` output looks intimidating at first, but every node in the physical plan has a specific meaning. Learning to identify the 5 most important nodes tells you almost everything about a query's performance characteristics.
+
+### The 5 Critical Nodes to Identify Immediately
+
+```
+1. Exchange (= SHUFFLE)
+   Exchange hashpartitioning(country#12, 200)
+   ↑ A shuffle happens here. This is a STAGE BOUNDARY.
+   The number (200) is spark.sql.shuffle.partitions.
+   Every Exchange is a potential performance bottleneck.
+
+2. Sort (= SORT required before this step)
+   Sort [salary#5L ASC NULLS FIRST], false, 0
+   ↑ Sorting is required. Appears before SortMergeJoin and orderBy.
+   If you see Sort inside a BroadcastHashJoin plan → something is wrong.
+
+3. BroadcastHashJoin (= NO SHUFFLE JOIN)
+   BroadcastHashJoin [dept_id#1], [dept_id#10], Inner, BuildRight
+   ↑ One side is broadcast. This is FAST. BuildRight = right side is the hash table.
+   
+4. SortMergeJoin (= BOTH SIDES SHUFFLED AND SORTED)
+   SortMergeJoin [id#1], [id#10], Inner
+   ↑ Both sides were shuffled AND sorted. Expensive but necessary for large-large joins.
+   If you expected BroadcastHashJoin here: check autoBroadcastJoinThreshold.
+
+5. HashAggregate (= AGGREGATION)
+   HashAggregate(keys=[dept#3], functions=[sum(salary#5)])
+   ↑ Often appears TWICE: once for partial aggregation (map-side), once for final.
+   If you see ONLY one HashAggregate: something is wrong with the two-stage model.
+```
+
+### Reading a Full Plan Example
+
+```
+== Physical Plan ==
+*(3) HashAggregate(keys=[country#12], functions=[sum(amount#5L)])   ← Stage 2: final agg
++- Exchange hashpartitioning(country#12, 200)                       ← SHUFFLE (Stage 1→2)
+   +- *(1) HashAggregate(keys=[country#12], functions=[partial_sum(amount#5L)])  ← Stage 1: partial agg
+      +- *(1) Filter (amount#5L > 100)                             ← pushed down filter
+         +- *(1) ColumnarToRow                                      ← convert Parquet to rows
+            +- FileScan parquet [amount#5L,country#12]              ← only 2 cols read (column pruning!)
+               PushedFilters: [IsNotNull(amount), GreaterThan(amount,100)]  ← predicate pushdown!
+               PartitionFilters: [isnotnull(year#8), (year#8 = 2024)]       ← partition pruning!
+```
+
+Reading this plan tells you:
+- **Stage 1**: FileScan → Filter → partial HashAggregate (no shuffle, 1 stage)
+- **Stage 2**: final HashAggregate after shuffle
+- Predicate pushdown is working (`PushedFilters`)
+- Column pruning is working (only 2 columns in FileScan)
+- Partition pruning is working (`PartitionFilters`)
+
+This plan looks **optimal**. A non-optimal version would show:
+- No `PushedFilters` → filter not pushed to data source
+- All columns in FileScan → no column pruning
+- SortMergeJoin where BroadcastHashJoin expected → threshold issue
+
+### explain() Mode Reference
+
+```python
+df.explain()                          # default: shows Physical Plan only
+df.explain("simple")                  # alias for default
+df.explain("extended")                # Logical + Optimized + Physical Plans
+df.explain("codegen")                 # Physical Plan + generated Java code
+df.explain("cost")                    # Physical Plan + estimated cost (AQE stats)
+df.explain("formatted")               # Spark 3.0+: prettily formatted with node IDs
+```
+
+**For debugging**: Start with `"formatted"` (Spark 3.0+) — it shows tree structure clearly.
+**For deep optimization**: Use `"codegen"` to see whether Tungsten's whole-stage codegen fired (look for `WholeStageCodegen` wrapper around nodes).
+
+---
+
 ## What is an Execution Plan?
 
 When you write a PySpark query, Spark doesn't execute it immediately. Instead, it builds a **logical plan** (what you want to do) and then converts it into an **optimized physical plan** (how to actually do it). This is called the **query execution plan**.

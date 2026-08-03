@@ -1,5 +1,106 @@
 # Checkpointing in PySpark
 
+## Why Lineage Truncation Is Critical: The Stack Overflow Problem
+
+Checkpointing is not primarily about fault tolerance — it is about **lineage graph management**. As transformations accumulate, the RDD lineage DAG grows larger and eventually causes serious problems.
+
+### The Growing Lineage Problem in Iterative Algorithms
+
+Machine learning algorithms, graph processing, and streaming pipelines apply the same transformation repeatedly:
+
+```python
+# Iterative ML training (simplified):
+weights = initial_weights
+for i in range(1000):
+    gradient = compute_gradient(data, weights)  # transformation
+    weights = weights - 0.01 * gradient          # more transformations
+# After 1000 iterations: weights has 1000+ transformations in its lineage!
+
+# When you call weights.collect() at the end:
+# Spark must traverse a DAG with 1000+ nested levels to build the execution plan
+# JVM Stack: each lineage level = one stack frame
+# 1000 levels = JVM StackOverflowError
+```
+
+Without checkpointing, every additional iteration makes the lineage longer. After ~100-200 iterations, you hit `java.lang.StackOverflowError` in the Catalyst optimizer's recursive traversal.
+
+### How Checkpoint Severs the Lineage
+
+```python
+# Without checkpoint (after 100 iterations):
+weights_rdd.toDebugString()
+# (1) MapPartitionsRDD → MapPartitionsRDD → ... (100 levels deep) → ParallelCollectionRDD
+
+# With checkpoint every 10 iterations:
+sc.setCheckpointDir("hdfs://cluster/checkpoints/")
+
+for i in range(100):
+    weights = update_weights(weights)
+    if i % 10 == 0:
+        weights.checkpoint()
+        weights.count()  # FORCE checkpoint to materialize NOW
+
+# After checkpoint:
+# weights.toDebugString():
+# (1) ReliableCheckpointRDD (lineage starts HERE, previous 10 levels GONE)
+# Lineage is always at most 10 levels deep regardless of total iterations!
+```
+
+When `checkpoint()` is called and materialized, Spark:
+1. Writes the RDD/DataFrame to the checkpoint directory (reliable storage)
+2. **Severs the parent reference** in the RDD's lineage graph
+3. On subsequent access, reads from checkpoint files instead of recomputing
+
+### Reliable vs Local Checkpoint: The Trade-Off
+
+```python
+# Reliable Checkpoint (default): saves to HDFS/S3
+sc.setCheckpointDir("hdfs://namenode/checkpoints/")
+df.checkpoint()
+# + Survives executor AND driver failure
+# + Lineage completely severed: can restart from checkpoint after cluster restart
+# - Expensive: write to HDFS (network I/O, replication factor 3 by default)
+# - Requires HDFS setup
+
+# Local Checkpoint (Spark 2.0+): saves to executor local disk
+df.localCheckpoint()
+# + Fast: write to local disk (no network for write)
+# + No HDFS/external storage required
+# - NOT fault-tolerant: if the executor dies, checkpoint is lost
+# - Does NOT sever lineage for fault recovery — only speeds up access
+# - Best for: iterative algorithms where failure recovery is acceptable
+#   (just restart the job)
+```
+
+### When to Use Cache vs Checkpoint
+
+```
+Cache (.cache()):
+  ✓ Fastest access (stays in memory)
+  ✓ Does NOT sever lineage (lineage preserved for fault recovery)
+  ✗ Lost if executor dies → falls back to recomputation
+  ✗ Does NOT solve StackOverflowError (lineage still there)
+  Use for: reusing intermediate DataFrames within one job
+
+Checkpoint (.checkpoint()):
+  ✓ Severs lineage → solves StackOverflowError
+  ✓ Reliable storage → survives executor failure
+  ✗ Slow (HDFS write + replicate)
+  ✗ Requires explicit materialization (need a count() after checkpoint())
+  Use for: iterative algorithms, long streaming jobs (every N batches)
+
+Both together (cache THEN checkpoint):
+  df.cache()
+  df.checkpoint()
+  ✓ First call reads from cache (fast)
+  ✓ checkpoint() reads cached data instead of recomputing
+  → Checkpoint is fast AND lineage is severed
+  Use for: production iterative pipelines where both performance and fault
+           tolerance are critical
+```
+
+---
+
 ## What is Checkpointing?
 
 **Checkpointing** is the process of saving the current state of an RDD or DataFrame to a reliable storage system (like HDFS or cloud storage) and severing its **lineage**. Once checkpointed, Spark doesn't need to recompute the data from the original source - it reads directly from the checkpoint files.

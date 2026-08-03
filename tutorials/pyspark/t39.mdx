@@ -1,5 +1,106 @@
 # Shuffling & Its Performance Cost
 
+## The Three-Phase Shuffle Lifecycle
+
+A shuffle in Spark is not a single operation — it is a **three-phase distributed process** that crosses stage boundaries and involves both disk I/O and network transfer. Understanding each phase explains why shuffles dominate job latency.
+
+### Phase 1: Shuffle Write (Map Side)
+
+Each task in the preceding stage (the "map" stage) writes its output sorted by partition key:
+
+```
+Executor A, Task for Partition 0:
+  Processes rows:
+    {user=Alice,  country=IN,  amount=100}
+    {user=Bob,    country=US,  amount=200}
+    {user=Carol,  country=IN,  amount=150}
+
+  groupBy("country") → hash("IN") % 200 = 42, hash("US") % 200 = 87
+
+  Sort rows by destination partition:
+    Dest partition 42: [{Alice, IN, 100}, {Carol, IN, 150}]
+    Dest partition 87: [{Bob, US, 200}]
+
+  Write to LOCAL DISK as shuffle files:
+    /tmp/spark-shuffle/app_id/executor_0/
+      shuffle_0_0_42.data   (42 = dest partition)
+      shuffle_0_0_87.data
+      shuffle_0_0_42.index  (byte offsets for fast seek)
+```
+
+**Key cost**: Every shuffle map task writes ALL its output to local disk before any reduce task can start. This is why shuffle disk I/O is a bottleneck.
+
+### Phase 2: Network Transfer
+
+Reduce-side tasks (in the next stage) **pull** their shuffle data from all map-side executors:
+
+```
+Executor B, Task for Partition 42 (country=IN):
+  Needs shuffle data from ALL previous-stage executors
+  
+  Sends HTTP requests to Spark's shuffle service:
+    GET executor_A/shuffle_0_0_42.data  → 2 rows (Alice, Carol)
+    GET executor_B/shuffle_0_0_42.data  → 3 rows (Dave, Eve, Frank)
+    GET executor_C/shuffle_0_0_42.data  → 0 rows (no IN users on executor C)
+    ...
+  
+  This is a network fan-out: each reduce task reads from ALL map tasks
+  200 partitions × 100 executors = 20,000 individual HTTP fetches per stage
+```
+
+### Phase 3: Shuffle Read (Reduce Side)
+
+Received data is merged, sorted (for sort-merge join / orderBy), and processed:
+
+```
+Executor B receives:
+  [Alice, IN, 100], [Carol, IN, 150], [Dave, IN, 80], [Eve, IN, 200]
+
+If groupBy+sum: HashAggregate → sum(amount) = 530
+If orderBy:    Sort → [Alice:100, Dave:80, Carol:150, Eve:200]
+```
+
+### Sort-Based vs Hash-Based Shuffle
+
+Spark's default is **sort-based shuffle** (since Spark 1.6):
+
+```
+Sort-Based (default: SortShuffleManager):
+  Map side: sort rows by partition key → write to ONE merged file per executor
+  + Only 1 file per map task (less file system pressure)
+  + Better for sequential disk I/O
+  - Requires sorting cost on map side
+
+Hash-Based (legacy, deprecated):
+  Map side: write separate file per destination partition
+  + No sorting cost
+  - N_partitions files per map task → too many open files for large N
+  - Causes "too many open files" errors with 200+ partitions
+```
+
+### Shuffle Spill-to-Disk
+
+When the sort buffer on the map side exceeds `spark.shuffle.spill.compress` memory threshold:
+
+```
+Map side sort buffer: 64MB default
+  Accumulates rows sorted by partition key...
+  Buffer reaches 64MB → SPILL to disk:
+    Write sorted partial buffer to spill file on local disk
+    
+  Continue accumulating...
+  Buffer reaches 64MB again → SPILL again
+
+  At end of task: merge all spill files + remaining buffer
+  → Final sorted shuffle output file
+
+Multiple spills = multiple disk read+writes per task!
+```
+
+Setting `spark.shuffle.sort.bypassMergeThreshold` (default 200) — if the number of output partitions is below this threshold, Spark bypasses sorting (no spill needed for small partition counts).
+
+---
+
 ## What is a Shuffle?
 
 A **shuffle** is the process of redistributing data across partitions - typically across different executors and machines in a cluster. It happens when Spark needs to bring together data that is spread across multiple nodes to complete an operation.

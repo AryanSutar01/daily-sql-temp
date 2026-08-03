@@ -7,6 +7,68 @@ In distributed computing, variables are copied to each executor independently. I
 | **Broadcast variable** | Driver → all executors (read-only) | Share a lookup table with all workers |
 | **Accumulator** | Executors → Driver (write-only from executors) | Count errors, track metrics across tasks |
 
+### The Closure Serialization Problem That Broadcast Solves
+
+When you reference a Python variable inside a transformation, Spark serializes the variable into every task's **closure** — a snapshot of all variables the lambda needs:
+
+```python
+lookup_dict = load_large_dict()  # 500MB dictionary
+
+# ❌ Without broadcast: dict is serialized into EVERY task!
+df.filter(lambda row: lookup_dict.get(row.id, False))
+# 200 tasks × 500MB = 100GB of serialization overhead!
+# Each task receives its own full copy
+
+# ✅ With broadcast: dict is transferred ONCE per executor
+lookup = spark.sparkContext.broadcast(lookup_dict)
+df.filter(lambda row: lookup.value.get(row.id, False))
+# Only 10 executors receive the 500MB once each = 5GB total
+# All tasks on an executor share the single local copy
+```
+
+The broadcast protocol: Driver serializes → sends to a few executors → those executors act as peers and send to others (BitTorrent-like), minimizing driver bandwidth bottleneck.
+
+### Accumulator Retry-Safety: A Critical Subtlety
+
+Accumulators appear to count events across tasks, but there is a **critical safety constraint** that most tutorials miss:
+
+```python
+error_count = spark.sparkContext.accumulator(0)
+
+def process_row(row):
+    if row.amount < 0:
+        error_count.add(1)  # increment accumulator
+    return row
+
+df.foreach(process_row)
+```
+
+**Problem**: Spark can **retry failed tasks** (e.g., if an executor dies). If a task runs twice (original + retry), the accumulator gets incremented **twice** for the same data:
+
+```
+Task for Partition 5 runs on Executor A:
+  Processes 100 rows, adds 5 to accumulator
+  Executor A crashes mid-stage!
+
+Spark retries Partition 5 on Executor B:
+  Processes same 100 rows AGAIN, adds 5 more to accumulator
+  
+Final accumulator value: 10 (overcounted — should be 5)
+```
+
+**Spark's guarantee**: Accumulator updates inside **transformations** (lazy) are not guaranteed to be exact — they may double-count on retry. Only updates inside **actions** (eager) are counted once per job. This is why accumulators are suitable for debugging/monitoring purposes but not for exact business metrics.
+
+```python
+# ✅ Use accumulators for approximate monitoring:
+error_count = spark.sparkContext.accumulator(0)
+df.filter(lambda row: row.amount >= 0 or (error_count.add(1) or True)) \
+  .count()
+print(f"Approx error count: {error_count.value}")
+
+# ✅ For exact counts, use aggregations:
+exact_error_count = df.filter(col("amount") < 0).count()
+```
+
 ## Broadcast Variables
 
 A broadcast variable ships a **read-only** value from the driver to all executors once - avoiding the cost of serializing it with every task.

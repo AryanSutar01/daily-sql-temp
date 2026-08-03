@@ -1,3 +1,22 @@
+## Algorithmic Architecture: Set Theory vs Procedural Iteration
+
+"Gaps and Islands" problems are notoriously difficult in SQL because they expose the fundamental difference between **Set Theory** and **Procedural Iteration**.
+
+### The Procedural Bottleneck
+
+If you were writing this in Python or Go, finding consecutive days is trivial: you iterate through a sorted array, keeping a running counter. $O(N)$ time, $O(1)$ memory. 
+SQL, however, is a declarative language based on relational algebra. It operates on sets of data simultaneously, not iteratively. It has no concept of "the previous row" without explicitly linking the set to itself.
+
+### The Tabibitosan Algorithm and Sort Penalties
+
+To solve this relationally, engineers use the **Tabibitosan Method** (subtracting a generated `ROW_NUMBER()` from the date). 
+While mathematically elegant, it carries a severe architectural penalty: **Sorting**.
+To generate the `ROW_NUMBER()`, the database must execute a massive $O(N \log N)$ Sort operation on the entire dataset. For a table with 100 million login events, this sort will completely exhaust RAM and spill to temporary disk files, taking minutes to execute.
+
+**Architectural Rule**: For massive datasets, pure SQL Gaps and Islands queries become computationally unviable. In high-volume systems (like IoT sensor streams or high-frequency trading), sessionization and island detection must be handled by stream processing engines (like Apache Flink or Kafka Streams) *before* the data lands in the database.
+
+---
+
 # What are Gap & Island Problems?
 
 - **Islands** - consecutive sequences of rows (e.g., consecutive login days, consecutive IDs)
@@ -67,6 +86,10 @@ ORDER BY longest_streak DESC;
 
 ## Grouping Events into Sessions (30-min gap = new session)
 
+Sessionization is a fundamental problem in product analytics: a user's raw event log is a flat stream of timestamps, but analysts need to understand *sessions* — discrete visit windows. The standard industry rule is: if more than 30 minutes pass between two events from the same user, the second event starts a new session.
+
+The algorithm uses three CTEs. First, `LAG()` computes the gap to the previous event. Second, a `CASE` statement marks any event that starts a new session (gap > 30 min, or the user's first event). Third, a cumulative `SUM(is_new_session) OVER (PARTITION BY user_id ORDER BY event_time)` converts those flags into monotonically increasing session IDs. This is a powerful pattern because `SUM` of a 0/1 flag over an ordered window acts as a counter that increments only at boundaries.
+
 ```sql
 WITH events_with_gap AS (
   SELECT
@@ -109,6 +132,8 @@ ORDER BY user_id, session_start;
 
 ## Finding Missing IDs (Gaps in Sequence)
 
+Missing IDs in an auto-increment sequence often indicate deleted rows, failed insertions, or data corruption. Detecting them requires finding all integers in a range that have no corresponding row. PostgreSQL's `generate_series()` function generates a complete sequence from `MIN(id)` to `MAX(id)`, and a `LEFT JOIN` with `WHERE o.id IS NULL` reveals which generated IDs don't exist in the actual table. The self-join method is the ANSI-portable alternative for databases without `generate_series()`.
+
 ```sql
 -- Method 1: generate_series (PostgreSQL)
 SELECT s.id AS missing_id
@@ -133,6 +158,8 @@ ORDER BY gap_start;
 
 ## Finding Missing Dates
 
+A common analytics problem is identifying dates with zero activity — days when no orders were placed, no logins occurred, or a pipeline produced no output. The key insight is that a `GROUP BY date` query will simply omit those dates entirely; they produce no rows to group. The solution is to generate a complete date spine (a reference table of every date) and LEFT JOIN the actual data against it, then filter for `WHERE o.id IS NULL` to find dates present in the spine but absent in reality.
+
 ```sql
 -- All dates in 2024 with no orders
 WITH all_dates AS (
@@ -150,6 +177,8 @@ ORDER BY date;
 ```
 
 ## Consecutive Rows with Same Value (Islands of a Status)
+
+The classic island problem — grouping consecutive rows that share the same value — requires a two-step approach. You generate two different `ROW_NUMBER()` sequences: one over all rows regardless of status (`rn`), and one partitioned by status (`rn_status`). When you subtract `rn - rn_status`, consecutive rows with the same status produce the same constant value. This constant becomes the "island group" key, which you then `GROUP BY` to aggregate each consecutive island into a single start-to-end time range.
 
 ```sql
 -- Find periods where a server was 'down' (consecutive rows with status='down')

@@ -1,3 +1,22 @@
+## The Physics of Isolation: Snapshots vs Serialization
+
+Isolation levels are a spectrum of trade-offs between **Data Correctness** and **System Throughput**. 
+
+### Snapshot Isolation (REPEATABLE READ)
+
+In PostgreSQL, the `REPEATABLE READ` isolation level is implemented using **Snapshot Isolation**. When the transaction begins, the database takes a logical "snapshot" of the MVCC state. The transaction only sees row versions that were committed *before* that exact microsecond.
+This is incredibly fast because it requires no read locks. However, it cannot prevent complex logical anomalies (like "Write Skew"), where two transactions read overlapping data and both decide to make conflicting writes based on stale snapshots.
+
+### Serializable Snapshot Isolation (SSI)
+
+To achieve true `SERIALIZABLE` isolation without destroying performance with table-level locks, modern databases use **SSI (Serializable Snapshot Isolation)**. 
+Under SSI, the database tracks every row that every transaction reads. If the database detects a cycle in the dependency graph (e.g., Transaction A read data that Transaction B just modified, and vice-versa), it realizes that these transactions cannot be safely serialized. 
+The database will deliberately **abort** one of the transactions with a serialization failure. 
+
+**Architectural Rule**: If you use `SERIALIZABLE` isolation, your application code *must* be wrapped in a retry loop. Serialization failures are not bugs; they are the architectural mechanism by which the database enforces strict correctness.
+
+---
+
 ## The Problem
 
 When multiple transactions run simultaneously, three types of anomalies can occur:

@@ -1,3 +1,24 @@
+## Denormalization: Trade-offs in Distributed Architectures
+
+Denormalization is the architectural admission that joining massive tables at runtime is too computationally expensive for the CPU and memory bandwidth. It is a calculated violation of 3NF (Third Normal Form) to prioritize **Read Latency** over **Write Throughput**.
+
+### The CAP Theorem and Relational Data
+
+While the CAP theorem strictly applies to distributed systems, a similar trade-off exists when denormalizing a single relational database: you are trading immediate consistency for performance.
+
+If you store the `user_name` directly in the `comments` table (denormalization), what happens when the user changes their name?
+1. **Synchronous Update (High Consistency):** You write a trigger that locks the `users` row and scans all 5,000 of the user's comments to update the name. This causes massive lock contention and destroys write throughput.
+2. **Asynchronous Update (Eventual Consistency):** You update the `users` table immediately, and queue a background job to update the 5,000 comments. The database reads are incredibly fast, but for a few seconds (or minutes), the data is stale (Eventually Consistent).
+
+### OLTP vs OLAP Architectures
+
+- **OLTP (Online Transaction Processing):** E-commerce checkouts, banking ledgers. The priority is data integrity, ACID compliance, and fast writes. **Rule:** Keep OLTP heavily normalized. Let the application cache handle read performance.
+- **OLAP (Online Analytical Processing):** Data warehouses, reporting dashboards. The priority is scanning billions of rows to calculate aggregates. **Rule:** Heavily denormalize into Star Schemas (Fact and Dimension tables). The data is usually loaded via batch ETL pipelines, so write amplification is irrelevant.
+
+**Architectural Standard**: Never denormalize your core OLTP schema to fix a slow query. First, try covering indexes. Second, try application-level caching (Redis). If the database *must* serve the read, implement managed denormalization using a **Materialized View**, decoupling the write complexity from the core schema.
+
+---
+
 ## What is Denormalization?
 
 Denormalization is the deliberate introduction of redundancy into a normalized database schema to improve read performance. It trades write complexity for read speed.
@@ -28,6 +49,8 @@ Write: no redundancy           Write: must update name in multiple places
 
 ### 1. Storing Computed Values
 
+Storing computed values (like an order total) is the most common denormalization pattern in e-commerce systems. The trade-off is explicit: you're moving computation cost from read time to write time. Every read is instant (no SUM join), but every write must keep the stored value synchronized. The synchronization mechanism — whether a database trigger, an ORM lifecycle hook, or a message queue event — becomes critical infrastructure. If it fails silently, your stored totals drift from reality, producing subtle financial discrepancies.
+
 ```sql
 -- Normalized: calculate total on every read
 SELECT SUM(oi.quantity * oi.unit_price) FROM order_items WHERE order_id = 1;
@@ -39,6 +62,8 @@ ALTER TABLE orders ADD COLUMN item_total DECIMAL(10,2);
 ```
 
 ### 2. Storing Foreign Key Labels
+
+Storing a label (like `category_name`) alongside its foreign key (`category_id`) eliminates a JOIN at read time. But this introduces **update anomalies**: if the category name ever changes (e.g., "Electronics" → "Consumer Electronics"), you must find and update every product row. In a database with proper normalization, changing the category name requires updating exactly one row in the `categories` table, and all products instantly reflect the change. With denormalization, a batch `UPDATE products SET category_name = 'Consumer Electronics'` affecting millions of rows is required.
 
 ```sql
 -- Normalized: JOIN to get category name
@@ -52,6 +77,8 @@ ALTER TABLE products ADD COLUMN category_name VARCHAR(100);
 ```
 
 ### 3. Precomputed Aggregates (Summary Tables)
+
+A summary table is a dedicated physical table that stores pre-aggregated metrics. It is a more explicit, controllable form of denormalization than a Materialized View. The `customer_stats` table caches per-customer metrics that would normally require a full scan of `orders` and `order_items`. The update mechanism (a trigger on `orders` or a scheduled cron job) must be carefully designed: triggers update in real-time (accurate but adds write latency), while scheduled jobs batch-update (introduces staleness but zero write overhead).
 
 ```sql
 -- Create a summary table (updated via trigger or scheduled job)
@@ -71,6 +98,8 @@ WHERE cs.total_spent > 50000;
 ```
 
 ### 4. Materialized Views (Managed Denormalization)
+
+A Materialized View is the database's own managed form of denormalization. Unlike a regular View (which is just a stored query), a Materialized View physically writes the query result to disk. Queries against it are just table scans — no JOINs, no aggregations at query time. `REFRESH MATERIALIZED VIEW CONCURRENTLY` rebuilds the cache without taking an exclusive lock — reads continue during refresh. Without `CONCURRENTLY`, refresh takes an exclusive lock, blocking all reads for the duration. The refresh strategy (real-time via trigger, scheduled, or on-demand) determines how stale the data can be.
 
 ```sql
 -- PostgreSQL: let the database manage the denormalized copy

@@ -1,3 +1,67 @@
+## How Spark Stores and Computes Dates and Timestamps
+
+String and date operations are among the most misunderstood in Spark. The internal representations, timezone handling, and parsing mechanics differ significantly from a single-node database.
+
+### Internal Date and Timestamp Representation
+
+Spark stores dates and timestamps as primitive integers — not as objects:
+
+```
+DateType:      stored as Int32 (number of days since 1970-01-01)
+               "2024-03-15" → 19797 (days since epoch)
+               ✓ Compact: 4 bytes per value
+               ✓ Fast comparison: integer comparison, no parsing
+
+TimestampType: stored as Int64 microseconds since 1970-01-01 00:00:00 UTC
+               "2024-03-15 10:30:00" → 1710494200000000 (microseconds)
+               ✓ Timezone-aware: always stored in UTC internally
+               ✓ Fast arithmetic: just integer addition/subtraction
+```
+
+Because these are **primitive integers in Tungsten's UnsafeRow**, date arithmetic (`date_add`, `datediff`, `months_between`) is just integer addition — extremely fast, no object allocation.
+
+### Timezone Handling: The Hidden Complexity
+
+Timestamps are stored as UTC microseconds internally, but displayed in the **session timezone** (`spark.sql.session.timeZone`). This creates a subtle trap:
+
+```python
+# Data written in US timezone on cluster A:
+spark.conf.set("spark.sql.session.timeZone", "America/New_York")
+df.withColumn("ts", lit("2024-03-15 10:00:00").cast("timestamp"))
+# Stored internally as: 1710511200000000 μs (= 15:00:00 UTC)
+
+# Same file read in India on cluster B:
+spark.conf.set("spark.sql.session.timeZone", "Asia/Kolkata")
+df.show()
+# Displayed as: 2024-03-15 20:30:00  (IST = UTC+5:30)
+```
+
+The **values are correct** (same UTC instant), but display differs by session timezone. This is why ETL pipelines should always:
+1. Store timestamps in UTC
+2. Only convert to local timezone at the presentation layer
+
+### Why String-to-Date Parsing is Expensive
+
+Functions like `to_date("2024-03-15", "yyyy-MM-dd")` must parse a **string** into an integer per row. String parsing in JVM involves:
+1. Creating a `java.lang.String` object from raw bytes
+2. Pattern matching the format string
+3. Extracting year/month/day components
+4. Converting to days-since-epoch integer
+
+For a 1-billion-row dataset, this is 1 billion string parse operations. If your data source stores dates as strings, **cast once at read time** and store as `DateType` in Parquet — subsequent operations are then pure integer math:
+
+```python
+# ✅ Cast at read time — date arithmetic is cheap forever after
+df = spark.read.csv("data.csv") \
+    .withColumn("order_date", to_date(col("order_date_str"), "yyyy-MM-dd")) \
+    .drop("order_date_str")
+
+# ❌ Keep as string — every date operation must re-parse
+df.withColumn("year", year(col("order_date_str")))  # parses string every time
+```
+
+---
+
 ## Setup
 
 ```python

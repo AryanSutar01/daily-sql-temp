@@ -1,296 +1,366 @@
-## What Is a REST API?
+## How HTTP Works — What Happens When You Make an API Call
 
-A REST API lets programs communicate over HTTP. You send a request to a URL and get data back - usually JSON.
+Before writing any Python code, understanding what happens at the network level helps you write more robust HTTP clients and debug failures effectively.
 
-```
-HTTP Methods:
-GET     - retrieve data
-POST    - create new data
-PUT     - replace existing data
-PATCH   - partially update data
-DELETE  - remove data
-```
+When your Python code calls `requests.get("https://api.example.com/users")`, the following chain of events occurs:
+1. **DNS resolution**: The hostname `api.example.com` is resolved to an IP address via DNS
+2. **TCP connection**: A 3-way handshake establishes a TCP connection to the server's IP on port 443
+3. **TLS handshake** (for HTTPS): Cryptographic negotiation authenticates the server and establishes an encrypted channel
+4. **HTTP request**: Your GET request is sent over the encrypted connection as structured text
+5. **Server processing**: The server receives, routes, and handles your request
+6. **HTTP response**: The server sends back a status code, headers, and a body
+7. **Connection handling**: The connection may be kept alive for reuse or closed
+
+This sequence means that for each `requests.get()` call without session reuse, steps 1–3 add network latency. On a local network, a TCP+TLS handshake takes ~10–50ms. To a remote API, it takes 100–500ms. If you make 1,000 API calls without connection reuse, you pay this overhead 1,000 times.
+
+## The requests Library
+
+`requests` is the most widely used Python library for making HTTP requests. It provides a clean, human-friendly API on top of Python's lower-level `http.client`.
 
 ```bash
 pip install requests
 ```
 
-## Basic GET Request
+### HTTP Methods
+
+HTTP methods express the intent of the operation — they map directly to CRUD operations:
 
 ```python
 import requests
 
+# GET — retrieve data; no request body
+response = requests.get("https://api.example.com/users")
+
+# POST — create a new resource; body contains the data
+response = requests.post("https://api.example.com/users",
+                          json={"name": "Alice", "email": "alice@example.com"})
+
+# PUT — replace an entire resource
+response = requests.put("https://api.example.com/users/1",
+                         json={"name": "Alice Updated", "email": "alice@example.com"})
+
+# PATCH — partially update a resource
+response = requests.patch("https://api.example.com/users/1",
+                           json={"name": "Alice Updated"})
+
+# DELETE — remove a resource
+response = requests.delete("https://api.example.com/users/1")
+```
+
+**`json=` vs `data=`**: When you pass `json=dict`, requests automatically serializes the dict to a JSON string and sets `Content-Type: application/json`. When you pass `data=dict`, requests encodes it as form data (`application/x-www-form-urlencoded`). For REST APIs, always use `json=`.
+
+## Response Objects
+
+The `Response` object is a rich container for all aspects of the server's reply.
+
+```python
 response = requests.get("https://jsonplaceholder.typicode.com/posts/1")
 
-print(response.status_code)   # 200
-print(response.json())        # dict from JSON response
-print(response.text)          # raw string response
-print(response.headers)       # response headers
+# Status
+response.status_code    # 200, 201, 400, 401, 403, 404, 500, etc.
+response.ok             # True if 200 <= status_code < 400
+
+# Content
+response.text           # response body as a string
+response.json()         # parse JSON body into a Python dict/list (raises JSONDecodeError if not JSON)
+response.content        # raw bytes (for binary responses like images)
+
+# Metadata
+response.headers        # dict-like object of response headers
+response.headers["Content-Type"]    # "application/json; charset=utf-8"
+response.url            # final URL (after any redirects)
+response.elapsed        # timedelta of request duration
+
+# Raise an exception for 4xx/5xx status codes
+response.raise_for_status()   # raises requests.HTTPError for 4xx and 5xx
 ```
 
-## Query Parameters
+**`raise_for_status()`** is a critical pattern: without it, your code proceeds silently even when the server returned an error. Always call `response.raise_for_status()` after requests in production code, then handle `requests.HTTPError` appropriately.
+
+### Status Code Reference
+
+```
+2xx — Success
+  200 OK           — request succeeded, body contains result
+  201 Created      — resource created (common after POST)
+  204 No Content   — success but no body (common after DELETE)
+
+3xx — Redirection
+  301 Moved Permanently  — resource moved, update your URL
+  302 Found              — temporary redirect
+
+4xx — Client Error (your request was wrong)
+  400 Bad Request        — invalid request syntax or parameters
+  401 Unauthorized       — missing or invalid authentication
+  403 Forbidden          — authenticated but not authorized
+  404 Not Found          — resource doesn't exist
+  422 Unprocessable      — valid JSON but fails validation
+  429 Too Many Requests  — rate limit exceeded (retry after delay)
+
+5xx — Server Error (the API is broken)
+  500 Internal Server Error  — generic server failure
+  502 Bad Gateway            — upstream server failure
+  503 Service Unavailable    — server is down or overloaded
+```
+
+## Request Parameters and Headers
 
 ```python
-# Pass params as a dict - requests builds the URL query string
-params = {
-    "userId": 1,
-    "completed": True,
-}
-response = requests.get(
-    "https://jsonplaceholder.typicode.com/todos",
-    params=params
-)
-# Equivalent URL: /todos?userId=1&completed=True
+# Query parameters — appended to the URL as ?key=value&key2=value2
+params = {"page": 1, "limit": 50, "status": "active"}
+response = requests.get("https://api.example.com/users", params=params)
+# Actual URL: https://api.example.com/users?page=1&limit=50&status=active
 
-todos = response.json()
-print(f"Found {len(todos)} todos")
+# Request headers — metadata about the request
+headers = {
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+    "X-API-Key": "your-api-key",
+    "User-Agent": "MyApp/1.0",
+}
+response = requests.get("https://api.example.com/users", headers=headers)
 ```
 
-## POST Request - Send Data
+**Never hardcode API keys or tokens** in source code. Load them from environment variables:
+```python
+import os
+api_key = os.getenv("API_KEY")
+headers = {"X-API-Key": api_key}
+```
+
+## Sessions — Connection Pooling and Persistent Headers
+
+A `Session` object is the production-grade approach to making multiple API calls. It provides:
+- **Connection pooling**: TCP and TLS connections are reused across requests (no handshake overhead per request)
+- **Persistent headers**: headers set on the session apply to every request (no repetition)
+- **Cookie persistence**: cookies received are automatically sent on subsequent requests
+- **Configurable retry behavior**: when combined with retry adapters
 
 ```python
 import requests
-import json
 
-# Send JSON body
-payload = {
-    "title": "Learn Python",
-    "body": "Practice every day",
-    "userId": 1,
-}
+# Without session — new TCP connection + TLS handshake on EVERY request
+for user_id in range(1000):
+    r = requests.get(f"https://api.example.com/users/{user_id}", headers=auth_headers)
+    # Pays TCP+TLS overhead 1,000 times → extremely slow
 
-response = requests.post(
-    "https://jsonplaceholder.typicode.com/posts",
-    json=payload,   # automatically sets Content-Type: application/json
-)
-
-print(response.status_code)   # 201 Created
-print(response.json())        # {'id': 101, 'title': 'Learn Python', ...}
-```
-
-## PUT and PATCH
-
-```python
-# PUT - replace entire resource
-response = requests.put(
-    "https://jsonplaceholder.typicode.com/posts/1",
-    json={"title": "Updated Title", "body": "New body", "userId": 1},
-)
-
-# PATCH - partial update
-response = requests.patch(
-    "https://jsonplaceholder.typicode.com/posts/1",
-    json={"title": "Only title updated"},
-)
-```
-
-## DELETE
-
-```python
-response = requests.delete("https://jsonplaceholder.typicode.com/posts/1")
-print(response.status_code)   # 200 or 204 No Content
-```
-
-## Headers & Authentication
-
-```python
-# Custom headers
-headers = {
-    "Authorization": "Bearer YOUR_TOKEN_HERE",
-    "Accept": "application/json",
-    "X-API-Key": "your-api-key",
-}
-
-response = requests.get("https://api.example.com/data", headers=headers)
-
-# Basic Auth
-from requests.auth import HTTPBasicAuth
-
-response = requests.get(
-    "https://api.example.com/secure",
-    auth=HTTPBasicAuth("username", "password"),
-)
-# or shorthand:
-response = requests.get(url, auth=("username", "password"))
-```
-
-## Using a Session - Reuse Connections & Headers
-
-```python
-# Session reuses TCP connections and persists headers/cookies across requests
+# With session — connection reused, headers applied once
 with requests.Session() as session:
     session.headers.update({
-        "Authorization": "Bearer TOKEN",
-        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+        "User-Agent": "MyDataPipeline/1.0",
     })
 
-    # All requests in this session include the headers automatically
-    r1 = session.get("https://api.example.com/users")
-    r2 = session.get("https://api.example.com/orders")
-    r3 = session.post("https://api.example.com/items", json={"name": "Widget"})
+    for user_id in range(1000):
+        r = session.get(f"https://api.example.com/users/{user_id}")
+        # Connection reused; headers sent automatically
 ```
 
-## Error Handling
+The performance improvement from session reuse is substantial. For 100 API calls to an HTTPS endpoint, eliminating TCP+TLS overhead can reduce total time from 15+ seconds to under 2 seconds.
+
+## Error Handling and Retries
+
+Network calls fail. Servers return 5xx errors, connections time out, and APIs enforce rate limits. A production-grade HTTP client must handle these failures gracefully.
 
 ```python
 import requests
-from requests.exceptions import HTTPError, ConnectionError, Timeout, RequestException
-
-def fetch_user(user_id: int) -> dict:
-    try:
-        response = requests.get(
-            f"https://api.example.com/users/{user_id}",
-            timeout=5,   # seconds - raises Timeout if exceeded
-        )
-        response.raise_for_status()   # raises HTTPError for 4xx/5xx responses
-        return response.json()
-
-    except Timeout:
-        print("Request timed out")
-        return {}
-    except HTTPError as e:
-        print(f"HTTP error: {e.response.status_code} - {e}")
-        return {}
-    except ConnectionError:
-        print("Failed to connect to server")
-        return {}
-    except RequestException as e:
-        print(f"Unexpected error: {e}")
-        return {}
-
-# Status code checks
-response = requests.get(url)
-if response.status_code == 200:
-    data = response.json()
-elif response.status_code == 404:
-    print("Resource not found")
-elif response.status_code == 429:
-    print("Rate limited - slow down")
-```
-
-## Retry Logic
-
-```python
-import time
-import requests
-
-def get_with_retry(url: str, max_retries: int = 3, delay: float = 1.0) -> dict:
-    for attempt in range(max_retries):
-        try:
-            response = requests.get(url, timeout=5)
-            response.raise_for_status()
-            return response.json()
-        except requests.RequestException as e:
-            if attempt == max_retries - 1:
-                raise
-            print(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
-            time.sleep(delay * (2 ** attempt))   # exponential backoff
-    return {}
-
-# Using urllib3 Retry adapter (more robust)
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import time
 
-session = requests.Session()
-retry = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503])
-adapter = HTTPAdapter(max_retries=retry)
-session.mount("https://", adapter)
-```
-
-## Paginated API - Fetch All Pages
-
-```python
-import requests
-
-def fetch_all_pages(base_url: str, params: dict = None) -> list:
-    results = []
-    page = 1
-
-    while True:
-        response = requests.get(
-            base_url,
-            params={**(params or {}), "page": page, "per_page": 100},
-            timeout=10,
-        )
-        response.raise_for_status()
-        data = response.json()
-
-        if not data:   # empty page = we're done
-            break
-
-        results.extend(data)
-        page += 1
-
-    return results
-
-all_posts = fetch_all_pages("https://jsonplaceholder.typicode.com/posts")
-print(f"Total: {len(all_posts)} posts")
-```
-
-## Real Example - GitHub API
-
-```python
-import requests
-import os
-
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-
-def get_github_repos(username: str) -> list:
+# Configure automatic retries with exponential backoff
+def create_session_with_retries(
+    total: int = 3,
+    backoff_factor: float = 1.0,
+    status_forcelist: tuple = (429, 500, 502, 503, 504),
+) -> requests.Session:
+    """Create a session with automatic retry on specific status codes."""
     session = requests.Session()
-    session.headers.update({
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json",
-    })
+    
+    retry = Retry(
+        total=total,                # maximum retry attempts
+        backoff_factor=backoff_factor,  # wait: 1s, 2s, 4s between retries
+        status_forcelist=status_forcelist,  # retry on these status codes
+        raise_on_status=False,     # don't raise on retry-eligible codes
+    )
+    
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
 
-    repos = []
+# Manual retry with exponential backoff
+def get_with_retry(url: str, max_retries: int = 3, timeout: int = 10) -> dict:
+    session = create_session_with_retries()
+    
+    for attempt in range(max_retries):
+        try:
+            response = session.get(url, timeout=timeout)
+            response.raise_for_status()
+            return response.json()
+        
+        except requests.HTTPError as e:
+            if e.response.status_code == 429:
+                # Rate limited — respect Retry-After header
+                retry_after = int(e.response.headers.get("Retry-After", 60))
+                print(f"Rate limited. Waiting {retry_after}s...")
+                time.sleep(retry_after)
+            elif e.response.status_code < 500:
+                # 4xx errors — client error, don't retry
+                raise
+            else:
+                # 5xx errors — server error, retry
+                wait = 2 ** attempt
+                print(f"Server error {e.response.status_code}. Retry {attempt+1}/{max_retries} in {wait}s")
+                time.sleep(wait)
+        
+        except requests.Timeout:
+            wait = 2 ** attempt
+            print(f"Timeout. Retry {attempt+1}/{max_retries} in {wait}s")
+            time.sleep(wait)
+        
+        except requests.ConnectionError:
+            wait = 2 ** attempt
+            print(f"Connection error. Retry {attempt+1}/{max_retries} in {wait}s")
+            time.sleep(wait)
+    
+    raise RuntimeError(f"Failed after {max_retries} retries: {url}")
+```
+
+**Exponential backoff** (doubling the wait time: 1s, 2s, 4s, 8s) is the standard retry strategy. It prevents thundering-herd problems where all clients simultaneously retry a recovering server, overwhelming it again.
+
+## Timeouts — Always Set Them
+
+A request without a timeout can hang indefinitely, blocking your program forever. Always set both a **connect timeout** and a **read timeout**.
+
+```python
+# Tuple: (connect_timeout, read_timeout) in seconds
+response = requests.get(url, timeout=(5, 30))
+# Fail if connection takes >5s to establish
+# Fail if server takes >30s to send the first byte
+
+# Single timeout applies to both
+response = requests.get(url, timeout=10)
+
+# No timeout — NEVER do this in production
+response = requests.get(url)   # can hang forever if server doesn't respond
+```
+
+The connect timeout covers the TCP+TLS handshake. The read timeout covers the time until the server begins sending the response. For most APIs, `timeout=(5, 30)` is a reasonable default.
+
+## Pagination — Consuming Large Datasets
+
+APIs rarely return all data in a single response. Pagination breaks large datasets into pages. There are two main approaches:
+
+```python
+import requests
+
+# Approach 1: Offset/limit pagination (most common)
+def fetch_all_pages(base_url: str, headers: dict) -> list:
+    """Fetch all pages of a paginated API."""
+    all_results = []
     page = 1
+    
+    with requests.Session() as session:
+        session.headers.update(headers)
+        
+        while True:
+            response = session.get(base_url, params={"page": page, "limit": 100})
+            response.raise_for_status()
+            data = response.json()
+            
+            results = data.get("results", data)   # handle both wrapped and unwrapped responses
+            if not results:
+                break   # no more data
+            
+            all_results.extend(results)
+            
+            # Check for next page indicator
+            if not data.get("next"):   # null/missing means last page
+                break
+            page += 1
+    
+    return all_results
 
-    while True:
-        response = session.get(
-            f"https://api.github.com/users/{username}/repos",
-            params={"page": page, "per_page": 30, "sort": "updated"},
-            timeout=10,
-        )
-        response.raise_for_status()
-        data = response.json()
+# Approach 2: Cursor-based pagination (more reliable for large datasets)
+def fetch_with_cursor(base_url: str, headers: dict) -> list:
+    """Fetch all pages using cursor-based pagination."""
+    all_results = []
+    cursor = None
+    
+    with requests.Session() as session:
+        session.headers.update(headers)
+        
+        while True:
+            params = {"limit": 100}
+            if cursor:
+                params["cursor"] = cursor
+            
+            response = session.get(base_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            
+            all_results.extend(data["results"])
+            
+            cursor = data.get("next_cursor")
+            if not cursor:
+                break
+    
+    return all_results
+```
 
-        if not data:
-            break
+**Cursor-based pagination** is more reliable than offset/limit for large datasets because it's stable even when data is being inserted or deleted between pages. Offset-based pagination can skip or duplicate rows when the underlying dataset changes.
 
-        repos.extend(data)
-        page += 1
+## Authentication Patterns
 
-    return repos
+```python
+# API Key in header (most common)
+headers = {"X-API-Key": os.getenv("API_KEY")}
 
-repos = get_github_repos("torvalds")
-for repo in repos[:5]:
-    print(f"{repo['name']:30} ⭐ {repo['stargazers_count']}")
+# Bearer token (OAuth 2.0 / JWT)
+headers = {"Authorization": f"Bearer {token}"}
+
+# Basic auth
+response = requests.get(url, auth=("username", "password"))
+# requests automatically encodes as Base64 in Authorization header
+
+# Built-in auth classes
+from requests.auth import HTTPBasicAuth, HTTPDigestAuth
+response = requests.get(url, auth=HTTPBasicAuth("user", "pass"))
+
+# Session-level auth — applied to every request automatically
+session = requests.Session()
+session.auth = HTTPBasicAuth("user", "pass")
 ```
 
 ## Interview Questions
 
-**Q: What is `response.raise_for_status()` and why use it?**
-It raises an `HTTPError` exception if the response status code indicates an error (4xx client error or 5xx server error). Without it, `requests` won't raise exceptions for bad status codes - your code would silently proceed with an error response. It's the cleanest way to check for HTTP errors.
-
 **Q: What is the difference between `requests.get()` and using a `Session`?**
-`requests.get()` opens a new TCP connection for each request. A `Session` reuses connections (connection pooling), persists headers, cookies, and auth across all requests, and is more efficient when making multiple requests to the same host.
+`requests.get()` creates a new TCP connection and performs a TLS handshake for every call. A `Session` maintains a connection pool — TCP connections are reused across requests, eliminating the handshake overhead per request. Sessions also support persistent headers (set once, sent with every request) and automatic cookie handling. For any code that makes multiple requests to the same host, using a Session is significantly faster.
 
-**Q: How do you set a timeout in requests and why is it important?**
-Pass `timeout=5` (seconds) to any request. Without a timeout, a request can hang indefinitely if the server doesn't respond. Always set a timeout in production code.
+**Q: Why should you always set a timeout on requests?**
+Without a timeout, `requests.get()` can wait indefinitely if the server stops responding mid-request. This blocks the current thread forever, which in a web service or pipeline means a hung worker. The `timeout` parameter accepts a tuple `(connect, read)` where connect limits the TCP+TLS handshake time and read limits the time to receive the first byte of the response.
 
-**Q: What is exponential backoff and when do you use it?**
-Exponential backoff is a retry strategy where the wait time doubles after each failure: 1s, 2s, 4s, 8s. Use it when an API is rate-limiting you (429) or temporarily unavailable (503). It reduces load on the server and avoids hammering a struggling service.
+**Q: What is exponential backoff and why do you use it for retries?**
+Exponential backoff doubles the wait time between retry attempts (e.g., 1s, 2s, 4s, 8s). The reason: if a server is overloaded, immediately retrying hammers it with more requests, making recovery harder. Backing off gives the server time to recover. Combined with `jitter` (random variation in the wait time), it prevents all clients from retrying simultaneously — avoiding the "thundering herd" problem.
 
-**Q: How do you handle pagination when calling an API?**
-Loop through pages, making a request for each page with an incrementing `page` parameter. Stop when the response returns an empty list or a `next` link is absent. Collect all results in a list and return it after all pages are fetched.
+**Q: What is the difference between offset/limit and cursor-based pagination?**
+Offset/limit pagination uses `?page=2&limit=100` — it fetches rows 100–200 by asking the server to skip the first 100. This is simple but unstable: if rows are inserted before page 2 is fetched, you may skip rows or see duplicates. Cursor-based pagination returns an opaque cursor (a pointer to the last seen item). The next request passes that cursor, so the server returns the next set of items relative to a specific record rather than a numeric offset — reliable even with concurrent insertions.
+
+**Q: What is the security implication of logging request headers?**
+Request headers often contain `Authorization: Bearer <token>` or API keys. If you log the full request object, you expose credentials in logs — a significant security risk. Never log raw headers. If you need to log requests for debugging, explicitly exclude or redact the `Authorization` header.
 
 ## Summary
 
-- `requests.get/post/put/patch/delete(url)` - HTTP methods
-- `params={}` - query string parameters; `json={}` - JSON request body
-- `response.raise_for_status()` - raise exception for 4xx/5xx responses
-- `timeout=5` - always set a timeout; prevents indefinite hangs
-- `requests.Session()` - reuse connections, persist headers/auth across requests
-- Retry with exponential backoff for transient failures (429, 500, 502, 503)
-- Paginated APIs: loop until empty response, collect all pages into one list
-- Store API keys in environment variables - never hardcode them
+- `requests.get/post/put/patch/delete(url)` — HTTP methods map to CRUD operations
+- `json=dict` — serializes to JSON body; `data=dict` — form-encodes (use `json=` for REST APIs)
+- `response.raise_for_status()` — always call; raises `HTTPError` for 4xx/5xx responses
+- `response.json()` — parse JSON body; `response.text` — raw string; `response.content` — raw bytes
+- `requests.Session()` — connection pooling + persistent headers; use for multiple requests to same host
+- `timeout=(5, 30)` — always set; `(connect_timeout, read_timeout)` in seconds
+- Retry with exponential backoff: double the wait time between retries; retry on 429, 500–504
+- `Retry` + `HTTPAdapter` — configure automatic retry behavior on a session
+- Query params: `params={"page": 1, "limit": 50}` — appended to URL automatically
+- Load API keys from environment variables — never hardcode credentials in source

@@ -1,3 +1,99 @@
+## How a SQL Query Engine Actually Works
+
+Before writing a single query, understanding what happens inside the database engine when you hit "Execute" gives you an enormous advantage — both for writing efficient SQL and for answering architecture questions in interviews.
+
+### The 5-Phase Query Processing Pipeline
+
+```
+Your SQL text:
+  SELECT name FROM users WHERE city = 'Mumbai';
+
+Phase 1: LEXER + PARSER
+  Input text → Token stream → Abstract Syntax Tree (AST)
+  "SELECT" → keyword token
+  "name"   → identifier token
+  "FROM"   → keyword token
+  "users"  → identifier token
+  Parser checks SQL grammar: is the syntax valid?
+  If not: SyntaxError (before any data is touched)
+
+Phase 2: SEMANTIC ANALYSIS (Binder / Analyzer)
+  AST + Schema Catalog → Annotated AST
+  - Does table "users" exist? → lookup system catalog
+  - Does column "name" exist in "users"? → resolve type: VARCHAR(100)
+  - Does column "city" exist? → resolve type: VARCHAR(100)
+  - Check data type compatibility: 'Mumbai' (string) vs VARCHAR → OK
+  If not: "column does not exist" error
+
+Phase 3: QUERY OPTIMIZER
+  Annotated AST → Logical Plan → Physical Plan
+  The most important phase for performance!
+  
+  Rule-based optimizations (always applied):
+    - Predicate pushdown: apply WHERE as early as possible
+    - Column pruning: only read needed columns
+    - Constant folding: evaluate WHERE 1=1 → remove condition
+  
+  Cost-based optimizations (uses table statistics):
+    - Choose: Sequential Scan vs Index Scan
+    - For JOINs: Nested Loop vs Hash Join vs Merge Join
+    - JOIN ordering: which table to probe first?
+  
+  Statistics used: row count, column cardinality, histogram of values
+  Updated by: ANALYZE (PostgreSQL), ANALYZE TABLE (MySQL)
+
+Phase 4: PHYSICAL PLAN GENERATION
+  Logical Plan → Executable Physical Plan
+  A tree of physical operators:
+    IndexScan(users, idx_city, city='Mumbai')
+      → Filter(city = 'Mumbai')
+        → Project(name)
+
+Phase 5: EXECUTION ENGINE
+  Physical Plan → Result rows
+  Operators execute in a pipeline (pull model):
+    - IndexScan reads rows from storage via buffer pool
+    - Filter evaluates each row's WHERE condition
+    - Project selects only the "name" column
+    - Returns rows to client
+```
+
+### The Query Optimizer: Why It Changes Everything
+
+The optimizer is why two equivalent SQL statements can have **1000x different performance**:
+
+```sql
+-- Both return the same result, but very different execution:
+
+-- Query A: may use an index (fast for small result set)
+SELECT * FROM orders WHERE customer_id = 42;
+
+-- Query B: function on column prevents index use!
+SELECT * FROM orders WHERE YEAR(created_at) = 2024;
+-- Optimizer cannot use an index on created_at for this
+-- Must read EVERY row and apply the function → full table scan
+
+-- Query B rewritten to allow index use:
+SELECT * FROM orders
+WHERE created_at >= '2024-01-01' AND created_at < '2025-01-01';
+```
+
+**Interview insight** 🎯: Never wrap an indexed column in a function in WHERE. The optimizer cannot use the index — it must evaluate the function for every row (full table scan).
+
+### Codd's Rules: The Theoretical Foundation
+
+In 1970, E.F. Codd at IBM defined the **relational model**. His 12 rules (actually 13, numbered 0-12) define what it truly means to be a relational database:
+
+- **Rule 1**: All data must be representable as tables (the **information rule**)
+- **Rule 4**: Active catalog (data dictionary) accessible via SQL — you can query `information_schema.tables` like a regular table
+- **Rule 6**: All views that are theoretically updatable must be updatable by the system
+- **Rule 8**: Physical data independence — how data is stored should be invisible to queries
+- **Rule 9**: Logical data independence — adding columns shouldn't break existing queries
+
+Understanding Codd's rules explains why SQL is designed the way it is — and why certain NoSQL systems technically aren't "relational" even if they support SQL-like syntax.
+
+---
+
 ## What is SQL?
 
 SQL - pronounced "S-Q-L" or "sequel" - stands for **Structured Query Language**. It is the standard language used to communicate with relational databases. With SQL you can:

@@ -1,3 +1,62 @@
+## How Pivot Executes: Two-Stage Aggregation
+
+Pivot looks simple in code, but internally it executes as a **two-stage process** that requires Spark to know all pivot column values in advance. Understanding this is critical for production use.
+
+### Stage 1: Value Discovery (if values not specified)
+
+When you don't specify pivot values explicitly, Spark must first discover all distinct values:
+
+```python
+# This triggers an extra full scan to find distinct "month" values:
+df.groupBy("product").pivot("month").sum("sales")
+
+# Spark internally runs:
+# SELECT DISTINCT month FROM df  → collects to Driver
+# Then runs the actual pivot with known values
+# COST: extra full table scan + collect to Driver
+```
+
+Always specify pivot values explicitly in production to avoid the extra scan:
+
+```python
+# Provide known values → single pass, no value discovery scan
+df.groupBy("product").pivot("month", ["Jan", "Feb", "Mar"]).sum("sales")
+```
+
+### Stage 2: The Pivot Aggregation
+
+With known values, Spark rewrites the pivot as a series of conditional aggregations — one per pivot value:
+
+```
+pivot("month", ["Jan","Feb","Mar"]).sum("sales")
+
+Rewritten as:
+  SELECT product,
+    SUM(CASE WHEN month='Jan' THEN sales ELSE 0 END) AS Jan,
+    SUM(CASE WHEN month='Feb' THEN sales ELSE 0 END) AS Feb,
+    SUM(CASE WHEN month='Mar' THEN sales ELSE 0 END) AS Mar
+  FROM df
+  GROUP BY product
+```
+
+This is a single `groupBy` with multiple conditional aggregations — one shuffle stage with the product column as the key.
+
+### The Cardinality Explosion Problem
+
+Pivot creates **one output column per distinct pivot value**. With high-cardinality columns, this becomes dangerous:
+
+```
+pivot("user_id")  ← user_id has 1M distinct values
+→ 1M output columns!
+→ Schema has 1M columns (Spark schema stores this in Driver memory)
+→ Each Parquet row group metadata must track 1M column statistics
+→ Query planning becomes extremely slow
+```
+
+**Rule**: Only pivot columns with **low cardinality** (< a few hundred distinct values). For high-cardinality pivots, use a different data model or aggregate first to reduce cardinality.
+
+---
+
 ## Long vs Wide Format
 
 ```

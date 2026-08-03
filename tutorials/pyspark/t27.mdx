@@ -1,3 +1,87 @@
+## Array and Explode: Memory and Execution Implications
+
+Array operations, `explode`, and `collect_list` look like simple transformations but have significant memory and performance implications in distributed execution.
+
+### How explode() Multiplies Row Count and Partition Size
+
+`explode(array_col)` transforms one row with an array of N elements into N separate rows — one per element. In a distributed context, this means:
+
+```
+Partition 0 before explode:
+  Row 1: [user_id=1, tags=["spark", "python", "sql"]]   → 1 row, ~50 bytes
+  Row 2: [user_id=2, tags=["hadoop", "hive"]]           → 1 row, ~40 bytes
+  Total: 2 rows, ~90 bytes
+
+Partition 0 after explode:
+  Row 1: [user_id=1, tag="spark"]
+  Row 2: [user_id=1, tag="python"]
+  Row 3: [user_id=1, tag="sql"]
+  Row 4: [user_id=2, tag="hadoop"]
+  Row 5: [user_id=2, tag="hive"]
+  Total: 5 rows, ~150 bytes
+```
+
+If arrays have average size 100, `explode()` creates 100× more rows. For a 10GB DataFrame, post-explode data may be **1TB**. This dramatically increases:
+- Shuffle data volume in any subsequent `groupBy` or `join`
+- Memory pressure on executors
+- Number of output partitions needed
+
+**Best practice**: Filter and select before explode — apply all predicates on the pre-explode data first.
+
+### collect_list and the Data Skew / OOM Trap
+
+`collect_list(col)` is the inverse of `explode` — it aggregates multiple rows into one array. But it creates a **data skew risk** in distributed execution:
+
+```
+groupBy("user_id").agg(collect_list("event"))
+
+If user 1001 has 10M events across all partitions:
+  After groupBy shuffle: all 10M events for user 1001 land on ONE executor
+  collect_list accumulates all 10M events as a JVM ArrayList on that executor
+  Each event ~100 bytes → 1GB list for ONE user
+  → Executor OOM!
+```
+
+`collect_list` grows **unbounded** — Spark has no limit on how large the resulting array can be. For high-activity users/entities, this is a common source of executor OOM in production pipelines.
+
+Mitigation strategies:
+```python
+# Option 1: Limit collection size
+from pyspark.sql.functions import slice
+df.groupBy("user_id") \
+  .agg(collect_list("event").alias("events")) \
+  .withColumn("events", slice("events", 1, 1000))  # keep max 1000
+
+# Option 2: Pre-aggregate to reduce cardinality before collecting
+df.groupBy("user_id", "event_type") \
+  .agg(count("event").alias("event_count")) \
+  .groupBy("user_id") \
+  .agg(collect_list(struct("event_type", "event_count")))
+```
+
+### Variable-Length Memory Layout in Tungsten UnsafeRow
+
+Arrays and strings are stored as **variable-length regions** in Tungsten's memory layout:
+
+```
+UnsafeRow for: [user_id=1, tags=["spark","python"]]
+
+Fixed-width section (per column):
+  user_id: 8 bytes (Long value = 1)
+  tags:    8 bytes (offset pointer → variable-length region)
+
+Variable-length section:
+  [4 bytes: array length=2]
+  [4 bytes: "spark" length=5][5 bytes: "spark"]
+  [4 bytes: "python" length=6][6 bytes: "python"]
+
+Total: 8 + 8 + 4 + 4+5 + 4+6 = 39 bytes (vs Python list: ~300+ bytes with overhead)
+```
+
+This compact binary layout is why Tungsten arrays are memory-efficient — but also why array element access requires offset arithmetic, making per-element random access slightly more expensive than fixed-width column access.
+
+---
+
 ## Setup
 
 ```python

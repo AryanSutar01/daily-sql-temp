@@ -1,5 +1,71 @@
 # Delta Lake - ACID on Spark, Merge, Time Travel
 
+## How Delta Lake Achieves ACID: The Transaction Log
+
+Delta Lake does not store data differently than plain Parquet — the actual data files are still `.parquet` files. What makes Delta Lake special is the **`_delta_log/` directory** that sits alongside the data files and implements a full MVCC (Multi-Version Concurrency Control) transaction system.
+
+### The Transaction Log Structure
+
+```
+s3://bucket/delta/sales/
+├── _delta_log/
+│   ├── 00000000000000000000.json   ← version 0: initial write (ADD files)
+│   ├── 00000000000000000001.json   ← version 1: MERGE/UPDATE (ADD + REMOVE)
+│   ├── 00000000000000000002.json   ← version 2: DELETE (REMOVE files)
+│   ├── 00000000000000000010.checkpoint.parquet  ← checkpoint every 10 commits
+│   └── _last_checkpoint             ← pointer to latest checkpoint
+├── part-00000-abc.parquet           ← actual data (version 0)
+├── part-00001-def.parquet           ← actual data (version 1, new rows)
+└── part-00002-ghi.parquet           ← data added in version 1 MERGE
+```
+
+Each `.json` log file contains **atomic actions**:
+- `add`: a new Parquet file is added to the table (with its stats: min, max, null counts per column)
+- `remove`: a Parquet file is no longer part of the current table version (tombstoned, not deleted from S3)
+- `commitInfo`: metadata about who committed and why
+
+### Reading a Delta Table: Snapshot Isolation
+
+When you read `spark.read.format("delta").load("path")`, Spark:
+1. Reads `_last_checkpoint` to find the latest checkpoint
+2. Replays all log entries after the checkpoint
+3. Constructs the current **snapshot** = set of active `add` files (minus any `remove` files)
+4. Reads only the active Parquet files
+
+Because files are never immediately deleted (only tombstoned with `remove`), **concurrent readers always see a consistent snapshot** — even if a writer is mid-commit:
+
+```
+Time 0:  Reader A starts reading → snapshot = {file1.parquet, file2.parquet}
+Time 1:  Writer B starts MERGE → adds file3.parquet, removes file1.parquet
+Time 1:  Reader A is still reading file1.parquet (snapshot doesn't change mid-read)
+Time 2:  Writer B commits → log entry with add(file3) + remove(file1)
+Time 3:  Reader C starts → snapshot = {file2.parquet, file3.parquet}
+Time 4:  Reader A finishes (read file1 from before Writer B's commit)
+
+→ Reader A and Reader C both get consistent snapshots (MVCC)
+→ No blocking between reader and writer
+```
+
+### Optimistic Concurrency Control for Concurrent Writers
+
+Delta Lake uses **optimistic concurrency control (OCC)** for concurrent writes:
+
+```
+Writer A and Writer B both start a MERGE at the same time:
+
+1. Both read the current snapshot: version 5
+2. Both compute their changes locally (no locking)
+3. Writer A finishes first → commits as version 6
+4. Writer B tries to commit → checks if version 6 conflicts with its changes
+   - If no overlap (different partition keys modified): Writer B commits as version 7 ✓
+   - If overlap detected: Writer B fails with ConcurrentModificationException
+     → Application must retry the transaction
+```
+
+This is why Delta Lake scales well for concurrent pipelines — no global write locks, conflicts are rare if partitioned correctly.
+
+---
+
 ## What is Delta Lake?
 
 **Delta Lake** is an open-source storage layer that brings **ACID transactions** and **data reliability** to data lakes built on cloud object stores (S3, GCS, ADLS) or HDFS. It sits on top of Parquet files and adds a **transaction log** that enables features like:

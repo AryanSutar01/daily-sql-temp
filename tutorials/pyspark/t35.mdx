@@ -1,5 +1,70 @@
 # PySpark on Databricks / EMR / GCP Dataproc
 
+## How Cluster Managers Allocate Resources
+
+The choice between Databricks, EMR, and Dataproc is partly a choice of **cluster manager** and **resource allocation model**. Understanding how containers are scheduled determines how you size your clusters for cost efficiency.
+
+### The Executor Container Model (YARN / Kubernetes)
+
+In YARN or Kubernetes, each Spark executor runs as an isolated container:
+
+```
+Spark requests: 10 executors × (4 cores, 8GB RAM)
+                1 driver     × (2 cores, 4GB RAM)
+
+YARN/K8s scheduler:
+  Finds worker nodes with available capacity
+  Allocates containers:
+    executor-1: Node A, Cores 0-3, Heap 8GB
+    executor-2: Node A, Cores 4-7, Heap 8GB
+    executor-3: Node B, Cores 0-3, Heap 8GB
+    ...
+  Launches JVM process per container
+  Reports allocation to Spark Driver
+```
+
+**Container granularity** matters. If you request 4 cores per executor on a node with 8 cores, you get 2 executors per node. If you request 8 cores per executor, you get 1 executor per node — better for JVM GC (larger heap, fewer GC pauses per node) but less partition-level parallelism.
+
+### JVM Heap Sizing and GC Pressure
+
+Executor memory configuration has non-obvious interactions with JVM garbage collection:
+
+```
+Too large (single 64GB executor on a node):
+  - Long GC stop-the-world pauses (all 64GB must be scanned)
+  - One GC event = entire executor frozen = task timeouts
+
+Too small (16 × 4GB executors on a node):
+  - Frequent GC (4GB fills quickly with shuffle buffers)
+  - High overhead from 16 JVM process startup costs
+  - 16 sets of JVM metadata (code cache, metaspace, etc.)
+
+Sweet spot: 4-8 executors per node, 8-16GB heap each
+  - GC pauses < 1 second
+  - Enough memory for shuffle buffers without overflow
+```
+
+### Databricks Photon: A Native Vectorized Engine
+
+Databricks replaces Spark's JVM bytecode execution with **Photon** — a native C++ vectorized execution engine:
+
+```
+Standard Spark (Tungsten):
+  Whole-stage codegen → JVM bytecode → JIT compiled → runs on CPU
+  Data: JVM objects on heap (GC pressure)
+
+Databricks Photon:
+  Query plan → C++ native code (no JVM, no GC)
+  Data: Apache Arrow columnar format off-heap
+  CPU SIMD instructions: process 256+ values in a single instruction
+  
+Benchmark: Photon is 2-8x faster than Tungsten for scan-heavy workloads
+```
+
+Photon is why Databricks benchmarks consistently outperform open-source Spark. The trade-off is vendor lock-in — your Photon-optimized jobs only run on Databricks.
+
+---
+
 ## Overview
 
 PySpark runs in the cloud through managed platforms that handle cluster provisioning, scaling, and infrastructure. The three most common platforms are:

@@ -1,5 +1,84 @@
 # Catalyst Optimizer & Tungsten Engine
 
+## Tungsten's Physical Execution Model: Eliminating the Volcano Iterator
+
+Tungsten (Spark's physical execution engine) solves two fundamental performance problems that plagued earlier Spark versions: **JVM GC pressure** and the **Volcano iterator model overhead**.
+
+### The Volcano Iterator Model (Pre-Tungsten)
+
+Traditional database execution used the "Volcano" or "iterator" model — each operator exposes a `next()` method and operators chain together:
+
+```
+// Volcano model (conceptual):
+while (filter.hasNext()) {
+    Row row = filter.next();          // virtual function call
+    // filter internally calls scan.next()  → another virtual call
+    // scan reads bytes from disk
+    Row result = aggregate.process(row);  // creates new Row OBJECT
+    // ... materializes result as JVM heap object
+}
+```
+
+Problems:
+1. **Virtual function calls**: Every `next()` call is a JVM interface dispatch — the CPU cannot predict the target → cache misses, branch mispredictions
+2. **Object creation per row**: Each `Row` is a heap-allocated JVM object → millions of objects per second → GC pressure, GC pauses stop all computation
+
+### Tungsten's Off-Heap UnsafeRow
+
+Tungsten replaces JVM Row objects with `UnsafeRow` — a **compact binary format** stored directly in native off-heap memory (allocated via `sun.misc.Unsafe`):
+
+```
+UnsafeRow binary layout for [id=1, name="Alice", salary=95000]:
+
+Byte offset:
+[0-7]   : null bit vector (1 bit per field: 0=not null, 1=null)
+[8-15]  : id = 1L           (8 bytes, fixed-width Long)
+[16-23] : name offset = 24, name length = 5  (8 bytes, points to variable section)
+[24-23+5]: name = "Alice"   (5 bytes, variable-length data)
+[29-36] : salary = 95000L   (8 bytes, fixed-width Long)
+
+Total: 37 bytes vs ~200 bytes for equivalent JVM object (with headers, padding, references)
+```
+
+**Key properties**:
+- Lives in **off-heap memory** (not JVM heap) → zero GC pressure for data
+- Accessed via `unsafe.getLong(baseObj, offset)` → direct memory read, no boxing
+- Can be passed directly to sort algorithms and hash maps without deserialization
+
+### Whole-Stage Code Generation: Eliminating Virtual Calls
+
+Tungsten compiles multiple chained operators into **one JVM method** (whole-stage codegen), eliminating all virtual function calls:
+
+```java
+// Traditional: 3 separate operators with virtual calls
+// filter.next() → scan.next() → materialise Row object
+
+// Tungsten generates ONE fused method for:
+// filter("amount > 100").groupBy("country").sum("amount")
+
+void processPartition(Iterator<UnsafeRow> inputRows,
+                      HashMap<Long, Long> aggregateMap) {
+    while (inputRows.hasNext()) {                    // tight loop, no virtuals
+        UnsafeRow row = inputRows.next();
+        long amount = row.getLong(2);                // direct memory read
+        if (amount > 100L) {                         // inline predicate
+            long hash = country_hash(row);           // inline hash
+            aggregateMap.merge(hash, amount, Long::sum);  // inline aggregate
+        }
+        // No object creation, no virtual calls, no GC
+    }
+}
+```
+
+The JVM JIT compiler can then:
+- **Inline** all operations into one loop body
+- **Unroll** the loop for SIMD vectorization
+- **Cache** all accessed memory in CPU registers
+
+This is why Tungsten achieves near-native C performance — the bottleneck becomes memory bandwidth, not JVM overhead.
+
+---
+
 ## Overview
 
 PySpark's performance is built on two pillars inside Spark SQL:

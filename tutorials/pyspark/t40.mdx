@@ -1,5 +1,95 @@
 # Caching & Persistence Levels
 
+## How Caching Works in Spark's Unified Memory Model
+
+Caching in Spark is not simply "save to memory" — it interacts with Spark's Unified Memory Manager in ways that directly affect both cache hit rates and the performance of other operations.
+
+### The Unified Memory Manager (Spark 2.0+)
+
+```
+Executor JVM Heap (example: 8GB configured)
+├── Reserved Memory: 300MB (fixed, for Spark internals)
+├── User Memory: (heap - 300MB) × 25% = ~1.9GB
+│   → For your UDFs, Python data structures, custom serializers
+└── Spark Memory: (heap - 300MB) × 75% = ~5.7GB
+    ├── Storage Memory: 50% of Spark Memory = ~2.85GB
+    │   → Cached DataFrames, broadcast variables
+    │   → Blocks stored in BlockManager (each partition = one block)
+    └── Execution Memory: 50% of Spark Memory = ~2.85GB
+        → Shuffle write buffers, sort buffers, join hash maps, aggregation buffers
+```
+
+**Key design**: Storage and Execution memory can **borrow from each other**:
+- If a shuffle needs more memory and Storage has idle space → Execution borrows
+- If cache is loading and Execution has idle space → Storage borrows
+
+But borrowing is NOT symmetric:
+- Execution can **evict** Storage blocks to reclaim borrowed memory → cached data is **evicted!**
+- Storage **cannot** evict Execution blocks (that would corrupt in-progress computations)
+
+### Cache Eviction and Recomputation Cost
+
+When executor memory is under pressure (large shuffles, joins), Spark uses **LRU eviction** to free cached blocks:
+
+```
+Memory pressure scenario:
+  cached_df: 2.5GB cached across 200 partitions in Storage memory
+  Large shuffle starts: needs 3GB for sort buffers
+  
+  Unified Memory Manager:
+    Execution borrows from Storage
+    LRU blocks of cached_df are EVICTED to free space
+    Part of cached_df is lost (e.g., partitions 100-200)
+  
+  Later: action on cached_df for partitions 100-200:
+    Cache miss → must recompute from scratch (full lineage replay)
+    This can take longer than if cache was never used!
+```
+
+This is why `cache()` is not always faster than not caching — if memory is tight and the cached DataFrame gets evicted between uses, you pay the cache-write cost with no benefit.
+
+### Choosing the Right Storage Level
+
+`persist(StorageLevel.X)` lets you choose where cached blocks live:
+
+```python
+from pyspark import StorageLevel
+
+# Most common choices and when to use them:
+
+StorageLevel.MEMORY_ONLY          # Default for DataFrame .cache()
+# Stored as deserialized JVM objects
+# Fastest access (no deserialization overhead)
+# Highest memory usage (JVM object overhead ~2-5x raw data size)
+# If evicted: recompute from scratch
+
+StorageLevel.MEMORY_AND_DISK      # Default for RDD .cache()
+# Stored in memory; OVERFLOW to disk if evicted
+# Disk access is slow (10-100x vs memory) but no recomputation needed
+# Best for data that's expensive to recompute
+
+StorageLevel.MEMORY_ONLY_SER      # Serialized in-memory
+# Stored as Kryo-serialized bytes (not JVM objects)
+# ~2x smaller than MEMORY_ONLY (no object header overhead)
+# ~2x slower access (must deserialize each time)
+# Use when data is large and recomputation is cheap
+
+StorageLevel.DISK_ONLY            # Disk-only cache
+# Useful only if disk I/O is faster than recomputation
+# (e.g., input is on slow remote storage, disk is local SSD)
+
+StorageLevel.OFF_HEAP              # Tungsten off-heap (requires config)
+# Stored outside JVM heap in direct memory
+# No GC pressure, but requires careful memory tuning
+```
+
+**Rule of thumb**:
+- Reused in multiple actions within one job → `MEMORY_ONLY` 
+- Reused across multiple jobs / expensive lineage → `MEMORY_AND_DISK`
+- Memory-constrained cluster → `MEMORY_ONLY_SER`
+
+---
+
 ## What is Caching in PySpark?
 
 By default, PySpark is **lazy** - it recomputes a DataFrame or RDD from scratch every time an action is called on it. If you use the same DataFrame multiple times in your pipeline, Spark will re-execute the entire lineage (all transformations) each time.

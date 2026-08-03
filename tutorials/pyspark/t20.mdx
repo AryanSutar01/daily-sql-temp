@@ -1,3 +1,56 @@
+## Spark SQL Internals: How SQL Text Becomes an Execution Plan
+
+Spark SQL and the DataFrame API are **semantically equivalent** — they produce identical physical plans. Understanding how SQL text is processed clarifies why Spark SQL is not a limited subset but a full first-class citizen of the optimizer.
+
+### The SQL Parsing Pipeline
+
+When you call `spark.sql("SELECT ...")`, Spark runs the SQL string through the exact same 4-phase Catalyst pipeline as DataFrame operations:
+
+```
+SQL String: "SELECT region, SUM(amount) FROM sales WHERE year=2024 GROUP BY region"
+     │
+     ▼ Phase 1: SQL Parser (ANTLR grammar)
+Unresolved Logical Plan:
+  Aggregate [region], [SUM(amount)]
+    └── Filter [year=2024]
+          └── UnresolvedRelation [sales]
+     │
+     ▼ Phase 2: Analyzer (resolves against catalog)
+Resolved Logical Plan:
+  Aggregate [region#12], [sum(amount#5L)]
+    └── Filter [year#8 = 2024]
+          └── Relation [id#1, amount#5L, region#12, year#8] parquet
+     │
+     ▼ Phase 3: Optimizer (predicate pushdown, etc.)
+     │
+     ▼ Phase 4: Physical Planner (BroadcastHashJoin vs SortMergeJoin, etc.)
+Physical Plan
+```
+
+The SQL parser simply produces the same unresolved plan tree that your DataFrame code would produce. The rest of the pipeline is identical.
+
+### Temporary Views vs Global Temp Views vs Hive Tables
+
+Spark SQL offers three levels of view persistence:
+
+```python
+# 1. Session-scoped temp view (dies when SparkSession is closed)
+df.createOrReplaceTempView("orders")
+spark.sql("SELECT * FROM orders")
+
+# 2. Global temp view (lives across sessions, accessible via global_temp database)
+df.createOrReplaceGlobalTempView("orders_global")
+spark.sql("SELECT * FROM global_temp.orders_global")
+
+# 3. Hive managed/external table (persisted to Hive Metastore)
+df.write.saveAsTable("default.orders_permanent")  # survives cluster restart
+spark.sql("SELECT * FROM default.orders_permanent")
+```
+
+The **Hive Metastore** (backed by MySQL/Derby) stores table-level metadata: schema, file location, partition info. When `enableHiveSupport()` is set, Spark's Analyzer resolves table names by querying the Metastore — enabling cross-session and cross-job table sharing.
+
+---
+
 ## What is Spark SQL?
 
 Spark SQL lets you run standard SQL queries against DataFrames by registering them as **temporary views**. The same Catalyst optimizer that powers the DataFrame API powers Spark SQL - so performance is identical.

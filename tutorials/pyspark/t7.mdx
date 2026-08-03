@@ -1,3 +1,120 @@
+## The Spark Write Commit Protocol
+
+Every `df.write` operation in Spark follows a precise commit protocol to ensure **atomicity** — either all data is written successfully or nothing is. Understanding this prevents data corruption in production pipelines.
+
+### The Two-Phase Commit Sequence
+
+```
+Phase 1: Task-level writing (on each executor)
+  ├── Each task writes its partition data to a TEMPORARY location:
+  │     output_path/_temporary/attempt-{taskId}/part-00000.parquet
+  ├── Task reports success or failure to the Driver
+  └── Failed tasks can be retried without corrupting existing output
+
+Phase 2: Job-level commit (on the Driver)
+  ├── ALL tasks must succeed before commit begins
+  ├── Driver renames all temp files to final locations atomically:
+  │     output_path/part-00000.parquet  (moved from _temporary/)
+  ├── Writes _SUCCESS marker file
+  └── Deletes the _temporary directory
+```
+
+This is why Spark always creates a `_SUCCESS` file — it marks that Phase 2 completed. If you see partial output without `_SUCCESS`, the job failed during Phase 2.
+
+### Why Overwrite Mode Can Cause Dataloss
+
+In `mode("overwrite")`, Spark deletes the existing output directory **before** Phase 2 completes:
+
+```
+overwrite sequence:
+1. Delete output_path/ (existing data gone!)
+2. Write new data to _temporary/
+3. Commit: move to final location
+
+Problem: Between step 1 and 3, there is a window where no data exists.
+If the cluster dies at step 2, you have no old data AND no new data.
+```
+
+This is why Delta Lake is preferred — its transaction log allows atomic overwrites without a data-loss window.
+
+### The Small File Problem With partitionBy
+
+`partitionBy("country", "year")` multiplies output files:
+
+```
+n_countries × n_years × n_partitions = total output files
+
+Example:
+  50 countries × 3 years × 200 shuffle partitions = 30,000 files!
+```
+
+Each small file adds overhead in S3/HDFS metadata lookups and Spark task scheduling. The solution is to `repartition` by the partition columns first, then write:
+
+```python
+# ✅ Reduces file count dramatically
+df.repartition("country", "year") \
+  .write.partitionBy("country", "year").parquet("output/")
+```
+
+### Parquet Row-Group Sizing During Writes
+
+When Spark writes Parquet, it controls the **row group size** through `parquet.block.size` (default: 128MB, matching HDFS block size). Each task accumulates rows in an in-memory write buffer until the buffer reaches `parquet.block.size`, then flushes a row group to disk:
+
+```
+Task writing 500MB of data (128MB row group size):
+
+Row group 1: [0 – 128MB] → flush to disk (part-00000.parquet row group 1)
+Row group 2: [128 – 256MB] → flush
+Row group 3: [256 – 384MB] → flush
+Row group 4: [384 – 500MB] → flush (partial row group, smaller)
+
+Result: one part file with 4 row groups
+```
+
+**Implication**: If your task processes only 10MB of data, you get one tiny row group per part file. Reading 1000 such files means 1000 individual Parquet footer reads + 1000 tiny row groups → much slower than reading 10 files with 100 row groups each.
+
+### The S3 Eventual Consistency Problem (Pre-2021)
+
+Prior to S3 strong consistency (December 2020), the Spark write commit protocol had a critical race condition on S3:
+
+```
+Phase 2 issue on S3 (historical):
+  Driver: renames _temporary/part-00000.parquet → output/part-00000.parquet
+  S3: "rename" is actually DELETE + PUT (S3 has no atomic rename!)
+  
+  If another reader reads output/ immediately after commit:
+    S3 might still return the OLD list (eventual consistency)
+    → Reader sees empty directory even though files were written
+```
+
+Modern S3 (post-2020) guarantees strong read-after-write consistency, and Spark uses the `S3A committer` which uses S3 multipart upload APIs to achieve true atomicity. This is why `spark.hadoop.fs.s3a.committer.name=magic` is recommended for S3 writes.
+
+### coalesce() vs repartition() Internals
+
+Both control the number of output files, but via completely different mechanisms:
+
+```
+repartition(N):
+  Full shuffle → every row may move to a different executor
+  Output: exactly N evenly-sized partitions (uniform distribution)
+  Cost: network I/O proportional to total data size
+  Use: when you need to INCREASE partitions, or need perfect balance
+
+coalesce(N):
+  No shuffle → combines existing partitions on the same executor
+  Output: N partitions (may be uneven if partitions aren't balanced)
+  Cost: essentially free (just merges adjacent partitions)
+  Use: when REDUCING partition count before write (e.g., 200 → 10)
+  
+  Limitation: coalesce(1) funnels ALL data through a single executor
+  → OOM risk for datasets larger than executor memory
+  → Never use coalesce(1) for large data
+```
+
+**Interview tip** 🎯: The key difference is that `repartition()` guarantees N uniform partitions via a full shuffle, while `coalesce()` avoids a shuffle but may produce uneven partitions and cannot increase partition count.
+
+---
+
 ## The Unified Write API
 
 PySpark uses a consistent API for writing DataFrames to all formats:

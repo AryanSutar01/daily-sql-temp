@@ -1,3 +1,26 @@
+## Physical Implementation of ACID: WAL and MVCC
+
+The ACID guarantees are not magic; they are enforced by two heavily engineered sub-systems inside the database kernel: the **Write-Ahead Log (WAL)** and **Multi-Version Concurrency Control (MVCC)**.
+
+### Durability and Atomicity (The WAL)
+
+When you execute an `UPDATE` and type `COMMIT`, the database does *not* write the changed row to the main data files on disk immediately (that would cause catastrophic random I/O bottlenecks). 
+
+Instead, it implements **Write-Ahead Logging (WAL)**. It appends a tiny binary record of the change to a sequential log file and issues a synchronous `fsync()` command to the operating system, forcing the disk hardware to flush its cache to non-volatile storage. 
+Because the WAL is an append-only sequential file, this is extremely fast. Once the `fsync()` acknowledges the write, the transaction is marked as committed. If the server loses power 1 microsecond later, upon reboot, the database replays the WAL from the exact point of failure, perfectly restoring the data (Durability) and rolling back any partial, uncommitted changes (Atomicity).
+
+### Isolation (MVCC)
+
+Historically, databases achieved Isolation by physically locking rows, meaning readers blocked writers, and writers blocked readers.
+
+Modern engines (PostgreSQL, Oracle, InnoDB) use **Multi-Version Concurrency Control (MVCC)**. When you `UPDATE` a row, the database does not overwrite the old data. It inserts a *completely new version* of the row, stamped with your Transaction ID.
+- Transaction A (which started 5 seconds ago) still sees the old version of the row.
+- Transaction B (your transaction) sees the new version of the row.
+
+Because of MVCC, **readers never block writers, and writers never block readers**. The database engine dynamically determines which physical version of a row each concurrent transaction is allowed to see.
+
+---
+
 ## What is ACID?
 
 ACID is an acronym for four properties that guarantee database transactions are processed reliably. These properties ensure that even in the face of errors, power failures, or concurrent access, your data remains correct.

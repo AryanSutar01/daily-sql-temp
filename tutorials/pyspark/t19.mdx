@@ -1,6 +1,33 @@
+## Why when/otherwise Exists — and Why It's Fast
+
+A common first instinct for conditional logic in PySpark is to use a Python function via a UDF (User Defined Function). This works, but it is significantly slower because every UDF call requires:
+
+1. Serialising each row from JVM (Tungsten binary format) to Python objects
+2. Executing the Python function in the Python interpreter
+3. Deserialising the result back to JVM format
+
+For a DataFrame with 100 million rows, this round-trip happens 100 million times.
+
+`when()/otherwise()` solves this by expressing conditional logic as a **Column expression** — part of Spark's internal expression tree. Catalyst compiles the entire expression tree (including `when` branches) into **JVM bytecode** at runtime through its code generation engine (Tungsten whole-stage codegen). The condition evaluation and branching happens entirely inside the JVM — no Python, no serialisation.
+
+```
+Python UDF path:
+  Row in JVM → serialize → Python process → evaluate → deserialize → JVM
+  (for every single row — very slow)
+
+when() path:
+  Generated JVM bytecode:
+  if (salary > 100000) return "Senior";
+  else return "Junior";
+  → Runs directly in JVM on each row (10–100x faster)
+```
+
+This is why `when()/otherwise()` is the **preferred replacement for if/else logic in PySpark** — it matches the expressive power of SQL `CASE WHEN` while staying inside Spark's optimised execution path.
+
 ## What is when/otherwise?
 
 `when(condition, value).otherwise(value)` is PySpark's equivalent of SQL's `CASE WHEN ... THEN ... ELSE ... END`. It lets you create conditional column values inline without UDFs.
+
 
 ```python
 from pyspark.sql import SparkSession

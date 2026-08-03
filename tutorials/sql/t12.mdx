@@ -1,3 +1,97 @@
+## GROUP BY: Physical Strategies and Cardinality
+
+GROUP BY is deceptively simple in syntax but its performance characteristics depend critically on the **cardinality** of the group key and the available memory.
+
+### Hash Strategy vs Sort-Group Strategy
+
+The database optimizer chooses between two physical implementations:
+
+```
+Query: SELECT status, COUNT(*) FROM orders GROUP BY status;
+
+Option A: Hash Aggregation
+  status has 3 distinct values: 'pending', 'completed', 'cancelled'
+  Hash table: 3 entries × ~50 bytes = ~150 bytes (trivially small!)
+  
+  Process: stream all rows through hash table
+  Result: 3 output rows
+  Cost: O(N) reads, O(cardinality) memory
+  → Chosen by optimizer: low cardinality = tiny hash table
+
+Query: SELECT user_id, COUNT(*) FROM events GROUP BY user_id;
+  user_id has 10M distinct values
+  Hash table: 10M entries × 50 bytes = 500MB!
+  work_mem = 64MB → hash table doesn't fit → SPILL TO DISK
+
+Option B: Sort + Unique Aggregation  
+  Sort all rows by user_id (external merge sort to disk)
+  Then stream through in sorted order, emitting one group per unique user_id
+  
+  Cost: O(N log N) sort + O(N) scan
+  Memory: only O(sort_run_size) needed at a time
+  → May be preferred for very high cardinality GROUP BY
+```
+
+**Key interview insight** 🎯: When GROUP BY is slow, check the cardinality. If it's high-cardinality and the table is large, the hash table won't fit in memory. Either increase `work_mem` or consider pre-aggregation strategies.
+
+### The "Every SELECT Column Must Be In GROUP BY" Rule: Why?
+
+This rule exists because of relational algebra correctness:
+
+```sql
+-- WRONG: which name to return for each department?
+SELECT department, name, COUNT(*) FROM employees GROUP BY department;
+-- MySQL (in non-strict mode) picks an ARBITRARY name from the group
+-- This is mathematically undefined and produces non-deterministic results!
+
+-- CORRECT options:
+-- Option 1: GROUP BY both
+SELECT department, name, COUNT(*) FROM employees GROUP BY department, name;
+-- Now each (dept, name) combo is its own group (effectively groups individual employees)
+
+-- Option 2: Use an aggregate to get a specific name
+SELECT department, MAX(name) AS example_name, COUNT(*) FROM employees GROUP BY department;
+-- MAX(name) deterministically returns the alphabetically last name
+
+-- Option 3: Window function (advanced)
+SELECT DISTINCT department,
+  FIRST_VALUE(name) OVER (PARTITION BY department ORDER BY hire_date) AS first_hired,
+  COUNT(*) OVER (PARTITION BY department) AS headcount
+FROM employees;
+```
+
+### GROUPING SETS: Multiple GROUP BYs in One Pass
+
+`GROUPING SETS` computes multiple GROUP BY aggregations in a single table scan — crucial for summary reports:
+
+```sql
+-- Without GROUPING SETS: 3 separate queries (3 table scans)
+SELECT 'By Category' AS type, category, NULL AS month, SUM(revenue) FROM sales GROUP BY category
+UNION ALL
+SELECT 'By Month',   NULL, month, SUM(revenue) FROM sales GROUP BY month
+UNION ALL
+SELECT 'Total',      NULL, NULL,  SUM(revenue) FROM sales;
+
+-- With GROUPING SETS: 1 table scan, same result
+SELECT category, month, SUM(revenue) AS revenue
+FROM sales
+GROUP BY GROUPING SETS (
+  (category),           -- sub-total by category
+  (month),              -- sub-total by month
+  ()                    -- grand total (empty set = all rows)
+);
+
+-- ROLLUP is a shortcut for hierarchical grouping sets:
+GROUP BY ROLLUP (year, month, day)
+-- = GROUPING SETS ((year,month,day), (year,month), (year), ())
+
+-- CUBE generates ALL possible subsets:
+GROUP BY CUBE (a, b, c)
+-- = GROUPING SETS ((a,b,c),(a,b),(a,c),(b,c),(a),(b),(c),())
+```
+
+---
+
 ## GROUP BY
 
 `GROUP BY` groups rows that share the same value in a column, then lets you apply aggregate functions to each group.

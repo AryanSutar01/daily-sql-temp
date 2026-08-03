@@ -1,4 +1,18 @@
-## JSON - JavaScript Object Notation
+## Data Exchange Formats in Production
+
+Every data engineer and backend developer works with JSON and CSV daily. Understanding not just the API but the format internals and trade-offs helps you make better decisions about when to use each.
+
+**JSON** has become the lingua franca of the internet. REST APIs, webhooks, event streams, and configuration files almost universally use JSON. Its popularity stems from being human-readable, natively supported by JavaScript (the language of the web browser), and parseable in every programming language. Its weakness is type imprecision — JSON has no datetime type, no decimal type, and no integer vs float distinction beyond what the parser infers.
+
+**CSV** is the universal data exchange format for tabular data between non-technical stakeholders — Excel users, business analysts, and most database export tools produce CSV. Its weakness is the lack of type information: everything is a string and you must parse and cast every column.
+
+**For production data pipelines**, neither JSON nor CSV is ideal for large datasets. Modern data engineering prefers:
+- **Parquet** — columnar binary format with embedded schema; 5–10x compression; 10–100x faster reads than CSV for analytical queries
+- **JSONL** (JSON Lines) — one JSON object per line; streamable; no need to load the entire file for sequential processing
+
+Knowing when to use each format is a professional skill. This tutorial covers both the Python API and the trade-offs.
+
+## JSON — JavaScript Object Notation
 
 JSON is the most common format for APIs and config files. Python's `json` module handles it natively.
 
@@ -13,6 +27,7 @@ import json
 # bool   → true/false
 # None   → null
 ```
+
 
 ### Encoding - Python to JSON
 

@@ -1,3 +1,59 @@
+## RDD Dependency Types and Stage Construction
+
+The most important concept in understanding Spark execution is how the DAG Scheduler converts your RDD lineage into executable stages. This is determined entirely by **dependency types**.
+
+### Narrow Dependencies (Pipeline-able)
+
+A **narrow dependency** means each partition of the child RDD depends on **at most one partition** of the parent RDD. These can be **pipelined** — run within a single stage with no data movement:
+
+```
+map(), filter(), flatMap(), mapPartitions()
+
+Parent:    [P0][P1][P2][P3]
+                │   │   │   │      ← each parent partition feeds exactly one child partition
+Child:     [P0][P1][P2][P3]
+```
+
+All narrow transformations in sequence collapse into a **single stage** and execute as a tight loop with no serialization between steps. Tungsten compiles them into a single JVM function (whole-stage code generation).
+
+### Wide Dependencies (Stage Boundary)
+
+A **wide dependency** means each partition of the child RDD may depend on **multiple partitions** of the parent. This requires a **shuffle** — data must be physically reorganized across the network:
+
+```
+groupByKey(), reduceByKey(), join(), distinct(), repartition()
+
+Parent:    [P0][P1][P2][P3]
+             │╲│╲│╲│╲          ← each child partition needs data from all parents
+Child:     [P0][P1][P2][P3]
+```
+
+Every wide dependency creates a **stage boundary**. The DAG Scheduler:
+1. Identifies all shuffle points in the lineage
+2. Cuts the DAG at each shuffle point into separate stages
+3. Executes stages sequentially (Stage N must complete before Stage N+1 can read its output)
+
+### Example: How 1 Job Becomes 3 Stages
+
+```python
+df.filter("year=2024")           # narrow → Stage 1
+  .groupBy("country").count()   # wide → Stage 1 ends, Stage 2 begins
+  .orderBy("count")             # wide → Stage 2 ends, Stage 3 begins
+  .show()
+```
+
+```
+Stage 1: FileScan → Filter        (narrow: pipelined in 1 pass)
+         ↓ SHUFFLE (hash on country)
+Stage 2: HashAggregate (partial) → Exchange → HashAggregate (final)
+         ↓ SHUFFLE (range partition for sort)
+Stage 3: Sort → collect to driver
+```
+
+Understanding this model explains why `groupBy` is expensive (shuffle) but `filter` is cheap (no shuffle), and why you should always filter **before** groupBy/join to minimize the data that crosses the shuffle boundary.
+
+---
+
 ## What is an RDD?
 
 **RDD (Resilient Distributed Dataset)** is Spark's original, fundamental data abstraction. It's an immutable, partitioned collection of records that can be processed in parallel across a cluster.

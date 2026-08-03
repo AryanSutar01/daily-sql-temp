@@ -1,3 +1,78 @@
+## Broadcast Hash Join: Internal Mechanics
+
+Broadcast Hash Join (BHJ) is the fastest join strategy in Spark — but only when one table is small enough to fit in executor memory. Understanding exactly how BHJ works explains both its performance advantage and its limitations.
+
+### The Broadcast Protocol: Torrent-Style Distribution
+
+When Spark decides to broadcast a table, it follows a multi-step protocol:
+
+```
+Step 1: COLLECT (Driver pulls small table from executors)
+  All partitions of small_df → collected to Driver
+  Driver assembles the complete dataset in its heap memory
+  ⚠️ Risk: if small_df is larger than driver memory → OOM crash
+
+Step 2: SERIALIZE (Driver converts to broadcast-ready format)
+  Dataset → serialized to bytes using Kryo/Java serialization
+  Serialized bytes stored in Driver BlockManager
+
+Step 3: BROADCAST (Torrent-style push to all executors)
+  NOT a direct Driver→all executors push (would bottleneck Driver)
+  Instead: Driver→some executors, those executors→other executors
+  Like BitTorrent: multiple sources, avoiding single-node bottleneck
+  Each executor stores the serialized bytes in its BlockManager
+
+Step 4: DESERIALIZE + BUILD HASH TABLE (on each executor)
+  Each executor deserializes its local copy
+  Builds an in-memory hash table: key → List[row]
+  Hash table lives in Spark Storage memory region
+
+Step 5: PROBE (during join execution)
+  For each row in big_df partition:
+    hash(join_key) → look up in local hash table
+    Emit matching rows
+  NO SHUFFLE of big_df required!
+```
+
+### Why BHJ Eliminates the Shuffle
+
+In Sort-Merge Join (SMJ), **both** tables must be shuffled and sorted by join key. In BHJ, only the small table moves — it's distributed once via broadcast. The large table's partitions stay in place and each executor probes the local hash table:
+
+```
+Sort-Merge Join:
+  big_df  → shuffle by key → sort → merge with
+  small_df → shuffle by key → sort
+  Cost: 2 full shuffles + 2 sorts
+
+Broadcast Hash Join:
+  small_df → collect to Driver → broadcast (once) → hash table on all executors
+  big_df   → stays in place, each partition probes local hash table
+  Cost: 0 shuffles + 1 broadcast
+```
+
+For a 10GB big table and 50MB small table: BHJ avoids shuffling 10GB. This typically reduces join time from minutes to seconds.
+
+### Why BHJ Has a Size Limit
+
+The broadcast size limit (`spark.sql.autoBroadcastJoinThreshold`, default 10MB) exists because:
+1. Broadcast materializes the entire table in **Driver heap memory** (OOM risk)
+2. Each executor must hold a complete copy in **Storage memory** (reduces execution memory for other operations)
+3. With 100 executors and a 500MB broadcast → 50GB of total cluster memory used for one copy of the table
+
+```python
+# Increase threshold if your small table is e.g. 200MB and cluster has enough memory
+spark.conf.set("spark.sql.autoBroadcastJoinThreshold", 209715200)  # 200MB
+
+# Disable auto-broadcast (force SortMergeJoin)
+spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
+
+# Force broadcast with hint (overrides threshold check)
+from pyspark.sql.functions import broadcast
+df_big.join(broadcast(df_small), "id")
+```
+
+---
+
 ## The Join Shuffle Problem
 
 A regular (sort-merge) join between two large tables is expensive:

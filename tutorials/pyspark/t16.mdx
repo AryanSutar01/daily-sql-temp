@@ -1,3 +1,52 @@
+## How Spark Represents and Handles Nulls
+
+Understanding null handling in Spark requires understanding two separate layers: how nulls are physically stored, and how SQL's three-valued logic governs their behaviour in expressions.
+
+### Physical Null Representation
+
+Spark's internal row format (Tungsten UnsafeRow) stores each row as a compact binary layout with a **null bit vector** — one bit per column indicating whether that column's value is null. The actual value slot for a null column is zeroed out but irrelevant; only the null bit is checked.
+
+```
+UnsafeRow memory layout (simplified):
+┌─────────────────┬─────────────────┬──────────────────────────────┐
+│ Null bit vector │  Fixed-width    │  Variable-length data        │
+│ (1 bit/column) │  values (8B ea) │  (strings, arrays, etc.)     │
+│ 0=not null      │  name→offset    │  pointed to by offsets       │
+│ 1=null          │  salary→value   │  in fixed-width section      │
+└─────────────────┴─────────────────┴──────────────────────────────┘
+```
+
+This bit-vector approach makes null checks extremely fast — a single bit read, no object allocation.
+
+### SQL Three-Valued Logic and Why null == null is False
+
+SQL defines **three truth values**: TRUE, FALSE, and UNKNOWN. Any comparison involving NULL yields UNKNOWN, not TRUE or FALSE. This is why `null == null` returns null (unknown), not true — you cannot prove two unknown values are equal.
+
+```python
+# This is why you MUST use isNull(), not == None:
+df.filter(col("name") == None).show()      # ❌ returns 0 rows — null == null → null → filtered out
+df.filter(col("name").isNull()).show()      # ✅ correct — uses IS NULL check
+
+# In SQL: WHERE name = NULL   → 0 rows (wrong, uses = which returns UNKNOWN)
+#         WHERE name IS NULL  → correct rows
+```
+
+This three-valued logic also affects aggregate functions: `SUM()`, `AVG()`, and `COUNT("col")` all **ignore null values** by SQL standard. Only `COUNT(*)` includes nulls.
+
+### NaN vs null — Two Different Concepts
+
+`NaN` (Not a Number) is a **float/double value** defined by the IEEE 754 standard — it is the result of invalid floating-point arithmetic like `0.0/0.0` or `math.sqrt(-1)`. It is distinct from null:
+
+| Property | `null` | `NaN` |
+|---|---|---|
+| Meaning | Value is absent/unknown | Value is an invalid float computation |
+| Type | Any type | Float/Double only |
+| Filter | `.isNull()` | `isnan()` |
+| Aggregate behaviour | Ignored by default | Propagates (NaN + anything = NaN) |
+| SQL equivalent | `IS NULL` | No direct SQL equivalent |
+
+---
+
 ## Setup
 
 ```python
