@@ -46,22 +46,22 @@ export function Navbar() {
       iconBg: "bg-amber-400/10",
       iconColor: "text-amber-400",
     },
-    // {
-    //   title: "Learn Python",
-    //   description: "Python fundamentals & interview prep.",
-    //   href: "/practice/learn/python",
-    //   icon: BookOpen,
-    //   iconBg: "bg-blue-400/10",
-    //   iconColor: "text-blue-400",
-    // },
-    // {
-    //   title: "Learn PySpark",
-    //   description: "Big data processing with PySpark.",
-    //   href: "/practice/learn/pyspark",
-    //   icon: BookOpen,
-    //   iconBg: "bg-orange-400/10",
-    //   iconColor: "text-orange-400",
-    // }
+    {
+      title: "Learn Python",
+      description: "Python fundamentals & interview prep.",
+      href: "/practice/learn/python",
+      icon: BookOpen,
+      iconBg: "bg-blue-400/10",
+      iconColor: "text-blue-400",
+    },
+    {
+      title: "Learn PySpark",
+      description: "Big data processing with PySpark.",
+      href: "/practice/learn/pyspark",
+      icon: BookOpen,
+      iconBg: "bg-orange-400/10",
+      iconColor: "text-orange-400",
+    }
   ];
 
   useEffect(() => {
