@@ -957,7 +957,7 @@ export default function AdminDashboard() {
         setCreateStep('problem');
         setCreatedProblemId(null);
         setProblemForm({ title: "", difficulty: "easy", description: "", estimated_time_minutes: 15, challenge_type: "sql" });
-        setDatasetForm({ table_name: "", schema_sql: "", seed_sql: "", column_types: "", seed_data_json: "" });
+        setDatasetForm({ table_name: "", seed_data_json: "", schema_sql: "", seed_sql: "", mysql_schema_sql: "", mysql_seed_sql: "", column_types: "" });
         setSolutionForm({ reference_query: "", mysql_reference_query: "", reference_code: "", function_name: "", starter_code: "", order_sensitive: false, notes: "" });
         setWizardDatasets([]);
         setTestCases([]);

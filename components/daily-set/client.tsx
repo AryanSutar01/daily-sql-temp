@@ -1760,7 +1760,7 @@ export function DailySetClient() {
                                                                 return (
                                                                     <div
                                                                         id={cardIdx === 0 ? 'tour-problem-card' : undefined}
-                                                                        key={`${key}-${id}`}
+                                                                        key={`card-${id ?? cardIdx}`}
                                                                         onClick={() => handleProblemSelect(id!)}
                                                                         className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${isActive
                                                                                 ? `${activeTabMeta.bg} ${activeTabMeta.border}`
