@@ -150,10 +150,16 @@ export default function AdminDashboard() {
         title: "", difficulty: "easy", description: "", estimated_time_minutes: 15, challenge_type: "sql"
     });
     const [datasetForm, setDatasetForm] = useState({
-        table_name: "", schema_sql: "", seed_sql: "", column_types: "", seed_data_json: ""
+        table_name: "",
+        seed_data_json: "",
+        schema_sql: "", seed_sql: "", mysql_schema_sql: "", mysql_seed_sql: "",
+        column_types: ""
     });
+    const [showRawSqlOverride, setShowRawSqlOverride] = useState(false);
+    const [showMysqlQueryOverride, setShowMysqlQueryOverride] = useState(false);
+    
     const [solutionForm, setSolutionForm] = useState({
-        reference_query: "", reference_code: "", function_name: "", starter_code: "", order_sensitive: false, notes: ""
+        reference_query: "", mysql_reference_query: "", reference_code: "", function_name: "", starter_code: "", order_sensitive: false, notes: ""
     });
     const [wizardDatasets, setWizardDatasets] = useState<any[]>([]);
     const [testCases, setTestCases] = useState<any[]>([]);
@@ -701,9 +707,30 @@ export default function AdminDashboard() {
             };
 
             if (problemForm.challenge_type === 'sql') {
-                // Parse column_types (e.g. "id: int \n name: varchar") into JSON object
+                // ── JSON descriptor mode (primary) ────────────────────────────
+                if (datasetForm.seed_data_json?.trim()) {
+                    try {
+                        bodyPayload.seed_data_json = JSON.parse(datasetForm.seed_data_json);
+                    } catch {
+                        showToast('error', 'Invalid JSON descriptor — check your seed_data_json format');
+                        setLoading(false);
+                        return;
+                    }
+                }
+
+                // ── Raw SQL overrides (advanced dropdown) — only include if filled ──
+                if (datasetForm.schema_sql?.trim()) {
+                    bodyPayload.schema_sql = datasetForm.schema_sql;
+                    bodyPayload.seed_sql = datasetForm.seed_sql;
+                }
+                if (datasetForm.mysql_schema_sql?.trim()) {
+                    bodyPayload.mysql_schema_sql = datasetForm.mysql_schema_sql;
+                    bodyPayload.mysql_seed_sql = datasetForm.mysql_seed_sql;
+                }
+
+                // Parse column_types (e.g. "id: int\nname: varchar") into JSON object
                 const colTypesObj: Record<string, string> = {};
-                if (datasetForm.column_types.trim()) {
+                if (datasetForm.column_types?.trim()) {
                     const lines = datasetForm.column_types.split('\n');
                     for (const line of lines) {
                         if (line.includes(':')) {
@@ -712,10 +739,11 @@ export default function AdminDashboard() {
                         }
                     }
                 }
-                bodyPayload.schema_sql = datasetForm.schema_sql;
-                bodyPayload.seed_sql = datasetForm.seed_sql;
-                bodyPayload.column_types = colTypesObj;
+                if (Object.keys(colTypesObj).length > 0) {
+                    bodyPayload.column_types = colTypesObj;
+                }
             } else {
+                // Python / PySpark — seed_data_json is always the source
                 bodyPayload.seed_data_json = JSON.parse(datasetForm.seed_data_json);
             }
 
@@ -725,7 +753,8 @@ export default function AdminDashboard() {
             });
             if (res.ok) {
                 showToast('success', `Dataset "${datasetForm.table_name}" added!`);
-                setDatasetForm({ table_name: "", schema_sql: "", seed_sql: "", column_types: "", seed_data_json: "" });
+                setDatasetForm({ table_name: "", seed_data_json: "", schema_sql: "", seed_sql: "", mysql_schema_sql: "", mysql_seed_sql: "", column_types: "" });
+                setShowRawSqlOverride(false);
             } else {
                 const data = await res.json();
                 showToast('error', data.detail || 'Failed to add dataset');
@@ -733,6 +762,7 @@ export default function AdminDashboard() {
         } catch (e: any) { showToast('error', e.message); }
         setLoading(false);
     };
+
 
     // ADD SOLUTION
     const handleAddSolution = async () => {
@@ -747,6 +777,9 @@ export default function AdminDashboard() {
 
             if (problemForm.challenge_type === 'sql') {
                 bodyPayload.reference_query = solutionForm.reference_query;
+                if (solutionForm.mysql_reference_query.trim()) {
+                    bodyPayload.mysql_reference_query = solutionForm.mysql_reference_query;
+                }
             } else {
                 bodyPayload.reference_code = solutionForm.reference_code;
                 if (problemForm.challenge_type === 'python_dsa') {
@@ -925,7 +958,7 @@ export default function AdminDashboard() {
         setCreatedProblemId(null);
         setProblemForm({ title: "", difficulty: "easy", description: "", estimated_time_minutes: 15, challenge_type: "sql" });
         setDatasetForm({ table_name: "", schema_sql: "", seed_sql: "", column_types: "", seed_data_json: "" });
-        setSolutionForm({ reference_query: "", reference_code: "", function_name: "", starter_code: "", order_sensitive: false, notes: "" });
+        setSolutionForm({ reference_query: "", mysql_reference_query: "", reference_code: "", function_name: "", starter_code: "", order_sensitive: false, notes: "" });
         setWizardDatasets([]);
         setTestCases([]);
         setTestCaseForm({ input_data: "", expected: "", is_hidden: true, label: "", order_index: 0 });
@@ -1501,20 +1534,98 @@ export default function AdminDashboard() {
 
                         {/* Step 2: Datasets */}
                         {createStep === 'datasets' && (
-                            <div className="bg-[#121826] p-6 rounded-xl border border-[#202736] space-y-4">
-                                <h2 className="text-xl font-bold flex items-center gap-2"><Database size={20} className="text-[#4DD4C4]" /> Add Dataset</h2>
-                                <p className="text-sm text-zinc-500">Add table schemas for this problem. You can add multiple tables.</p>
-                                <input className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white" placeholder="Table Name (e.g. users, orders)" value={datasetForm.table_name} onChange={e => setDatasetForm({ ...datasetForm, table_name: e.target.value })} />
+                            <div className="bg-[#121826] p-6 rounded-xl border border-[#202736] space-y-5">
+                                <div>
+                                    <h2 className="text-xl font-bold flex items-center gap-2"><Database size={20} className="text-[#4DD4C4]" /> Add Dataset</h2>
+                                    <p className="text-sm text-zinc-500 mt-1">Define your table using the JSON descriptor — SQL for all dialects is auto-generated. You can add multiple tables.</p>
+                                </div>
+
+                                <input
+                                    className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg text-white focus:border-[#4DD4C4] focus:outline-none"
+                                    placeholder="Table Name (e.g. users, orders)"
+                                    value={datasetForm.table_name}
+                                    onChange={e => setDatasetForm({ ...datasetForm, table_name: e.target.value })}
+                                />
+
                                 {problemForm.challenge_type === 'sql' ? (
-                                    <>
-                                        <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-24 font-mono text-xs text-white" placeholder="CREATE TABLE SQL..." value={datasetForm.schema_sql} onChange={e => setDatasetForm({ ...datasetForm, schema_sql: e.target.value })} />
-                                        <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-24 font-mono text-xs text-white" placeholder="INSERT INTO SQL (seed data)..." value={datasetForm.seed_sql} onChange={e => setDatasetForm({ ...datasetForm, seed_sql: e.target.value })} />
-                                        <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-20 font-mono text-xs text-white" placeholder="Column Types (e.g. id: int \n name: varchar)" value={datasetForm.column_types} onChange={e => setDatasetForm({ ...datasetForm, column_types: e.target.value })} />
-                                    </>
+                                    <div className="space-y-4">
+                                        {/* ── Primary: JSON Descriptor ─────────────────────────────── */}
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <label className="text-xs font-bold text-white">JSON Descriptor</label>
+                                                <span className="text-[10px] bg-[#4DD4C4]/15 text-[#4DD4C4] border border-[#4DD4C4]/30 px-2 py-0.5 rounded font-semibold">RECOMMENDED</span>
+                                                <span className="text-[10px] text-zinc-500">Auto-generates SQL for PostgreSQL + MySQL</span>
+                                            </div>
+                                            <textarea
+                                                className="w-full bg-[#0b101c] border border-[#4DD4C4]/30 p-3 rounded-lg h-56 font-mono text-xs text-white focus:outline-none focus:border-[#4DD4C4]"
+                                                placeholder={`{\n  "columns": [\n    { "name": "id",     "type": "integer",  "primary_key": true, "auto_increment": true },\n    { "name": "name",   "type": "varchar",  "length": 100, "nullable": false },\n    { "name": "salary", "type": "decimal",  "precision": 10, "scale": 2 },\n    { "name": "hired_at", "type": "date" }\n  ],\n  "rows": [\n    [1, "Alice", 95000.00, "2021-03-15"],\n    [2, "Bob",   72000.00, "2022-07-01"]\n  ]\n}`}
+                                                value={datasetForm.seed_data_json}
+                                                onChange={e => setDatasetForm({ ...datasetForm, seed_data_json: e.target.value })}
+                                            />
+                                            <p className="text-[11px] text-zinc-600 mt-1.5">
+                                                Supported types: <span className="font-mono text-zinc-500">integer, bigint, varchar, text, decimal, float, boolean, date, timestamp, json</span>
+                                            </p>
+                                        </div>
+
+                                        {/* ── Advanced: Raw SQL Override ─────────────────────────── */}
+                                        <div className="border border-dashed border-zinc-700 rounded-lg overflow-hidden">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowRawSqlOverride(v => !v)}
+                                                className="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/[0.03] transition-colors"
+                                            >
+                                                <span className="flex items-center gap-2">
+                                                    <Code size={14} />
+                                                    Advanced: Raw SQL Override
+                                                    <span className="text-[10px] text-zinc-600 font-normal">Use when JSON descriptor can't express what you need (composite PKs, FKs, DEFAULT NOW(), etc.)</span>
+                                                </span>
+                                                <span className="text-zinc-600">{showRawSqlOverride ? '▲' : '▼'}</span>
+                                            </button>
+
+                                            {showRawSqlOverride && (
+                                                <div className="px-4 pb-4 pt-1 space-y-4 bg-[#0d121c]">
+                                                    <p className="text-[11px] text-amber-400/70 bg-amber-400/5 border border-amber-400/20 rounded px-3 py-2">
+                                                        ⚠ Raw SQL overrides take priority over the JSON descriptor above. Only fill these if you need something the generator can't express.
+                                                    </p>
+
+                                                    <div>
+                                                        <label className="block text-xs text-zinc-500 mb-1">PostgreSQL Schema SQL <span className="text-zinc-600">(CREATE TABLE override)</span></label>
+                                                        <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-24 font-mono text-xs text-white focus:outline-none focus:border-zinc-500" placeholder="CREATE TABLE ..." value={datasetForm.schema_sql} onChange={e => setDatasetForm({ ...datasetForm, schema_sql: e.target.value })} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs text-zinc-500 mb-1">PostgreSQL Seed SQL <span className="text-zinc-600">(INSERT INTO override)</span></label>
+                                                        <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-24 font-mono text-xs text-white focus:outline-none focus:border-zinc-500" placeholder="INSERT INTO ..." value={datasetForm.seed_sql} onChange={e => setDatasetForm({ ...datasetForm, seed_sql: e.target.value })} />
+                                                    </div>
+                                                    <div className="border-t border-zinc-800 pt-4">
+                                                        <div className="flex items-center gap-2 mb-3">
+                                                            <span className="text-xs font-bold text-[#4DD4C4]">MySQL Schema SQL</span>
+                                                            <span className="text-[10px] text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">optional</span>
+                                                        </div>
+                                                        <textarea className="w-full bg-[#0b101c] border border-[#4DD4C4]/20 p-3 rounded-lg h-24 font-mono text-xs text-white focus:outline-none focus:border-[#4DD4C4]/50" placeholder="CREATE TABLE ... (MySQL syntax override)" value={datasetForm.mysql_schema_sql} onChange={e => setDatasetForm({ ...datasetForm, mysql_schema_sql: e.target.value })} />
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-xs font-bold text-[#4DD4C4]">MySQL Seed SQL</span>
+                                                            <span className="text-[10px] text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">optional</span>
+                                                        </div>
+                                                        <textarea className="w-full bg-[#0b101c] border border-[#4DD4C4]/20 p-3 rounded-lg h-24 font-mono text-xs text-white focus:outline-none focus:border-[#4DD4C4]/50" placeholder="INSERT INTO ... (MySQL syntax override)" value={datasetForm.mysql_seed_sql} onChange={e => setDatasetForm({ ...datasetForm, mysql_seed_sql: e.target.value })} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs text-zinc-500 mb-1">Column Types <span className="text-zinc-600">(optional, e.g. id: int)</span></label>
+                                                        <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-16 font-mono text-xs text-white focus:outline-none focus:border-zinc-500" placeholder={`id: int\nname: varchar`} value={datasetForm.column_types} onChange={e => setDatasetForm({ ...datasetForm, column_types: e.target.value })} />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 ) : (
-                                    <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-48 font-mono text-xs text-white" placeholder={`Seed Data JSON, e.g.:\n{\n  "columns": [\n    {"name": "id", "type": "integer"},\n    {"name": "name", "type": "text"}\n  ],\n  "rows": [\n    [1, "Alice"],\n    [2, "Bob"]\n  ]\n}`} value={datasetForm.seed_data_json} onChange={e => setDatasetForm({ ...datasetForm, seed_data_json: e.target.value })} />
+                                    <div>
+                                        <label className="block text-xs text-zinc-500 mb-2">Seed Data JSON</label>
+                                        <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-48 font-mono text-xs text-white focus:outline-none focus:border-[#4DD4C4]" placeholder={`{\n  "columns": [\n    {"name": "id", "type": "integer"},\n    {"name": "name", "type": "text"}\n  ],\n  "rows": [\n    [1, "Alice"],\n    [2, "Bob"]\n  ]\n}`} value={datasetForm.seed_data_json} onChange={e => setDatasetForm({ ...datasetForm, seed_data_json: e.target.value })} />
+                                    </div>
                                 )}
-                                <div className="flex gap-3">
+
+                                <div className="flex gap-3 pt-1">
                                     <Button onClick={handleAddDataset} disabled={!datasetForm.table_name || loading} className="flex-1 bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-bold">
                                         {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : <Plus size={16} className="mr-2" />}
                                         Add This Table
@@ -1525,6 +1636,7 @@ export default function AdminDashboard() {
                                 </div>
                             </div>
                         )}
+
 
                         {/* Step 2.5: Test Cases (DSA only) */}
                         {createStep === 'test-cases' && (
@@ -1667,7 +1779,37 @@ export default function AdminDashboard() {
                                 )}
 
                                 {problemForm.challenge_type === 'sql' ? (
-                                    <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-40 font-mono text-sm text-white focus:outline-none focus:border-[#4DD4C4]" placeholder="SELECT ... FROM ... WHERE ..." value={solutionForm.reference_query} onChange={e => setSolutionForm({ ...solutionForm, reference_query: e.target.value })} />
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-xs text-zinc-500 mb-1">PostgreSQL Reference Query</label>
+                                            <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-40 font-mono text-sm text-white focus:outline-none focus:border-[#4DD4C4]" placeholder="SELECT ... FROM ... WHERE ..." value={solutionForm.reference_query} onChange={e => setSolutionForm({ ...solutionForm, reference_query: e.target.value })} />
+                                        </div>
+                                        {/* ── MySQL override: collapsible ─────────────────── */}
+                                        <div className="border border-dashed border-zinc-700 rounded-lg overflow-hidden">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowMysqlQueryOverride(v => !v)}
+                                                className="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/[0.03] transition-colors"
+                                            >
+                                                <span className="flex items-center gap-2">
+                                                    MySQL Reference Query Override
+                                                    <span className="text-[10px] text-zinc-600 font-normal">Only needed if MySQL syntax differs from PostgreSQL (e.g. uses different functions)</span>
+                                                </span>
+                                                <span className="text-zinc-600">{showMysqlQueryOverride ? '▲' : '▼'}</span>
+                                            </button>
+                                            {showMysqlQueryOverride && (
+                                                <div className="px-4 pb-4 pt-1 bg-[#0d121c]">
+                                                    <p className="text-[11px] text-zinc-500 mb-3">Leave blank to use the PostgreSQL query for both dialects.</p>
+                                                    <textarea
+                                                        className="w-full bg-[#0b101c] border border-[#4DD4C4]/20 p-3 rounded-lg h-32 font-mono text-sm text-white focus:outline-none focus:border-[#4DD4C4]/50"
+                                                        placeholder="SELECT ... -- MySQL-specific syntax if needed"
+                                                        value={solutionForm.mysql_reference_query}
+                                                        onChange={e => setSolutionForm({ ...solutionForm, mysql_reference_query: e.target.value })}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 ) : (
                                     <textarea className="w-full bg-[#0b101c] border border-[#202736] p-3 rounded-lg h-40 font-mono text-sm text-white focus:outline-none focus:border-[#4DD4C4]" placeholder={problemForm.challenge_type === 'python_dsa' ? `def twoSum(nums: list[int], target: int) -> list[int]:\n    # Reference implementation\n    pass` : `# Write reference solution\n# Assign your final DataFrame to 'result'\n\nresult = ...`} value={solutionForm.reference_code} onChange={e => setSolutionForm({ ...solutionForm, reference_code: e.target.value })} />
                                 )}

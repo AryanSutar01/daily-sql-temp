@@ -351,6 +351,7 @@ export function DailySetClient() {
         setExpectedOutput(null);
         setActiveSampleTab(0);
         setActiveOutputTab('test');
+        setSqlDialect('postgresql');  // reset dialect on every problem switch
         try {
             let p = problems.find(x => x.id === id);
             if (!p) {
@@ -851,6 +852,12 @@ export function DailySetClient() {
     };
 
     const isDsaProblem = activeProblem?.challenge_type === 'python_dsa';
+    const isSqlProblem  = activeProblem?.challenge_type === 'sql';
+
+    // ── SQL Dialect State ─────────────────────────────────────────────
+    // Reset to postgresql whenever the user switches to a different problem
+    const [sqlDialect, setSqlDialect] = useState<'postgresql' | 'mysql'>('postgresql');
+    const isDualDialect = isSqlProblem && (activeProblem?.supported_dialects?.includes('mysql') ?? false);
 
     // ── DSA Test Results Panel ─────────────────────────────────────────────
     const renderDsaPanel = () => {
@@ -1044,7 +1051,7 @@ export function DailySetClient() {
         try {
             // DSA uses 'run' mode (sample test cases only); others use 'submit' which evaluates correctness
             const mode = isDsaProblem ? 'run' : 'submit';
-            const res = await api.execute(activeProblemId, code, mode);
+            const res = await api.execute(activeProblemId, code, mode, isSqlProblem ? sqlDialect : 'postgresql');
             setExecutionResult(res);
             if (isDsaProblem) {
                 setActiveOutputTab('test');
@@ -1071,7 +1078,7 @@ export function DailySetClient() {
             setShowResult(true);
             setOutputHeight(340);
             try {
-                const res = await api.execute(activeProblemId, code, 'submit');
+                const res = await api.execute(activeProblemId, code, 'submit', isSqlProblem ? sqlDialect : 'postgresql');
                 setExecutionResult(res);
                 if (isDsaProblem) {
                     setActiveOutputTab('submit');
@@ -1753,7 +1760,7 @@ export function DailySetClient() {
                                                                 return (
                                                                     <div
                                                                         id={cardIdx === 0 ? 'tour-problem-card' : undefined}
-                                                                        key={id}
+                                                                        key={`${key}-${id}`}
                                                                         onClick={() => handleProblemSelect(id!)}
                                                                         className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${isActive
                                                                                 ? `${activeTabMeta.bg} ${activeTabMeta.border}`
@@ -2389,9 +2396,35 @@ export function DailySetClient() {
                     <Panel minSize="30" className="flex flex-col bg-[#0b101c]">
                         {/* Editor toolbar */}
                         <div className="h-[52px] border-b border-[#202736] bg-[#131924] flex items-center justify-between px-4 shrink-0">
-                            <span className="text-xs font-mono font-medium text-[#4DD4C4] flex items-center gap-2">
-                                <span className="text-zinc-500">&gt;_</span> {activeProblem?.challenge_type === 'python' ? 'Python (Pandas)' : activeProblem?.challenge_type === 'pyspark' ? 'PySpark' : 'PostgreSQL'}
-                            </span>
+                            <div className="flex items-center gap-3">
+                                {/* Language / dialect label */}
+                                {!isDualDialect && (
+                                    <span className="text-xs font-mono font-medium text-[#4DD4C4] flex items-center gap-2">
+                                        <span className="text-zinc-500">&gt;_</span>
+                                        {activeProblem?.challenge_type === 'python' ? 'Python (Pandas)' : activeProblem?.challenge_type === 'pyspark' ? 'PySpark' : activeProblem?.challenge_type === 'sql' ? 'PostgreSQL' : 'SQL'}
+                                    </span>
+                                )}
+
+                                {/* Dialect toggle — only shown for dual-dialect SQL problems */}
+                                {isDualDialect && (
+                                    <div className="flex items-center gap-1 bg-[#0b101c] border border-[#202736] rounded-lg p-0.5">
+                                        {(['postgresql', 'mysql'] as const).map(d => (
+                                            <button
+                                                key={d}
+                                                onClick={() => setSqlDialect(d)}
+                                                title={d === 'postgresql' ? 'Run with PostgreSQL' : 'Run with MySQL'}
+                                                className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold transition-all duration-150 ${
+                                                    sqlDialect === d
+                                                        ? 'bg-[#4DD4C4]/15 text-[#4DD4C4] border border-[#4DD4C4]/30'
+                                                        : 'text-zinc-500 hover:text-zinc-300'
+                                                }`}
+                                            >
+                                                {d === 'postgresql' ? 'PostgreSQL' : 'MySQL'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                             <div className="flex items-center gap-3 text-zinc-400">
                                 <button
                                     onClick={() => {

@@ -38,11 +38,15 @@ export interface Problem {
     challenge_type?: string;  // 'sql' | 'python' | 'pyspark' | 'python_dsa'
     function_name?: string | null;  // DSA only: the function the user must implement
     starter_code?: string | null;   // DSA only: the full stub shown to users (with params)
+    supported_dialects?: ('postgresql' | 'mysql')[];  // SQL only; ['postgresql'] for old problems, both for new dual-dialect ones
 }
 
 export interface Dataset {
     table_name: string;
     schema_sql: string;
+    seed_sql?: string;
+    mysql_schema_sql?: string | null;
+    mysql_seed_sql?: string | null;
     sample_rows: Record<string, any>[];
     column_types?: Record<string, string>;
     seed_data_json?: any;
