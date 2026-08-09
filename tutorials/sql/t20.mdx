@@ -1,3 +1,39 @@
+## CASE WHEN: CPU Branching and Vectorization
+
+While `CASE WHEN` looks like a simple logical switch, understanding how it executes at the hardware level is critical for optimizing high-throughput analytical queries.
+
+### CPU Branch Prediction and Short-Circuiting
+
+The SQL engine executes `CASE WHEN` using **short-circuit evaluation**. It evaluates conditions strictly from top to bottom. As soon as a `WHEN` condition evaluates to TRUE, the engine stops evaluating the remaining conditions for that row and immediately returns the result.
+
+```sql
+CASE 
+  WHEN expensive_function(a) = 1 THEN 'A'
+  WHEN cheap_function(b) = 1 THEN 'B'
+END
+```
+**Architectural Rule**: Always put the most likely condition, or the cheapest condition to compute, at the very top of your `CASE` statement. If 90% of your rows match condition B, but you put the expensive condition A first, the CPU will waste millions of cycles computing `expensive_function` only for it to fail. By putting the most frequent matches first, you leverage CPU short-circuiting to skip unnecessary computations.
+
+### The Vectorization Penalty in OLAP Engines
+
+In modern OLAP databases (like Snowflake, ClickHouse, or Redshift), the execution engine uses **Vectorized Execution (SIMD)**. Instead of processing one row at a time, the CPU processes arrays (vectors) of thousands of rows simultaneously in a single CPU instruction.
+
+`CASE WHEN` statements are the enemy of vectorization. Because different rows follow different logical branches (some hit condition 1, some hit condition 2), the CPU cannot apply a single mathematical operation uniformly across the vector. This causes a **pipeline flush** or forces the database to fall back to row-by-row processing for that specific expression.
+
+If you have a massive analytical query performing conditional math, it is often much faster to use mathematical tricks to avoid branching entirely.
+
+```sql
+-- Branching (Breaks Vectorization):
+SUM(CASE WHEN is_active = true THEN revenue ELSE 0 END)
+
+-- Branchless (Highly Vectorizable):
+-- Assuming is_active is castable to integer (1 or 0)
+SUM(revenue * is_active::INT)
+```
+By multiplying instead of branching, the CPU can use SIMD instructions to multiply the entire `revenue` vector by the `is_active` vector in a fraction of the time.
+
+---
+
 ## What is CASE WHEN?
 
 `CASE WHEN` is SQL's conditional expression. It evaluates conditions and returns a value based on the first condition that matches - like if-else in programming.

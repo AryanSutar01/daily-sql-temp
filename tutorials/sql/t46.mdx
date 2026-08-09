@@ -1,3 +1,25 @@
+## Architectural Foundations: Storage Engines and Trade-offs
+
+The debate between SQL and NoSQL is fundamentally a debate about **Storage Architectures**, **Compute Bottlenecks**, and the **CAP Theorem**.
+
+### B-Trees (SQL) vs LSM-Trees (NoSQL)
+
+Relational databases (SQL) are built on **B-Trees**. B-Trees excel at fast reads and in-place updates, but they suffer from Write Amplification. If you push 100,000 inserts per second, the random I/O required to update the B-Tree will crush the disk.
+
+Modern NoSQL databases (like Cassandra, ScyllaDB, and DynamoDB) are built on **LSM-Trees (Log-Structured Merge-Trees)**. LSM-Trees buffer writes in RAM and periodically flush them to disk as immutable, sequential files (SSTables). This converts random I/O into pure sequential I/O, allowing NoSQL engines to ingest millions of writes per second with near-zero latency. The trade-off? Reads require scanning multiple files (Read Amplification).
+
+### Compute-Bound (SQL) vs Storage-Bound (NoSQL)
+
+- **SQL (Relational):** Data is normalized. To serve a user profile, the database must `JOIN` five tables. JOINs are **CPU-bound** (hashing, sorting) and memory-bound. This makes relational databases difficult to scale horizontally.
+- **NoSQL (Document/Wide-Column):** Data is denormalized. The user profile, their addresses, and recent orders are pre-computed and stored as a single massive JSON document. The database does zero CPU work; it just fetches the bytes. NoSQL trades massive storage space (duplication) to eliminate CPU bottlenecks, enabling infinite horizontal scaling.
+
+### The CAP Theorem
+
+Distributed NoSQL databases explicitly choose **Availability** and **Partition Tolerance** over immediate Consistency (AP systems). 
+If a network cable is cut between two data centers, a SQL database will refuse writes to prevent data corruption (Consistency). A NoSQL database will accept writes in both data centers and resolve the conflicts later (Eventual Consistency).
+
+---
+
 ## The Core Difference
 
 **SQL databases** store data in tables with rows and columns. Data is structured, schema is fixed, relationships are enforced.

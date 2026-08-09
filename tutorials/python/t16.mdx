@@ -1,100 +1,81 @@
-## What Is OOP?
+## The Memory Architecture of Object-Oriented Programming
 
-Object-Oriented Programming organizes code around objects - bundles of data (attributes) and behaviour (methods). Instead of separate functions and variables, an object combines both.
+Python's execution model is deeply **Object-Oriented (OOP)**. Everything in Python—from simple integers to functions and modules—is an object allocated on the CPython heap. 
 
-```
-Procedural:           OOP:
-- variables           - object (bundles both)
-- functions             - attributes (data)
-                        - methods (behaviour)
-```
+Conceptually, OOP is a paradigm that organizes software design around **Objects** rather than logical procedures. An object is a data structure that tightly couples state (Attributes) and behavior (Methods). This architectural coupling ensures that data is mutated strictly by the functions designed to handle it, heavily reducing global state pollution.
 
-## Defining a Class
+### `PyTypeObject` vs `PyObject`
+
+Understanding the memory model is crucial for high-performance Python. 
+A **Class** is a blueprint. When Python parses a class definition, it allocates a `PyTypeObject` in C. This object possesses a dictionary (`__dict__`) containing all the class attributes and methods.
+
+An **Instance** is a concrete realization. When you instantiate a class (`acc = BankAccount()`), Python allocates a new `PyObject`. Crucially, this instance gets its *own* separate `__dict__`.
 
 ```python
 class BankAccount:
-    # Class variable - shared across all instances
-    interest_rate = 0.05
+    # Class Attribute: Lives in the PyTypeObject's __dict__.
+    # Shared exactly once across all instances to save memory.
+    bank_name = "Global Trust"
 
     def __init__(self, owner, balance=0):
-        # Instance variables - unique to each instance
+        # Instance Attributes: Live in the PyObject's __dict__.
+        # Unique to every individual account.
         self.owner = owner
         self.balance = balance
-        self._transactions = []   # _ prefix = convention for "private"
-
-    def deposit(self, amount):
-        if amount <= 0:
-            raise ValueError("Deposit must be positive")
-        self.balance += amount
-        self._transactions.append(("deposit", amount))
-        return self.balance
-
-    def withdraw(self, amount):
-        if amount > self.balance:
-            raise ValueError("Insufficient funds")
-        self.balance -= amount
-        self._transactions.append(("withdraw", amount))
-        return self.balance
-
-    def get_statement(self):
-        return self._transactions
-
-    def __repr__(self):
-        return f"BankAccount(owner={self.owner!r}, balance={self.balance})"
-
-    def __str__(self):
-        return f"{self.owner}'s account - Balance: ₹{self.balance:,.2f}"
 ```
 
-## Creating and Using Objects
+## The Descriptor Protocol and `self`
+
+Unlike languages like Java or C++ where the instance context (`this`) is implicit at the compiler level, Python requires `self` to be explicitly passed as the first parameter of every instance method. 
+
+How does `acc.deposit(100)` automatically pass `acc` as `self`? It relies on the **Descriptor Protocol**.
+
+In Python, functions are non-data descriptors. When you access a method on an instance (`acc.deposit`), you aren't retrieving the raw function. The interpreter triggers the function's internal `__get__` method. This dynamically generates a **Bound Method Object** (`PyMethodObject`). This bound object wraps the raw function and securely binds the `acc` instance to the first parameter. When you invoke it, it translates the call to `BankAccount.deposit(acc, 100)`.
+
+## Encapsulation and Name Mangling
+
+Encapsulation restricts external access to an object's internal state. Python does not implement strict C-level `private` memory barriers. Instead, it relies on conventions and namespace manipulation:
+
+- **Single Underscore (`_var`):** A gentleman's agreement. It signals to other developers that the attribute is internal and subject to change without notice. The interpreter does not enforce this restriction whatsoever.
+- **Double Underscore (`__var`):** Triggers **Name Mangling**. During compilation, the parser statically rewrites the attribute name to `_ClassName__var`. This provides a structural barrier to prevent subclasses from accidentally overwriting internal state in complex inheritance hierarchies.
 
 ```python
-# Create instances
-acc1 = BankAccount("Alice", 1000)
-acc2 = BankAccount("Bob")
-
-# Call methods
-acc1.deposit(500)
-acc1.withdraw(200)
-print(acc1.balance)   # 1300
-
-# Access attributes
-print(acc1.owner)     # Alice
-print(acc1.interest_rate)   # 0.05 - from class variable
-
-# String representation
-print(repr(acc1))   # BankAccount(owner='Alice', balance=1300)
-print(str(acc1))    # Alice's account - Balance: ₹1,300.00
-print(acc1)         # same as str()
+class SecureVault:
+    def __init__(self):
+        self._internal = 1      # Protected by convention
+        self.__secret = 42      # Mangled to _SecureVault__secret
 ```
 
-## Instance vs Class Variables
+## Memory Optimization: `__slots__`
+
+By default, every instance object uses a hash table (`__dict__`) to store its attributes. While this allows for dynamic attribute assignment at runtime, hash tables carry massive memory overhead. If you instantiate one million `User` objects, the RAM consumption of one million dictionaries will crash your system.
+
+Python provides `__slots__` to explicitly declare the structural shape of the class. When defined, the CPython interpreter suppresses the creation of the `__dict__`. Instead, it allocates a highly optimized, static C-array for the attributes, saving hundreds of megabytes of RAM in large-scale architectures.
 
 ```python
-class Counter:
-    count = 0   # class variable - shared
+class OptimizedUser:
+    # Destroys the __dict__ and allocates a static C-array
+    __slots__ = ['id', 'username', 'email']
 
-    def __init__(self, name):
-        Counter.count += 1    # modify the class variable
-        self.name = name      # instance variable - unique
-
-c1 = Counter("first")
-c2 = Counter("second")
-c3 = Counter("third")
-
-print(Counter.count)   # 3
-print(c1.count)        # 3 - reads class variable (no instance override)
-c1.count = 99          # creates INSTANCE variable, doesn't change class var
-print(Counter.count)   # 3 - class variable unchanged
-print(c2.count)        # 3 - other instances unaffected
+    def __init__(self, uid, name, email):
+        self.id = uid
+        self.username = name
+        self.email = email
+        
+# user = OptimizedUser(1, "bob", "bob@example.com")
+# user.is_admin = True # AttributeError! Dynamic assignment is blocked.
 ```
 
-## @property - Computed and Validated Attributes
+## Abstracting Access: `@property`
+
+Directly accessing attributes (`obj.value`) is fast, but it violates encapsulation because it prevents you from adding validation logic later without breaking the public API. 
+
+The `@property` decorator is a built-in Descriptor that allows you to define a method but access it syntactically like a variable. This achieves the architectural encapsulation of Java's `get()` and `set()` methods without the verbose boilerplate.
 
 ```python
 class Temperature:
-    def __init__(self, celsius):
-        self._celsius = celsius   # _ marks it as "private by convention"
+    def __init__(self, c):
+        self._celsius = c
 
     @property
     def celsius(self):
@@ -103,112 +84,28 @@ class Temperature:
     @celsius.setter
     def celsius(self, value):
         if value < -273.15:
-            raise ValueError("Temperature below absolute zero")
+            raise ValueError("Below absolute zero!")
         self._celsius = value
-
-    @property
-    def fahrenheit(self):
-        return self._celsius * 9/5 + 32   # computed property - no setter
-
-t = Temperature(100)
-print(t.celsius)      # 100
-print(t.fahrenheit)   # 212.0
-t.celsius = 0
-print(t.fahrenheit)   # 32.0
-t.celsius = -300      # ValueError
-```
-
-## @staticmethod and @classmethod
-
-```python
-class User:
-    _count = 0
-
-    def __init__(self, name, email):
-        self.name = name
-        self.email = email
-        User._count += 1
-
-    @classmethod
-    def get_count(cls):
-        # cls = the class itself (not an instance)
-        return cls._count
-
-    @classmethod
-    def from_string(cls, data_str):
-        # Factory method - alternative constructor
-        name, email = data_str.split(",")
-        return cls(name.strip(), email.strip())
-
-    @staticmethod
-    def validate_email(email):
-        # No access to cls or self - just a utility function
-        return "@" in email and "." in email
-
-u1 = User("Alice", "alice@example.com")
-u2 = User.from_string("Bob, bob@example.com")
-
-print(User.get_count())                   # 2
-print(User.validate_email("not-valid"))   # False
-```
-
-## The Four Pillars of OOP
-
-```python
-# 1. ENCAPSULATION - bundle data + methods; hide internals
-class Account:
-    def __init__(self):
-        self.__balance = 0   # double underscore = name mangling (stronger "private")
-
-    def deposit(self, amount):
-        if amount > 0:
-            self.__balance += amount
-
-    def get_balance(self):
-        return self.__balance
-
-# 2. INHERITANCE - reuse code from parent class (covered in next topic)
-class SavingsAccount(Account):
-    pass
-
-# 3. POLYMORPHISM - same method, different behaviour
-class Dog:
-    def speak(self): return "Woof!"
-
-class Cat:
-    def speak(self): return "Meow!"
-
-animals = [Dog(), Cat(), Dog()]
-for animal in animals:
-    print(animal.speak())   # works on any object with speak()
-
-# 4. ABSTRACTION - hide implementation, expose interface (covered in ABC topic)
 ```
 
 ## Interview Questions
 
-**Q: What is the difference between a class variable and an instance variable?**
-A class variable is shared across all instances - defined directly in the class body. An instance variable is unique to each instance - assigned via `self.var = value` in `__init__`. Modifying a class variable through the class affects all instances; assigning through an instance creates a new instance variable that shadows the class variable.
+**Q: Explain the exact mechanism of `self` via the Descriptor Protocol.**
+Functions in Python implement the descriptor `__get__` method. When a function is accessed via an instance (`obj.method`), `__get__` intercepts the access and returns a Bound Method Object. This wrapper object holds a reference to both the instance and the original function. When called, the wrapper injects the instance object as the first argument (`self`), effectively executing `Class.method(obj, args)`.
 
-**Q: What is `self` in Python?**
-`self` is a reference to the current instance of the class. It's the first parameter of every instance method and is passed automatically by Python when you call a method on an object. Through `self`, methods can access and modify the instance's attributes.
+**Q: Why does Python use Name Mangling (`__var`) instead of true private variables?**
+Python's philosophy is "we are all consenting adults here." Name mangling is not designed for security; it is designed to prevent namespace collisions. If a subclass defines an attribute with the same name as an internal base class attribute, it would silently overwrite the state. Mangling it to `_BaseClass__var` ensures the subclass (`_SubClass__var`) cannot accidentally collide with it.
 
-**Q: What is the difference between `__str__` and `__repr__`?**
-`__str__` is for human-readable output - shown by `print()` and `str()`. `__repr__` is for developer/debug output - shown in the REPL and by `repr()`. The convention is that `repr` should ideally return a string that could recreate the object. If `__str__` is not defined, Python falls back to `__repr__`.
+**Q: What is the architectural purpose of `__slots__`?**
+To drastically reduce memory consumption. Standard objects use a dynamic `__dict__` hash table, which incurs massive memory overhead. `__slots__` disables the dictionary, replacing it with a static, tightly packed C-array. It is strictly used for performance optimization in systems that instantiate millions of uniform objects.
 
-**Q: What is the difference between `@staticmethod` and `@classmethod`?**
-`@staticmethod` has no implicit first argument - it's just a regular function placed in the class namespace, with no access to class or instance. `@classmethod` receives `cls` (the class) as its first argument - it can access class variables and create instances. Use `@classmethod` for factory methods and `@staticmethod` for utility functions related to the class.
-
-**Q: What is encapsulation?**
-Encapsulation bundles data and the methods that operate on that data together in a class, hiding internal implementation details. Python uses `_name` (single underscore, convention) and `__name` (double underscore, name mangling) to indicate private attributes. This protects internal state and reduces coupling.
+**Q: What is the architectural difference between `@classmethod` and `@staticmethod`?**
+Both skip the `self` instance binding. A `@classmethod` triggers a descriptor that binds the Class Object (`cls`) as the first argument, primarily used to implement Factory patterns (alternative constructors). A `@staticmethod` returns the raw function without binding anything; it is fundamentally just a procedural function housed inside the class namespace purely for organizational hygiene.
 
 ## Summary
 
-- `class Name:` - define a class; `__init__(self, ...)` - constructor
-- `self` - reference to the current instance; required as first param of instance methods
-- Instance variables (`self.x`) - unique per instance; class variables - shared across all
-- `@property` - computed attribute with getter/setter validation
-- `@classmethod` - receives `cls`; used for factory methods and class-level operations
-- `@staticmethod` - no `self` or `cls`; utility function scoped to the class
-- `__str__` - human-readable; `__repr__` - developer-readable
-- Four pillars: Encapsulation, Inheritance, Polymorphism, Abstraction
+- **Memory Model:** Classes are `PyTypeObject` blueprints; Instances are `PyObject` concrete allocations with distinct `__dict__` hash tables.
+- **`self`:** Dynamically injected via the Descriptor Protocol returning Bound Method Objects.
+- **Name Mangling (`__var`):** Prevents attribute namespace collisions in deep inheritance trees.
+- **`__slots__`:** Replaces the `__dict__` with a static C-array, optimizing RAM at the cost of dynamic assignment.
+- **`@property`:** Maintains API stability by wrapping getter/setter logic behind standard attribute syntax.

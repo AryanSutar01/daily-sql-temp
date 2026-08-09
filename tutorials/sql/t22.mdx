@@ -1,4 +1,38 @@
+## Time Storage Architecture and Epochs
+
+Dates and times are never stored as strings like `'2024-06-15'` at the storage layer. Relational databases store them as **highly optimized 8-byte integers**. 
+
+### The Epoch and Internal Representation
+
+This integer represents the number of seconds (or microseconds) elapsed since a specific **Epoch** (usually `1970-01-01 00:00:00 UTC`, known as Unix Time, though PostgreSQL uses `2000-01-01 00:00:00 UTC`).
+
+```sql
+-- What you see in the terminal:
+SELECT created_at FROM users;
+-- '2024-06-15 14:30:00+00'
+
+-- What the CPU is actually processing and storing on disk:
+-- 1718461800000000 (microseconds since epoch)
+```
+
+**Why this matters for performance:**
+Because timestamps are just integers under the hood, comparing two timestamps (`time_a > time_b`) or sorting them (`ORDER BY time_a`) is incredibly fast for the CPU — it is a simple integer math operation.
+
+However, if you store your dates as `VARCHAR` (e.g., `'15-06-2024'`), the CPU must perform a byte-by-byte string comparison. Even worse, if you run `TO_DATE(date_string, 'DD-MM-YYYY')` in a `WHERE` clause, the database must invoke an expensive string parser for millions of rows on the fly, destroying query throughput.
+
+### NOW() vs CLOCK_TIMESTAMP()
+
+When you call `NOW()`, you might assume the database asks the operating system hardware for the current time. 
+
+In PostgreSQL, `NOW()` actually returns the **Transaction Start Time**. If your transaction takes 30 seconds to run and you call `NOW()` a million times inside a loop, it will return the exact same timestamp every single time. 
+
+If you need the true, advancing hardware clock time, you must use `CLOCK_TIMESTAMP()`. The database literally pauses, queries the OS kernel for the hardware clock, and returns the live time.
+
+---
+
 ## Getting Current Date/Time
+
+PostgreSQL distinguishes two types of "current time" functions with a critical behavioral difference. `NOW()` and `CURRENT_TIMESTAMP` return the **transaction start time** — the timestamp is frozen for the entire duration of the transaction, so multiple calls to `NOW()` within the same transaction return the identical value. This is essential for consistency: all operations within a transaction appear to happen at the same instant. `CLOCK_TIMESTAMP()`, by contrast, returns the **actual wall-clock time** at the moment it is called, advancing with each invocation. Use `CLOCK_TIMESTAMP()` for measuring elapsed time within a transaction; use `NOW()` for consistent timestamps written across multiple rows.
 
 ```sql
 SELECT NOW();               -- 2024-06-15 14:30:00.123456+05:30
@@ -78,6 +112,8 @@ WHERE trial_ends_at BETWEEN NOW() AND NOW() + INTERVAL '3 days';
 
 ## Date Differences
 
+Date arithmetic in SQL is database-specific. PostgreSQL's `DATE '-' DATE` returns an integer number of days directly. MySQL requires `DATEDIFF(date1, date2)` as a function call. The PostgreSQL `AGE(timestamp)` function is unique — it returns an `INTERVAL` type expressing the difference as `X years Y months Z days`, accounting for the actual calendar (months have different lengths). This is more human-readable than raw day counts for age calculations. For precise elapsed-time measurements in seconds, use `EXTRACT(EPOCH FROM (ts2 - ts1))`.
+
 ```sql
 -- Difference in days
 SELECT DATE '2024-12-31' - DATE '2024-01-01';   -- 365 (PostgreSQL)
@@ -99,6 +135,8 @@ ORDER BY days_left ASC;
 ```
 
 ## Formatting Dates - TO_CHAR
+
+`TO_CHAR` is PostgreSQL's formatting function for converting timestamps and numbers to strings using format masks. Unlike `DATE_FORMAT` in MySQL or `FORMAT` in SQL Server, `TO_CHAR` handles both dates and numbers in one function. The format codes are case-sensitive and follow Oracle-style notation (e.g., `HH24` for 24-hour time vs `HH` for 12-hour). Critically, `TO_CHAR` is a presentation function and should be applied as the final step. Wrapping a column in `TO_CHAR` in a `WHERE` clause forces a sequential scan — the column can no longer be compared using its native index.
 
 ```sql
 -- PostgreSQL: TO_CHAR(timestamp, format)

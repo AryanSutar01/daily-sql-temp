@@ -1,9 +1,48 @@
+## How Column Operations Work in Spark's Execution Model
+
+Before writing code, it is important to understand what `withColumn()` and column expressions **actually do** when Spark processes them — because the difference between efficient and inefficient column transformations is not about what the code looks like, it's about how Catalyst builds and compiles the execution plan.
+
+### Every withColumn() Adds a Plan Node
+
+When you call `df.withColumn("bonus", col("salary") * 0.10)`, Spark does NOT immediately compute anything. Instead, it adds a **Project node** to the logical plan — a description of "add a column called bonus with value salary * 0.10". Each additional `withColumn()` call stacks another Project node on top.
+
+```
+df
+.withColumn("monthly", col("salary") / 12)     → Project: [*, salary/12 as monthly]
+.withColumn("bonus",   col("salary") * 0.10)   → Project: [*, salary*0.10 as bonus]
+.withColumn("total",   col("salary") + col("bonus"))  → Project: [*, salary+bonus as total]
+
+Logical plan (nested):
+Project [total]
+  └── Project [bonus]
+        └── Project [monthly]
+              └── Scan(df)
+```
+
+Catalyst **collapses** multiple consecutive Project nodes into a single combined projection during optimization — so chaining a few `withColumn()` calls has zero extra runtime cost. However, when you chain **50+ withColumn() calls**, the plan itself becomes so large that Catalyst's analysis and optimization phases slow down significantly (this is a known Spark limitation).
+
+### Why col() is Preferred Over Attribute Access
+
+Spark provides four ways to reference a column (string, `df.col`, `col()`, `expr()`). The `col()` function from `pyspark.sql.functions` creates a **Column object** that is fully integrated into Catalyst's expression tree. Attribute access (`df.salary`) is tied to a specific DataFrame object — if you create a new DataFrame via a join or alias, attribute references can silently refer to the wrong DataFrame and cause `AnalysisException` errors.
+
+```python
+# Problem with df.col after join:
+result = employees.join(departments, on="dept_id")
+result.select(employees.salary)  # might fail or resolve incorrectly
+
+# col() always resolves by name in the current schema:
+result.select(col("salary"))  # always correct
+```
+
+For production code, `col()` is the safe choice.
+
 ## withColumn - Add or Replace a Column
 
 `withColumn(name, expression)` returns a new DataFrame with a column added or replaced.
 
 - If `name` is a **new** column name → adds a column
 - If `name` is an **existing** column name → replaces that column
+
 
 ```python
 from pyspark.sql import SparkSession

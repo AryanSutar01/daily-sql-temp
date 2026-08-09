@@ -1,3 +1,56 @@
+## How SparkSession Bootstraps the Spark Runtime
+
+When you call `SparkSession.builder.getOrCreate()`, a complex initialization sequence occurs under the hood. Understanding this explains why you can only have one active Spark context per JVM, and why session creation is expensive.
+
+### The Initialization Sequence
+
+```
+Python Process                    JVM Process
+─────────────                    ───────────
+SparkSession.builder             
+    │
+    ▼
+py4j Gateway starts  ────────►  JVM (gateway server) launches
+    │                           SparkContext initializes:
+    │                             - Reads spark-defaults.conf
+    │                             - Applies .config() overrides
+    │                             - Registers with ClusterManager
+    │                             - Allocates Executors
+    │                           ◄── Driver ready signal
+    ▼
+Python SparkSession object
+wraps the JVM SparkSession
+via py4j proxy
+```
+
+**py4j** is the bridge library that lets PySpark call Java/Scala methods from Python. Every `spark.read`, `df.filter()`, and `df.show()` is a remote call from the Python process into the JVM, translated by py4j.
+
+### Why Only One SparkContext Per JVM
+
+`SparkContext` registers with the Cluster Manager (YARN/K8s/Standalone) and requests executor slots. If two SparkContexts existed simultaneously, they would compete for the same cluster resources with no coordination — a recipe for deadlock and resource exhaustion. This is why `.getOrCreate()` always returns the existing session if one exists.
+
+### SparkSession vs SparkContext Internals
+
+```
+SparkSession (Python-visible)
+    │
+    ├── SQLContext   ← DataFrame/SQL API
+    │       │
+    │       └── Catalyst  ← query optimizer
+    │
+    ├── SparkContext  ← core cluster communicator
+    │       │
+    │       ├── DAGScheduler    ← converts lineage to stages
+    │       ├── TaskScheduler   ← assigns tasks to executors
+    │       └── BlockManager    ← manages partitions in memory/disk
+    │
+    └── py4j Gateway ← Python↔JVM bridge
+```
+
+The `SparkContext` owns all cluster-level resources. `SparkSession` adds the SQL layer on top. That's why `spark.sparkContext` gives you the lower-level object — and why you need it for RDD operations and broadcast variables.
+
+---
+
 ## The Entry Points to Spark
 
 Before you can read data, run queries, or do anything in PySpark, you need an **entry point** - an object that connects your code to the Spark runtime.

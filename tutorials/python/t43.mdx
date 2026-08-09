@@ -1,189 +1,226 @@
-## 1. Mutable Default Arguments
+## Why Python Has So Many Traps
 
-The most famous Python gotcha. Default argument values are evaluated **once** when the function is defined - not each time the function is called.
+Python's design philosophy prioritizes readability and simplicity, but several of its core design decisions create behaviours that feel surprising or counterintuitive — especially coming from other languages. These "gotchas" are not bugs; they are deliberate design choices with logical explanations. Understanding the *why* behind each one transforms them from mysterious bugs into predictable, manageable behaviours.
+
+Most Python gotchas fall into three categories:
+1. **Evaluated-once semantics** — defaults, class variables evaluated at definition time, not call time
+2. **Reference semantics** — names point to objects; aliasing, mutation, and copying have specific rules
+3. **Scope rules** — Python's LEGB lookup and compile-time local detection can surprise even experienced developers
+
+## 1. Mutable Default Arguments — Evaluated Once at Definition
+
+This is the single most famous Python gotcha. When Python parses a function definition, it evaluates all default argument values **exactly once** — at the time the `def` statement executes. The resulting objects are stored on the function object itself (`function.__defaults__`). This means every call to the function that uses the default shares the **same object** across all calls.
+
+For immutable defaults (integers, strings, tuples), this is harmless — they can't be modified. For mutable defaults (lists, dicts, sets), every call that modifies the default is modifying the same object that future calls will see.
 
 ```python
-# WRONG - the list is created once and shared across all calls
+# WRONG — the [] is created ONCE when Python parses this def statement
 def append_item(item, lst=[]):
-    lst.append(item)
+    lst.append(item)   # modifies the SAME list object every time
     return lst
 
 print(append_item(1))   # [1]
-print(append_item(2))   # [1, 2] - expected [2], got the same list!
+print(append_item(2))   # [1, 2] — expected [2], but the list persisted!
 print(append_item(3))   # [1, 2, 3]
+
+# Proof — inspect the function's stored defaults
+print(append_item.__defaults__)   # ([1, 2, 3],) — the accumulated state
 ```
 
+The idiomatic fix is to use `None` as the sentinel default (which is immutable and safe) and create the mutable object inside the function on each call:
+
 ```python
-# RIGHT - use None as the default, create inside the function
+# CORRECT — None is immutable; a fresh list is created per call
 def append_item(item, lst=None):
     if lst is None:
-        lst = []
+        lst = []   # new list created on each call that doesn't provide lst
     lst.append(item)
     return lst
 
 print(append_item(1))   # [1]
-print(append_item(2))   # [2] - fresh list each time
+print(append_item(2))   # [2] — fresh list, correct behavior
+print(append_item(3))   # [3]
+
+# The same fix applies to dict and set defaults
+def add_to_cache(key, value, cache=None):
+    if cache is None:
+        cache = {}
+    cache[key] = value
+    return cache
 ```
 
-This applies to any mutable type as a default: `list`, `dict`, `set`, custom objects.
+## 2. Late Binding Closures — Variables, Not Values
+
+Closures in Python capture a **reference to the variable**, not the variable's value at the time the closure is created. When the closure is eventually called, it looks up the variable's **current value** at that moment — not what it was when the closure was defined.
+
+This causes a characteristic bug when creating closures inside a loop: all closures end up referencing the same loop variable, which by the time they're called, holds the loop's final value.
 
 ```python
-# Same problem with dict
-def add_key(key, value, d={}):   # WRONG
-    d[key] = value
-    return d
-
-# Fix
-def add_key(key, value, d=None):
-    if d is None:
-        d = {}
-    d[key] = value
-    return d
-```
-
-## 2. Late Binding in Closures
-
-Closures capture the **variable**, not its value at definition time. The value is looked up when the function is **called**.
-
-```python
-# WRONG - all functions see the final value of i
+# WRONG — all functions capture the variable 'i', not its current value
 funcs = []
 for i in range(5):
-    funcs.append(lambda: i)
+    funcs.append(lambda: i)   # captures the NAME 'i', not the value 0,1,2,3,4
 
-print([f() for f in funcs])   # [4, 4, 4, 4, 4] - not [0, 1, 2, 3, 4]!
+# After the loop, i == 4 (the loop variable retains its last value)
+print([f() for f in funcs])   # [4, 4, 4, 4, 4] — all see i=4
 ```
 
+The fix uses a **default argument**, which is evaluated at the time the lambda is created (not called), effectively capturing the current value:
+
 ```python
-# RIGHT - capture the current value with a default argument
+# CORRECT — default argument i=i is evaluated NOW, creating a new local 'i' per lambda
 funcs = []
 for i in range(5):
-    funcs.append(lambda i=i: i)   # default arg evaluated at definition
+    funcs.append(lambda i=i: i)   # the right side of i=i is evaluated immediately
 
-print([f() for f in funcs])   # [0, 1, 2, 3, 4]
+print([f() for f in funcs])   # [0, 1, 2, 3, 4] — correct
+```
 
-# Alternative: use a factory function
-def make_func(i):
-    return lambda: i
+An equivalent and arguably clearer alternative is a factory function, which forces a new scope (and a new local variable) for each iteration:
+
+```python
+def make_func(value):
+    return lambda: value   # captures 'value' from make_func's scope — fresh each call
 
 funcs = [make_func(i) for i in range(5)]
 print([f() for f in funcs])   # [0, 1, 2, 3, 4]
 ```
 
-## 3. Modifying a List While Iterating Over It
+## 3. Modifying a List While Iterating
+
+When you use a `for` loop over a list, Python creates an iterator that tracks the current **index position**. If you remove elements from the list during iteration, the iterator's index advances past the next element — silently skipping it. This produces wrong results without any error.
 
 ```python
-# WRONG - skips elements
+# WRONG — elements are skipped when you remove during iteration
 numbers = [1, 2, 3, 4, 5, 6]
 for num in numbers:
     if num % 2 == 0:
         numbers.remove(num)
 
-print(numbers)   # [1, 3, 5] - looks right but...
+print(numbers)   # [1, 3, 5] — looks correct, but was it?
 
-# Hidden bug: [1, 2, 3, 4, 5, 6]
-# Remove 2: [1, 3, 4, 5, 6] - index advances, skips 3
-# Remove 4: [1, 3, 5, 6]   - skips 5
-# Final: [1, 3, 5] - accidentally correct here, but NOT reliable
+# Step through the bug:
+# Start: [1, 2, 3, 4, 5, 6], index=0 → num=1, odd, no remove
+# Index=1 → num=2, even, remove → list becomes [1, 3, 4, 5, 6]
+# Index=2 → num=4 (skipped 3!), even, remove → list becomes [1, 3, 5, 6]
+# Index=3 → num=6, even, remove → list becomes [1, 3, 5]
+# Result looks correct by coincidence — try [1, 2, 3, 4] to see the bug clearly
 ```
 
+The idiomatic and correct fix is to build a new list rather than modifying the original in place:
+
 ```python
-# RIGHT - iterate over a copy or build a new list
+# CORRECT — list comprehension builds a new list; original is unchanged during iteration
 numbers = [1, 2, 3, 4, 5, 6]
+numbers = [x for x in numbers if x % 2 != 0]   # filter approach
+print(numbers)   # [1, 3, 5]
 
-# Option 1: filter (best)
-evens_removed = [x for x in numbers if x % 2 != 0]
-
-# Option 2: iterate over a copy
-for num in numbers[:]:   # numbers[:] creates a copy
+# Alternative: iterate over a copy, modify the original
+for num in numbers[:]:   # numbers[:] creates a shallow copy to iterate over
     if num % 2 == 0:
         numbers.remove(num)
 ```
 
-## 4. Variable Scope Trap (UnboundLocalError)
+## 4. Variable Scope Trap — `UnboundLocalError`
 
-Python decides at compile time whether a variable is local based on whether any assignment exists in the function.
+Python's compiler determines whether a variable is local or global at **parse time** (compile time), not at runtime. The rule is simple: if a function contains any assignment statement for a name, that name is considered local for the entire function — even before the assignment line.
+
+This creates a surprising error: reading a global variable inside a function works fine, but if the same function also assigns to that name anywhere in its body, Python treats all reads of that name as local — even the reads that come before the assignment.
 
 ```python
-x = 10
+x = 10   # module-level global
 
 def bad_func():
-    print(x)   # UnboundLocalError!
-    x = 20     # this assignment makes x LOCAL throughout the function
-               # even before the assignment - so the print fails
+    print(x)   # UnboundLocalError — Python sees the assignment below and marks x as LOCAL
+    x = 20     # this assignment makes x LOCAL throughout this entire function
 
-# Fix 1: global
+# Why? At parse time, Python sees 'x = 20' and marks x as a local variable.
+# When the print(x) executes, Python looks in the local scope, finds no value yet → error.
+```
+
+The fix is to declare your intent explicitly using `global` or to avoid shadowing:
+
+```python
+# Fix 1: declare global
 def func_with_global():
     global x
-    print(x)
-    x = 20
+    print(x)   # now reads the global x
+    x = 20     # now modifies the global x
 
-# Fix 2: don't shadow the variable
-def func_clean(value):
-    print(value)
-    value = 20
+# Fix 2: use a different name to avoid shadowing
+def func_clean():
+    local_x = x   # reads global, stores in a new local name
+    local_x += 10
+    print(local_x)
 ```
 
-## 5. Chained Comparisons vs Chained Operations
+## 5. Integer Division — Floors Toward Negative Infinity
+
+Python 3's floor division (`//`) rounds toward **negative infinity**, not toward zero. This matches the mathematical definition of floor but differs from C, Java, and many other languages where integer division truncates toward zero.
 
 ```python
-# Python supports chained comparisons - this is fine and idiomatic
-1 < x < 10   # True if x is between 1 and 10
-a == b == c  # True if all three are equal
+# Standard division always returns float in Python 3
+7 / 2     # 3.5 (float)
 
-# BUT be careful with 'is' chaining
-a = b = 256   # both point to the same cached int - safe
-a is b        # True (by coincidence, cache)
+# Floor division — floors toward NEGATIVE INFINITY
+7 // 2    # 3   (rounds down: 3.5 → 3)
+-7 // 2   # -4  (rounds down: -3.5 → -4, not -3!)
 
-a = b = 1000
-a is b        # might be True in some contexts - never rely on this
+# C/Java behavior: truncation toward zero → -7 / 2 = -3
+# Python behavior: floor toward -∞ → -7 // 2 = -4
+
+# The modulo operator follows the same convention
+7 % 2     # 1  (7 = 3*2 + 1)
+-7 % 2    # 1  (not -1! Because -7 = -4*2 + 1)
+# Python guarantees: a == (a // b) * b + (a % b)
 ```
 
-## 6. Integer Division Surprise (Python 2 Legacy)
+This is consistent with Python's mathematical floor function (`math.floor(-3.5) == -4`) but trips up developers expecting C-like truncation. When in doubt, test with negative values.
+
+## 6. Copying Mutable Objects — Assignment Is an Alias
+
+In Python, `=` never copies an object. It creates a new name that references the same object. For immutable types this is safe — they can't be changed. For mutable types (list, dict, set), this creates an **alias** — modifying through one name modifies the shared object, visible through all other names.
 
 ```python
-# Even in Python 3, this can surprise you
-result = 7 / 2     # 3.5 - float division
-result = 7 // 2    # 3   - floor division
-result = -7 // 2   # -4  - floors toward negative infinity, not toward zero!
-
-# This is different from C/Java truncation behavior
-# In C: -7 / 2 = -3 (truncates toward zero)
-# In Python: -7 // 2 = -4 (floors toward negative infinity)
-```
-
-## 7. Copying Mutable Objects
-
-```python
-# Assignment - alias, not a copy
+# Assignment — alias, not a copy
 a = [1, [2, 3], 4]
 b = a
 b.append(5)
-print(a)   # [1, [2, 3], 4, 5] - a changed too
+print(a)   # [1, [2, 3], 4, 5] — a changed too, because b IS a
 
-# Shallow copy - top level is copied, nested objects are shared
+# Shallow copy — outer container is new, but nested objects are still shared
 import copy
-b = a[:]          # or list(a) or copy.copy(a)
+b = a[:]        # or list(a) or copy.copy(a)
 b.append(99)
-print(a)   # [1, [2, 3], 4, 5] - outer list unaffected
+print(a)        # [1, [2, 3], 4, 5] — outer list unaffected ✓
 
 b[1].append(99)
-print(a)   # [1, [2, 3, 99], 4, 5] - NESTED list still shared!
+print(a)        # [1, [2, 3, 99], 4, 5] — inner list IS still shared ✗
 
-# Deep copy - everything is copied recursively
+# Deep copy — everything is recursively copied — fully independent
 b = copy.deepcopy(a)
 b[1].append(0)
-print(a)   # [1, [2, 3], 4, 5] - completely independent
+print(a)        # [1, [2, 3, 99], 4, 5] — completely unaffected ✓
 ```
 
-## 8. Using `==` Instead of `is` for None
+The rule is: use shallow copy for flat structures (no nested mutables); use `deepcopy` when nesting mutables.
+
+## 7. Using `== None` Instead of `is None`
+
+`None` is a singleton — Python guarantees exactly one `None` object exists in the entire interpreter. Comparing with `is None` checks whether the object IS the `None` singleton — an unambiguous pointer comparison.
+
+Using `== None` works in most cases but calls `__eq__`, which a custom class can override. This creates a potential false positive:
 
 ```python
-# WRONG - == calls __eq__, which could be overridden
-if x == None:
-    ...
+class Deceptive:
+    def __eq__(self, other):
+        return True   # claims equality with EVERYTHING, including None
 
-# RIGHT - None is a singleton; use identity check
+d = Deceptive()
+d == None    # True — fooled by __eq__
+d is None    # False — never wrong, checks identity directly
+
+# The correct idiom:
 if x is None:
     ...
 
@@ -191,86 +228,116 @@ if x is not None:
     ...
 ```
 
-## 9. Exception Handling Too Broadly
+Linters (pylint, ruff) flag `== None` as `E711` for exactly this reason.
+
+## 8. Exception Handling Too Broadly
+
+Catching exceptions too broadly hides real bugs and makes debugging nearly impossible. A bare `except:` catches **everything** including `SystemExit` (raised by `sys.exit()`), `KeyboardInterrupt` (Ctrl+C), and `GeneratorExit`. Catching `Exception` catches all exceptions except these three, but still swallows bugs you should be seeing.
 
 ```python
-# WRONG - catches everything, hides bugs
+# WORST — bare except catches SystemExit, KeyboardInterrupt
 try:
     result = do_something()
-except:   # bare except catches SystemExit, KeyboardInterrupt, etc.
-    pass
+except:   # DO NOT USE
+    pass  # silently swallows everything including Ctrl+C
 
-# Also wrong - still too broad
+# BAD — too broad; hides bugs
 try:
     result = do_something()
 except Exception:
-    pass   # silences all exceptions, makes debugging impossible
+    pass   # You have no idea what broke or why
 
-# RIGHT - catch specific exceptions and handle them
+# CORRECT — catch only what you expect and handle it specifically
 try:
-    result = do_something()
-except ValueError as e:
-    logger.warning(f"Bad value: {e}")
-    result = default_value
+    result = parse_config("config.json")
 except FileNotFoundError:
-    raise RuntimeError("Config file missing") from None
+    result = default_config()   # expected case: file doesn't exist
+except json.JSONDecodeError as e:
+    raise ValueError(f"Invalid JSON in config file: {e}") from e   # re-raise with context
+except PermissionError:
+    logger.error("Cannot read config file: permission denied")
+    raise   # re-raise the original exception
 ```
 
-## 10. String Formatting with `%` in Logging
+The `raise ... from e` syntax preserves the original exception chain, so debuggers and logging show the full context. `raise` (bare) re-raises the current exception with its original traceback.
+
+## 9. Logging String Formatting — Lazy vs Eager
+
+When using Python's `logging` module, always pass the format string and arguments **separately** instead of formatting them into a single string first. The logging module only builds the string if the log record will actually be emitted (based on the configured log level). Eager formatting always builds the string regardless of whether it will be used.
 
 ```python
-# WRONG - string is always formatted, even if log level filters it out
-logger.debug("Processing %s items: %s" % (len(items), items))
+import logging
 
-# RIGHT - lazy formatting: string is only built if DEBUG is enabled
-logger.debug("Processing %s items: %s", len(items), items)
+items = list(range(1000))
+
+# WRONG — always formats the string, even if DEBUG is disabled
+logging.debug("Processing %s items: %s" % (len(items), items))
+# This builds a 5000-character string every call, even in production where DEBUG is off
+
+# CORRECT — lazy formatting: string is only built if DEBUG level is enabled
+logging.debug("Processing %s items: %s", len(items), items)
+# In production with log level=WARNING, this call costs almost nothing
 ```
 
-## 11. `+=` with Tuples vs Lists
+This matters in performance-critical loops. Building a large string representation of a complex object (like `str(items)` for a 10,000-element list) is expensive. Lazy formatting means you pay that cost only in development/debug mode.
+
+## 10. `+=` with Tuples — The Confusing Hybrid
+
+The `+=` operator on a tuple creates a new tuple (tuples are immutable). But `+=` on a list modifies it in place. The truly confusing case is `+=` on a list inside a tuple — it partially succeeds and partially fails, leaving the data in a modified state despite raising an exception.
 
 ```python
-# Unexpected behavior with tuples and +=
+# Tuples — += creates a new tuple
 t = (1, 2, 3)
-t += (4,)       # creates a NEW tuple - old one unchanged
-print(id(t))    # different from original
+id_before = id(t)
+t += (4,)
+id(t) == id_before   # False — t now points to a NEW tuple object
 
+# Lists — += modifies in place
 lst = [1, 2, 3]
-lst += [4]      # modifies in place - same object
-print(id(lst))  # same as original
+id_before = id(lst)
+lst += [4]
+id(lst) == id_before   # True — same object, modified in place
 
-# The real trap: tuple containing a mutable object
+# The real trap: list inside a tuple
 t = ([1, 2], [3, 4])
-t[0] += [5]     # raises TypeError (tuple is immutable)
-                # BUT t[0] IS modified! [1, 2, 5]
-                # += on a list modifies in place THEN tries to assign - the assign fails
-print(t)        # ([1, 2, 5], [3, 4]) - modified despite the error!
+t[0] += [5]
+# This raises: TypeError: 'tuple' object does not support item assignment
+# BUT — t[0] IS modified: t[0] is now [1, 2, 5]
+# Why? += on a list calls list.__iadd__ (in-place add) FIRST → modifies the list
+# THEN tries to do t[0] = result → fails (tuples are immutable)
+# The mutation happened before the error!
+print(t)   # ([1, 2, 5], [3, 4]) — modified despite the TypeError
 ```
 
 ## Interview Questions
 
 **Q: Why shouldn't you use a mutable object as a default argument?**
-Default argument values are evaluated once when the function is defined, not on each call. If you use a mutable default like `[]` or `{}`, all calls that don't pass that argument share the same object. Use `None` as the default and create the mutable object inside the function.
+Default argument values are evaluated **once** when the `def` statement executes, not on each call. The resulting object is stored in `function.__defaults__`. If it's mutable (list, dict), all calls that don't provide that argument share the same object — mutations accumulate across calls. Use `None` as the default and create the mutable inside the function body.
 
 **Q: What is the late binding problem in closures?**
-Closures capture the variable reference, not its value at the time of creation. In a loop, all closures share the same loop variable. When the closures are called, they all see the final value of that variable. Fix it by using a default argument (`lambda i=i: i`) which is evaluated at definition time.
+Closures capture a reference to the **variable** (name), not its value at closure creation time. In a loop, all closures share the same loop variable. When they're called later, they look up the current value — which is the loop's final value. Fix with a default argument (`lambda i=i: i`) that is evaluated immediately at lambda creation time.
 
 **Q: What is the difference between shallow copy and deep copy?**
-A shallow copy creates a new container but references the same inner objects. Modifying a nested mutable object in the copy also changes the original. A deep copy recursively copies all objects - the copy is completely independent. Use `copy.copy()` for shallow, `copy.deepcopy()` for deep.
+A shallow copy creates a new outer container but its elements still reference the same inner objects. Modifying a nested mutable object in the copy also changes the original. A deep copy recursively copies everything — the copy is fully independent. Use `copy.copy()` or slicing for shallow; `copy.deepcopy()` for deep.
 
 **Q: What is `UnboundLocalError` and what causes it?**
-Python determines whether a variable is local or global at compile time. If the function contains any assignment to a name, that name is treated as local throughout the function - even before the assignment. Reading it before the assignment triggers `UnboundLocalError`. Use `global` or restructure the code to fix it.
+Python classifies all names in a function as either local or global at parse time. If a function contains any assignment to a name, that name is local for the entire function. Reading it before the assignment line raises `UnboundLocalError` — Python looks in the local scope (where it has no value yet). Use `global` or `nonlocal` to change this classification.
 
 **Q: Why is a bare `except:` clause dangerous?**
-A bare `except:` catches everything, including `SystemExit` (raised by `sys.exit()`), `KeyboardInterrupt` (Ctrl+C), and `GeneratorExit`. This can prevent a program from being interrupted or shut down. Always catch specific exception types or at minimum use `except Exception:`.
+A bare `except:` catches everything — including `SystemExit` (raised by `sys.exit()`), `KeyboardInterrupt` (Ctrl+C), and `GeneratorExit`. This can prevent the program from being interrupted or shut down gracefully. It also hides all exceptions silently, making debugging impossible. Always catch specific exception types.
+
+**Q: Why does `logging.debug("msg %s", val)` perform better than `logging.debug("msg %s" % val)`?**
+The `%` format version eagerly builds the string on every call regardless of the configured log level. The comma-separated version passes the template and args separately — the logging module only builds the string if the record will be emitted. In production with DEBUG disabled, the comma version has near-zero cost; the `%` version builds the string every call.
 
 ## Summary
 
-- **Mutable defaults** - use `None` as default, create mutable inside function; never `def f(lst=[])`
-- **Late binding** - closures capture variables not values; fix with `lambda i=i: i` default arg
-- **Iterate safely** - never modify a list while iterating; use list comprehension or iterate over a copy
-- **Scope trap** - any assignment in a function makes the variable local throughout; use `global`/`nonlocal` to fix
-- **`//` floors toward -∞** - not truncation; `-7 // 2` is `-4`, not `-3`
-- **Shallow vs deep copy** - `copy.copy()` shares nested objects; `copy.deepcopy()` is fully independent
-- **`is None` not `== None`** - always use identity check for singletons
-- **Catch specific exceptions** - never use bare `except:`; log or re-raise properly
-- **Logger string formatting** - use `logger.debug("msg %s", val)` not `"msg %s" % val`
+- **Mutable defaults** — evaluated once at `def` time, shared across calls; always use `None` + create inside
+- **Late binding** — closures capture the variable reference; fix with `lambda i=i: i` default arg
+- **Iterate safely** — never modify a list while iterating over it; use list comprehension instead
+- **Scope trap** — any assignment makes a name local for the entire function; use `global`/`nonlocal`
+- **`//` floors toward −∞** — not truncation: `−7 // 2 == −4`, not `−3`
+- **Shallow vs deep copy** — `copy.copy()` shares inner objects; `copy.deepcopy()` is fully independent
+- **`is None` not `== None`** — identity check is correct for singletons; `==` can be fooled by `__eq__`
+- **Catch specific exceptions** — never bare `except:`; log, handle, or re-raise with context
+- **Logger formatting** — `logger.debug("msg %s", val)` is lazy (built only if emitted)
+- **`+=` on list in tuple** — mutates the list successfully, then raises TypeError on the reassignment

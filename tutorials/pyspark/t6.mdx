@@ -1,3 +1,58 @@
+## How Spark Reads Files: The Physical I/O Model
+
+Understanding Spark's read path explains several important performance decisions — why `inferSchema` is expensive, why Parquet beats CSV, and why predicate pushdown works at the file level.
+
+### Parquet Internal Structure: Row Groups and Column Chunks
+
+Parquet files are not flat binary blobs. They have a precise internal structure that Spark exploits:
+
+```
+Parquet File Layout:
+┌─────────────────────────────────────────┐
+│  Row Group 0  (128MB default)           │
+│   ┌──────────┬──────────┬──────────┐    │
+│   │ Col: id  │Col:amount│ Col:date │    │
+│   │ [bytes]  │ [bytes]  │ [bytes]  │    │
+│   ├──────────┼──────────┼──────────┤    │
+│   │Statistics│Statistics│Statistics│    │
+│   │ min=1    │ min=0.5  │ min=Jan1 │    │
+│   │ max=1000 │ max=9999 │ max=Dec31│    │
+│   └──────────┴──────────┴──────────┘    │
+│  Row Group 1  (128MB)                   │
+│   ...                                   │
+│  Row Group N                            │
+├─────────────────────────────────────────┤
+│  File Footer (metadata)                 │
+│  - Column names + types                 │
+│  - Row group offsets                    │
+│  - Per-column min/max/null statistics   │
+└─────────────────────────────────────────┘
+```
+
+**Column pruning** works because each column chunk is stored independently. Reading only `amount` from a 100-column table means reading ~1% of the data.
+
+**Predicate pushdown** works because of the **row group statistics**. When you run `.filter("amount > 5000")`, Spark reads only the file footer (kilobytes), checks each row group's `amount.max` — if `max < 5000`, the entire row group is skipped without reading its data.
+
+### Why `inferSchema=True` is Expensive
+
+`inferSchema=True` forces Spark to do **two full passes** over the CSV file:
+1. First pass: read all data to determine column types
+2. Second pass: read again to produce the DataFrame
+
+For a 10GB CSV, that's 20GB of disk reads instead of 10GB. Always provide an explicit schema in production:
+
+```python
+# ❌ Double scan — never in production
+df = spark.read.csv("data.csv", inferSchema=True)
+
+# ✅ Single scan — schema is applied without reading the file first
+df = spark.read.schema(your_schema).csv("data.csv")
+```
+
+Parquet never has this problem — the schema is embedded in the file footer and read in milliseconds.
+
+---
+
 ## The Unified Read API
 
 PySpark uses a consistent API to read from all file formats:

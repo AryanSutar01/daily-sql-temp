@@ -1,3 +1,29 @@
+## UDF Internals: The Optimizer's Blind Spot
+
+User-Defined Functions (UDFs) allow you to write custom logic in SQL. However, from an architectural standpoint, UDFs represent a massive danger to query performance because they are an **Optimizer Black Box**.
+
+### The Inlining Problem
+
+When you write a complex subquery, the SQL optimizer can flatten it, push down predicates, and reorder joins. 
+
+When you wrap that same logic in a UDF (especially in languages like PL/pgSQL), the query optimizer can no longer see the logic. It treats the function as a black box. 
+If you write `SELECT * FROM users WHERE my_custom_func(id) = true`, the database cannot push that filter down to an index. It is forced to perform a Full Table Scan, passing every single row into your function, context-switching between the SQL engine and the procedural engine millions of times.
+
+**The exception**: In PostgreSQL, functions written in pure `LANGUAGE SQL` (not `plpgsql`) can often be "inlined" by the parser. The parser physically unpacks the `SQL` function into a subquery before optimization, restoring the database's ability to create a fast execution plan.
+
+### Volatility and Caching
+
+The database uses Volatility tags (`IMMUTABLE`, `STABLE`, `VOLATILE`) to determine if it can cache the function's output.
+- **VOLATILE**: The database must execute the function for every single row. (Default, slowest).
+- **STABLE**: The database executes the function once per transaction. If a query calls it 1,000 times, the database caches the result of the first call and reuses it for the remaining 999.
+- **IMMUTABLE**: The database assumes `f(x)` always yields `y`. It allows the function to be evaluated during the query parsing phase rather than the execution phase, and allows the function to be used in B-Tree index creation.
+
+### JIT Compilation
+
+In modern databases (like PostgreSQL 11+), complex UDFs can trigger **JIT (Just-In-Time) Compilation**. The database compiles the PL/pgSQL logic down to native machine code using LLVM before execution. This speeds up massive loops within the function but adds a high upfront compilation latency.
+
+---
+
 ## What is a UDF?
 
 A User-Defined Function (UDF) is a custom SQL function you write and store in the database. Once created, it can be used anywhere a built-in function can be used - in SELECT, WHERE, GROUP BY, etc.
@@ -11,6 +37,8 @@ A User-Defined Function (UDF) is a custom SQL function you write and store in th
 | Aggregate | Summary of rows | SELECT with GROUP BY |
 
 ## Scalar Function - Returns One Value
+
+A `LANGUAGE SQL` scalar function is the simplest form of UDF: it is a named, parameterized SQL expression. Because it uses pure SQL (not PL/pgSQL), PostgreSQL can **inline** it during query planning — replacing every call to `calculate_gst(price)` with the raw expression `ROUND(price * 18 / 100, 2)` before optimization. This means the query optimizer can push the expression into an index scan rather than executing a function call per row. The `DEFAULT 18` parameter makes the tax rate optional, defaulting to 18% GST.
 
 ```sql
 -- Simple SQL function: calculate tax
@@ -26,6 +54,8 @@ SELECT * FROM products WHERE calculate_gst(price) > 500;
 ```
 
 ## PL/pgSQL Function - With Logic
+
+When your function requires conditional logic, variable declarations, or multiple SQL statements, you must use `LANGUAGE plpgsql`. PL/pgSQL is a procedural superlanguage that adds `IF/ELSIF/ELSE`, loops, exception handling, and local variables to SQL. The critical trade-off: unlike `LANGUAGE SQL`, PL/pgSQL functions cannot be inlined. The optimizer treats them as a black box. Using `get_customer_tier(id)` in a `WHERE` clause forces a full table scan, calling the function once per row — the optimizer cannot push the predicate into an index.
 
 ```sql
 CREATE OR REPLACE FUNCTION get_customer_tier(p_customer_id INT)
@@ -55,6 +85,8 @@ SELECT * FROM users WHERE get_customer_tier(id) = 'Platinum';
 ```
 
 ## Table-Returning Function
+
+A table-returning function (also called a set-returning function or SRF) returns a full result set and can be used in the `FROM` clause like a parameterized view. `RETURNS TABLE(...)` declares the output column names and types. `RETURN QUERY` inside the body executes a `SELECT` and streams its output as the function's return value. This is useful for encapsulating complex, parameterized reports that are called with different arguments from multiple application endpoints.
 
 ```sql
 CREATE OR REPLACE FUNCTION get_top_customers(n INT DEFAULT 10)
@@ -106,6 +138,8 @@ $$ LANGUAGE SQL STABLE;
 ```
 
 ## Managing Functions
+
+In PostgreSQL, `DROP FUNCTION` requires the function signature (argument types) if the function name is overloaded. `DROP FUNCTION calculate_gst(DECIMAL, DECIMAL)` drops only the two-argument version, leaving other overloaded versions intact. `CASCADE` also drops any database objects that depend on the function — typically other functions or views that call it. Never use `CASCADE` in production without first running `\df+ function_name` or querying `pg_depend` to understand what will be dropped.
 
 ```sql
 -- List functions

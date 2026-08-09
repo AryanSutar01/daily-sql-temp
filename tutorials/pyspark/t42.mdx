@@ -1,5 +1,93 @@
 # Data Skew & Salting Technique
 
+## Why Data Skew is Catastrophic: The Math
+
+Data skew doesn't just slow a job down proportionally — it creates a **stage completion time governed by the single slowest task**. This is the key insight that makes skew so damaging.
+
+### The Straggler Task Problem
+
+```
+Scenario: groupBy("country").count() with 40 executor cores
+  200 shuffle partitions, data distributed as:
+    IN (India):  80% of 1TB = 800GB → Partition 42
+    US (USA):    5% = 50GB  → Partition 87
+    Other 48:    15% spread across remaining 198 partitions
+
+Stage 2 execution:
+  198 "normal" tasks: ~750MB each → complete in ~30 seconds
+  Partition 87 (US): 50GB → completes in ~100 seconds
+  Partition 42 (IN): 800GB → completes in ~1600 seconds
+  
+  Stage completion time = max(task times) = 1600 seconds
+  → 198 executors sit IDLE for 1500 seconds waiting for partition 42
+  → Parallelism wasted: 198/200 executors idle during the straggler
+```
+
+The total available CPU capacity was 40 cores × 1600 seconds = 64,000 core-seconds. The skewed job actually used only ~(198 × 30 + 1 × 1600) = 7540 useful core-seconds out of 64,000 available = **11.8% CPU efficiency**.
+
+### The Salting Algorithm: Exact Mechanics
+
+Salting artificially creates **sub-keys** from the skewed key to distribute one logical group across multiple partitions:
+
+```python
+from pyspark.sql.functions import col, rand, floor, concat, lit
+
+# Salt factor: how many sub-buckets to split the skewed key into
+SALT = 10
+
+# Step 1: Add random salt to the large table
+large_df_salted = large_df.withColumn(
+    "salted_key",
+    concat(col("country"), lit("_"), (floor(rand() * SALT)).cast("string"))
+)
+# Result: "IN" → "IN_0", "IN_1", ..., "IN_9" (randomly)
+#         "US" → "US_0", ..., "US_9" (randomly)
+# Each salt bucket gets ~1/10 of IN's rows → 80GB instead of 800GB per partition
+
+# Step 2: Explode the small table to match every possible salt value
+from pyspark.sql.functions import explode, array
+
+small_df_exploded = small_df.withColumn(
+    "salt_range", array([lit(i) for i in range(SALT)])
+).withColumn(
+    "salt", explode(col("salt_range"))
+).withColumn(
+    "salted_key", concat(col("country"), lit("_"), col("salt").cast("string"))
+).drop("salt_range", "salt")
+# Result: each "IN" row in small_df becomes 10 rows: "IN_0"..."IN_9"
+
+# Step 3: Join on salted key (no skew — each bucket ~equal size)
+result = large_df_salted.join(small_df_exploded, on="salted_key")
+
+# Step 4: Drop the artificial salt column
+result = result.drop("salted_key")
+```
+
+**Trade-off**: The small table is `SALT`× larger after explosion. For a 100MB small table with SALT=10: becomes 1GB. For a 10GB small table: becomes 100GB — use carefully.
+
+### AQE Skew Join Optimization (Spark 3.0+)
+
+Spark 3.0 introduced **Adaptive Query Execution (AQE)** which detects and handles skew automatically:
+
+```python
+# Enable AQE (Spark 3.0+ default: true)
+spark.conf.set("spark.sql.adaptive.enabled", "true")
+spark.conf.set("spark.sql.adaptive.skewJoin.enabled", "true")
+spark.conf.set("spark.sql.adaptive.skewJoin.skewedPartitionFactor", "5")  # skew threshold
+spark.conf.set("spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes", "256MB")
+
+# AQE automatically:
+# 1. Collects runtime partition size statistics after the shuffle
+# 2. Identifies partitions larger than threshold × median_partition_size
+# 3. Splits skewed partitions into sub-partitions
+# 4. Re-reads the corresponding partition from the other side to join
+# (effectively doing automatic salting internally)
+```
+
+AQE skew join is less efficient than manual salting (it splits after the shuffle, so the shuffle itself is still skewed), but it requires zero code changes and works transparently.
+
+---
+
 ## What is Data Skew?
 
 **Data skew** occurs when data is unevenly distributed across partitions - some partitions have significantly more data than others. In a distributed system like Spark, all tasks in a stage must complete before the next stage begins. So if one partition has 100x more data than others, that one "straggler" task holds up the entire job.

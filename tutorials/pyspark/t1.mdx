@@ -1,3 +1,56 @@
+## How Spark Eliminated the MapReduce Bottleneck
+
+Before understanding Spark, you need to understand **exactly** why Hadoop MapReduce was slow — not just "disk I/O" but the specific mechanism:
+
+In MapReduce, every intermediate computation stage materializes its output to HDFS. A 3-stage pipeline (Map → Reduce → Map → Reduce → Map → Reduce) writes to disk **6 times** — once per stage boundary. Each disk write incurs:
+1. Serialization of Java objects to bytes
+2. Network transfer to HDFS DataNodes (3x replication by default)
+3. Physical spinning disk I/O at each node
+
+For a 10-stage ML training loop, that's 60 disk round-trips per iteration × N iterations = enormous latency. This made iterative algorithms (gradient descent, PageRank, k-means) practically unusable on Hadoop.
+
+### Spark's Core Innovation: The RDD Lineage Graph
+
+Spark replaces disk-materialized intermediate results with a **lineage graph** — a logical record of how each dataset was derived. No data is written to disk until you explicitly request it. The Spark runtime maintains:
+
+```
+RDD Lineage (in Driver memory only):
+  raw_data (ParquetScan)
+       │
+       ▼  filter(year==2024)     ← narrow: no shuffle
+  filtered_rdd
+       │
+       ▼  groupByKey()           ← wide: triggers shuffle stage boundary
+  grouped_rdd
+       │
+       ▼  mapValues(sum)         ← narrow: stays in same stage
+  result_rdd
+```
+
+Each RDD stores only:
+- A reference to its parent RDD(s)
+- The transformation function applied
+- Metadata about partition scheme
+
+**No actual data is stored in this graph.** When you call an action, the DAG Scheduler traverses this graph, identifies stage boundaries (at shuffle operations), and submits tasks to executors.
+
+### Fault Tolerance Without Replication
+
+MapReduce achieves fault tolerance via HDFS replication (store 3 copies of everything). Spark achieves it via **lineage recomputation**:
+
+```
+Scenario: Executor 3 crashes mid-job, losing Partition 5 of result_rdd
+
+MapReduce recovery: Restart the entire job from scratch (worst case)
+Spark recovery:     Re-execute only the lineage for Partition 5:
+                    ParquetScan[partition 5] → filter → groupByKey[partition 5]
+                    All other partitions are unaffected
+```
+
+This is why RDDs are "resilient" — they can be reconstructed from their lineage without any external replication overhead.
+
+---
+
 ## The Problem Before Spark
 
 Before Spark, the dominant big data tool was **Hadoop MapReduce**. It worked, but it had serious limitations:

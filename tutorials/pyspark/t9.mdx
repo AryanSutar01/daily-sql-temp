@@ -1,3 +1,64 @@
+## Catalyst's Four-Phase Optimization Pipeline
+
+Lazy evaluation is only the enabler — the true power is what Spark does with the collected plan before executing it. Catalyst, Spark's query optimizer, runs a **four-phase transformation pipeline** on your logical plan before generating executable tasks.
+
+### Phase 1: Parsing (Unresolved Logical Plan)
+
+Your PySpark code is parsed into an **unresolved logical plan** — a tree of abstract operations where column names are just strings and types are unknown:
+
+```
+df.filter("amount > 100").groupBy("region").sum("amount")
+
+Unresolved Plan:
+  Aggregate [region], [sum(amount)]
+    └── Filter [amount > 100]
+          └── Relation [?amount, ?region, ?id] (types unknown)
+```
+
+### Phase 2: Analysis (Resolved Logical Plan)
+
+The Analyzer resolves column references against the **catalog** (table schema). Column names become typed column references:
+
+```
+Resolved Plan:
+  Aggregate [region#12], [sum(amount#5L)]
+    └── Filter [(amount#5L > 100)]          ← amount is Long
+          └── Relation [id#1L, amount#5L, region#12] parquet
+```
+
+If you reference a non-existent column, this phase throws `AnalysisException`.
+
+### Phase 3: Logical Optimization (Optimized Logical Plan)
+
+Catalyst applies a **set of rewrite rules** to improve the plan. Key rules:
+
+| Rule | What it does |
+|---|---|
+| **Predicate Pushdown** | Move `filter` as close to the data source as possible |
+| **Column Pruning** | Remove columns not referenced anywhere in the plan |
+| **Constant Folding** | Evaluate constant expressions at plan time: `1 + 2` → `3` |
+| **Boolean Simplification** | `true AND expr` → `expr`; `false OR expr` → `expr` |
+| **Null Propagation** | Simplify null-handling expressions |
+| **Join Reordering** | Reorder joins to start with the smallest table |
+
+### Phase 4: Physical Planning (Physical Plan)
+
+The Planner converts the optimized logical plan into one or more **physical plans** and uses a **cost model** to choose the best:
+
+```
+Logical: Join(A, B, on=id)
+Physical options:
+  Option 1: BroadcastHashJoin (if B fits in memory → ~10ms)
+  Option 2: SortMergeJoin     (safe for large B → ~60 seconds)
+
+Cost model: check size of B → if < spark.sql.autoBroadcastJoinThreshold
+            → choose BroadcastHashJoin
+```
+
+This 4-phase pipeline is what makes `df.filter().groupBy()` fast — Spark doesn't blindly execute your operations in the order you wrote them. It finds the optimal execution order first.
+
+---
+
 ## What is Lazy Evaluation?
 
 **Lazy evaluation** means Spark does not execute your transformations immediately when you write them. Instead, it builds up a **logical plan** (a recipe) and only executes it when you call an **action**.

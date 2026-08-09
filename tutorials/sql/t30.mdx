@@ -1,3 +1,26 @@
+## View Architecture: The Flattening Phase
+
+A common misconception among junior engineers is that Views are "pre-computed" or offer inherently faster performance than raw queries. This is entirely false. A standard View is nothing more than a string of text saved in the database's internal catalog.
+
+### View Flattening (Macro Expansion)
+
+When you run `SELECT * FROM active_customers WHERE city = 'Mumbai'`, the database engine goes through a specific lifecycle:
+
+1. **Catalog Lookup:** The Parser sees the identifier `active_customers` and checks the system catalog (e.g., `pg_class` in PostgreSQL). It discovers it is a View, not a physical heap table.
+2. **AST Macro Expansion (Flattening):** The Parser retrieves the raw text of the View's query from the catalog and parses it into a sub-Abstract Syntax Tree (AST). It then **splices** that sub-AST directly into your outer query's AST.
+3. **Optimization:** The Query Optimizer now looks at the massive, flattened AST. It doesn't care that part of it came from a View. It optimizes the whole tree as one single query.
+
+This means querying a View is physically identical to copying and pasting the View's source code directly into your query as a subquery. There is zero execution-time performance benefit.
+
+### The Abstraction Hazard
+
+Because Views are just macros, they can hide devastating performance traps. 
+If a View performs a 5-table join to calculate total corporate revenue, and you query `SELECT name FROM revenue_view LIMIT 10`, the query optimizer *might* not be able to eliminate the 5-table join. The database could physically join millions of rows across 5 tables, only to throw 99.9% of them away to satisfy your `LIMIT 10`.
+
+**Architectural Standard**: Use Views to build robust logical abstraction layers (e.g., hiding legacy schema column names behind modern API-friendly names) and for row-level security. Never use standard Views to attempt to fix query performance; if you need to cache expensive joins and aggregations, you must use a **Materialized View**.
+
+---
+
 ## What is a View?
 
 A view is a saved SQL query that behaves like a table. It doesn't store data - it re-runs the underlying query each time it's accessed.
@@ -52,6 +75,8 @@ FROM customer_summary;
 ```
 
 ## CREATE, REPLACE, DROP
+
+`CREATE OR REPLACE VIEW` is the safe, idempotent way to update a view in production. It atomically swaps the view's definition without dropping it, preserving any permissions granted on the view. Dropping and recreating would revoke all grants. One important limitation: `CREATE OR REPLACE` can only *add* columns to the end of the column list — it cannot remove columns, reorder them, or change a column's data type. For structural changes, you must `DROP VIEW` and `CREATE VIEW`, re-granting permissions afterward.
 
 ```sql
 -- Create

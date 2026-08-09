@@ -1,3 +1,86 @@
+## How Schemas Power Spark's Entire Execution Pipeline
+
+The schema is not just metadata for display — it is the **foundation of Catalyst's type system** and directly determines how Tungsten stores and processes data. Getting the schema wrong has far-reaching consequences.
+
+### Schema as Catalyst's Type Contract
+
+When you define a `StructType` schema, each field tells Catalyst the **physical type** to use for that column across the entire execution pipeline:
+
+```
+StructField("amount", DoubleType(), nullable=True)
+   │
+   ├── Catalyst Analysis: knows amount is Double (not String)
+   │   → enables arithmetic expressions without cast overhead
+   │
+   ├── Tungsten UnsafeRow: allocates exactly 8 bytes for this column
+   │   → no JVM object, no GC, direct memory read/write
+   │
+   ├── Parquet physical type: maps to DOUBLE (binary64)
+   │   → 8 bytes on disk, no dictionary encoding needed
+   │
+   └── Code generation: uses getLong() vs getDouble() vs getString()
+       → compiler knows exactly which accessor to call, no branching
+```
+
+### Type Mapping: Spark → Parquet → JVM
+
+Understanding how Spark types map to Parquet helps you choose the right type for compression and performance:
+
+| Spark Type | Parquet Type | JVM Primitive | Bytes |
+|---|---|---|---|
+| `IntegerType` | INT32 | int | 4 |
+| `LongType` | INT64 | long | 8 |
+| `FloatType` | FLOAT | float | 4 |
+| `DoubleType` | DOUBLE | double | 8 |
+| `StringType` | BYTE_ARRAY (UTF8) | String object | variable |
+| `DateType` | INT32 (DATE) | int (days since epoch) | 4 |
+| `TimestampType` | INT64 (TIMESTAMP_MICROS) | long (μs since epoch) | 8 |
+| `BooleanType` | BOOLEAN | boolean | 1 bit |
+| `DecimalType(p,s)` | FIXED_LEN_BYTE_ARRAY | BigDecimal object | p/2 bytes |
+
+**Key insight**: `DecimalType` maps to `BigDecimal` objects on the JVM heap — it is the **only numeric type that causes GC pressure**. For financial amounts, prefer `LongType` with implicit scaling (e.g., store dollars as cents: `1000` = `$10.00`) when possible.
+
+### How Wrong Types Cause Silent Data Loss
+
+```python
+# ❌ Dangerous: using StringType for amounts that need arithmetic
+schema = StructType([
+    StructField("amount", StringType())  # "1,500.50" (locale-formatted)
+])
+
+# Later:
+df.withColumn("total", col("amount") * 1.18)  # CAST from String to Double
+# "1,500.50" → CastException or silently returns null if cast fails!
+# You lose data with no error (null silently replaces the bad cast)
+```
+
+Spark's implicit cast from String to Numeric returns `null` when parsing fails — not an exception. Always use the correct numeric type from the start, or add explicit validation:
+
+```python
+# ✅ Explicit cast with null detection
+df.withColumn("amount_clean",
+    regexp_replace(col("amount_str"), "[,$]", "")  # remove formatting
+    .cast("double")
+).filter(col("amount_clean").isNotNull())  # drop rows that failed to parse
+```
+
+### nullable=True Has a Compile-Time Cost
+
+Marking fields `nullable=True` (the default) forces Tungsten to emit a null-check in the generated code for every expression involving that field:
+
+```java
+// nullable=True generates:
+if (amount_isNull) { result_isNull = true; }
+else { result = amount * 1.18; }
+
+// nullable=False generates (no null check needed):
+result = amount * 1.18;
+```
+
+For columns you know will never be null (e.g., primary keys, partition columns), setting `nullable=False` removes this overhead and can improve performance by 5-15% on computation-heavy pipelines.
+
+---
+
 ## Why Explicit Schemas Matter
 
 ```python

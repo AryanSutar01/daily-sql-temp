@@ -1,3 +1,23 @@
+## Physical Architecture: The Clustered Index and Page Fragmentation
+
+A Primary Key is not just a logical constraint; it dictates the physical layout of the table on disk in many databases (e.g., MySQL InnoDB, SQL Server) via a **Clustered Index**.
+
+### The Clustered Index (Sequential Disk I/O)
+
+In a clustered architecture, the table *is* the B-Tree index. The rows are physically sorted on the disk pages according to the Primary Key. 
+If your primary key is an auto-incrementing integer (`BIGSERIAL`), every new `INSERT` goes to the very end of the file. This creates perfect **Sequential I/O**. The disk head simply appends data, and B-Tree pages are filled to 100% capacity sequentially.
+
+### The UUID Fragmentation Penalty
+
+Many modern applications use UUIDs (Universally Unique Identifiers) like `123e4567-e89b-12d3-a456-426614174000` as the Primary Key. 
+
+Because standard UUIDs are entirely random (UUIDv4), an `INSERT` cannot be appended sequentially. The database must traverse the B-Tree, locate a random 8KB disk page somewhere in the middle of the table, and squeeze the new row into it. 
+If that page is full, the database must perform a **Page Split**: it allocates a new page, moves half the rows over, and updates the parent nodes. This causes massive **Random I/O**, disk fragmentation, and drastically degrades write throughput on high-volume systems.
+
+**Architectural Standard**: If you must use a UUID for a clustered primary key, you must use a **Time-Sorted UUID** (like UUIDv7 or ULID), which monotonically increases over time, restoring the sequential disk insertion pattern.
+
+---
+
 ## Primary Key
 
 A primary key uniquely identifies each row in a table. Rules:
@@ -67,6 +87,8 @@ CREATE TABLE orders (
 
 ### ON DELETE Behaviors
 
+The `ON DELETE` clause defines what happens to child rows when a parent row is deleted. The choice has profound operational impact. `CASCADE` is convenient but dangerous: deleting a user cascades to delete all their orders, then all order items, potentially removing millions of rows in a chain reaction triggered by a single `DELETE` statement. `RESTRICT` / `NO ACTION` are safer defaults — they prevent accidental data destruction by requiring you to manually clean up children before deleting the parent. `SET NULL` is the right choice when the child-parent relationship is optional (e.g., deleting an employee who was a sales rep on some orders doesn't mean those orders should disappear).
+
 ```sql
 ON DELETE CASCADE      -- delete child rows when parent is deleted
 ON DELETE RESTRICT     -- prevent deletion if child rows exist (default, strictest)
@@ -102,6 +124,8 @@ INSERT INTO order_items VALUES (1, 5, 1, 999);  -- ❌ ERROR: duplicate key
 
 ## Composite Foreign Key
 
+When referencing a table with a composite primary key, the foreign key must also be composite, referencing all columns of the target's primary key. This is most common in many-to-many junction tables and audit/discount tables that extend a composite-keyed entity. The columns in the `FOREIGN KEY (...)` list must match the *order* of the columns in the referenced `REFERENCES (...) (...)` list exactly.
+
 ```sql
 -- Reference a composite PK
 CREATE TABLE order_item_discounts (
@@ -115,6 +139,8 @@ CREATE TABLE order_item_discounts (
 
 ## Unique Constraints vs Primary Keys
 
+Both PRIMARY KEY and UNIQUE enforce uniqueness at the storage level, but they have key differences. A table can only have one PRIMARY KEY — it is the canonical row identifier, cannot be NULL, and is used as the default target for FOREIGN KEY references from other tables. A table can have many UNIQUE constraints — they enforce uniqueness on alternate columns (like `email` or `username`) and allow one NULL (since NULL is not equal to NULL, two NULL values do not violate uniqueness in most databases). Architecturally, always use surrogate integer keys as your PRIMARY KEY; reserve UNIQUE for natural key enforcement.
+
 ```sql
 -- PRIMARY KEY: one per table, cannot be NULL, clustered index (usually)
 id BIGSERIAL PRIMARY KEY
@@ -127,6 +153,8 @@ UNIQUE (user_id, provider)   -- a user can have one account per OAuth provider
 ```
 
 ## Checking Constraints
+
+`CHECK` constraints are the last line of defense at the database layer against invalid data. They execute on every `INSERT` and `UPDATE`, and the row is rejected if the constraint evaluates to FALSE. An important nuance: if a `CHECK` constraint evaluates to NULL (because it references a NULLable column and that column is NULL), the constraint *passes* — SQL's three-valued logic means NULL-producing conditions are treated as "we don't know it's false, so allow it". Always test your CHECK constraints with NULL inputs to ensure they behave as intended.
 
 ```sql
 CREATE TABLE products (

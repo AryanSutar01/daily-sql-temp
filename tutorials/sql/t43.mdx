@@ -1,3 +1,21 @@
+## The Physical Lock Manager and MVCC Tuple Headers
+
+Concurrency control is the hardest problem in database engineering. It is managed by two parallel systems: the Lock Manager (for writes) and MVCC (for reads).
+
+### The Lock Manager and Wait Queues
+
+When you execute `SELECT ... FOR UPDATE`, the database doesn't just flip a bit. It registers the request in the in-memory **Lock Manager**. 
+If Transaction A holds the lock, and Transaction B requests it, Transaction B is placed in a **Wait Queue**. If 1,000 users try to buy the same ticket simultaneously, 1 user gets the lock, and 999 connections are suspended in the Wait Queue, completely exhausting the database connection pool. This is known as **Lock Contention**.
+
+### MVCC Tuple Headers (xmin / xmax)
+
+Instead of using the Lock Manager for reads (which would cause massive contention), PostgreSQL uses **MVCC (Multi-Version Concurrency Control)**. 
+Every row on disk has hidden metadata columns in its header, primarily `xmin` (the Transaction ID that created the row) and `xmax` (the Transaction ID that deleted/updated it).
+
+When Transaction 100 runs `SELECT`, it looks at the `xmin`/`xmax` of every row. If a row was created by Transaction 105, Transaction 100 mathematically knows that row is "in the future" and physically ignores it, scanning for an older version of the row instead. This requires zero locks, allowing thousands of concurrent readers to scan the exact same disk pages that writers are actively modifying.
+
+---
+
 ## Why Concurrency Control?
 
 When multiple transactions run simultaneously, they can conflict. Without concurrency control:
@@ -10,6 +28,8 @@ Databases use **locks** and **MVCC** to prevent these problems.
 ## Lock Types
 
 ### Row-Level Locks
+
+Row-level locking in SQL is explicit — you opt in using `FOR UPDATE` or `FOR SHARE`. `FOR UPDATE` acquires an **Exclusive Lock** on each returned row, preventing any other transaction from modifying or locking it until you commit. `FOR SHARE` acquires a **Shared Lock** that allows other readers but blocks writers. `FOR UPDATE SKIP LOCKED` is the basis of efficient job queue implementations: instead of blocking when a row is locked by another worker, it silently skips that row, allowing each worker to grab its own row without contention or retry loops.
 
 ```sql
 -- Exclusive row lock: only you can read or modify this row until COMMIT
@@ -27,6 +47,8 @@ FOR UPDATE SKIP LOCKED;
 ```
 
 ### Table-Level Locks
+
+Table-level locks are the bluntest instrument in the database's concurrency toolkit. They are rarely taken by application SQL directly — instead, they are automatically acquired by DDL commands. `ALTER TABLE` always acquires `ACCESS EXCLUSIVE MODE`, which blocks every other operation on the table (reads, writes, other DDL) for the entire duration of the schema change. On a busy production table with millions of rows, even a simple `ALTER TABLE ADD COLUMN` can cause significant downtime. The solution is to use online DDL tools like `pt-online-schema-change` (MySQL) or `pg-osc` (PostgreSQL).
 
 ```sql
 -- Lock entire table (blocks all reads and writes by others)
@@ -125,6 +147,8 @@ WHERE product_id = 5 AND version = 42;
 Optimistic locking is implemented in the application, not in SQL - but the pattern is common in ORMs (Hibernate, ActiveRecord, Prisma).
 
 ## Checking Lock Activity
+
+When a production application slows down inexplicably, the first place to check in PostgreSQL is `pg_locks` and `pg_stat_activity`. `pg_locks` shows every lock currently held or requested in the system. `WHERE NOT granted` filters for locks that are *waiting* — these are the bottleneck. The `pg_blocking_pids()` function is the key tool for tracing the dependency chain: given a blocked PID, it returns the PIDs of all transactions blocking it. This is essential for identifying long-running transactions that are holding locks and starving other queries.
 
 ```sql
 -- PostgreSQL: see current locks

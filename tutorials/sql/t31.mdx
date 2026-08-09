@@ -1,3 +1,29 @@
+## Stored Procedures: Pre-Compilation and Context Switching
+
+Stored procedures represent a fundamental shift from declarative SQL to procedural programming embedded directly inside the database kernel.
+
+### AST Pre-Compilation and Plan Caching
+
+When you send a standard `SELECT` query from your backend application, the database must parse the text, build the AST, generate a query plan, and execute it.
+
+When you create a Stored Procedure, the database pre-parses the code. The first time the procedure is called in a session, the database generates the execution plan and **caches it in memory**. 
+On subsequent calls, the database skips the parser and the query optimizer entirely, directly executing the cached physical plan. For massive batches of OLTP (Online Transaction Processing) operations, eliminating the compilation overhead saves significant CPU cycles.
+
+### The Context Switch Penalty
+
+When you write a procedure in PL/pgSQL, you are combining two completely different execution engines:
+1. The **PL/pgSQL Procedural Engine** (handles IF statements, loops, variables).
+2. The **SQL Engine** (handles SELECT, INSERT, UPDATE).
+
+When your procedure loops through 10,000 records and runs an `UPDATE` on each iteration, the database must execute a **Context Switch** between the procedural engine and the SQL engine 10,000 times. This is incredibly slow compared to a single set-based SQL `UPDATE` statement. 
+**Architectural Rule**: Never write a `WHILE` or `FOR` loop in a stored procedure if a single `INSERT ... SELECT` or `UPDATE` statement could achieve the same result. The relational engine's set-based operations will always outperform procedural looping by orders of magnitude.
+
+### Transaction Boundaries
+
+The defining feature of a Procedure (as opposed to a Function) is the ability to manage its own Transaction Boundaries (`COMMIT` and `ROLLBACK`). This allows a single long-running procedure to process data in batches, committing every 1,000 rows. If it crashes on row 9,000, the first 8,000 rows remain safely committed. A Function, which must execute entirely within a single atomic transaction wrapper, would rollback everything.
+
+---
+
 ## What is a Stored Procedure?
 
 A stored procedure is a named, reusable block of SQL code stored in the database. Unlike functions, procedures:
@@ -17,6 +43,8 @@ A stored procedure is a named, reusable block of SQL code stored in the database
 | Called with | `SELECT func()` | `CALL proc()` |
 
 ## Creating a Stored Procedure (PostgreSQL)
+
+A stored procedure is compiled code living inside the database server. Unlike a function, a procedure can issue `COMMIT` and `ROLLBACK` directly, giving it full transaction control. The `DECLARE` block allocates session-local variables. `RETURNING id INTO v_order_id` is PostgreSQL's way of capturing a generated ID from an `INSERT` without a second `SELECT` roundtrip. The `EXCEPTION WHEN OTHERS THEN ROLLBACK` ensures that any unexpected error — a constraint violation, a type mismatch, a network timeout — atomically rolls back all changes made within the procedure.
 
 ```sql
 -- Simple procedure: place an order atomically
@@ -67,6 +95,8 @@ CALL place_order(customer_id => 1, product_id => 5, quantity => 2, unit_price =>
 
 ## Fund Transfer Procedure
 
+Fund transfer is the classic use case where a stored procedure provides clear advantages over application-layer logic. The risk in a fund transfer is a partial execution: debit Account A but fail before crediting Account B. The procedure's `BEGIN/EXCEPTION/ROLLBACK` block guarantees atomicity. The intermediate balance check (`IF balance < 0 THEN RAISE EXCEPTION`) happens inside the same transaction, preventing race conditions where two concurrent transfers could both read a positive balance, both proceed, and together overdraw the account.
+
 ```sql
 CREATE OR REPLACE PROCEDURE transfer_funds(
   from_id  INT,
@@ -107,6 +137,8 @@ CALL transfer_funds(1, 2, 5000.00);
 
 ## Procedures in MySQL
 
+MySQL requires `DELIMITER $$` before defining a stored procedure because MySQL's default statement delimiter is `;`, which would prematurely terminate the procedure body before it's complete. By switching to `$$`, you allow the procedure body (which contains semicolons) to be parsed as a single unit. MySQL procedures use `IN`, `OUT`, and `INOUT` parameter modes — `IN` is read-only input (equivalent to PostgreSQL's default), `OUT` returns a value to the caller, and `INOUT` does both.
+
 ```sql
 DELIMITER $$
 
@@ -127,6 +159,8 @@ CALL get_customer_stats(42);
 ```
 
 ## Managing Procedures
+
+The `information_schema.routines` view is the ANSI-standard way to introspect stored routines across databases. PostgreSQL also provides `pg_proc` in the system catalog for more detailed information. When dropping a procedure, you must specify the argument types if there are multiple overloaded versions with the same name — this allows PostgreSQL to identify the exact function signature to remove.
 
 ```sql
 -- List procedures (PostgreSQL)

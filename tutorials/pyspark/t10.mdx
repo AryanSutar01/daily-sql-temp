@@ -1,3 +1,42 @@
+## How Column Selection and Filtering Work Inside Spark
+
+`select()`, `filter()`, and `drop()` are the three most fundamental column and row operations. They look trivial — "just pick some columns" or "just remove rows that don't match" — but understanding what Spark does with them internally explains why chaining them in the right order can have a massive effect on performance.
+
+### Projection Pushdown
+
+When you call `select()` on a Parquet or ORC file, the Catalyst optimizer rewrites the physical plan to push the column selection all the way **down to the file reader**. The file reader only deserialises the columns you requested — columns you didn't select are never read from disk at all.
+
+```
+Your code:
+df = spark.read.parquet("table_with_100_cols.parquet")
+df.select("user_id", "revenue").groupBy("user_id").sum("revenue").show()
+
+What physically happens:
+ParquetReader → reads ONLY user_id + revenue columns from disk
+             → all other 98 columns never touched
+```
+
+This is called **column pruning** or **projection pushdown**, and it's why selecting early is essential with columnar formats.
+
+### Predicate Pushdown
+
+Similarly, `filter()` conditions are pushed down to the file reader. Parquet and ORC store per-row-group statistics (min, max, null count). Spark uses these statistics to skip entire row groups that cannot possibly contain matching rows — without reading a single byte of their actual data.
+
+```
+df.filter(df.year == 2024).count()
+
+Parquet reader behaviour:
+  Row group 1: min_year=2020, max_year=2022 → SKIP (no 2024 rows possible)
+  Row group 2: min_year=2023, max_year=2025 → READ (might contain 2024)
+  Row group 3: min_year=2019, max_year=2021 → SKIP
+```
+
+### Why This Makes Column Order Matter
+
+Because Spark's Catalyst can push both projections and predicates to the source, the **order in which you write select() and filter()** does NOT affect performance in most cases — Catalyst will reorder them optimally. However, using explicit column references (`col()`) rather than string expressions helps Catalyst analyse dependencies accurately.
+
+---
+
 ## Setup
 
 ```python

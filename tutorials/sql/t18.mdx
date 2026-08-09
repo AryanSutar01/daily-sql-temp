@@ -1,3 +1,49 @@
+## Subquery Internals: Unnesting and Lateral Execution
+
+Writing a subquery makes a SQL statement conceptually easier for a human to read. However, the database engine hates executing subqueries exactly as written.
+
+### Subquery Flattening (Unnesting)
+
+When you write a subquery in the `WHERE` clause or `FROM` clause, modern query optimizers will immediately attempt to **flatten** or **unnest** it into a standard `JOIN`.
+
+```sql
+-- You write a subquery:
+SELECT name FROM users 
+WHERE id IN (SELECT customer_id FROM orders WHERE total > 5000);
+
+-- The optimizer rewrites the AST internally to a physical Semi-Join:
+SELECT users.name 
+FROM users 
+SEMI JOIN orders ON users.id = orders.customer_id 
+WHERE orders.total > 5000;
+```
+
+Why does the optimizer do this? Because executing a subquery independently creates a rigid execution pipeline. By flattening the query into a JOIN graph, the optimizer gains the freedom to reorder operations, choose between Hash/Merge/Nested Loop joins, and push down predicates.
+
+If a subquery is too complex to flatten (e.g., it contains `LIMIT`, `OFFSET`, or certain `GROUP BY` combinations), the optimizer is forced to materialize it. It executes the inner query completely, writes the result to a temporary in-memory table, and then executes the outer query against that temp table. This is called an **Opaque Subquery** and is usually terrible for performance.
+
+### The Physics of Correlated Subqueries
+
+A correlated subquery references columns from the outer query. Historically, this forced the database into a row-by-row execution model (a massive nested loop):
+
+```sql
+SELECT u.name,
+  (SELECT MAX(created_at) FROM orders o WHERE o.customer_id = u.id)
+FROM users u;
+```
+
+**Physical Execution (The Naive Way):**
+1. Read `users` row 1 (Alice, id=1).
+2. Execute `SELECT MAX(created_at) FROM orders WHERE customer_id = 1`.
+3. Read `users` row 2 (Bob, id=2).
+4. Execute `SELECT MAX(created_at) FROM orders WHERE customer_id = 2`.
+
+If `users` has 1 million rows, the database executes the inner query 1 million times. This is $O(N \times M)$ scaling and will bring the database to its knees.
+
+Modern optimizers (like PostgreSQL 10+) try to rewrite correlated subqueries into a `LATERAL JOIN` or a `HashAggregate` on the whole table, computing the max for all users at once and joining the result. When writing production code, you should manually convert correlated subqueries into `JOIN`s or Window Functions to guarantee you don't accidentally trigger a row-by-row execution plan.
+
+---
+
 ## What is a Subquery?
 
 A subquery (also called an inner query or nested query) is a SELECT statement written inside another SQL statement. The inner query runs first, and its result is used by the outer query.

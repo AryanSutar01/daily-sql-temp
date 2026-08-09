@@ -1,3 +1,40 @@
+## Window Functions: The Physical Spool Operator
+
+Standard aggregations (`GROUP BY`) destroy the original rows, condensing them into a single row per group. Window functions are mathematically different: they must preserve every original row while appending an aggregated metric.
+
+To achieve this, the query engine uses a physical **Window Spool** operator.
+
+### Memory Buffering and Sorting
+
+A Window operator cannot stream rows to the client instantly. If you ask for the `SUM(salary) OVER (PARTITION BY department)`, the engine cannot emit the first row of the 'Engineering' department until it has read *every* row in the 'Engineering' department to compute the final sum.
+
+**Physical Execution:**
+1. The engine performs an $O(N \log N)$ Sort on the input data, sorting it first by the `PARTITION BY` key, and then by the `ORDER BY` key.
+2. The engine spools (buffers) the current partition's rows into memory (`work_mem`).
+3. It computes the aggregate (or ranking function) over the buffer.
+4. It iterates over the buffer, appending the computed metric to each row, and emits them to the client.
+
+If a single partition (e.g., all users in a massive country) is too large to fit in memory, the Window Spool spills to disk, causing massive I/O penalties.
+
+### The Indexing Advantage
+
+Because the first step of window execution is almost always a Sort, Window functions heavily penalize the CPU. However, if you have a B-Tree index that exactly matches your `PARTITION BY` and `ORDER BY` clause, the optimizer can skip the sort phase entirely.
+
+```sql
+-- Query:
+SELECT name, RANK() OVER (PARTITION BY department ORDER BY salary DESC) 
+FROM employees;
+
+-- If you have this index:
+CREATE INDEX idx_emp_dept_salary ON employees (department, salary DESC);
+
+-- The optimizer performs an Index Scan (O(N)), skipping the expensive O(N log N) Sort!
+```
+
+**Architectural Insight**: While `GROUP BY` can often use extremely fast $O(N)$ HashAggregates, Window Functions are almost entirely dependent on Sorting. In analytical systems processing billions of rows, excessive window functions will rapidly saturate your CPU cores and memory bandwidth unless perfectly indexed.
+
+---
+
 ## What Are Window Functions?
 
 Window functions calculate a value for each row based on a "window" of related rows - without collapsing the result like GROUP BY does.

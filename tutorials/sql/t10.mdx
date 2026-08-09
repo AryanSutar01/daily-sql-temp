@@ -1,3 +1,57 @@
+## Comments and Query Processing Internals
+
+Comments in SQL are often thought of purely as documentation for humans, but understanding how the database engine handles them reveals how query parsing and optimization actually work.
+
+### The Lexer and Abstract Syntax Tree (AST)
+
+When you send a SQL string to the database, it doesn't execute the string directly. It goes through the **Lexer** and **Parser**:
+
+1. **Lexer (Tokenizer)**: Scans the raw string character by character. When it encounters `--` or `/*`, it transitions into a "comment state" and simply discards all subsequent characters until the newline or `*/` is found. 
+2. **Parser**: Takes the tokens (keywords, identifiers) produced by the Lexer and builds an **Abstract Syntax Tree (AST)**. 
+
+Because the Lexer strips comments *before* the AST is built, comments have **zero performance impact** on execution time. The query planner never even knows they existed.
+
+```sql
+-- Query A:
+SELECT * FROM users WHERE id = 1;
+
+-- Query B:
+/* 
+   Author: DBA Team
+   Purpose: Get user by ID for login flow
+   Note: Do not remove this query
+*/
+SELECT * FROM users WHERE id = 1;
+
+-- The database hashes the parsed AST (not the raw text) to check the plan cache.
+-- Therefore, Query A and Query B resolve to the EXACT same cached execution plan instantly.
+```
+
+### Optimizer Hints: When Comments Aren't Ignored
+
+There is one critical exception to the "comments are ignored" rule. Many databases (like MySQL and Oracle) use a special comment syntax to inject **Optimizer Hints**. 
+
+Optimizer hints bypass the cost-based query planner and force the database to use a specific physical execution strategy.
+
+```sql
+-- MySQL / Oracle Optimizer Hint Syntax: /*+ ... */
+-- The '+' tells the Lexer NOT to discard this comment, but pass it to the Optimizer.
+
+-- Force the database to use a specific index (even if the optimizer thinks a full scan is better):
+SELECT /*+ INDEX(users idx_users_email) */ name, email 
+FROM users 
+WHERE email = 'alice@example.com';
+
+-- Force a Hash Join instead of a Nested Loop Join:
+SELECT /*+ HASH_JOIN(u o) */ u.name, o.total
+FROM users u
+JOIN orders o ON u.id = o.customer_id;
+```
+
+**Interview insight** 🎯: Hints are considered an anti-pattern in modern database engineering (PostgreSQL actively refuses to support them natively). If you have to use a hint, it usually means your table statistics are out of date (`ANALYZE` hasn't run) or your query is written poorly. You should fix the underlying statistics rather than forcing a physical plan that might become terrible as the data grows.
+
+---
+
 ## SQL Comments
 
 Comments are ignored by the database engine - they exist to explain the code to humans.
@@ -116,7 +170,11 @@ LEFT JOIN orders o ON u.id = o.customer_id
 GROUP BY u.id, u.name, u.email;
 ```
 
-### Indent Subqueries and CTEs
+### Subqueries and CTEs: Visual Execution Blocks
+
+When you indent a subquery or a CTE, you are not just making it "look pretty". You are visually mapping the **Execution Blocks** that the Query Optimizer will construct. 
+
+Just as the database parser builds an Abstract Syntax Tree (AST), the human brain builds a mental AST when reviewing a Pull Request. Proper indentation visually isolates optimizer boundaries (like CTE materialization steps), allowing the reviewer to instantly understand the query's dependency graph.
 
 ```sql
 -- ✅ Clearly nested structure
@@ -149,10 +207,12 @@ FROM active_users u
 LEFT JOIN user_orders uo ON u.id = uo.customer_id;
 ```
 
-### Trailing vs Leading Commas
+### Trailing vs Leading Commas: The Version Control Impact
+
+In data engineering, the debate between trailing and leading commas is not about aesthetics — it is entirely about **Version Control (Git) efficiency** and `git blame` accuracy.
 
 ```sql
--- Trailing commas (more common)
+-- Trailing commas (The standard)
 SELECT
   name,
   email,
@@ -167,7 +227,10 @@ SELECT
 FROM users;
 ```
 
-Both are valid - just be consistent. Most style guides use trailing commas.
+**The Engineering Impact:**
+If you use trailing commas and add a new column to the end of the `SELECT` list, you must modify the previous line to add a comma. Git registers this as a **2-line diff** (one modification, one addition). This corrupts `git blame` because the previous line's author appears to have modified the query, when they only added a comma.
+
+If you use leading commas, adding a new column to the end of the list is a **1-line diff**. `git blame` perfectly preserves the author history of every column. However, leading commas break standard language tooling and are often rejected by automated formatters (like `sqlfluff`). Most modern data teams accept the trailing comma standard and rely on advanced IDEs to resolve `git blame` nuances.
 
 ### JOIN Formatting
 

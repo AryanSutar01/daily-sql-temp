@@ -1,3 +1,20 @@
+## The Architecture of Pivoting: Database vs Application
+
+Pivoting transforms row-based data into column-based reports. While technically possible in SQL, doing this in the database engine violates a core architectural principle: **The database should return raw sets; the application should format the presentation.**
+
+### The Physical Cost of Row Reassembly
+
+When you write a manual Pivot using `CASE WHEN` aggregations, the database engine must:
+1. Scan the raw rows.
+2. Build an in-memory Hash Table for the `GROUP BY` keys.
+3. For *every single column*, evaluate the `CASE` condition and update a running accumulator.
+
+If you pivot sales data into 365 daily columns, the engine must evaluate 365 `CASE` statements for *every single row* before aggregating. This causes massive CPU spikes and inflates the network payload size because the database must dynamically assemble extremely wide, sparse rows.
+
+**Architectural Rule**: Use SQL to calculate the raw, normalized aggregations (e.g., `month, category, revenue`). Send this dense, lightweight dataset over the wire. Let the frontend (JavaScript) or the BI tool (Tableau/PowerBI) pivot the data into a visual grid. Their memory models are designed for UI rendering; the database's memory model is designed for set theory.
+
+---
+
 ## What is Pivoting?
 
 Pivoting transforms row values into column headers - turning a "tall" (normalized) table into a "wide" (report-style) table.
@@ -14,6 +31,8 @@ Mar   | Laptop   | 88000
 ```
 
 ## Manual Pivot with CASE WHEN (Works in All Databases)
+
+The most universally compatible way to pivot data is using conditional aggregation. By wrapping a `CASE WHEN` statement inside a `SUM()` function, you force the database to only add the revenue if the row matches that specific column's criteria (e.g., `month_num = 1` for January). This approach is highly performant because it scans the dataset exactly once, applying the conditions inline. It works in PostgreSQL, MySQL, SQL Server, and SQLite without any special extensions.
 
 ```sql
 SELECT
@@ -52,6 +71,8 @@ ORDER BY annual_total DESC;
 
 Cleaner syntax for conditional aggregation:
 
+PostgreSQL introduced the ANSI-standard `FILTER (WHERE ...)` clause specifically to make conditional aggregation more readable. Instead of burying the logic inside the aggregate function, `FILTER` acts as an inline `WHERE` clause applied only to that specific `SUM()`. It compiles down to the exact same execution plan as the `CASE WHEN` method, but is significantly easier to read and maintain.
+
 ```sql
 SELECT
   category,
@@ -67,6 +88,8 @@ GROUP BY category;
 ```
 
 ## Pivot User Counts by Status and City
+
+Pivoting is not exclusive to revenue data. A very common reporting requirement is a matrix of user segment sizes: how many active, inactive, and banned users exist per city? This uses the same `FILTER` conditional aggregation technique, applied to `COUNT(*)` instead of `SUM()`. The result is a dense crosstab that can be rendered directly in any dashboard tool as a heatmap or comparison table.
 
 ```sql
 SELECT
@@ -103,6 +126,8 @@ SELECT * FROM crosstab(
 
 ## PIVOT in SQL Server
 
+SQL Server provides a native `PIVOT` keyword that is more declarative than the `CASE WHEN` approach. You define the aggregate function, the column whose values become new column headers (`FOR month_name IN (...)`), and the database handles the conditional aggregation automatically. The limitation is that the column list must be hardcoded — SQL Server's native `PIVOT` does not support dynamic column lists without using dynamic SQL.
+
 ```sql
 -- SQL Server has native PIVOT syntax
 SELECT *
@@ -116,7 +141,7 @@ PIVOT (
 
 ## Unpivot - Columns to Rows
 
-Unpivoting does the reverse - turns column headers into row values.
+Unpivoting does the reverse - turns column headers into row values. This is often necessary when importing poorly structured Excel spreadsheets into a normalized relational format. The most compatible way to unpivot is using `UNION ALL`, where you query the same table multiple times, each time extracting a different column as a standardized row value. While this approach forces the database to scan the source table multiple times (once for each unioned segment), it is completely database-agnostic.
 
 ```sql
 -- Wide format (pivot table):
@@ -139,6 +164,8 @@ ORDER BY category, month;
 
 ## SQL Server UNPIVOT
 
+SQL Server also provides a native `UNPIVOT` operator that is the mirror image of `PIVOT`. Instead of a `UNION ALL` chain, you define the output value column (`revenue`), the output name column (`month`), and the list of source columns to rotate into rows (`jan, feb, mar...`). This is syntactically cleaner than `UNION ALL` for wide tables but is limited to a fixed, known set of source columns.
+
 ```sql
 SELECT category, month, revenue
 FROM pivot_table
@@ -148,6 +175,8 @@ UNPIVOT (
 ```
 
 ## Real-World Example: Survey Results Pivot
+
+Survey data is classically stored in "long" (tall) format: one row per response, with a `question_id` and `answer` column. To analyze results in a spreadsheet-style view, you pivot it so that each question becomes a column and each user occupies a single row. `MAX(CASE WHEN ...)` is used here instead of `SUM` because each user can only have one answer per question — `MAX` simply picks that single value out of the group (since the other cells are NULL).
 
 ```sql
 -- responses: user_id, question_id, answer

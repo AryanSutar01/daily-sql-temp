@@ -1,3 +1,69 @@
+## How Built-in Functions Become JVM Bytecode
+
+`pyspark.sql.functions` contains 300+ built-in functions, but from Spark's perspective they are not Python functions at all — they are **expression tree nodes** that Catalyst understands and compiles into optimized JVM bytecode. This is a fundamental difference from Python UDFs.
+
+### The Expression Tree Model
+
+When you write `F.upper(col("name"))`, you are constructing a **Catalyst expression object** — a tree node of type `Upper(AttributeReference("name"))`. When `F.round(col("amount") * 1.18, 2)` is written, it builds:
+
+```
+Round(
+  Multiply(
+    AttributeReference("amount"),
+    Literal(1.18, DoubleType)
+  ),
+  Literal(2, IntegerType)
+)
+```
+
+This expression tree is what Catalyst optimizes. It can:
+- Apply **constant folding**: `Multiply(col, Literal(1.0))` → `col` (multiplying by 1 is a no-op)
+- Apply **null propagation**: if `amount` is nullable, wrap in null check automatically
+- Apply **type coercion**: auto-cast IntegerType to DoubleType where needed
+
+### Tungsten Whole-Stage Codegen
+
+After optimization, Tungsten compiles the entire expression tree into a **single JVM method**:
+
+```java
+// What Tungsten generates for: F.round(col("amount") * 1.18, 2)
+// (simplified conceptual bytecode)
+void processRow(UnsafeRow inputRow, UnsafeRow outputRow) {
+    boolean amount_isNull = inputRow.isNullAt(2);
+    if (amount_isNull) {
+        outputRow.setNullAt(0);
+    } else {
+        double amount = inputRow.getDouble(2);
+        double result = Math.round(amount * 1.18 * 100.0) / 100.0;
+        outputRow.setDouble(0, result);
+    }
+}
+```
+
+This runs at near-native JVM speed with:
+- Zero Python process involvement
+- No row serialization/deserialization
+- No object allocation per row (operates directly on `UnsafeRow` binary format)
+
+### Python UDF Comparison
+
+When you write `@udf def my_func(x): return x * 1.18`:
+
+```
+Per partition execution:
+  JVM serializes each row to Python pickle bytes     ← CPU overhead
+  Sends bytes over Unix domain socket to Python worker
+  Python worker deserializes, calls my_func()
+  Python worker serializes result back to pickle
+  JVM receives and deserializes result               ← CPU overhead
+  
+Repeat for every single row in every partition
+```
+
+The serialization cost alone is typically **5–10x** the actual computation cost. For simple operations like `col * 1.18`, always use `F.col("amount") * 1.18` — never a UDF.
+
+---
+
 ## Overview
 
 `pyspark.sql.functions` (commonly imported as `F`) contains 300+ built-in functions that run natively on the JVM - no Python serialization overhead, unlike UDFs.

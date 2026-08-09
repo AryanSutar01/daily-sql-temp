@@ -1,3 +1,29 @@
+## Trigger Architecture: Transactional Hooks and Penalties
+
+A Trigger is essentially an event-driven **Transactional Hook** embedded deep within the database engine's storage manager. While powerful for maintaining data integrity, triggers are infamous for silently destroying database write throughput.
+
+### The Context Switch Penalty
+
+When an application sends a batch `UPDATE` affecting 10,000 rows, a standard SQL engine executes this efficiently via vectorized updates on disk blocks.
+
+If you attach a `FOR EACH ROW` trigger to the table, you completely break this batch optimization. For every single row, the database must halt the storage engine, perform a **Context Switch** to load the PL/pgSQL procedural engine, execute the trigger logic, context-switch back, and process the next row. This can turn a 50ms batch update into a 5,000ms crawl.
+
+### FOR EACH ROW vs FOR EACH STATEMENT
+
+Database architects strongly differentiate between row-level and statement-level triggers:
+
+1. **`FOR EACH ROW`**: Executes once per modified tuple. Essential if you need access to the `NEW` and `OLD` variables (e.g., updating an `updated_at` timestamp on specific rows). Extremely CPU-intensive for bulk operations.
+2. **`FOR EACH STATEMENT`**: Executes exactly *once* per SQL command, regardless of whether the command updated 1 row or 1 million rows. Used for table-level validation or auditing (e.g., "Do not allow DELETEs on Sundays"). It incurs almost zero performance overhead.
+
+### Implicit Lock Escalation
+
+Because triggers run synchronously inside the same transaction boundary as the triggering event, if your trigger performs a secondary action (e.g., updating a parent row's aggregate total), it takes an `ExclusiveLock` on that parent row. 
+If 50 concurrent transactions update different child rows that all trigger an update to the *same* parent row, the database will serialize all 50 transactions, creating a catastrophic locking bottleneck.
+
+**Architectural Rule**: Keep triggers microscopic in complexity. Never perform complex business logic or cross-table aggregations inside a synchronous row-level trigger unless absolutely necessary.
+
+---
+
 ## What is a Trigger?
 
 A trigger is a function that automatically executes when a specified event (INSERT, UPDATE, DELETE) occurs on a table. Triggers are used for automation - you don't call them directly.
@@ -49,6 +75,8 @@ UPDATE users SET name = 'Alice New' WHERE id = 1;
 
 ### Audit Log Trigger
 
+An audit log trigger is the definitive use case for `AFTER` triggers. It fires after every `INSERT`, `UPDATE`, or `DELETE`, recording the before/after state of each changed row into an `audit_log` table. PostgreSQL's `TG_TABLE_NAME` and `TG_OP` special variables allow a single generic trigger function to be attached to any table. `row_to_json(OLD)::JSONB` serializes the old row state to JSONB, enabling you to reconstruct exactly what a row looked like at any point in history. This is the basis of compliance auditing and point-in-time data recovery.
+
 ```sql
 CREATE TABLE audit_log (
   id         BIGSERIAL PRIMARY KEY,
@@ -81,6 +109,8 @@ FOR EACH ROW EXECUTE FUNCTION log_changes();
 
 ### Auto-generate Slug
 
+A `BEFORE INSERT` trigger can automatically derive computed columns from other columns at write time, centralizing the computation in the database layer rather than trusting every application client to perform it correctly. Here, a URL slug is generated from the article title using a regex to replace non-alphanumeric characters with hyphens. Since this is a `BEFORE` trigger, `NEW` can be modified before it's written to disk — `NEW.slug = ...` overwrites any value the application passed, ensuring the slug is always consistent.
+
 ```sql
 CREATE OR REPLACE FUNCTION generate_slug()
 RETURNS TRIGGER AS $$
@@ -96,6 +126,8 @@ FOR EACH ROW EXECUTE FUNCTION generate_slug();
 ```
 
 ### Maintain Summary Table
+
+This trigger demonstrates the summary table synchronization pattern: after every `INSERT` into the `orders` table, the corresponding row in `customer_stats` is immediately updated. The `ON CONFLICT (customer_id) DO UPDATE` is the upsert mechanism — if the customer already has a stats row, it increments the counts. If this is their first order, it creates the stats row. The trade-off is real-time accuracy (stats are always current) vs. write overhead (every order insert now also triggers an upsert into `customer_stats`, adding latency to the write path).
 
 ```sql
 CREATE OR REPLACE FUNCTION sync_customer_stats()
@@ -118,6 +150,8 @@ FOR EACH ROW EXECUTE FUNCTION sync_customer_stats();
 
 ## Special Trigger Variables
 
+PostgreSQL provides a set of special variables automatically available inside every trigger function. `TG_TABLE_NAME` contains the table name, enabling a single generic function to be attached to multiple tables. `TG_OP` contains the triggering operation (`'INSERT'`, `'UPDATE'`, `'DELETE'`, `'TRUNCATE'`). `NEW` is a record variable holding the row being inserted or updated — mutations to `NEW` in a `BEFORE` trigger are reflected in the final written row. `OLD` holds the pre-update row state and is only available in `UPDATE` and `DELETE` triggers.
+
 ```sql
 -- Available inside trigger functions:
 TG_TABLE_NAME  -- name of the table ('users', 'orders')
@@ -127,6 +161,8 @@ OLD            -- the old row (UPDATE/DELETE only)
 ```
 
 ## Managing Triggers
+
+Triggers are stored as database objects and can be listed, disabled, enabled, and dropped. `DISABLE TRIGGER` is extremely useful in data migration scenarios: when bulk-loading millions of rows into a table, disabling its audit triggers eliminates the overhead of millions of extra inserts into the audit log. After the migration, re-enable them with `ENABLE TRIGGER`. Always document which triggers are disabled during a migration window to avoid accidentally leaving audit coverage gaps in production.
 
 ```sql
 -- List triggers

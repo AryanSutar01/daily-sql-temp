@@ -1,3 +1,31 @@
+## LAG and LEAD: Row Cursors and Cyclic Buffers
+
+`LAG` and `LEAD` allow you to access data from previous or future rows relative to the current row. While they are conceptually simple, they require the database engine to maintain sophisticated internal memory structures.
+
+### The Physical Row Cursor
+
+When executing a window function with `ORDER BY`, the database processes the sorted partition using an internal pointer called a **Row Cursor**. 
+
+For a standard aggregate like `SUM()`, the cursor simply maintains a running total. However, for `LAG` and `LEAD`, the engine must actually keep copies of the physical rows in memory.
+
+### Cyclic Buffers for Offset Storage
+
+If you write `LAG(revenue, 3)`, the database must remember the revenue values of the last 3 rows. To do this efficiently, the execution engine allocates a **Cyclic Buffer** (or Ring Buffer) in memory.
+
+1. The cursor reads Row 1, stores the value in buffer index 0, and emits `NULL` (since there is no row -3).
+2. The cursor reads Row 4, stores the value in buffer index 3.
+3. When the cursor reads Row 5, the buffer is full. It overwrites buffer index 0 with Row 5's data, while simultaneously reading the old value (Row 2's data) to emit as the result for `LAG(..., 3)`.
+
+This cyclic buffer allows `LAG` and `LEAD` to execute with $O(K)$ memory complexity, where $K$ is the offset parameter, rather than $O(N)$ memory for the entire partition.
+
+### The Streaming Advantage
+
+Because `LAG` and `LEAD` only require a fixed-size lookbehind or lookahead buffer, they are highly optimized **Streaming Operators** (unlike `FIRST_VALUE` or `LAST_VALUE` which often require the engine to buffer the entire partition). 
+
+If the underlying data is already sorted (e.g., provided by a B-Tree index scan), `LAG` and `LEAD` can execute with near-zero memory footprint and emit rows to the client instantly, making them incredibly fast for time-series analysis and period-over-period financial reporting on massive datasets.
+
+---
+
 ## LAG - Access the Previous Row
 
 `LAG(column, offset, default)` returns the value from a row that is `offset` rows behind the current row.
@@ -63,6 +91,8 @@ ORDER BY month;
 ```
 
 ## LAG with PARTITION BY
+
+When your data has multiple groups (e.g., revenue per category per month), you almost always want `LAG` to reset at each group boundary — otherwise the lag from the last row of category A would contaminate the first row of category B. Adding `PARTITION BY category` instructs the database to maintain a separate row cursor per category, so the lag function starts fresh at the beginning of each partition.
 
 ```sql
 -- Month-over-month change per product category
@@ -136,6 +166,8 @@ FROM employees;
 ```
 
 ## Practical: Finding Gaps Between Events
+
+One of the most powerful real-world uses of `LAG` is measuring the *time gap between consecutive events per entity*. In e-commerce, this tells you how often customers re-order. In monitoring, it identifies gaps in heartbeat signals. The pattern is always the same: use `LAG(event_timestamp)` ordered by time and partitioned by the entity (user, device, etc.), then subtract to get the interval. Rows where the gap is `NULL` are first-ever events.
 
 ```sql
 -- Time between consecutive orders per customer

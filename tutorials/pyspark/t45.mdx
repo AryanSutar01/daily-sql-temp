@@ -1,5 +1,79 @@
 # Spark UI & DAG Visualization
 
+## How the Spark UI Maps to Execution Internals
+
+The Spark UI is not just a monitoring dashboard — every tab directly corresponds to a specific layer of Spark's execution model. Knowing which tab maps to which layer tells you exactly where to look for performance problems.
+
+### The Execution Model → UI Mapping
+
+```
+Your PySpark code
+      ↓
+Action triggered (e.g., .count(), .write(), .show())
+      ↓ creates a
+Job  ← UI: Jobs tab (one row per .count()/.write() call)
+      ↓ divided into
+Stages  ← UI: Stages tab (one row per Exchange/shuffle boundary)
+      ↓ each stage runs
+Tasks  ← UI: Stage Detail → Task table (one row per partition)
+         Running on
+Executors  ← UI: Executors tab (one row per JVM process)
+         Storing cached data in
+Storage  ← UI: Storage tab (one row per cached DataFrame)
+```
+
+### Reading the Stage Detail: Identifying Bottlenecks
+
+The **Stage Detail** page is the most powerful view. The task metric distribution reveals the root cause of slow stages:
+
+```
+Task metrics to inspect (for a 200-task stage):
+
+Duration column:
+  Min: 2s  Median: 5s  Max: 480s  ← MAX is 96x the median!
+  → DATA SKEW: one partition has 96x more data than average
+  → Solution: repartition by key, salting, or AQE skew join
+
+GC Time column:
+  Min: 0s  Median: 4s  Max: 8s  ← GC is 80% of median task time!
+  → JVM GC PRESSURE: executor heap too small, too many objects
+  → Solution: increase executor memory, use G1GC, reduce UDFs
+
+Shuffle Read column:
+  Min: 10MB  Median: 12MB  Max: 11MB  ← all ~equal
+  → NO SKEW in shuffle read (uniform distribution, good)
+
+Shuffle Write column:
+  If Max >> Median → skew in pre-shuffle data (groupBy key is skewed)
+```
+
+### The Event Timeline: Understanding Parallelism Gaps
+
+The Event Timeline in the Stage Detail shows each task's phases:
+- **Scheduler delay** (blue): time between task submission and task start → too many tasks per executor, or slow TaskScheduler
+- **Task deserialization** (red): unpacking task closure → large closure means large broadcast needed instead
+- **Shuffle read** (orange): fetching shuffle data from other executors → long shuffle read means network bottleneck or skew
+- **Executor computing** (green): actual computation → want this to be the dominant color
+- **Result serialization** (purple): sending result back to driver → if large, avoid collect()-style actions on big data
+
+An ideal timeline: **green dominates**. If you see large orange or blue gaps, that's your optimization target.
+
+### Adaptive Query Execution (AQE) in the UI (Spark 3.0+)
+
+When AQE is enabled, the SQL tab shows the query re-optimization:
+```
+SQL plan before AQE:
+  SortMergeJoin (planned based on estimated statistics)
+
+SQL plan after AQE (after seeing actual runtime stats):
+  BroadcastHashJoin (AQE detected actual table size was < threshold)
+  → Switched join strategy at runtime without restarting the job!
+```
+
+To see AQE re-optimizations: SQL tab → click query → look for orange "AQE" badges on plan nodes that were changed at runtime.
+
+---
+
 ## What is the Spark UI?
 
 The **Spark UI** is a web-based dashboard that Spark automatically starts when you run a Spark application. It gives you a real-time and historical view of everything happening in your Spark job - jobs, stages, tasks, executors, memory, and more.

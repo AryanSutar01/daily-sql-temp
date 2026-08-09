@@ -1,3 +1,50 @@
+## Window partitionBy vs Physical Partitioning: A Critical Distinction
+
+The most common confusion in window function usage is treating `WindowSpec.partitionBy()` as equivalent to `df.repartition()`. They are related but operate at different layers of the execution model.
+
+### What WindowSpec.partitionBy() Specifies
+
+`partitionBy("department")` in a `WindowSpec` is a **logical specification** — it tells the window function evaluator: "reset the window frame at each boundary of `department`". It is part of the SQL plan, not the physical data layout.
+
+### How Spark Physically Satisfies the Window Spec
+
+To evaluate a window function with `partitionBy("department")`, Spark must **guarantee data co-location**: all rows with `department="engineering"` must be on the same physical executor partition. To achieve this, Spark **automatically inserts a shuffle**:
+
+```
+Physical plan for:
+  w = Window.partitionBy("department").orderBy("salary")
+  df.withColumn("rank", rank().over(w))
+
+Physical Plan:
+  Window [rank() OVER (PARTITION BY department ORDER BY salary)]
+    +- Sort [department ASC, salary ASC]
+         +- Exchange hashpartitioning(department, 200)   ← automatic shuffle!
+              +- FileScan parquet ...
+
+Exchange = shuffle → data is moved across the network so that all rows
+with the same "department" value end up on the same executor
+```
+
+### The Relationship to spark.sql.shuffle.partitions
+
+The shuffle that Spark inserts for window functions uses `spark.sql.shuffle.partitions` (default: 200) as the number of output partitions. This means:
+- If you have 5 departments and 200 shuffle partitions, ~195 partitions will be empty
+- Processing 195 empty tasks wastes scheduler overhead
+- Set `spark.sql.shuffle.partitions` to a value closer to your actual distinct partition key count for window queries
+
+```python
+# For a dataset with 20 departments, reduce shuffle partitions
+spark.conf.set("spark.sql.shuffle.partitions", "20")
+
+# Or use Adaptive Query Execution (AQE) to auto-coalesce empty partitions
+spark.conf.set("spark.sql.adaptive.enabled", "true")
+spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
+```
+
+AQE (Spark 3.0+) automatically merges empty/small partitions post-shuffle, solving this inefficiency without manual tuning.
+
+---
+
 ## What partitionBy Does in a Window
 
 `partitionBy()` in a `WindowSpec` is NOT the same as `df.repartition()` - it defines the **logical grouping** within which the window function operates. Each partition is an isolated calculation scope.

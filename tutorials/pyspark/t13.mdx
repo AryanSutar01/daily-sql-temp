@@ -1,6 +1,33 @@
+## What Sorting Means in a Distributed System
+
+In a single-machine database, sorting is conceptually simple: compare all rows and arrange them. In a distributed system like Spark, data lives across many partitions spread across many machines. **There is no single place where all rows exist simultaneously** — which means a true global sort requires moving data across the network.
+
+This is the fundamental reason why `orderBy()` is a **wide transformation** — it crosses partition boundaries and triggers a shuffle.
+
+## How Global Sort Works Internally
+
+When you call `orderBy()`, Spark executes a **range-partitioned sort** in two phases:
+
+```
+Phase 1 — Sampling (Lightweight):
+Spark samples a small fraction of the data to understand
+the distribution of values. From this, it determines
+"split points" that divide the value range into N buckets.
+
+Phase 2 — Range Shuffle + Local Sort:
+Each partition sends its rows to the correct bucket
+(determined by the split points) across the network.
+Each resulting partition is then sorted locally.
+
+Result: All values in partition 0 < all values in partition 1
+        < all values in partition 2 < ... → global order!
+```
+
+This two-phase approach guarantees globally sorted output while doing only **one shuffle** rather than requiring all data to move to a single node.
+
 ## orderBy and sort - Identical Methods
 
-`orderBy()` and `sort()` are aliases - they do the same thing: return a new DataFrame sorted by one or more columns.
+`orderBy()` and `sort()` are aliases — they do the same thing: return a new DataFrame sorted by one or more columns.
 
 ```python
 from pyspark.sql import SparkSession
@@ -37,6 +64,8 @@ df.orderBy(asc("salary")).show()
 
 ## Sort by Multiple Columns
 
+When sorting by multiple columns, Spark sorts by the first column, then breaks ties using the second column, and so on. This happens within each range partition during the local sort phase:
+
 ```python
 # Sort by dept ascending, then salary descending
 df.orderBy("dept", col("salary").desc()).show()
@@ -55,9 +84,15 @@ df.orderBy(
 ).show()
 ```
 
-## Null Handling in Sort
+## How Null Values Are Placed
 
-By default, nulls sort first on ascending, last on descending. Override this:
+SQL defines three-valued logic: `TRUE`, `FALSE`, and `UNKNOWN` (NULL). Comparing any value to NULL yields NULL, not TRUE or FALSE. This creates a design question: **where should NULLs go in a sorted order?**
+
+Spark follows the SQL standard defaults:
+- `ASC` sort → nulls appear **first** (NULL is treated as the smallest value)
+- `DESC` sort → nulls appear **last** (NULL is treated as the largest value)
+
+You can override this behaviour explicitly:
 
 ```python
 # nulls first (default for ascending)
@@ -72,29 +107,46 @@ df.orderBy(desc_nulls_first("salary")).show()
 # nulls last (default for descending)
 df.orderBy(desc_nulls_last("salary")).show()
 
-# Practical: put nulls at end regardless of sort direction
-df.orderBy(col("salary").desc().nulls_last()).show()  # Spark 3.0+
+# Spark 3.0+ fluent style
+df.orderBy(col("salary").desc().nulls_last()).show()
 ```
 
-## sortWithinPartitions - Local Sort (No Shuffle)
+## sortWithinPartitions - Local Sort Without Shuffle
 
-`orderBy()` causes a full global sort - data moves across executors (expensive shuffle).
-`sortWithinPartitions()` sorts each partition independently - no shuffle, much faster:
+`orderBy()` guarantees **global order** — after execution, row 1 across all output files is truly the smallest value. This requires a full shuffle.
+
+`sortWithinPartitions()` makes a different guarantee: each **individual partition** is sorted, but there is no ordering relationship between partitions. Because no data crosses partition boundaries, there is **no shuffle** — it is a narrow transformation.
+
+```
+orderBy("salary"):           sortWithinPartitions("salary"):
+┌────────────┐               ┌────────────┐
+│ Partition 0│               │ Partition 0│
+│ 60000      │               │ 60000      │  ← sorted locally
+│ 72000      │               │ 72000      │
+│ 95000      │               │ 110000     │
+│ 105000     │               └────────────┘
+│ 110000     │               ┌────────────┘
+└────────────┘               │ Partition 1│
+(all data globally sorted,   │ 70000      │  ← sorted locally,
+ required 1 full shuffle)    │ 80000      │     but 70000 > 60000
+                             │ 90000      │     from partition 0
+                             └────────────┘
+                             (no shuffle, no global guarantee)
+```
 
 ```python
 # Global sort - triggers shuffle, data reorganized across all executors
 df.orderBy("salary").write.parquet("output/")
 
 # Local sort - each partition sorted, no shuffle (fast)
-# Use when downstream process just needs data sorted within each file
 df.sortWithinPartitions("salary").write.parquet("output/")
 df.sortWithinPartitions(col("dept").asc(), col("salary").desc()).write.parquet("output/")
 ```
 
 When to use `sortWithinPartitions`:
-- Before writing Parquet/ORC for better compression (similar values grouped)
-- When consumers process each partition independently
-- When global order is NOT required
+- Before writing Parquet/ORC — sorted data within a file compresses better because similar values are adjacent (run-length encoding and dictionary encoding both benefit)
+- When consumers process each partition independently (e.g., each file goes to a different downstream system)
+- When global order is **NOT** required — saves significant compute and network I/O
 
 ## Sort After groupBy
 
@@ -112,6 +164,20 @@ df.groupBy("dept").agg(
     avg("salary").alias("avg_salary")
 ).orderBy(col("avg_salary").desc()).limit(3).show()
 ```
+
+## How Spark Optimises Top-N
+
+When you chain `orderBy(...).limit(N)`, the Catalyst optimizer recognises the **Top-N pattern** and avoids a full global sort. Instead it runs a partial sort on each partition (keeping only N rows), then merges those partial results:
+
+```python
+# Efficient Top-N: Spark recognises the pattern and avoids full sort
+df.orderBy(col("salary").desc()).limit(10).show()
+
+# vs full sort (Spark cannot optimise away the complete shuffle)
+df.orderBy(col("salary").desc()).show()
+```
+
+This is why `limit()` after `orderBy()` is often much faster than a bare `orderBy()` — it's a fundamentally different execution plan.
 
 ## SQL Equivalent
 
@@ -133,23 +199,29 @@ spark.sql("""
 """).show()
 ```
 
-## Performance Note
+## Performance Considerations
 
-`orderBy()` is a **wide transformation** - it causes a full shuffle. Every row needs to be compared globally. For large datasets:
-- Prefer `sortWithinPartitions()` when global order is not required
-- Use `limit(N).orderBy(...)` is efficient for Top-N (Spark optimizes this)
-- `orderBy` before a `write` forces all data through a single sort stage
+`orderBy()` is a **wide transformation** — it causes a full shuffle. Every row needs to be compared globally. For large datasets:
+
+| Approach | When to use | Shuffle? |
+|---|---|---|
+| `orderBy()` | Global order is truly required | ✅ Yes (expensive) |
+| `sortWithinPartitions()` | Partition-level order is enough (writes, compression) | ❌ No (fast) |
+| `orderBy().limit(N)` | Top-N results | Partial (optimised) |
 
 ```python
-# Efficient Top-N: limit applied before full sort in optimizer
-df.orderBy(col("salary").desc()).limit(10).show()  # Spark can optimize this
+# Reducing shuffle.partitions for small datasets (default 200 is too many)
+spark.conf.set("spark.sql.shuffle.partitions", "10")
+df.orderBy("salary").show()
 ```
 
 ## Summary
 
-- `orderBy()` and `sort()` are identical - use either
+- `orderBy()` and `sort()` are identical — use either
 - Default sort is ascending; use `.desc()`, `desc()` for descending
-- Sort by multiple columns with a mix of directions
+- Sort by multiple columns with a mix of directions — tie-breaking is left-to-right
 - Null placement: `asc_nulls_first`, `asc_nulls_last`, `desc_nulls_first`, `desc_nulls_last`
-- `orderBy()` is a global sort (shuffle); `sortWithinPartitions()` is local (no shuffle)
-- Use `sortWithinPartitions()` before writes for performance when global order isn't needed
+- `orderBy()` is a **global sort** — requires a range-partitioned shuffle across the cluster
+- `sortWithinPartitions()` is a **local sort** — no shuffle, each partition sorted independently
+- Use `sortWithinPartitions()` before writes for better compression when global order isn't needed
+- `orderBy().limit(N)` triggers an optimised Top-N plan — much cheaper than a full sort

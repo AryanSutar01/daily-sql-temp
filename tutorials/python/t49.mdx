@@ -1,4 +1,17 @@
-## datetime - Working with Dates and Times
+## The Standard Library — Python's "Batteries Included" Philosophy
+
+Python's design philosophy is "batteries included" — the standard library ships with tools for nearly every common programming task, so you rarely need to reach for third-party libraries for foundational work. A professional Python developer knows which stdlib module handles each problem, saving time and avoiding unnecessary dependencies.
+
+The modules covered in this tutorial are among the most frequently used in data pipelines, web backends, and automation scripts:
+- **`datetime`**: mandatory for any system that works with time-series data, logs, scheduling, or user input
+- **`collections`**: specialized data structures that solve common problems more efficiently than plain dicts and lists
+- **`itertools`**: lazy, memory-efficient tools for working with sequences — essential for processing large datasets without loading them into memory
+- **`functools`**: higher-order function tools including memoization, partial application, and comparison helpers
+
+Understanding when to use these over hand-rolled alternatives is a sign of Python proficiency. `defaultdict` instead of a `dict` with `if key not in d` checks; `lru_cache` instead of a manual dict-based cache; `deque` instead of `list` for queue operations — each makes intent clearer and is more efficient.
+
+## datetime — Working with Dates and Times
+
 
 ```python
 from datetime import date, time, datetime, timedelta, timezone

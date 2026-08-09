@@ -1,71 +1,109 @@
-## What Are Dunder Methods?
+## The Protocol-Based Design of Python
 
-Dunder (double underscore) methods - also called magic methods or special methods - let your custom classes hook into Python's built-in behaviour. They're called automatically by Python, not directly by you.
+One of Python's most powerful design principles is **duck typing with protocols**. Instead of requiring objects to inherit from a specific class to use built-in features, Python defines **protocols** — sets of dunder (double underscore) methods that objects can implement to participate in language features.
 
-```python
-class Point:
-    def __init__(self, x, y):   # called on object creation
-        self.x = x
-        self.y = y
+When you write `len(obj)`, Python calls `obj.__len__()`. When you write `for x in obj`, Python calls `iter(obj)`, which calls `obj.__iter__()`. When you write `obj + other`, Python calls `obj.__add__(other)`. Every Python built-in syntax and function is ultimately implemented via these protocol methods.
 
-p = Point(3, 4)   # Python calls p.__init__(3, 4) automatically
-```
+This means your custom classes can:
+- Work with `len()`, `print()`, `repr()`, `str()`, `bool()`, `abs()`
+- Participate in arithmetic: `+`, `-`, `*`, `/`, `**`
+- Be compared: `==`, `<`, `>`, `<=`, `>=`
+- Act as containers: indexed access, iteration, `in` operator
+- Act as context managers: `with` statement
+- Be called like functions: `obj(args)`
+- Be used as dict keys or set members: hashing
 
-## Object Lifecycle
+Understanding dunder methods means understanding how Python itself works internally.
+
+## Object Lifecycle — `__new__`, `__init__`, `__del__`
+
+When you write `obj = MyClass(arg)`, Python actually calls two methods in sequence: first `__new__` to create the raw instance, then `__init__` to initialize it. Understanding this sequence is important for advanced patterns like singletons and immutable type subclassing.
+
+`__new__` is a **static method** (automatically) that creates and returns the new instance. It receives the class as its first argument. `__init__` receives the already-created instance as `self` and initializes it. You only override `__new__` in rare cases.
+
+`__del__` is called when the object's reference count reaches zero and it's about to be garbage collected. It is **not** a reliable destructor — the timing is not guaranteed (especially with circular references), and exceptions inside `__del__` are silently ignored. Use context managers (`__enter__`/`__exit__`) for reliable resource cleanup instead.
 
 ```python
 class MyClass:
+    def __new__(cls, *args, **kwargs):
+        """Step 1: creates the raw instance. Called before __init__.
+        Rarely overridden — only for Singleton patterns or subclassing immutable types."""
+        print(f"__new__ called for {cls.__name__}")
+        instance = super().__new__(cls)   # allocate memory, return the instance
+        return instance
+
     def __init__(self, value):
-        """Called when object is created."""
+        """Step 2: initializes the instance. Called after __new__."""
+        print(f"__init__ called with value={value}")
         self.value = value
 
     def __del__(self):
-        """Called when object is about to be garbage collected."""
-        print(f"Deleting object with value {self.value}")
+        """Called when object is garbage collected — NOT reliable for cleanup."""
+        print(f"Object with value={self.value} being collected")
 
-    def __new__(cls, *args, **kwargs):
-        """Called before __init__ - creates and returns the instance.
-        Rarely overridden except for Singleton or immutable types."""
-        instance = super().__new__(cls)
-        return instance
+obj = MyClass(42)
+# Output:
+# __new__ called for MyClass
+# __init__ called with value=42
+del obj
+# __del__ called... eventually
 ```
 
-## String Representation
+## String Representation — `__str__` and `__repr__`
+
+Every Python object has two string representations serving different audiences:
+- `__str__` — human-friendly output for end users, used by `print()` and `str()`
+- `__repr__` — developer-friendly output for debugging, used in the REPL and `repr()`
+
+The convention for `__repr__` is to return a string that looks like valid Python code that would recreate the object. If `__str__` is not defined, Python falls back to `__repr__`. So at minimum, always define `__repr__` — it serves as both.
 
 ```python
 class Product:
-    def __init__(self, name, price):
+    def __init__(self, name, price, stock):
         self.name = name
         self.price = price
+        self.stock = stock
 
     def __str__(self):
-        """Human-readable - used by print() and str()"""
-        return f"{self.name} - ₹{self.price:.2f}"
+        """Human-readable — shown by print(), str(), and f-strings by default."""
+        return f"{self.name} — ₹{self.price:.2f} ({self.stock} in stock)"
 
     def __repr__(self):
-        """Developer/debug representation - used in REPL, repr(), logs"""
-        return f"Product(name={self.name!r}, price={self.price})"
+        """Developer-readable — shown in REPL, repr(), and containers like lists."""
+        # Convention: return a string that could recreate the object
+        return f"Product(name={self.name!r}, price={self.price}, stock={self.stock})"
 
-p = Product("Laptop", 49999)
-print(p)        # Laptop - ₹49999.00        (uses __str__)
-repr(p)         # Product(name='Laptop', price=49999)  (uses __repr__)
-f"{p}"          # uses __str__
-f"{p!r}"        # uses __repr__
+p = Product("Laptop", 49999, 5)
+
+print(p)          # Laptop — ₹49999.00 (5 in stock)    → __str__
+repr(p)           # Product(name='Laptop', price=49999, stock=5)  → __repr__
+f"{p}"            # uses __str__
+f"{p!r}"          # uses __repr__
+
+# In a list, __repr__ is used for each element
+products = [p, Product("Mouse", 999, 20)]
+print(products)   # [Product(name='Laptop',...), Product(name='Mouse',...)]
 ```
 
-## Comparison Operators
+The `!r` format spec in f-strings calls `repr()` on the value — useful in `__repr__` itself: `f"name={self.name!r}"` adds the quotes around string values automatically.
+
+## Comparison Operators and `@total_ordering`
+
+To make objects orderable and sortable, you implement comparison methods. Python's `functools.total_ordering` decorator is a critical tool: if you define `__eq__` and any one of `__lt__`, `__gt__`, `__le__`, or `__ge__`, it automatically generates the remaining three. Without it, you'd need to write all six comparison methods manually.
+
+Returning `NotImplemented` (not `None`) from a comparison method tells Python "I don't know how to compare with this type — try asking the other operand." This enables graceful interoperability between types.
 
 ```python
 from functools import total_ordering
 
-@total_ordering   # auto-generates missing comparison methods from __eq__ and one of __lt__/__gt__
+@total_ordering   # generates __le__, __gt__, __ge__ from __eq__ + __lt__
 class Temperature:
     def __init__(self, celsius):
         self.celsius = celsius
 
     def __eq__(self, other):
         if not isinstance(other, Temperature):
-            return NotImplemented
+            return NotImplemented   # let Python try the other operand
         return self.celsius == other.celsius
 
     def __lt__(self, other):
@@ -79,17 +117,23 @@ class Temperature:
 t1 = Temperature(100)
 t2 = Temperature(50)
 
-t1 == t2   # False
-t1 > t2    # True  - auto-generated by @total_ordering
-t1 < t2    # False
-t1 >= t2   # True
+t1 == t2   # False — __eq__
+t1 > t2    # True  — auto-generated by @total_ordering from __lt__
+t1 <= t2   # False — auto-generated
+t1 >= t2   # True  — auto-generated
 
-# Sort a list of Temperature objects
+# Now objects are sortable with built-in sorted()
 temps = [Temperature(30), Temperature(10), Temperature(20)]
 sorted(temps)   # [Temperature(10°C), Temperature(20°C), Temperature(30°C)]
+min(temps)      # Temperature(10°C)
+max(temps)      # Temperature(30°C)
 ```
 
-## Arithmetic Operators
+## Arithmetic Operators — `__add__`, `__rmul__`, `__iadd__`
+
+Arithmetic dunder methods let your objects work with Python's operators. The `__r*__` variants (reflected operations) handle the case where your object is on the **right side** of the operator and the left operand doesn't know how to handle the operation.
+
+`__iadd__` handles the in-place `+=` operator. For mutable types, it should modify `self` and return `self`. For immutable types, it should return a new object.
 
 ```python
 class Vector:
@@ -98,22 +142,34 @@ class Vector:
         self.y = y
 
     def __add__(self, other):
-        return Vector(self.x + other.x, self.y + other.y)
+        """Called by: vector + vector"""
+        if isinstance(other, Vector):
+            return Vector(self.x + other.x, self.y + other.y)
+        return NotImplemented
 
     def __sub__(self, other):
         return Vector(self.x - other.x, self.y - other.y)
 
     def __mul__(self, scalar):
+        """Called by: vector * 3"""
         return Vector(self.x * scalar, self.y * scalar)
 
     def __rmul__(self, scalar):
-        """Called when scalar * vector (left operand doesn't support it)"""
-        return self.__mul__(scalar)
+        """Called by: 3 * vector (when int doesn't know how to multiply a Vector)"""
+        return self.__mul__(scalar)   # multiplication is commutative — delegate
+
+    def __iadd__(self, other):
+        """Called by: v1 += v2 — modify in place, return self"""
+        self.x += other.x
+        self.y += other.y
+        return self   # must return self for in-place operations
 
     def __neg__(self):
+        """Called by: -vector"""
         return Vector(-self.x, -self.y)
 
     def __abs__(self):
+        """Called by: abs(vector) — returns magnitude"""
         return (self.x**2 + self.y**2) ** 0.5
 
     def __repr__(self):
@@ -122,15 +178,18 @@ class Vector:
 v1 = Vector(1, 2)
 v2 = Vector(3, 4)
 
-v1 + v2    # Vector(4, 6)
-v1 - v2    # Vector(-2, -2)
-v1 * 3     # Vector(3, 6)
-3 * v1     # Vector(3, 6)  - uses __rmul__
--v1        # Vector(-1, -2)
-abs(v2)    # 5.0
+v1 + v2    # Vector(4, 6)   — __add__
+v1 - v2    # Vector(-2, -2) — __sub__
+v1 * 3     # Vector(3, 6)   — __mul__
+3 * v1     # Vector(3, 6)   — __rmul__ (int doesn't know about Vector)
+-v1        # Vector(-1, -2) — __neg__
+abs(v2)    # 5.0            — __abs__ (Pythagorean theorem: √(9+16))
+v1 += v2   # modifies v1 in place — __iadd__
 ```
 
-## Container Methods
+## Container Protocol — Making Objects Behave Like Sequences
+
+The container protocol allows custom objects to support indexing (`obj[key]`), iteration (`for x in obj`), membership testing (`item in obj`), and length (`len(obj)`). Implementing just `__getitem__` is enough for both indexing and iteration — Python will iterate by calling `obj[0]`, `obj[1]`, ... until `IndexError`.
 
 ```python
 class Stack:
@@ -141,31 +200,41 @@ class Stack:
         self._items.append(item)
 
     def pop(self):
+        if not self._items:
+            raise IndexError("pop from empty stack")
         return self._items.pop()
 
     def __len__(self):
-        """Called by len()"""
+        """Called by len(stack). Also used for truthiness if __bool__ not defined."""
         return len(self._items)
 
+    def __bool__(self):
+        """Called by if stack: — more efficient than len() > 0 for large containers."""
+        return bool(self._items)
+
     def __getitem__(self, index):
-        """Called by stack[index]"""
+        """Called by stack[index]. Enables iteration if __iter__ not defined."""
         return self._items[index]
 
     def __setitem__(self, index, value):
-        """Called by stack[index] = value"""
+        """Called by stack[index] = value."""
         self._items[index] = value
 
     def __delitem__(self, index):
-        """Called by del stack[index]"""
+        """Called by del stack[index]."""
         del self._items[index]
 
     def __contains__(self, item):
-        """Called by 'item in stack'"""
+        """Called by 'item in stack'. If not defined, Python falls back to iterating."""
         return item in self._items
 
     def __iter__(self):
-        """Called by for loops and iter()"""
+        """Called by iter() and for loops. Returns an iterator."""
         return iter(self._items)
+
+    def __reversed__(self):
+        """Called by reversed(). Returns an iterator in reverse order."""
+        return reversed(self._items)
 
     def __repr__(self):
         return f"Stack({self._items})"
@@ -173,56 +242,104 @@ class Stack:
 s = Stack()
 s.push(1); s.push(2); s.push(3)
 
-len(s)          # 3
-s[0]            # 1
-2 in s          # True
-for x in s:
+len(s)          # 3   — __len__
+bool(s)         # True — __bool__
+s[0]            # 1   — __getitem__
+2 in s          # True — __contains__
+for x in s:     # — __iter__
     print(x)    # 1 2 3
+list(reversed(s))  # [3, 2, 1] — __reversed__
 ```
 
-## Callable Objects
+## Callable Objects — `__call__`
+
+`__call__` makes an instance behave like a function. This is powerful for creating **stateful callables** — objects that behave like functions but retain state between invocations. Decorators, middleware, and configurable functions often use this pattern.
 
 ```python
+class RateLimiter:
+    """A callable that limits how often a function can be called per second."""
+    import time
+
+    def __init__(self, max_calls_per_second):
+        self.max_rate = max_calls_per_second
+        self.call_times = []
+
+    def __call__(self, func):
+        """Makes the limiter usable as a decorator AND as a check."""
+        import time
+        now = time.time()
+        # Remove calls older than 1 second
+        self.call_times = [t for t in self.call_times if now - t < 1.0]
+        if len(self.call_times) >= self.max_rate:
+            raise RuntimeError(f"Rate limit exceeded: max {self.max_rate}/sec")
+        self.call_times.append(now)
+        return func()
+
+# The instance IS callable — used exactly like a function
+check = RateLimiter(max_calls_per_second=3)
+callable(check)   # True — __call__ is defined
+
+# Simple example
 class Multiplier:
     def __init__(self, factor):
         self.factor = factor
 
     def __call__(self, value):
-        """Makes the object callable like a function"""
         return value * self.factor
 
 double = Multiplier(2)
 triple = Multiplier(3)
 
-double(5)    # 10  - calls double.__call__(5)
-triple(5)    # 15
-
-callable(double)   # True
+double(5)    # 10 — calls double.__call__(5)
+triple(7)    # 21
+callable(double)  # True
 ```
 
-## Context Manager Methods
+## Context Manager Protocol — `__enter__` and `__exit__`
+
+The `with` statement calls `__enter__` at the start and `__exit__` at the end — **always**, even if an exception is raised inside the block. This makes context managers the correct tool for resource management: file handles, database connections, locks, timers.
+
+`__exit__` receives the exception type, value, and traceback. If an exception occurred, you can suppress it by returning `True`. Returning `False` or `None` lets the exception propagate.
 
 ```python
-class Timer:
-    import time
+import time
 
+class Timer:
     def __enter__(self):
-        """Called at the start of 'with' block"""
-        self.start = __import__('time').time()
-        return self
+        """Called at 'with Timer() as t:' — set up the resource, return it."""
+        self.start = time.perf_counter()   # higher resolution than time.time()
+        return self   # the value bound to 'as t'
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Called at the end of 'with' block"""
-        self.elapsed = __import__('time').time() - self.start
-        print(f"Elapsed: {self.elapsed:.4f}s")
-        return False   # don't suppress exceptions
+        """Called at end of with block — ALWAYS, even on exception."""
+        self.elapsed = time.perf_counter() - self.start
+        if exc_type is None:
+            print(f"Completed in {self.elapsed:.4f}s")
+        else:
+            print(f"Failed after {self.elapsed:.4f}s with {exc_type.__name__}")
+        return False   # don't suppress exceptions — let them propagate
 
 with Timer() as t:
-    total = sum(range(1_000_000))
-# Elapsed: 0.0421s
+    total = sum(i**2 for i in range(1_000_000))
+# Completed in 0.0821s
+
+# Exception case
+with Timer() as t:
+    raise ValueError("something broke")
+# Failed after 0.0001s with ValueError
+# ValueError is re-raised (return False)
+
+# Access the timer after the block
+print(f"Elapsed: {t.elapsed:.4f}s")
 ```
 
-## Hashing
+## Hashing — `__hash__` and `__eq__`
+
+Python dictionaries and sets require their keys to be **hashable**. An object is hashable if it has a `__hash__` method that returns an integer that is consistent with `__eq__`: if `a == b`, then `hash(a) == hash(b)` must also be true.
+
+This is a **contract**: violating it (defining `__eq__` without updating `__hash__`, or having `hash(a) != hash(b)` when `a == b`) breaks dicts and sets in subtle, hard-to-debug ways.
+
+**Python's rule**: if you define `__eq__`, Python automatically sets `__hash__ = None` (making the class unhashable) to prevent accidental contract violations. You must explicitly define `__hash__` if you want hashability.
 
 ```python
 class Point:
@@ -231,76 +348,84 @@ class Point:
         self.y = y
 
     def __eq__(self, other):
+        if not isinstance(other, Point):
+            return NotImplemented
         return self.x == other.x and self.y == other.y
 
     def __hash__(self):
-        """Required to use object as dict key or set member.
-        If you define __eq__, you must also define __hash__."""
+        """MUST be defined when __eq__ is defined.
+        Use a tuple of the same fields as __eq__ — guarantees consistency."""
         return hash((self.x, self.y))
+        # hash((1, 2)) is stable and consistent — same inputs always give same hash
+
+    def __repr__(self):
+        return f"Point({self.x}, {self.y})"
 
 p1 = Point(1, 2)
 p2 = Point(1, 2)
+p3 = Point(3, 4)
 
-p1 == p2            # True
-p1 is p2            # False
-hash(p1) == hash(p2)  # True
+p1 == p2            # True  — same values
+p1 is p2            # False — different objects
+hash(p1) == hash(p2)  # True  — contract maintained: equal objects have equal hashes
 
 # Can now use in sets and as dict keys
-points = {p1, p2}   # set - {Point(1,2)} - deduplicated because __hash__ + __eq__
-d = {p1: "origin"}  # dict key
-```
-
-## Quick Reference
-
-```
-Method              Triggered by
-------              ------------
-__init__            MyClass(...)
-__repr__            repr(obj), REPL display
-__str__             str(obj), print(obj)
-__len__             len(obj)
-__getitem__         obj[key]
-__setitem__         obj[key] = value
-__delitem__         del obj[key]
-__contains__        item in obj
-__iter__            for x in obj, iter(obj)
-__next__            next(obj)
-__call__            obj(args)
-__enter__           with obj as ...
-__exit__            end of with block
-__eq__              obj == other
-__lt__              obj < other
-__add__             obj + other
-__radd__            other + obj (fallback)
-__hash__            hash(obj), use in set/dict
-__bool__            bool(obj), if obj:
-__del__             garbage collected
+point_set = {p1, p2, p3}   # {Point(1, 2), Point(3, 4)} — p2 deduplicated because p1==p2
+location_map = {p1: "origin", p3: "far"}
+location_map[p2]    # "origin" — works because p2 == p1 and hash(p2) == hash(p1)
 ```
 
 ## Interview Questions
 
 **Q: What is the difference between `__str__` and `__repr__`?**
-`__str__` returns a human-readable string - shown by `print()` and `str()`. `__repr__` returns a developer-readable string - shown in the REPL and by `repr()`. Convention: `__repr__` should ideally produce a string that could recreate the object. If `__str__` is not defined, Python falls back to `__repr__`.
+`__str__` returns a human-readable string for end users — used by `print()` and `str()`. `__repr__` returns a developer-readable string for debugging — used in the REPL, `repr()`, and when objects appear inside containers. Convention: `__repr__` should ideally return a string that could recreate the object. If `__str__` is not defined, Python falls back to `__repr__` for all contexts.
 
-**Q: What is `__call__`?**
-`__call__` makes an instance callable like a function. When you do `obj(args)`, Python calls `obj.__call__(args)`. Useful for stateful callables - objects that behave like functions but remember state between calls.
+**Q: What is `__call__` and when would you use it?**
+`__call__` makes an instance behave like a function — `obj(args)` calls `obj.__call__(args)`. Use it for stateful callables: objects that need to behave like functions but retain state between calls. Examples include rate limiters, memoization wrappers, configurable validators, and middleware components. `callable(obj)` returns `True` if `__call__` is defined.
 
-**Q: If you define `__eq__`, do you need to define `__hash__`?**
-Yes. Defining `__eq__` without `__hash__` makes Python set `__hash__` to `None`, making your object unhashable (can't be used in sets or as dict keys). If two objects are equal, they must have the same hash. Define `__hash__` using a tuple of the same fields used in `__eq__`.
+**Q: If you define `__eq__`, do you also need to define `__hash__`?**
+Yes. Defining `__eq__` without `__hash__` makes Python set `__hash__ = None`, making the class unhashable (can't be used in sets or as dict keys). This enforces the hash contract: if `a == b`, then `hash(a) == hash(b)` must hold. Define `__hash__` using a tuple of the same fields used in `__eq__`, e.g., `return hash((self.x, self.y))`.
 
 **Q: What is `__new__` vs `__init__`?**
-`__new__` creates and returns the new instance (called first). `__init__` initializes the instance after it's been created (called second). You rarely override `__new__` - only for Singleton patterns or when subclassing immutable types like `int` or `str`.
+`__new__` is called first — it creates the raw instance object and returns it. `__init__` is called second — it initializes the already-created instance. You almost never override `__new__` except for Singleton patterns (control how many instances exist) or when subclassing immutable types like `int` or `str` (since `__init__` can't change an already-created immutable object).
 
-**Q: What does `@total_ordering` do?**
-It's a decorator from `functools` that auto-generates the remaining comparison methods (`__le__`, `__gt__`, `__ge__`) from just `__eq__` and one of `__lt__` or `__gt__`. Saves you from writing all six comparison methods manually.
+**Q: What does `@total_ordering` do and why is it useful?**
+`@total_ordering` from `functools` is a class decorator that auto-generates the remaining comparison methods (`__le__`, `__gt__`, `__ge__`) if you define `__eq__` and at least one of `__lt__` or `__gt__`. Without it, you'd need to write all six comparison methods manually, and they'd likely have inconsistent logic. With it, you write two methods and get full ordering support — including `sorted()`, `min()`, `max()`.
+
+**Q: What does `__exit__` returning `True` mean?**
+In a context manager, `__exit__` returning `True` **suppresses** the exception — the `with` block ends silently as if no exception occurred. Returning `False` or `None` allows the exception to propagate normally. Use suppression sparingly and intentionally — suppressing exceptions carelessly hides bugs.
 
 ## Summary
 
-- Dunder methods let classes integrate with Python's built-in syntax and functions
-- `__str__` - human output; `__repr__` - developer output; always define `__repr__` at minimum
-- `__len__`, `__getitem__`, `__contains__`, `__iter__` - make objects behave like containers
-- `__add__`, `__sub__`, `__mul__` - operator overloading; `__radd__` for right-hand operations
-- `__call__` - makes objects callable like functions
-- `__enter__` / `__exit__` - context manager protocol for `with` statement
-- `__eq__` + `__hash__` - always define together; needed for use in sets and as dict keys
-- `@total_ordering` - define `__eq__` + one comparison, get all six automatically
+```
+Method              Triggered by                    Use case
+------              ------------                    --------
+__init__            MyClass(...)                    Initialize instance state
+__new__             MyClass(...) before __init__    Singleton, immutable subclassing
+__repr__            repr(obj), REPL display         Developer-readable; always define this
+__str__             str(obj), print(obj)            Human-readable output
+__len__             len(obj)                        Container size
+__bool__            bool(obj), if obj:              Truthiness (fallback: len() != 0)
+__getitem__         obj[key]                        Indexing and iteration fallback
+__setitem__         obj[key] = value                Index assignment
+__delitem__         del obj[key]                    Index deletion
+__contains__        item in obj                     Membership test
+__iter__            for x in obj, iter(obj)         Return an iterator
+__next__            next(obj)                       Iterator protocol
+__call__            obj(args)                       Make callable
+__enter__           with obj as x:                  Acquire resource, return it
+__exit__            end of with block               Release resource; return True to suppress
+__eq__              obj == other                    Value equality
+__lt__              obj < other                     Less-than comparison
+__add__             obj + other                     Addition
+__radd__            other + obj                     Reflected addition (other doesn't handle it)
+__iadd__            obj += other                    In-place addition
+__hash__            hash(obj), use in set/dict      Hashing (must pair with __eq__)
+__del__             garbage collected               Destructor (use context managers instead)
+```
+
+- Dunder methods connect your classes to Python's built-in syntax and functions
+- `@total_ordering` — define `__eq__` + one comparison → get all six for free
+- Container protocol: `__len__` + `__getitem__` is the minimum for iteration
+- `__enter__`/`__exit__` — the `with` statement; `__exit__` is guaranteed to run
+- `__hash__` must be defined whenever `__eq__` is defined — same fields, same logic

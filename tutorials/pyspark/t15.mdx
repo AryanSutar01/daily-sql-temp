@@ -1,6 +1,27 @@
+## What Union Really Means in a Distributed System
+
+When you call `union()` in a traditional single-node database, it simply appends one result set below another. In Spark, both DataFrames already live as separate sets of partitions distributed across executor memory. `union()` is fundamentally a **partition concatenation** — Spark's new logical DataFrame simply points to all the partitions from both input DataFrames, without moving any data at all.
+
+```
+Before union():
+DataFrame A:                   DataFrame B:
+┌──────────┐ ┌──────────┐     ┌──────────┐ ┌──────────┐
+│Partition0│ │Partition1│     │Partition0│ │Partition1│
+│ (Alice)  │ │  (Bob)   │     │ (Carol)  │ │ (David)  │
+└──────────┘ └──────────┘     └──────────┘ └──────────┘
+
+After union() — no data moved, partitions combined logically:
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│  A:P0    │ │  A:P1    │ │  B:P0    │ │  B:P1    │
+│ (Alice)  │ │  (Bob)   │ │ (Carol)  │ │ (David)  │
+└──────────┘ └──────────┘ └──────────┘ └──────────┘
+```
+
+This makes `union()` a **narrow transformation** — one of the cheapest operations you can do in Spark. The cost only increases if you add `.distinct()` afterward, which requires a shuffle.
+
 ## union - Stack DataFrames by Position
 
-`union()` combines two DataFrames with the **same number of columns**, matching by **position** (not column name).
+`union()` combines two DataFrames with the **same number of columns**, matching by **position** (not column name). This mirrors SQL's `UNION ALL` behaviour.
 
 ```python
 from pyspark.sql import SparkSession
@@ -30,10 +51,12 @@ result.show()
 # +---+-----+-----------+
 ```
 
-### union() Matches by Position - Not Name
+## Why Position-Matching is Dangerous
+
+`union()` uses the schema of the **left** DataFrame. The right DataFrame's column names are ignored — only the positions matter. This is a silent data corruption hazard:
 
 ```python
-# ❌ Dangerous: different column order - union matches by position!
+# ❌ Dangerous: different column order — union matches by position!
 df_a = spark.createDataFrame([(1, "Alice")], ["id", "name"])
 df_b = spark.createDataFrame([("Bob", 2)],  ["name", "id"])  # swapped!
 
@@ -42,13 +65,17 @@ df_a.union(df_b).show()
 # | id| name|
 # +---+-----+
 # |  1|Alice|
-# |Bob|    2|   ← wrong! "Bob" went into 'id', 2 went into 'name'
+# |Bob|    2|   ← WRONG: "Bob" went into 'id', 2 went into 'name'
 # +---+-----+
+#
+# No error is raised. Data is silently corrupted.
 ```
+
+Spark has no way to detect this at plan time — it only sees that both DataFrames have the same number of columns and compatible types. The mismatch surfaces as bad data at runtime.
 
 ## unionByName - Stack by Column Name (Safer)
 
-`unionByName()` matches columns by name - safer when schemas might differ.
+`unionByName()` matches columns by **name** instead of position. This is safe regardless of the column ordering in either DataFrame:
 
 ```python
 # Safe: unionByName matches by column name regardless of order
@@ -60,13 +87,15 @@ df_a.unionByName(df_b).show()
 # | id|name|
 # +---+----+
 # |  1|Alice|
-# |  2| Bob|   ← correct!
+# |  2| Bob|   ← correct! Names matched by column name
 # +---+----+
 ```
 
-### allowMissingColumns (Spark 3.1+)
+Internally, Spark rewrites the plan for `unionByName` to align columns before concatenating partitions — a projection step on the right DataFrame, still no shuffle.
 
-When DataFrames have different columns, fill missing ones with null:
+## allowMissingColumns — Evolving Schemas (Spark 3.1+)
+
+In real pipelines, DataFrames sourced from different time periods or systems often have slightly different schemas. `allowMissingColumns=True` fills absent columns with `null` rather than throwing an `AnalysisException`:
 
 ```python
 df_a = spark.createDataFrame([(1, "Alice", 95000)], ["id", "name", "salary"])
@@ -82,15 +111,17 @@ result.show()
 # +---+-----+------+
 ```
 
+This is extremely useful for schema evolution in data lakes where new columns are added over time.
+
 ## Deduplication After Union
 
-`union()` keeps all rows including duplicates. Use `distinct()` to deduplicate:
+`union()` behaves like SQL `UNION ALL` — it keeps **all rows including duplicates**. To get SQL `UNION` semantics (deduplication), chain `.distinct()`:
 
 ```python
 df1 = spark.createDataFrame([(1, "Alice"), (2, "Bob")],   ["id", "name"])
 df2 = spark.createDataFrame([(2, "Bob"),   (3, "Carol")], ["id", "name"])
 
-# With duplicates (Bob appears twice)
+# UNION ALL — with duplicates
 df1.union(df2).show()
 # +---+-----+
 # | id| name|
@@ -101,7 +132,7 @@ df1.union(df2).show()
 # |  3|Carol|
 # +---+-----+
 
-# Remove duplicates
+# UNION — deduplicated (triggers shuffle for global deduplication)
 df1.union(df2).distinct().show()
 # +---+-----+
 # | id| name|
@@ -112,7 +143,11 @@ df1.union(df2).distinct().show()
 # +---+-----+
 ```
 
+> ⚠️ `.distinct()` after `.union()` triggers a **full shuffle** — it is a wide transformation. The union itself is free; the deduplication is expensive. Only add `.distinct()` when you genuinely need it.
+
 ## Unioning Many DataFrames
+
+When combining more than two DataFrames, use `reduce` to chain them pairwise:
 
 ```python
 from functools import reduce
@@ -122,14 +157,27 @@ from pyspark.sql import DataFrame
 dfs = [df1, df2, df3, df4]
 result = reduce(DataFrame.union, dfs)
 
-# Or use unionByName with reduce
+# Or use unionByName (safer) with reduce
 result = reduce(lambda a, b: a.unionByName(b, allowMissingColumns=True), dfs)
 
-# With a loop
+# With a loop (equivalent, more readable for beginners)
 result = dfs[0]
 for df in dfs[1:]:
     result = result.unionByName(df, allowMissingColumns=True)
 ```
+
+Each pairwise union is lazy and free — Spark builds a chain of partition references. No data moves until an action is called.
+
+## Common Interview Questions
+
+**Q: What is the difference between union() and unionByName()?**
+`union()` stacks DataFrames by column position — column names on the right DataFrame are ignored. `unionByName()` aligns columns by name before stacking. In production code, always prefer `unionByName()` since schema column order is not always guaranteed.
+
+**Q: Is union() a narrow or wide transformation?**
+`union()` is a **narrow transformation** — it simply concatenates the partition lists of both DataFrames with no data movement across the network. However, chaining `.distinct()` afterward converts it to a wide transformation requiring a shuffle.
+
+**Q: What is the equivalent of SQL UNION vs UNION ALL in PySpark?**
+`union()` / `unionByName()` = `UNION ALL` (keeps duplicates). `union().distinct()` = `UNION` (deduplicates). The default in PySpark does NOT deduplicate — this is the opposite intuition from pandas `concat`.
 
 ## Summary
 
@@ -137,10 +185,12 @@ for df in dfs[1:]:
 |---|---|---|
 | Match by | Position | Name |
 | Safe for reordered schemas | ❌ No | ✅ Yes |
-| Missing columns | Error | Optional (allowMissingColumns) |
-| Deduplicate | Use .distinct() | Use .distinct() |
+| Missing columns | AnalysisException | Optional (allowMissingColumns) |
+| Shuffle | ❌ None (narrow) | ❌ None (narrow) |
+| Deduplication | Use `.distinct()` | Use `.distinct()` |
 
-- Use `unionByName()` in production - it's safer
-- Use `allowMissingColumns=True` when DataFrames have different schema subsets
-- Use `distinct()` after union if you want SQL `UNION` semantics (deduplication)
+- `union()` is a partition concatenation — no data moves, very cheap
+- Use `unionByName()` in production — column order cannot always be trusted
+- Use `allowMissingColumns=True` when DataFrames have different schema subsets (schema evolution)
+- Use `.distinct()` after union only when deduplication is required — it triggers a full shuffle
 - `union()` = SQL `UNION ALL`; `union().distinct()` = SQL `UNION`

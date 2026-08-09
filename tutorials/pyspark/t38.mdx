@@ -4,7 +4,48 @@
 
 In PySpark, a **partition** is a logical chunk of data stored in memory or on disk. When Spark reads data or performs transformations, it splits the data into multiple partitions so that each partition can be processed in **parallel** by different executor cores.
 
-Think of partitions like slices of a pizza - each worker (executor) takes one slice and processes it independently. More slices = more parallelism (up to a limit).
+### How Hash Partitioning Works Internally
+
+When you call `df.repartition(n, "country")`, Spark uses **hash partitioning**: it computes `hash(column_value) % n` to determine which of the `n` output partitions each row belongs to. This guarantees that all rows with the same `country` value always land in the same partition — which is exactly what `groupBy("country")` and `join("country")` need.
+
+```
+Hash partitioning with n=4 partitions:
+  "India"   → hash("India") % 4 = 2  → Partition 2
+  "USA"     → hash("USA") % 4 = 1    → Partition 1
+  "UK"      → hash("UK") % 4 = 3     → Partition 3
+  "India"   → hash("India") % 4 = 2  → Partition 2  (same as first!)
+  "Germany" → hash("Germany") % 4 = 0 → Partition 0
+```
+
+This co-location property is fundamental: any subsequent aggregation or join on the same key does **not need another shuffle** because the data is already co-located.
+
+### Why HDFS Block Size Determines Initial Partition Count
+
+When Spark reads a file from HDFS or S3, it creates **one partition per input split**. HDFS splits are typically equal to the block size (default 128MB). So a 1GB file on HDFS creates approximately 8 partitions (1GB / 128MB = 8).
+
+This is why `df.rdd.getNumPartitions()` after a read equals roughly `file_size / hdfs_block_size`, not a round number.
+
+### The Shuffle Write → Network Transfer → Shuffle Read Cycle
+
+`repartition()` triggers a full shuffle — the most expensive data movement operation:
+
+```
+1. SHUFFLE WRITE (Map-side):
+   Each existing task writes its output rows into n shuffle files
+   (one file per destination partition), sorted by target partition.
+   Files land on executor local disk.
+
+2. NETWORK TRANSFER:
+   Each new task (one per output partition) fetches its
+   shuffle file fragments from ALL other executors over the network.
+   For 200 executors → 200 remote reads per task.
+
+3. SHUFFLE READ (Reduce-side):
+   Each task merges and sorts the received fragments,
+   then processes the combined data.
+```
+
+**Key insight:** `coalesce()` eliminates steps 2 and 3 entirely by only combining existing partitions that already live on the same executor — no network transfer, no new shuffle files.
 
 ---
 

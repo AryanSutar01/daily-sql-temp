@@ -1,8 +1,30 @@
+## Analytical Architecture: Data Cubes and Columnar Execution
+
+Cohort analysis and Funnel tracking are the foundation of product analytics. However, executing these queries against a production OLTP (Online Transaction Processing) database often leads to catastrophic performance degradation.
+
+### The HashAggregate Memory Exhaustion
+
+To calculate a retention cohort, the database must join a massive `events` table (millions of rows) against a `users` table, extract date metrics, and group the results. 
+The Query Optimizer typically executes this via a **HashAggregate**. It attempts to build an in-memory hash table where every key is a combination of `(cohort_month, months_since_join)`. 
+If you add more dimensions (e.g., `device_type`, `country`, `marketing_campaign`), you create a **Multidimensional Data Cube**. The cardinality (unique combinations) explodes exponentially. The HashAggregate will immediately exhaust `work_mem` and spill to disk, bringing the query to a grinding halt.
+
+### Row-Oriented vs Column-Oriented Storage
+
+Standard SQL databases (PostgreSQL, MySQL) use **Row-Oriented** storage. To calculate the `COUNT(DISTINCT user_id)` for a funnel, the database must load the entire 8KB disk page from disk, even though you only need the `user_id` and `event_type` columns.
+
+This is why modern data teams export this data to **Column-Oriented** OLAP Data Warehouses (like Snowflake, BigQuery, or ClickHouse). In a columnar database, the `event_type` column is stored entirely by itself in contiguous disk blocks. The database can scan billions of event types per second without ever loading the unrelated JSON payloads or timestamps into RAM.
+
+**Architectural Rule**: While writing complex cohort SQL is a necessary skill, never run these queries against the primary read-replica of a production application. At scale, this level of aggregation strictly belongs in a columnar Data Warehouse.
+
+---
+
 ## Cohort Analysis
 
 A cohort is a group of users who share a common characteristic, typically their first activity date. Cohort analysis tracks what those users do over time.
 
 ### Monthly Cohort Retention
+
+To build a retention grid, the query must first determine every user's cohort (their "month zero") and then join that back to their entire activity history. The `DATE_PART` math calculates the exact number of months elapsed between the cohort month and any subsequent order. Finally, conditional aggregation (`COUNT(DISTINCT CASE WHEN ...)`) pivots the rows into a horizontal format, counting how many unique users from the cohort returned in month 1, month 2, etc.
 
 ```sql
 WITH cohorts AS (
@@ -41,6 +63,8 @@ ORDER BY cohort_month;
 ```
 
 ### Cohort Retention as Percentage
+
+Raw counts are useful, but stakeholders need percentages. The retention rate for each month is simply the count of returners divided by the cohort size (month 0 count). `NULLIF(m0, 0)` prevents division-by-zero errors for cohorts that somehow have zero members. The resulting table — cohort rows with M1%, M3%, M6%, M12% columns — is the standard "retention grid" used in product analytics to evaluate product-market fit and churn trends.
 
 ```sql
 WITH cohort_data AS (
@@ -99,6 +123,8 @@ SELECT 'Step 5: Purchased', step5_purchased,
 
 ## Ordered Funnel (User Must Complete Steps in Order)
 
+A simple funnel counts users who performed each event type, regardless of order. But a real conversion funnel requires that users complete steps *in sequence*: you cannot count someone as having started checkout if they never added to cart. The ordered funnel approach captures the **first timestamp** of each event per user using `MIN(CASE WHEN event_type = ... THEN created_at END)`. Then it uses cumulative timestamp comparisons (`t2 > t1 AND t3 > t2`) to enforce ordering. A user who did `t3` before `t1` is correctly excluded.
+
 ```sql
 WITH step_times AS (
   SELECT
@@ -123,6 +149,8 @@ WHERE t1 IS NOT NULL;
 
 ### Day-N Retention
 
+Day-N retention asks a precise question: of all the users who signed up on a given day, what percentage came back exactly N days later? It's different from "at any point after day N" — it measures activity on that specific day. The technique uses a `LEFT JOIN` between signups and activity, and `CASE WHEN r.active_date = s.signup_date + N` selects only users who were active on that exact day offset. `COUNT(DISTINCT user_id)` inside the CASE ensures a user is only counted once per day even if they triggered multiple events.
+
 ```sql
 -- What % of users who signed up on day 0 came back on day N?
 WITH signups AS (
@@ -146,6 +174,8 @@ ORDER BY s.signup_date;
 
 ## Active User Metrics (DAU, WAU, MAU)
 
+DAU (Daily Active Users), WAU (Weekly Active Users), and MAU (Monthly Active Users) are the fundamental engagement metrics for any product. The challenge is that WAU and MAU require a **rolling window** — they should include distinct users from the last 7 or 30 days, not just the current day. This is achieved using `RANGE BETWEEN INTERVAL '6 days' PRECEDING AND CURRENT ROW`, which instructs the window function to include all rows where the `ORDER BY` value falls within 6 days behind the current row, effectively creating a 7-day rolling distinct user count.
+
 ```sql
 -- Daily, Weekly, Monthly Active Users
 SELECT
@@ -165,6 +195,8 @@ ORDER BY date;
 ```
 
 ## LTV - Lifetime Value
+
+Customer Lifetime Value (LTV) is one of the most important metrics in e-commerce and SaaS. At its core, it is the total revenue a customer has generated since acquisition. The `monthly_ltv` normalization divides total revenue by the number of months since first purchase, making customers with different tenure lengths comparable. `HAVING COUNT(*) >= 2` filters out one-time buyers since their LTV trajectory is not yet established. This query is typically the input to customer segmentation, marketing spend decisions, and churn risk modeling.
 
 ```sql
 -- Customer LTV: revenue per customer over their lifetime

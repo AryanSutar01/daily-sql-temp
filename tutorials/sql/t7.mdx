@@ -1,3 +1,97 @@
+## How ORDER BY Works Internally: External Merge Sort
+
+Sorting is one of the most computationally expensive operations in database query processing. Understanding how it works helps you write queries that avoid unnecessary sorts.
+
+### When ORDER BY Can Use an Index (Free Sort)
+
+If the ORDER BY column already has a B-tree index, the database traverses the index in sorted order — no sorting required:
+
+```
+Table: orders (10M rows)
+Index: idx_orders_created_at ON orders(created_at DESC)
+
+Query: SELECT id, total FROM orders ORDER BY created_at DESC LIMIT 20;
+
+Execution (free sort via index):
+  1. Scan idx_orders_created_at from the beginning (already sorted DESC)
+  2. Read first 20 index entries → get 20 row locations
+  3. Fetch the actual rows from those 20 locations
+  4. Return result
+
+Cost: 20 index reads + 20 heap reads = 40 I/O operations (very fast!)
+No sorting computation needed at all.
+```
+
+### When ORDER BY Must Sort (External Merge Sort)
+
+Without a usable index, the database must sort the entire result set:
+
+```
+Query: SELECT id, total FROM orders WHERE status='completed' ORDER BY total DESC;
+No index on (total) column.
+
+Step 1: Read all matching rows from disk into memory (sort buffer)
+  sort_buffer_size = 256MB (PostgreSQL work_mem)
+  Matching rows: 7.8M rows × 20 bytes = ~156MB → fits in buffer!
+  
+  In-memory QuickSort on total column:
+  Result: sorted in memory → return directly
+
+Step 2 (if data doesn't fit in sort buffer):
+  External Merge Sort:
+  7.8M rows × 20 bytes = 156MB, but work_mem = 64MB (too small)
+  
+  Pass 1: Sort 64MB chunks, write to disk as "run files"
+    Run 1: sort rows 1-3M → write to temp file 1 (64MB)
+    Run 2: sort rows 3M-6M → write to temp file 2 (64MB)
+    Run 3: sort rows 6M-7.8M → write to temp file 3 (28MB)
+  
+  Pass 2: K-way merge of run files
+    Read from all 3 temp files simultaneously
+    Use a min-heap to merge in sorted order
+    Write final sorted output
+  
+  Total: 3 disk read passes + 2 disk write passes = expensive!
+  Solution: increase work_mem or add an index on total
+```
+
+### OFFSET Pagination: Why It Gets Slower
+
+`OFFSET N` does NOT skip rows — it reads N rows and **discards** them:
+
+```sql
+-- "Page 100" query: LIMIT 20 OFFSET 1980
+SELECT * FROM products ORDER BY id LIMIT 20 OFFSET 1980;
+
+What actually happens:
+  1. Read AND sort ALL 10M products by id
+  2. Skip first 1980 rows (throw them away)
+  3. Return rows 1981-2000
+
+For page 1: reads 20 rows → fast
+For page 100: reads 2000 rows, discards 1980 → slow
+For page 10000: reads 200,020 rows, discards 200,000 → very slow!
+```
+
+**Keyset pagination** (also called cursor-based pagination) solves this:
+
+```sql
+-- Instead of: LIMIT 20 OFFSET 1980
+-- Pass the last seen ID from the previous page:
+
+SELECT * FROM products
+WHERE id > :last_seen_id   -- use index to jump directly to next page!
+ORDER BY id
+LIMIT 20;
+
+-- With an index on id:
+-- B-tree seek to :last_seen_id → scan next 20 entries → done!
+-- Reads exactly 20 rows regardless of which "page" you're on
+-- Cost is always O(log N + 20), not O(N)
+```
+
+---
+
 ## ORDER BY
 
 `ORDER BY` sorts the result set by one or more columns. Without it, the database returns rows in no guaranteed order - the order can change between runs.

@@ -1,3 +1,96 @@
+## DDL and the Database Catalog: What Really Happens Internally
+
+DDL commands like `CREATE TABLE` and `ALTER TABLE` don't just create data structures — they modify the **system catalog** (also called the data dictionary), which is itself a set of tables that the database uses to track its own structure.
+
+### The System Catalog: A Database About Your Database
+
+```
+When you run: CREATE TABLE users (id INT, name VARCHAR(100));
+
+The database writes to its own system tables:
+  pg_class:    row for table "users" (relation, relkind='r', reltuples=0)
+  pg_attribute: rows for each column:
+    id:   atttypid=23 (INT4), attlen=4, attnum=1
+    name: atttypid=1043 (VARCHAR), attlen=-1, attnum=2
+  pg_type:     type entries referenced by pg_attribute
+  pg_constraint: any CHECK, PRIMARY KEY, FOREIGN KEY constraints
+
+You can query these system tables directly:
+SELECT column_name, data_type, character_maximum_length
+FROM information_schema.columns
+WHERE table_name = 'users';
+```
+
+This is Codd's Rule 4: the catalog is queryable with SQL — the database uses SQL to describe itself.
+
+### Why DDL Auto-Commits (and Why This Matters)
+
+In PostgreSQL, DDL can be wrapped in a transaction and rolled back — which is unusual and powerful:
+
+```sql
+-- PostgreSQL: DDL is transactional!
+BEGIN;
+  CREATE TABLE test (id INT);
+  INSERT INTO test VALUES (1);
+  SELECT * FROM test;  -- sees the new table and row
+ROLLBACK;
+-- Now 'test' table doesn't exist (rolled back!)
+
+-- This allows safe migration testing:
+BEGIN;
+  ALTER TABLE users ADD COLUMN age INT;
+  -- Test your queries with the new column
+  -- If something looks wrong:
+ROLLBACK;  -- undo the ALTER, zero impact on production!
+```
+
+In MySQL and most other databases, DDL auto-commits — you cannot roll back a `CREATE TABLE` or `ALTER TABLE`. This is why production database migrations are more risky in MySQL.
+
+### ALTER TABLE Lock Escalation: The Production Problem
+
+`ALTER TABLE` on a large table acquires an **exclusive lock** that blocks ALL reads and writes for the duration of the operation:
+
+```
+ALTER TABLE orders ADD COLUMN notes TEXT;
+
+On a 500M row table:
+  PostgreSQL: takes AccessExclusiveLock
+  Duration: seconds (just schema change) → OK!
+  
+ALTER TABLE orders ALTER COLUMN customer_id TYPE BIGINT;
+
+On a 500M row table:
+  PostgreSQL: rewrites entire table (all 500M rows!)
+  Duration: 30+ minutes
+  During this time: ALL reads and writes blocked
+  → Production outage!
+```
+
+**Online DDL strategies** for zero-downtime schema changes:
+
+```sql
+-- Strategy 1: Add column with a default (PostgreSQL 11+)
+-- PostgreSQL 11+ adds NULL columns instantly (no table rewrite)
+ALTER TABLE orders ADD COLUMN notes TEXT;  -- instant! (no DEFAULT = no rewrite)
+
+-- Strategy 2: Use pg_repack or pt-online-schema-change tools
+-- These tools copy the table in background, swap atomically
+
+-- Strategy 3: Expand/contract pattern
+-- Step 1: Add new column (non-breaking)
+ALTER TABLE users ADD COLUMN name_new VARCHAR(100);
+-- Step 2: Populate in background (off-hours)
+UPDATE users SET name_new = name WHERE name_new IS NULL LIMIT 10000;
+-- Step 3: Switch application to read new column
+-- Step 4: Drop old column (non-blocking)
+ALTER TABLE users DROP COLUMN name;
+ALTER TABLE users RENAME COLUMN name_new TO name;
+```
+
+**Interview insight** 🎯: When asked "how do you migrate a production schema without downtime?", describe the expand/contract pattern above.
+
+---
+
 ## DDL - Data Definition Language
 
 DDL commands define and manage the **structure** of your database - the tables, columns, indexes, and constraints. They don't touch the data itself; they define the containers that hold it.

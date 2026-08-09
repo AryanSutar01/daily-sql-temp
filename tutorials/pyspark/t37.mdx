@@ -1,5 +1,63 @@
 # Parquet vs ORC vs Avro - When to Use What
 
+## How Columnar Storage Achieves Compression: Encoding Schemes
+
+The compression advantage of Parquet and ORC isn't just from codec (Snappy/GZIP) — it comes from **encoding schemes** applied before compression that dramatically reduce data size when columns have repeated or sequential values.
+
+### Parquet Encoding Schemes
+
+Parquet automatically selects the best encoding per column based on data characteristics:
+
+**Dictionary Encoding** (most common for string columns)
+```
+Raw column (status):   [active, active, inactive, active, inactive, pending, active]
+Dictionary:            {0: "active", 1: "inactive", 2: "pending"}
+Encoded:               [0, 0, 1, 0, 1, 2, 0]
+
+Before: 7 × ~8 bytes = 56 bytes per entry average
+After:  7 × 1 byte + 24 bytes dictionary = ~31 bytes → ~45% reduction
+```
+For a column with 1M rows but only 10 distinct values (e.g., country codes), dictionary encoding compresses ~98% of the data.
+
+**Run-Length Encoding (RLE)** (for sorted or repetitive values)
+```
+Raw column (year):  [2024, 2024, 2024, 2024, 2025, 2025, 2025]
+RLE encoded:        [(2024, 4), (2025, 3)]  ← (value, count) pairs
+
+Space reduction: 7 entries → 2 entries
+```
+
+**Delta Encoding** (for monotonically increasing values like timestamps)
+```
+Raw column (timestamp_ms): [1700000000, 1700000001, 1700000002, 1700000003]
+Delta encoded:             [1700000000, +1, +1, +1]
+
+Only the deltas are stored — compresses perfectly for sequential IDs
+```
+
+### ORC Bloom Filters
+
+ORC supports **Bloom filters** at the stripe level — a probabilistic data structure that lets Spark ask "does this stripe contain value X?" before reading the stripe:
+
+```
+Stripe 1 bloom filter for column "user_id":
+  Contains: {1001, 1002, 1003, 1004, ... 10000}
+  Bit vector: 1011010100110...  (fixed size regardless of stripe rows)
+
+Query: filter(user_id == 99999)
+  Check bloom filter: "is 99999 in this stripe?"
+  Answer: NO (with 100% certainty for negatives)
+  → Skip entire stripe without reading it
+```
+
+Bloom filters are especially powerful for **point lookups on high-cardinality columns** (user IDs, order IDs) — use cases where Parquet's min/max statistics are ineffective (min=1, max=10M doesn't help exclude user_id=5000).
+
+### Why Avro Has No Encoding Optimization
+
+Avro is **row-based** — each row is serialized independently as: `[field1_bytes][field2_bytes][field3_bytes]`. There's no opportunity for inter-row compression since rows are written one at a time (streaming). This is why Avro is efficient for *writing* (no column transposition needed) but poor for *reading* analytics queries (no column pruning, no row-group statistics).
+
+---
+
 ## Why File Format Matters
 
 The file format you choose has a **massive impact** on performance, storage cost, and compatibility. For the same dataset:

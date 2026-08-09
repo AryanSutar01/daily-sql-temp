@@ -1,8 +1,34 @@
+## The Query Optimizer Cost Model
+
+When you run `EXPLAIN`, the database does not actually execute the query. Instead, the **Query Optimizer** builds a mathematical cost model for every possible physical execution path (Full Scan, Index Scan, Hash Join, Nested Loop) and selects the plan with the lowest theoretical cost.
+
+### Disk Page Costs
+
+The number you see in `cost=0.43..8.45` is an abstract unit of work based fundamentally on disk I/O. In PostgreSQL, the cost model starts with two baseline constants:
+- `seq_page_cost = 1.0` (The cost of fetching one 8KB page sequentially).
+- `random_page_cost = 4.0` (The cost of a random disk seek, historically 4x slower on spinning HDDs).
+
+The optimizer calculates how many disk pages it expects to read. If a table has 10,000 pages, a Sequential Scan has a baseline cost of ~10,000. An Index Scan might only need 3 random page reads, resulting in a cost of ~12. The optimizer trivially chooses the Index Scan. 
+*(Note: On modern SSDs, `random_page_cost` should be lowered in the database config to accurately reflect SSD random read speeds).*
+
+### The Statistical Histogram (pg_statistic)
+
+How does the optimizer guess how many rows will be returned (`rows=3`)? It relies on the **Statistics Collector**.
+
+A background daemon (`AUTOANALYZE`) randomly samples the table and builds a statistical **Histogram** of the data distribution, storing it in the system catalog (e.g., `pg_statistic`). 
+If your query is `WHERE status = 'pending'`, the optimizer checks the histogram. If 'pending' accounts for 1% of the data, it uses an Index Scan. If 'pending' accounts for 99% of the data, the optimizer realizes that looking up 99% of the rows via random B-Tree I/O is *slower* than just sequentially scanning the entire table, and it will intentionally choose a **Sequential Scan**.
+
+**Architectural Insight**: A Sequential Scan is not inherently evil. For fetching large percentages of a table, it is mathematically faster than an Index Scan. Never force an index if the optimizer calculates a Seq Scan is cheaper.
+
+---
+
 ## Why Read Execution Plans?
 
 When a query is slow, you need to understand *how* the database is executing it. `EXPLAIN` shows you exactly what the query planner decided to do - and EXPLAIN ANALYZE shows what actually happened.
 
 ## EXPLAIN vs EXPLAIN ANALYZE
+
+`EXPLAIN` without `ANALYZE` is a static estimation — it does not execute the query. It shows the plan the optimizer *chose* and its cost estimates, which are calculated using statistical models, not real data. `EXPLAIN ANALYZE` actually runs the query, making it safe to use only on `SELECT` statements (or `DELETE`/`UPDATE` inside a `ROLLBACK` transaction). The `BUFFERS` option adds critical information about shared buffer cache hits vs disk reads. The `FORMAT TEXT` output is human-readable; `FORMAT JSON` is machine-parseable and useful for programmatic plan analysis.
 
 ```sql
 -- EXPLAIN: estimates only (doesn't run the query)
@@ -19,6 +45,8 @@ SELECT * FROM orders WHERE customer_id = 101;
 **Use EXPLAIN when the query is too slow to run.** Use EXPLAIN ANALYZE to see actual vs estimated.
 
 ## Reading the Output
+
+The execution plan is a tree of nodes. Each node represents one physical operation (scan, join, sort, aggregate). Reading starts from the innermost, most-indented node — that runs first and feeds its output upward. The `cost` is a unitless optimizer estimate in "disk page cost units" (where a sequential page read costs 1.0 by default). The `..` separates startup cost (cost before first row emitted) from total cost (cost to produce all rows). A large startup cost signals a pipeline-breaking operation like a Sort or HashAggregate that must process all input before producing output.
 
 ```
 Index Scan using idx_orders_customer on orders
@@ -74,6 +102,8 @@ When estimates are far off, the planner chooses a bad plan. Fix: run `ANALYZE ta
 
 ## Identifying a Slow Seq Scan
 
+A sequential scan (`Seq Scan`) reads every disk page in a table from start to finish. On tables with millions of rows, this is catastrophic for latency. The key diagnostic signal is `Rows Removed by Filter: 5000000` — the database read 5 million rows and threw all but 1 away. This is the clearest possible sign that a missing index is forcing a full table scan. After adding the index, the `actual time` drops from hundreds of milliseconds to a fraction of a millisecond.
+
 ```sql
 EXPLAIN ANALYZE SELECT * FROM events WHERE user_id = 42;
 
@@ -107,6 +137,8 @@ Reading tip: find the innermost (most indented) nodes - they run first.
 
 ## BUFFERS - Cache Hit Analysis
 
+The `BUFFERS` output reveals the memory behavior of the query. `shared hit` counts how many 8KB pages were served from the in-memory buffer pool (fast, sub-microsecond latency). `shared read` counts how many pages had to be fetched from disk (slow, millisecond latency). A query with high `shared read` values is memory-starved — the working set is larger than `shared_buffers`. Solutions include increasing `shared_buffers`, adding a covering index to reduce the number of pages read, or scheduling the query during off-peak hours when the buffer pool is warm.
+
 ```sql
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT * FROM orders WHERE customer_id = 101;
@@ -130,6 +162,8 @@ Many `read` (disk) blocks = data not in cache = consider increasing `shared_buff
 | Index Scan but still slow | Consider partial or covering index |
 
 ## EXPLAIN for UPDATE/DELETE
+
+Running `EXPLAIN ANALYZE` on a destructive DML operation like `DELETE` is dangerous because it actually executes the deletion. The safe approach is to wrap the DML in a transaction, use `EXPLAIN ANALYZE`, and then `ROLLBACK`. This lets you inspect the actual execution plan and row counts without committing the changes. Always do this before running large bulk deletes or updates in production to verify the correct rows will be affected and to estimate the lock duration.
 
 ```sql
 EXPLAIN ANALYZE
