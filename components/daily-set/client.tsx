@@ -2401,7 +2401,7 @@ export function DailySetClient() {
                                 {!isDualDialect && (
                                     <span className="text-xs font-mono font-medium text-[#4DD4C4] flex items-center gap-2">
                                         <span className="text-zinc-500">&gt;_</span>
-                                        {activeProblem?.challenge_type === 'python' ? 'Python (Pandas)' : activeProblem?.challenge_type === 'pyspark' ? 'PySpark' : activeProblem?.challenge_type === 'sql' ? 'PostgreSQL' : 'SQL'}
+                                        {activeProblem?.challenge_type === 'python' ? 'Python (Pandas)' : activeProblem?.challenge_type === 'pyspark' ? 'PySpark' : activeProblem?.challenge_type === 'python_dsa' ? 'Python' : activeProblem?.challenge_type === 'sql' ? 'PostgreSQL' : 'SQL'}
                                     </span>
                                 )}
 
