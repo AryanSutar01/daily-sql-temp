@@ -1426,7 +1426,7 @@ export function DailySetClient() {
                             className={`flex items-center gap-2 px-5 py-2 text-[#080C16] text-sm font-bold rounded transition-colors shadow-[0_0_10px_rgba(77,212,196,0.2)] ${activeProblemId ? 'bg-[#4DD4C4] hover:bg-[#3dbdb0]' : 'bg-zinc-700 cursor-not-allowed shadow-none text-zinc-500'}`}
                         >
                             {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} fill="currentColor" />}
-                            {isDsaProblem ? 'Test' : 'Run'}
+                            Run
                         </button>
                         {authStatus === 'unauthenticated' && <LoginTooltip text="Sign in to run queries" />}
                     </div>
