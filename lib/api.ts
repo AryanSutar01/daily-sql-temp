@@ -109,5 +109,29 @@ export const api = {
             method: 'POST',
             body: JSON.stringify(data),
         }),
+
+    // Subscriptions & Payments
+    getMySubscription: () => fetchApi<any>('/api/payments/my-subscription'),
+    cancelSubscription: () =>
+        fetchApi<any>('/api/payments/cancel', {
+            method: 'POST',
+            body: JSON.stringify({ reason: 'User requested' }),
+        }),
+    createPaymentOrder: (plan_id: string) =>
+        fetchApi<any>('/api/payments/create-order', {
+            method: 'POST',
+            body: JSON.stringify({ plan_id }),
+        }),
+    verifyPaymentOrder: (order_id: string) =>
+        fetchApi<any>(`/api/payments/verify-order/${order_id}`),
+
+    // Coupons & Launch Status
+    redeemCoupon: (code: string) =>
+        fetchApi<any>('/api/coupons/redeem', {
+            method: 'POST',
+            body: JSON.stringify({ code }),
+        }),
+    checkCoupon: (code: string) => fetchApi<any>(`/api/coupons/check/${code}`),
+    getLaunchStatus: () => fetchApi<any>('/api/coupons/launch-status'),
 };
-//dep
+

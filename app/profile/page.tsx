@@ -8,6 +8,9 @@ import { api } from "@/lib/api";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useWalkthrough } from "@/hooks/useWalkthrough";
+import SubscriptionStatus from "@/components/subscription/subscription-status";
+
+
 
 function polarToCartesian(centerX: number, centerY: number, radius: number, angleInDegrees: number) {
     const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
@@ -726,8 +729,12 @@ function ProfileContent() {
                         </div>
                     </div>
 
+                    {/* Subscription & Membership Card */}
+                    <SubscriptionStatus />
+
                     {/* Leaderboard Card */}
                     <div className="relative flex-1 bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-6 flex flex-col shadow-xl overflow-hidden group hover:border-[#4DD4C4]/20 transition-all duration-500">
+
                         <div className="absolute -bottom-20 -right-20 w-48 h-48 bg-[#f59e0b]/5 rounded-full blur-[60px] pointer-events-none group-hover:bg-[#f59e0b]/10 transition-colors duration-700"></div>
                         
                         {/* Header */}

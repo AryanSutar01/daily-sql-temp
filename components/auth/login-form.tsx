@@ -63,14 +63,20 @@ export function LoginForm() {
             const { access_token } = await res.json();
             saveToken(access_token);
 
-            const profile = await api.getProfile().catch(() => ({ onboarding_completed: false }));
-            router.push(profile.onboarding_completed ? "/practice/daily" : "/profile");
+            const redirectUrl = searchParams.get("redirect");
+            if (redirectUrl && redirectUrl.startsWith("/")) {
+                router.push(redirectUrl);
+            } else {
+                const profile = await api.getProfile().catch(() => ({ onboarding_completed: false }));
+                router.push(profile.onboarding_completed ? "/practice/daily" : "/profile");
+            }
             router.refresh();
         } catch (err: any) {
             setError(err.message || "Login failed. Please try again.");
         } finally {
             setIsLoading(false);
         }
+
     };
 
     const handleGoogleLogin = () => {

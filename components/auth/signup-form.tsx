@@ -112,13 +112,19 @@ export function SignupForm() {
             const { access_token } = await res.json();
             saveToken(access_token);
 
-            router.push("/profile");
+            const redirectUrl = searchParams.get("redirect");
+            if (redirectUrl && redirectUrl.startsWith("/")) {
+                router.push(redirectUrl);
+            } else {
+                router.push("/profile");
+            }
             router.refresh();
         } catch (err: any) {
             setError(err.message || "Verification failed");
         } finally {
             setIsLoading(false);
         }
+
     };
 
     const resendCode = async () => {
