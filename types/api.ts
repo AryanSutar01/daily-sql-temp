@@ -36,10 +36,13 @@ export interface Problem {
     description: string;
     estimated_time_minutes: number;
     challenge_type?: string;  // 'sql' | 'python' | 'pyspark' | 'python_dsa'
+    row_number?: number;
+    is_locked?: boolean;
     function_name?: string | null;  // DSA only: the function the user must implement
     starter_code?: string | null;   // DSA only: the full stub shown to users (with params)
     supported_dialects?: ('postgresql' | 'mysql')[];  // SQL only; ['postgresql'] for old problems, both for new dual-dialect ones
 }
+
 
 export interface Dataset {
     table_name: string;

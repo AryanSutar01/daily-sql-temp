@@ -248,6 +248,7 @@ export function DailySetClient() {
     const [feedbackMessage, setFeedbackMessage] = useState('');
     const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
     const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+    const [lockedModalProblem, setLockedModalProblem] = useState<Problem | null>(null);
 
     // ── Refs ─────────────────────────────────────────────
     const containerRef = useRef<HTMLDivElement>(null);
@@ -329,6 +330,11 @@ export function DailySetClient() {
 
     // ── Handlers ─────────────────────────────────────────
     const handleProblemSelect = async (id: string) => {
+        const targetProb = problems.find(p => p.id === id);
+        if (targetProb?.is_locked) {
+            setLockedModalProblem(targetProb);
+            return;
+        }
         if (sidebarScrollRef.current) {
             sessionStorage.setItem('sidebar_scroll_top', String(sidebarScrollRef.current.scrollTop));
         }
@@ -1877,13 +1883,36 @@ export function DailySetClient() {
                                                 <div
                                                     key={p.id}
                                                     onClick={() => handleProblemSelect(p.id)}
-                                                    className={`flex flex-col gap-2 p-3 rounded border cursor-pointer transition-all group ${isActive ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40' : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'}`}
+                                                    className={`flex flex-col gap-2 p-3 rounded border cursor-pointer transition-all group ${
+                                                        p.is_locked
+                                                            ? 'bg-[#10141e]/80 border-[#202736]/60 hover:border-amber-500/40 opacity-85 hover:opacity-100'
+                                                            : isActive
+                                                            ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40'
+                                                            : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'
+                                                    }`}
                                                 >
                                                     <div className="flex justify-between items-center">
-                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>{dStyle.label}</span>
-                                                        <CheckCircle2 size={14} className={solvedIds.has(p.id) ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
+                                                                {dStyle.label}
+                                                            </span>
+                                                            {p.is_locked && (
+                                                                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                                                                    <Lock size={9} /> PRO
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {p.is_locked ? (
+                                                            <Lock size={13} className="text-amber-400/80 group-hover:text-amber-400 transition-colors" />
+                                                        ) : (
+                                                            <CheckCircle2 size={14} className={solvedIds.has(p.id) ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
+                                                        )}
                                                     </div>
-                                                    <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'}`}>{p.title}</div>
+                                                    <div className={`text-sm font-medium transition-colors line-clamp-2 ${
+                                                        p.is_locked ? 'text-zinc-400 group-hover:text-zinc-200' : isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'
+                                                    }`}>
+                                                        {p.title}
+                                                    </div>
                                                 </div>
                                             );
                                         })}
@@ -2738,6 +2767,54 @@ export function DailySetClient() {
                         <button onClick={() => setToast(null)} className="text-zinc-500 hover:text-white transition-colors">
                             <X size={16} />
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ══ Pro / Locked Challenge Modal ══ */}
+            {lockedModalProblem && (
+                <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                    <div className="bg-[#131924] border border-amber-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 relative overflow-hidden text-center">
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-orange-400 to-amber-500" />
+                        <button
+                            onClick={() => setLockedModalProblem(null)}
+                            className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+                        >
+                            <X size={18} />
+                        </button>
+
+                        <div className="w-16 h-16 rounded-3xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto shadow-lg shadow-amber-500/10">
+                            <Lock size={28} />
+                        </div>
+
+                        <div className="space-y-2">
+                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
+                                Pro Challenge Locked
+                            </span>
+                            <h3 className="text-lg font-bold text-white tracking-tight mt-2">
+                                {lockedModalProblem.title}
+                            </h3>
+                            <p className="text-xs text-zinc-400 leading-relaxed max-w-xs mx-auto">
+                                Free tier includes the first 30 SQL questions and the daily practice set. Upgrade to unlock all questions across SQL, Python, PySpark &amp; DSA.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2.5 pt-2">
+                            <Link
+                                href="/payment"
+                                onClick={() => setLockedModalProblem(null)}
+                                className="w-full bg-gradient-to-r from-[#4DD4C4] to-[#34b6a5] hover:opacity-90 text-[#080c16] font-bold rounded-xl py-3 text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#4DD4C4]/20"
+                            >
+                                Upgrade to Pro Plan →
+                            </Link>
+                            <Link
+                                href="/redeem"
+                                onClick={() => setLockedModalProblem(null)}
+                                className="w-full bg-[#0b101c] hover:bg-[#202736] border border-[#202736] text-amber-400 hover:text-amber-300 font-semibold rounded-xl py-2.5 text-xs transition-colors flex items-center justify-center gap-1.5"
+                            >
+                                <Sparkles size={12} /> Have an early invite code? Redeem here
+                            </Link>
+                        </div>
                     </div>
                 </div>
             )}
