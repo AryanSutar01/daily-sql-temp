@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import {
     Database, Plus, Calendar, Lock, Search, CheckCircle2,
     AlertCircle, Loader2, ChevronRight, Edit3, Eye,
-    Code, FileText, Clock, Trash2, MessageSquare, X, Save, ThumbsDown, Phone, Download, BarChart3, TrendingUp, Users, Activity, Target, Zap
+    Code, FileText, Clock, Trash2, MessageSquare, X, Save, ThumbsDown, Phone, Download, BarChart3, TrendingUp, Users, Activity, Target, Zap,
+    CreditCard, Ticket, Sparkles, Copy, Check, DollarSign, Gift, RefreshCw, Sliders, ShieldCheck, ArrowUpRight, UserCheck
 } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -90,7 +91,7 @@ interface ScheduleEntry {
     pyspark_advanced?: { id: string; title: string } | null;
 }
 
-type Tab = 'problems' | 'create' | 'schedule' | 'feedback' | 'members' | 'analytics';
+type Tab = 'problems' | 'create' | 'schedule' | 'feedback' | 'members' | 'analytics' | 'subscriptions' | 'coupons';
 type CreateStep = 'problem' | 'datasets' | 'test-cases' | 'solution' | 'preview' | 'done';
 
 export default function AdminDashboard() {
@@ -126,6 +127,31 @@ export default function AdminDashboard() {
     const [bulkEmailsText, setBulkEmailsText] = useState("");
     const [loadingDetails, setLoadingDetails] = useState(false);
 
+    // Subscriptions & Revenue State
+    const [subscriptions, setSubscriptions] = useState<any[]>([]);
+    const [subAnalytics, setSubAnalytics] = useState<any>(null);
+    const [subFilter, setSubFilter] = useState<string>('all');
+    const [subPlanFilter, setSubPlanFilter] = useState<string>('all');
+    const [subSearch, setSubSearch] = useState<string>('');
+    const [grantModalOpen, setGrantModalOpen] = useState(false);
+    const [grantEmail, setGrantEmail] = useState('');
+    const [grantPlan, setGrantPlan] = useState('lifetime');
+    const [grantDuration, setGrantDuration] = useState('');
+    const [grantLoading, setGrantLoading] = useState(false);
+
+    // Coupons & Launch Trial State
+    const [coupons, setCoupons] = useState<any[]>([]);
+    const [launchConfig, setLaunchConfig] = useState<any>(null);
+    const [couponFilter, setCouponFilter] = useState<string>('all');
+    const [couponSearch, setCouponSearch] = useState<string>('');
+    const [couponGenMode, setCouponGenMode] = useState<'all' | 'custom'>('all');
+    const [couponGenEmails, setCouponGenEmails] = useState('');
+    const [couponGenDays, setCouponGenDays] = useState('32');
+    const [couponGenPlan, setCouponGenPlan] = useState('lifetime');
+    const [couponGenLoading, setCouponGenLoading] = useState(false);
+    const [copiedCode, setCopiedCode] = useState<string | null>(null);
+    const [generatedCouponsModal, setGeneratedCouponsModal] = useState<any[] | null>(null);
+    const [launchTrialLoading, setLaunchTrialLoading] = useState(false);
 
     // Analytics State
     const [analyticsSummary, setAnalyticsSummary] = useState<any>(null);
@@ -266,6 +292,204 @@ export default function AdminDashboard() {
                 setWaGroupChecklist(await res.json());
             }
         } catch (e) { console.error(e); }
+    };
+
+    const loadSubscriptions = async (token?: string) => {
+        setLoading(true);
+        try {
+            const [subsRes, anaRes] = await Promise.all([
+                fetchWithAuth(`${API_URL}/admin/subscriptions`, {}, token),
+                fetchWithAuth(`${API_URL}/admin/subscriptions/analytics`, {}, token)
+            ]);
+            if (subsRes.ok) {
+                setSubscriptions(await subsRes.json());
+            }
+            if (anaRes.ok) {
+                setSubAnalytics(await anaRes.json());
+            }
+        } catch (e) { console.error(e); }
+        setLoading(false);
+    };
+
+    const loadCoupons = async (token?: string) => {
+        setLoading(true);
+        try {
+            const [coupRes, cfgRes] = await Promise.all([
+                fetchWithAuth(`${API_URL}/admin/coupons`, {}, token),
+                fetchWithAuth(`${API_URL}/admin/launch-config`, {}, token)
+            ]);
+            if (coupRes.ok) {
+                setCoupons(await coupRes.json());
+            }
+            if (cfgRes.ok) {
+                setLaunchConfig(await cfgRes.json());
+            }
+        } catch (e) { console.error(e); }
+        setLoading(false);
+    };
+
+    const handleToggleLaunchTrial = async (isActive: boolean) => {
+        setLaunchTrialLoading(true);
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/launch-config`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    is_active: isActive,
+                    trial_days: launchConfig?.trial_days || 30,
+                    new_user_trial_days: launchConfig?.new_user_trial_days || 7,
+                    coupon_grace_days: launchConfig?.coupon_grace_days || 2,
+                })
+            });
+            if (res.ok) {
+                const updated = await res.json();
+                setLaunchConfig(updated);
+                showToast('success', isActive ? 'Global 30-Day Launch Trial is now ACTIVE!' : 'Global Launch Trial has been DEACTIVATED.');
+                loadCoupons();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showToast('error', err.detail || 'Failed to update launch configuration');
+            }
+        } catch (e: any) { showToast('error', e.message); }
+        setLaunchTrialLoading(false);
+    };
+
+    const handleGenerateCoupons = async () => {
+        setCouponGenLoading(true);
+        try {
+            let emails: string[] | null = null;
+            if (couponGenMode === 'custom') {
+                emails = couponGenEmails.split(/[\n,]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
+                if (emails.length === 0) {
+                    showToast('error', 'Please enter at least one valid email address.');
+                    setCouponGenLoading(false);
+                    return;
+                }
+            }
+
+            const res = await fetchWithAuth(`${API_URL}/admin/coupons/generate`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    emails: emails,
+                    days_valid: parseInt(couponGenDays) || 32,
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setGeneratedCouponsModal(data.coupons || []);
+                showToast('success', `Successfully generated ${data.count} lifetime coupon(s)!`);
+                setCouponGenEmails('');
+                loadCoupons();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showToast('error', err.detail || 'Failed to generate coupons');
+            }
+        } catch (e: any) { showToast('error', e.message); }
+        setCouponGenLoading(false);
+    };
+
+    const handleDeleteCoupon = async (code: string) => {
+        if (!confirm(`Are you sure you want to revoke coupon ${code}?`)) return;
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/coupons/${encodeURIComponent(code)}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                showToast('success', `Coupon ${code} revoked successfully.`);
+                loadCoupons();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showToast('error', err.detail || 'Failed to revoke coupon');
+            }
+        } catch (e: any) { showToast('error', e.message); }
+    };
+
+    const handleGrantPlan = async () => {
+        if (!grantEmail.trim()) {
+            showToast('error', 'Please enter a valid user email address.');
+            return;
+        }
+        setGrantLoading(true);
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/subscriptions/grant`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    email: grantEmail.trim(),
+                    plan_id: grantPlan,
+                    duration_days: grantDuration ? parseInt(grantDuration) : null,
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                showToast('success', `Plan '${grantPlan.toUpperCase()}' granted to ${grantEmail}!`);
+                setGrantModalOpen(false);
+                setGrantEmail('');
+                setGrantDuration('');
+                loadSubscriptions();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showToast('error', err.detail || 'Failed to grant plan');
+            }
+        } catch (e: any) { showToast('error', e.message); }
+        setGrantLoading(false);
+    };
+
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedCode(text);
+        showToast('success', `Copied: ${text}`);
+        setTimeout(() => setCopiedCode(null), 2500);
+    };
+
+    const exportSubscriptionsCsv = () => {
+        if (subscriptions.length === 0) {
+            showToast('error', 'No subscriptions to export');
+            return;
+        }
+        const headers = ["Email", "Username", "Plan", "Amount Paid (INR)", "Status", "Order ID", "Started At", "Expires At"];
+        const rows = subscriptions.map(s => [
+            `"${s.email || ''}"`,
+            `"${s.username || ''}"`,
+            `"${s.plan_name || s.plan_id || ''}"`,
+            s.amount_paid || 0,
+            `"${s.status || ''}"`,
+            `"${s.cashfree_order_id || ''}"`,
+            `"${s.starts_at || ''}"`,
+            `"${s.is_lifetime ? 'Never (Lifetime)' : s.expires_at || 'Never'}"`,
+        ].join(',')).join('\n');
+
+        const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows;
+        const link = document.createElement("a");
+        link.setAttribute("href", encodeURI(csvContent));
+        link.setAttribute("download", `dailysql_subscriptions_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const exportCouponsCsv = () => {
+        if (coupons.length === 0) {
+            showToast('error', 'No coupons to export');
+            return;
+        }
+        const headers = ["Coupon Code", "Email", "Username", "Plan Granted", "Redeemed Status", "Redeemed At", "Expires At", "Created At"];
+        const rows = coupons.map(c => [
+            `"${c.code}"`,
+            `"${c.email || ''}"`,
+            `"${c.username || ''}"`,
+            `"${c.plan_granted || 'lifetime'}"`,
+            `"${c.is_used ? 'Redeemed' : (c.expires_at && new Date(c.expires_at) < new Date() ? 'Expired' : 'Active')}"`,
+            `"${c.used_at || ''}"`,
+            `"${c.expires_at || ''}"`,
+            `"${c.created_at || ''}"`,
+        ].join(',')).join('\n');
+
+        const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows;
+        const link = document.createElement("a");
+        link.setAttribute("href", encodeURI(csvContent));
+        link.setAttribute("download", `dailysql_coupons_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
 
@@ -514,10 +738,12 @@ export default function AdminDashboard() {
     }, [createStep, createdProblemId]);
 
     useEffect(() => {
-        if (activeTab === 'analytics' && isAuthenticated) {
-            loadAnalytics();
+        if (isAuthenticated) {
+            if (activeTab === 'analytics') loadAnalytics();
+            if (activeTab === 'subscriptions') loadSubscriptions();
+            if (activeTab === 'coupons') loadCoupons();
         }
-    }, [activeTab]);
+    }, [activeTab, isAuthenticated]);
 
     const handleUpdateDataset = async (ds: any) => {
         if (!selectedProblem) return;
@@ -1194,6 +1420,20 @@ export default function AdminDashboard() {
                             className={`${activeTab === 'feedback' ? 'bg-[#4DD4C4]/10 text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}
                         >
                             <MessageSquare size={16} className="mr-2" /> Feedback
+                        </Button>
+                        <Button
+                            onClick={() => setActiveTab('subscriptions')}
+                            variant="ghost"
+                            className={`${activeTab === 'subscriptions' ? 'bg-amber-500/10 text-amber-400' : 'text-zinc-400 hover:text-white'}`}
+                        >
+                            <CreditCard size={16} className="mr-2" /> Subscriptions
+                        </Button>
+                        <Button
+                            onClick={() => setActiveTab('coupons')}
+                            variant="ghost"
+                            className={`${activeTab === 'coupons' ? 'bg-violet-500/10 text-violet-400' : 'text-zinc-400 hover:text-white'}`}
+                        >
+                            <Ticket size={16} className="mr-2" /> Coupons
                         </Button>
                         <Button
                             onClick={() => setActiveTab('members')}
@@ -2801,9 +3041,771 @@ export default function AdminDashboard() {
                         </Grid>
                     </div>
                 )}
+
+                {/* ============ SUBSCRIPTIONS & REVENUE TAB ============ */}
+                {activeTab === 'subscriptions' && (
+                    <div className="space-y-8 animate-premium-entry pb-12">
+                        {/* Title & Actions */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-2xl font-bold flex items-center gap-3">
+                                    <CreditCard size={26} className="text-amber-400" />
+                                    Subscription Analytics &amp; Revenue
+                                </h2>
+                                <p className="text-xs text-zinc-400 mt-1">
+                                    Track cash collections, active subscribers, expiry dates, and manual grants.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <Button
+                                    onClick={() => setGrantModalOpen(true)}
+                                    className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs"
+                                >
+                                    <Plus size={14} className="mr-1.5" /> Grant / Update Plan
+                                </Button>
+                                <Button
+                                    onClick={exportSubscriptionsCsv}
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-[#202736] text-zinc-300 hover:text-white bg-[#121826] text-xs"
+                                >
+                                    <Download size={14} className="mr-1.5" /> Export CSV
+                                </Button>
+                                <Button
+                                    onClick={() => loadSubscriptions()}
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-[#202736] text-zinc-400 bg-white/5 text-xs"
+                                >
+                                    {loading ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <RefreshCw size={14} className="mr-1.5" />} Refresh
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* 1. Revenue & Subscribers KPI Cards */}
+                        <Grid numItemsSm={2} numItemsLg={4} className="gap-5">
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-6">
+                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em] flex items-center gap-1.5">
+                                    <DollarSign size={13} className="text-emerald-400" /> Total Collection
+                                </Text>
+                                <Metric className="text-emerald-400 font-bold text-3xl mt-2 font-mono">
+                                    ₹{(subAnalytics?.overview?.total_revenue || 0).toLocaleString('en-IN')}
+                                </Metric>
+                                <Text className="text-zinc-500 text-[10px] mt-1">All verified payments through Cashfree</Text>
+                            </Card>
+
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-6">
+                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em] flex items-center gap-1.5">
+                                    <Users size={13} className="text-amber-400" /> Active Paid Users
+                                </Text>
+                                <Metric className="text-white font-bold text-3xl mt-2 font-mono">
+                                    {subAnalytics?.overview?.active_subscribers || 0}
+                                </Metric>
+                                <Text className="text-zinc-500 text-[10px] mt-1">Monthly, Yearly, &amp; Lifetime</Text>
+                            </Card>
+
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-6">
+                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em] flex items-center gap-1.5">
+                                    <Sparkles size={13} className="text-[#4DD4C4]" /> Active Free Trials
+                                </Text>
+                                <Metric className="text-[#4DD4C4] font-bold text-3xl mt-2 font-mono">
+                                    {subAnalytics?.overview?.active_trials || 0}
+                                </Metric>
+                                <Text className="text-zinc-500 text-[10px] mt-1">Users currently in trial period</Text>
+                            </Card>
+
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-6">
+                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em] flex items-center gap-1.5">
+                                    <Clock size={13} className="text-rose-400" /> Expiring in 7 Days
+                                </Text>
+                                <Metric className="text-rose-400 font-bold text-3xl mt-2 font-mono">
+                                    {subAnalytics?.overview?.expiring_soon || 0}
+                                </Metric>
+                                <Text className="text-zinc-500 text-[10px] mt-1">Subscriptions needing renewal</Text>
+                            </Card>
+                        </Grid>
+
+                        {/* 2. Plan Distribution Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            <div className="bg-[#121826] border border-blue-500/20 rounded-xl p-5 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl pointer-events-none" />
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-blue-400">Monthly Pro (₹899)</span>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/30">
+                                        {subAnalytics?.plan_breakdown?.monthly?.count || 0} active
+                                    </span>
+                                </div>
+                                <div className="text-2xl font-bold font-mono text-white mt-1">
+                                    ₹{(subAnalytics?.plan_breakdown?.monthly?.revenue || 0).toLocaleString('en-IN')}
+                                </div>
+                                <div className="text-[11px] text-zinc-500 mt-1">30-day recurring period</div>
+                            </div>
+
+                            <div className="bg-[#121826] border border-emerald-500/20 rounded-xl p-5 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Yearly Pro (₹1,499)</span>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                                        {subAnalytics?.plan_breakdown?.yearly?.count || 0} active
+                                    </span>
+                                </div>
+                                <div className="text-2xl font-bold font-mono text-white mt-1">
+                                    ₹{(subAnalytics?.plan_breakdown?.yearly?.revenue || 0).toLocaleString('en-IN')}
+                                </div>
+                                <div className="text-[11px] text-zinc-500 mt-1">365-day annual pass</div>
+                            </div>
+
+                            <div className="bg-[#121826] border border-amber-500/20 rounded-xl p-5 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl pointer-events-none" />
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400">Lifetime VIP (₹4,999)</span>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                                        {subAnalytics?.plan_breakdown?.lifetime?.count || 0} active
+                                    </span>
+                                </div>
+                                <div className="text-2xl font-bold font-mono text-white mt-1">
+                                    ₹{(subAnalytics?.plan_breakdown?.lifetime?.revenue || 0).toLocaleString('en-IN')}
+                                </div>
+                                <div className="text-[11px] text-zinc-500 mt-1">Permanent access with zero renewals</div>
+                            </div>
+                        </div>
+
+                        {/* 3. Subscribers Table & Search */}
+                        <Card className="bg-[#121826] border-[#202736] ring-0 p-6">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                                <div className="flex items-center gap-3">
+                                    <Title className="text-white text-sm font-bold uppercase tracking-[0.2em] border-l-2 border-amber-400 pl-3">
+                                        All Subscriptions &amp; Subscribers
+                                    </Title>
+                                    <span className="text-xs text-zinc-500">({subscriptions.length} records)</span>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-3">
+                                    {/* Plan Filter */}
+                                    <select
+                                        value={subPlanFilter}
+                                        onChange={e => setSubPlanFilter(e.target.value)}
+                                        className="bg-[#0b101c] border border-[#202736] px-3 py-1.5 rounded-lg text-xs text-zinc-300 focus:border-amber-400 focus:outline-none"
+                                    >
+                                        <option value="all">All Plans</option>
+                                        <option value="monthly">Monthly</option>
+                                        <option value="yearly">Yearly</option>
+                                        <option value="lifetime">Lifetime VIP</option>
+                                    </select>
+
+                                    {/* Status Filter */}
+                                    <select
+                                        value={subFilter}
+                                        onChange={e => setSubFilter(e.target.value)}
+                                        className="bg-[#0b101c] border border-[#202736] px-3 py-1.5 rounded-lg text-xs text-zinc-300 focus:border-amber-400 focus:outline-none"
+                                    >
+                                        <option value="all">All Statuses</option>
+                                        <option value="active">Active</option>
+                                        <option value="expired">Expired</option>
+                                        <option value="pending">Pending</option>
+                                    </select>
+
+                                    {/* Search input */}
+                                    <div className="relative max-w-xs w-full">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={13} />
+                                        <input
+                                            type="text"
+                                            placeholder="Search email, username, order ID..."
+                                            className="w-full bg-[#0b101c] border border-[#202736] pl-8 pr-3 py-1.5 rounded-lg text-xs text-white focus:border-amber-400 focus:outline-none"
+                                            value={subSearch}
+                                            onChange={e => setSubSearch(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto max-h-[550px] custom-scrollbar">
+                                <TremorTable>
+                                    <TableHead className="sticky top-0 bg-[#121826] z-10">
+                                        <TableRow className="border-[#202736]">
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">User Account</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Plan</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase text-right bg-[#121826]">Amount Paid</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Started At</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Expires At</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase text-center bg-[#121826]">Status</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Cashfree Order ID</TableHeaderCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {subscriptions
+                                            .filter(s => {
+                                                const matchPlan = subPlanFilter === 'all' || s.plan_id === subPlanFilter;
+                                                const matchStatus = subFilter === 'all' || s.status === subFilter;
+                                                const query = subSearch.toLowerCase();
+                                                const matchSearch = !query ||
+                                                    (s.email && s.email.toLowerCase().includes(query)) ||
+                                                    (s.username && s.username.toLowerCase().includes(query)) ||
+                                                    (s.cashfree_order_id && s.cashfree_order_id.toLowerCase().includes(query));
+                                                return matchPlan && matchStatus && matchSearch;
+                                            })
+                                            .map(s => {
+                                                const isExp = s.expires_at && new Date(s.expires_at) < new Date();
+                                                return (
+                                                    <TableRow key={s.id} className="border-[#202736] hover:bg-white/[0.02]">
+                                                        <TableCell>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-white font-medium text-xs font-mono">{s.email || '—'}</span>
+                                                                <span className="text-[10px] text-zinc-500">{s.username ? `@${s.username}` : (s.full_name || 'No username')}</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${
+                                                                s.plan_id === 'lifetime'
+                                                                    ? 'border-amber-500/40 text-amber-400 bg-amber-500/10'
+                                                                    : s.plan_id === 'yearly'
+                                                                    ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
+                                                                    : s.plan_id === 'monthly'
+                                                                    ? 'border-blue-500/40 text-blue-400 bg-blue-500/10'
+                                                                    : 'border-zinc-600 text-zinc-400 bg-zinc-800/40'
+                                                            }`}>
+                                                                {s.plan_name || s.plan_id}
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-zinc-200 font-mono text-xs font-bold">
+                                                            ₹{Number(s.amount_paid || 0).toLocaleString('en-IN')}
+                                                        </TableCell>
+                                                        <TableCell className="text-zinc-400 text-xs font-mono">
+                                                            {s.starts_at ? new Date(s.starts_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {s.is_lifetime || (!s.expires_at && s.plan_id === 'lifetime') ? (
+                                                                <span className="text-amber-400 font-mono text-xs font-bold">Never (Lifetime)</span>
+                                                            ) : s.expires_at ? (
+                                                                <span className={`font-mono text-xs ${isExp ? 'text-red-400' : 'text-zinc-300'}`}>
+                                                                    {new Date(s.expires_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-zinc-500 text-xs">—</span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="text-center">
+                                                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${
+                                                                s.status === 'active' && !isExp
+                                                                    ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
+                                                                    : 'border-red-500/40 text-red-400 bg-red-500/10'
+                                                            }`}>
+                                                                {isExp && s.status === 'active' ? 'Expired' : s.status}
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell className="text-zinc-500 font-mono text-[11px]">
+                                                            {s.cashfree_order_id || 'manual_grant'}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                    </TableBody>
+                                </TremorTable>
+                                {subscriptions.length === 0 && (
+                                    <div className="text-center py-16 text-zinc-500 italic text-sm">
+                                        No subscription records found.
+                                    </div>
+                                )}
+                            </div>
+                        </Card>
+                    </div>
+                )}
+
+                {/* ============ COUPONS & LAUNCH TRIAL TAB ============ */}
+                {activeTab === 'coupons' && (
+                    <div className="space-y-8 animate-premium-entry pb-12">
+                        {/* Title & Actions */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-2xl font-bold flex items-center gap-3">
+                                    <Ticket size={26} className="text-violet-400" />
+                                    Coupons &amp; 30-Day Launch Trial
+                                </h2>
+                                <p className="text-xs text-zinc-400 mt-1">
+                                    Manage early adopter lifetime access coupons, track redemptions, and toggle global launch trials.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <Button
+                                    onClick={exportCouponsCsv}
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-[#202736] text-zinc-300 hover:text-white bg-[#121826] text-xs"
+                                >
+                                    <Download size={14} className="mr-1.5" /> Export CSV
+                                </Button>
+                                <Button
+                                    onClick={() => loadCoupons()}
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-[#202736] text-zinc-400 bg-white/5 text-xs"
+                                >
+                                    {loading ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <RefreshCw size={14} className="mr-1.5" />} Refresh
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* 1. Global Launch Trial Controller Box */}
+                        <div className="bg-[#121826] border border-violet-500/25 rounded-2xl p-6 relative overflow-hidden">
+                            <div className="absolute -top-10 -right-10 w-40 h-40 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="text-sm font-bold text-white uppercase tracking-wider">Global 30-Day Launch Trial</span>
+                                        <span className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${
+                                            launchConfig?.is_active
+                                                ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
+                                                : 'border-zinc-600 text-zinc-400 bg-zinc-800/50'
+                                        }`}>
+                                            {launchConfig?.is_active ? '● Active Globally' : '○ Inactive'}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-zinc-400 max-w-2xl leading-relaxed">
+                                        When active, all existing users receive full platform access across all 110 problems.
+                                        New signups automatically receive a 7-day trial. Early users receive single-use coupons for Lifetime VIP.
+                                    </p>
+                                    {launchConfig?.trial_start && (
+                                        <div className="flex flex-wrap items-center gap-4 text-[11px] text-zinc-400 pt-1 font-mono">
+                                            <span>Start: <b className="text-white">{new Date(launchConfig.trial_start).toLocaleDateString()}</b></span>
+                                            <span>•</span>
+                                            <span>End: <b className="text-white">{new Date(launchConfig.trial_end).toLocaleDateString()}</b></span>
+                                            <span>•</span>
+                                            <span>Duration: <b className="text-[#4DD4C4]">{launchConfig.trial_days || 30} Days</b></span>
+                                            <span>•</span>
+                                            <span>New User Trial: <b className="text-violet-400">{launchConfig.new_user_trial_days || 7} Days</b></span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-3 shrink-0">
+                                    {launchConfig?.is_active ? (
+                                        <Button
+                                            onClick={() => handleToggleLaunchTrial(false)}
+                                            disabled={launchTrialLoading}
+                                            variant="destructive"
+                                            className="bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 font-bold text-xs"
+                                        >
+                                            {launchTrialLoading ? <Loader2 className="animate-spin mr-1.5" size={14} /> : null}
+                                            Deactivate Global Trial
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            onClick={() => handleToggleLaunchTrial(true)}
+                                            disabled={launchTrialLoading}
+                                            className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs shadow-lg shadow-emerald-500/20"
+                                        >
+                                            {launchTrialLoading ? <Loader2 className="animate-spin mr-1.5" size={14} /> : null}
+                                            ⚡ Activate 30-Day Launch Trial
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2. Coupon Generation Section */}
+                        <div className="bg-[#121826] border border-[#202736] rounded-2xl p-6 space-y-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#202736] pb-4">
+                                <div>
+                                    <h3 className="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                                        <Sparkles size={16} className="text-amber-400" />
+                                        Generate Lifetime Early Adopter Coupons
+                                    </h3>
+                                    <p className="text-xs text-zinc-400 mt-0.5">
+                                        Generates single-use codes (e.g. <code className="font-mono text-amber-400 bg-black/40 px-1 py-0.5 rounded">DSQL-LT-8K9M2P4X</code>) locked to email addresses.
+                                    </p>
+                                </div>
+
+                                {/* Mode Switch */}
+                                <div className="flex bg-[#0b101c] p-1 rounded-lg border border-[#202736] shrink-0">
+                                    <button
+                                        onClick={() => setCouponGenMode('all')}
+                                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                                            couponGenMode === 'all'
+                                                ? 'bg-violet-600 text-white shadow'
+                                                : 'text-zinc-400 hover:text-white'
+                                        }`}
+                                    >
+                                        All Early Users
+                                    </button>
+                                    <button
+                                        onClick={() => setCouponGenMode('custom')}
+                                        className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                                            couponGenMode === 'custom'
+                                                ? 'bg-violet-600 text-white shadow'
+                                                : 'text-zinc-400 hover:text-white'
+                                        }`}
+                                    >
+                                        Specific Email(s)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                {couponGenMode === 'custom' ? (
+                                    <div className="md:col-span-2 space-y-1.5">
+                                        <label className="text-xs font-bold text-zinc-300">
+                                            Target Email Addresses (comma or newline separated)
+                                        </label>
+                                        <textarea
+                                            rows={2}
+                                            value={couponGenEmails}
+                                            onChange={e => setCouponGenEmails(e.target.value)}
+                                            placeholder="user1@example.com, user2@example.com"
+                                            className="w-full bg-[#0b101c] border border-[#202736] rounded-lg p-2.5 text-xs text-white focus:border-violet-400 focus:outline-none font-mono"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="md:col-span-2 bg-[#0b101c] p-3.5 rounded-lg border border-[#202736] flex items-center justify-between">
+                                        <div className="text-xs text-zinc-400">
+                                            Target: <span className="text-white font-bold">All registered users without an active Lifetime plan</span>
+                                        </div>
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-violet-500/10 text-violet-300 border border-violet-500/30">
+                                            Single-Use Email Locked
+                                        </span>
+                                    </div>
+                                )}
+
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-zinc-300">
+                                        Validity Duration (Days)
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="number"
+                                            value={couponGenDays}
+                                            onChange={e => setCouponGenDays(e.target.value)}
+                                            placeholder="32"
+                                            className="w-24 bg-[#0b101c] border border-[#202736] rounded-lg p-2 text-xs text-white focus:border-violet-400 focus:outline-none font-mono text-center"
+                                        />
+                                        <Button
+                                            onClick={handleGenerateCoupons}
+                                            disabled={couponGenLoading}
+                                            className="flex-1 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-violet-500/20"
+                                        >
+                                            {couponGenLoading ? <Loader2 className="animate-spin mr-1.5" size={14} /> : <Zap size={14} className="mr-1.5" />}
+                                            Generate Now
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 3. Coupon Metrics KPI Cards */}
+                        <Grid numItemsSm={2} numItemsLg={4} className="gap-5">
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-5">
+                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em]">Total Generated</Text>
+                                <Metric className="text-white font-bold text-3xl mt-1.5 font-mono">{coupons.length}</Metric>
+                            </Card>
+
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-5">
+                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em] text-emerald-400">Redeemed</Text>
+                                <Metric className="text-emerald-400 font-bold text-3xl mt-1.5 font-mono">
+                                    {coupons.filter(c => c.is_used).length}
+                                </Metric>
+                            </Card>
+
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-5">
+                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em] text-amber-400">Active / Unused</Text>
+                                <Metric className="text-amber-400 font-bold text-3xl mt-1.5 font-mono">
+                                    {coupons.filter(c => !c.is_used && (!c.expires_at || new Date(c.expires_at) > new Date())).length}
+                                </Metric>
+                            </Card>
+
+                            <Card className="bg-[#121826] border-[#202736] ring-0 p-5">
+                                <Text className="text-zinc-500 uppercase text-[11px] font-bold tracking-[0.15em] text-rose-400">Expired</Text>
+                                <Metric className="text-rose-400 font-bold text-3xl mt-1.5 font-mono">
+                                    {coupons.filter(c => !c.is_used && c.expires_at && new Date(c.expires_at) <= new Date()).length}
+                                </Metric>
+                            </Card>
+                        </Grid>
+
+                        {/* 4. Coupons Management Table */}
+                        <Card className="bg-[#121826] border-[#202736] ring-0 p-6">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                                <div className="flex items-center gap-3">
+                                    <Title className="text-white text-sm font-bold uppercase tracking-[0.2em] border-l-2 border-violet-400 pl-3">
+                                        Coupons Registry &amp; Redemption Status
+                                    </Title>
+                                    <span className="text-xs text-zinc-500">({coupons.length} coupons)</span>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-3">
+                                    {/* Status Filter */}
+                                    <select
+                                        value={couponFilter}
+                                        onChange={e => setCouponFilter(e.target.value)}
+                                        className="bg-[#0b101c] border border-[#202736] px-3 py-1.5 rounded-lg text-xs text-zinc-300 focus:border-violet-400 focus:outline-none"
+                                    >
+                                        <option value="all">All Coupons</option>
+                                        <option value="active">Active (Unused)</option>
+                                        <option value="used">Redeemed</option>
+                                        <option value="expired">Expired</option>
+                                    </select>
+
+                                    {/* Search input */}
+                                    <div className="relative max-w-xs w-full">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={13} />
+                                        <input
+                                            type="text"
+                                            placeholder="Search code, email, username..."
+                                            className="w-full bg-[#0b101c] border border-[#202736] pl-8 pr-3 py-1.5 rounded-lg text-xs text-white focus:border-violet-400 focus:outline-none"
+                                            value={couponSearch}
+                                            onChange={e => setCouponSearch(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto max-h-[550px] custom-scrollbar">
+                                <TremorTable>
+                                    <TableHead className="sticky top-0 bg-[#121826] z-10">
+                                        <TableRow className="border-[#202736]">
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Coupon Code</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Issued To (Email)</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Plan Granted</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase text-center bg-[#121826]">Status</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Redeemed At</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Expires At</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase text-right bg-[#121826]">Actions</TableHeaderCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {coupons
+                                            .filter(c => {
+                                                const isExp = c.expires_at && new Date(c.expires_at) < new Date();
+                                                if (couponFilter === 'active' && (c.is_used || isExp)) return false;
+                                                if (couponFilter === 'used' && !c.is_used) return false;
+                                                if (couponFilter === 'expired' && (!isExp || c.is_used)) return false;
+
+                                                const query = couponSearch.toLowerCase();
+                                                if (!query) return true;
+                                                return (
+                                                    c.code.toLowerCase().includes(query) ||
+                                                    (c.email && c.email.toLowerCase().includes(query)) ||
+                                                    (c.username && c.username.toLowerCase().includes(query))
+                                                );
+                                            })
+                                            .map(c => {
+                                                const isExp = c.expires_at && new Date(c.expires_at) < new Date();
+                                                return (
+                                                    <TableRow key={c.code} className="border-[#202736] hover:bg-white/[0.02]">
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2">
+                                                                <code className="font-mono text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/30 select-all">
+                                                                    {c.code}
+                                                                </code>
+                                                                <button
+                                                                    onClick={() => copyToClipboard(c.code)}
+                                                                    title="Copy coupon code"
+                                                                    className="text-zinc-500 hover:text-white p-1 rounded hover:bg-white/10 transition-colors"
+                                                                >
+                                                                    {copiedCode === c.code ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                                                                </button>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-white font-mono text-xs">{c.email}</span>
+                                                                <span className="text-[10px] text-zinc-500">{c.username ? `@${c.username}` : (c.full_name || '—')}</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border border-amber-500/40 text-amber-400 bg-amber-500/10">
+                                                                {c.plan_granted || 'lifetime'}
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell className="text-center">
+                                                            {c.is_used ? (
+                                                                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded border border-emerald-500/40 text-emerald-400 bg-emerald-500/10 flex items-center justify-center gap-1">
+                                                                    <CheckCircle2 size={10} /> Redeemed
+                                                                </span>
+                                                            ) : isExp ? (
+                                                                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded border border-rose-500/40 text-rose-400 bg-rose-500/10">
+                                                                    Expired
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded border border-amber-500/40 text-amber-400 bg-amber-500/10">
+                                                                    Active
+                                                                </span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="text-zinc-400 text-xs font-mono">
+                                                            {c.used_at ? new Date(c.used_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                                                        </TableCell>
+                                                        <TableCell className="text-zinc-400 text-xs font-mono">
+                                                            {c.expires_at ? new Date(c.expires_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Never'}
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            {!c.is_used && (
+                                                                <Button
+                                                                    onClick={() => handleDeleteCoupon(c.code)}
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="text-zinc-500 hover:text-red-400 hover:bg-red-500/10 p-1.5 h-auto text-xs"
+                                                                    title="Revoke Coupon"
+                                                                >
+                                                                    <Trash2 size={13} />
+                                                                </Button>
+                                                            )}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                    </TableBody>
+                                </TremorTable>
+                                {coupons.length === 0 && (
+                                    <div className="text-center py-16 text-zinc-500 italic text-sm">
+                                        No coupons generated yet. Click &quot;Generate Now&quot; above to create early access coupons.
+                                    </div>
+                                )}
+                            </div>
+                        </Card>
+                    </div>
+                )}
             </main>
+
+            {/* ============ MODAL: GRANT / UPDATE PLAN MANUALLY ============ */}
+            {grantModalOpen && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-[#121826] border border-[#202736] rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+                        <div className="flex justify-between items-center border-b border-[#202736] pb-3">
+                            <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                <CreditCard size={18} className="text-amber-400" />
+                                Grant / Update User Plan
+                            </h3>
+                            <button onClick={() => setGrantModalOpen(false)} className="text-zinc-400 hover:text-white">
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-zinc-300">User Email Address</label>
+                                <input
+                                    type="email"
+                                    placeholder="user@example.com"
+                                    value={grantEmail}
+                                    onChange={e => setGrantEmail(e.target.value)}
+                                    className="w-full bg-[#0b101c] border border-[#202736] rounded-lg p-2.5 text-xs text-white focus:border-amber-400 focus:outline-none font-mono"
+                                />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-zinc-300">Target Plan</label>
+                                <select
+                                    value={grantPlan}
+                                    onChange={e => setGrantPlan(e.target.value)}
+                                    className="w-full bg-[#0b101c] border border-[#202736] rounded-lg p-2.5 text-xs text-white focus:border-amber-400 focus:outline-none"
+                                >
+                                    <option value="lifetime">Lifetime VIP (Permanent Access)</option>
+                                    <option value="yearly">Yearly Pro (365 Days)</option>
+                                    <option value="monthly">Monthly Pro (30 Days)</option>
+                                    <option value="free">Free Tier (Reset / Revoke Access)</option>
+                                </select>
+                            </div>
+
+                            {grantPlan !== 'lifetime' && grantPlan !== 'free' && (
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-zinc-300">
+                                        Custom Duration in Days (optional)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        placeholder={grantPlan === 'monthly' ? '30' : '365'}
+                                        value={grantDuration}
+                                        onChange={e => setGrantDuration(e.target.value)}
+                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-lg p-2.5 text-xs text-white focus:border-amber-400 focus:outline-none font-mono"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                            <Button
+                                onClick={() => setGrantModalOpen(false)}
+                                variant="outline"
+                                className="flex-1 border-[#202736] text-zinc-400 text-xs"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleGrantPlan}
+                                disabled={grantLoading}
+                                className="flex-1 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs"
+                            >
+                                {grantLoading ? <Loader2 className="animate-spin mr-1.5" size={14} /> : null}
+                                Save Plan
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ============ MODAL: GENERATED COUPONS RESULTS ============ */}
+            {generatedCouponsModal && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-[#121826] border border-violet-500/40 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl">
+                        <div className="flex justify-between items-center border-b border-[#202736] pb-3">
+                            <div>
+                                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                    <Sparkles size={18} className="text-amber-400" />
+                                    {generatedCouponsModal.length} Coupon(s) Generated Successfully!
+                                </h3>
+                                <p className="text-xs text-zinc-400 mt-0.5">
+                                    Share these codes with early adopters to unlock Lifetime VIP access.
+                                </p>
+                            </div>
+                            <button onClick={() => setGeneratedCouponsModal(null)} className="text-zinc-400 hover:text-white">
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="max-h-[350px] overflow-y-auto custom-scrollbar border border-[#202736] rounded-xl bg-[#0b101c]">
+                            <table className="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr className="border-b border-[#202736] text-zinc-500 uppercase text-[10px]">
+                                        <th className="p-3">Email</th>
+                                        <th className="p-3">Coupon Code</th>
+                                        <th className="p-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {generatedCouponsModal.map(c => (
+                                        <tr key={c.code} className="border-b border-[#202736]/50 hover:bg-white/[0.02]">
+                                            <td className="p-3 font-mono text-zinc-300">{c.email}</td>
+                                            <td className="p-3">
+                                                <code className="font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                                                    {c.code}
+                                                </code>
+                                            </td>
+                                            <td className="p-3 text-right">
+                                                <button
+                                                    onClick={() => copyToClipboard(c.code)}
+                                                    className="text-xs font-bold text-[#4DD4C4] hover:underline flex items-center gap-1 ml-auto"
+                                                >
+                                                    {copiedCode === c.code ? '✓ Copied' : 'Copy'}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-2">
+                            <Button
+                                onClick={() => setGeneratedCouponsModal(null)}
+                                className="bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs"
+                            >
+                                Done
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );
 }
 // redeploy
+
