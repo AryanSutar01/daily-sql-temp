@@ -180,7 +180,7 @@ function RedeemContent() {
 
               <div className="pt-2 flex flex-col gap-2.5">
                 <Link
-                  href="/practice"
+                  href="/practice/daily"
                   className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 text-sm"
                 >
                   Start Practicing Now <ArrowRight className="w-4 h-4" />
