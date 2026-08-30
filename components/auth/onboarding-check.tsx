@@ -21,8 +21,10 @@ export function OnboardingCheck() {
           if (profile && profile.onboarding_completed === false) {
             router.push("/onboarding");
           }
-        } catch (err) {
-          console.error("Failed to check onboarding status:", err);
+        } catch (err: any) {
+          if (!err?.message?.includes("token") && !err?.message?.includes("401")) {
+            console.error("Failed to check onboarding status:", err);
+          }
         }
       }
       checkOnboarding();
