@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Sparkles, Gift, CheckCircle2, AlertCircle, Loader2, Crown, ArrowRight, Shield } from "lucide-react";
+import { Sparkles, Gift, CheckCircle2, AlertCircle, Loader2, Crown, ArrowRight, Shield, Zap } from "lucide-react";
 import { getToken } from "@/lib/auth";
 
 interface Subscription {
@@ -20,6 +20,9 @@ interface SubscriptionData {
   is_trial?: boolean;
   trial_type?: string | null;
   trial_expires_at?: string | null;
+  trial_days_remaining?: number;
+  trial_hours_remaining?: number;
+  trial_expired?: boolean;
   plan_expires_at: string | null;
   is_lifetime: boolean;
   has_access?: boolean;
@@ -195,20 +198,22 @@ export default function SubscriptionStatus() {
         {isTrial && !isPaid && (
           <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 uppercase tracking-wider">
             <Gift className="w-3 h-3 text-emerald-400" />
-            {data?.trial_type === "new_signup" ? "7-Day Trial" : "Launch Trial"}
+            {data?.trial_type === "new_signup" ? `7-Day Pro Pass (${data?.trial_days_remaining ?? 7}d left)` : "30-Day Launch Access"}
           </span>
         )}
 
         {!isPaid && !isTrial && (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700/50 uppercase tracking-wider">
-            Free Plan
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+            data?.trial_expired ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30' : 'bg-zinc-800 text-zinc-400 border border-zinc-700/50'
+          }`}>
+            {data?.trial_expired ? "Trial Expired" : "Free Tier"}
           </span>
         )}
       </div>
 
       {/* Plan Title */}
       <h3 className={`text-xl font-black tracking-tight mb-1 ${meta.color}`}>
-        {isPaid ? meta.label : isTrial ? "Launch Trial (Full Access)" : "Free Tier"}
+        {isPaid ? meta.label : isTrial ? (data?.trial_type === "new_signup" ? "7-Day Pro Pass (Full Access)" : "Launch Trial (Full Access)") : "Free Tier"}
       </h3>
 
       {/* Paid Active Subscription Details */}
@@ -240,19 +245,19 @@ export default function SubscriptionStatus() {
       {/* Trial Active Banner */}
       {isTrial && !isPaid && (
         <div className="mt-3 pt-3 border-t border-white/5 space-y-2">
-          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-1">
+          <div className="p-3.5 bg-[#4DD4C4]/10 border border-[#4DD4C4]/25 rounded-2xl space-y-1.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-emerald-400 font-bold flex items-center gap-1">
-                <Gift className="w-3.5 h-3.5" /> Full Access Unlocked
+              <span className="text-[#4DD4C4] font-bold flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 fill-[#4DD4C4]" /> All 110 Challenges Unlocked
               </span>
               {data?.trial_expires_at && (
-                <span className="text-[11px] text-emerald-300 font-medium">
-                  Until {new Date(data.trial_expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                <span className="text-[11px] text-zinc-300 font-mono">
+                  {data?.trial_days_remaining ?? 0} days remaining
                 </span>
               )}
             </div>
             <p className="text-zinc-400 text-[11px] leading-relaxed">
-              You currently have full unlimited access to all problems across SQL, Python, PySpark, and DSA during the trial period.
+              Enjoy unrestricted access across all SQL, Python &amp; PySpark tracks. Access ends automatically with zero hidden fees.
             </p>
           </div>
         </div>
@@ -260,10 +265,16 @@ export default function SubscriptionStatus() {
 
       {/* Free Tier Info */}
       {!isPaid && !isTrial && (
-        <div className="mt-3 pt-3 border-t border-white/5 text-xs text-zinc-400">
-          <p className="mb-1 text-zinc-300">
-            Current access: <span className="text-white font-semibold">First 30 SQL questions</span> + daily practice sets.
-          </p>
+        <div className="mt-3 pt-3 border-t border-white/5 text-xs text-zinc-400 space-y-2">
+          {data?.trial_expired ? (
+            <div className="p-3 bg-violet-500/10 border border-violet-500/25 rounded-xl text-violet-300 text-xs">
+              <strong>Your Pro Pass has expired.</strong> Upgrade to continue solving advanced SQL, Python &amp; PySpark questions.
+            </div>
+          ) : (
+            <p className="mb-1 text-zinc-300">
+              Current access: <span className="text-white font-semibold">First 30 SQL questions</span> + daily practice sets.
+            </p>
+          )}
           <p className="text-[11px] text-zinc-500">
             Upgrade to unlock all premium challenges, company interview sets, Python, PySpark &amp; DSA.
           </p>

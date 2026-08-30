@@ -7,6 +7,8 @@ import { ArrowRight, Flame, User, LogOut, Loader2, ChevronDown, Code2, BookOpen,
 import { api } from "@/lib/api";
 import { usePathname, useRouter } from "next/navigation";
 
+import { NavbarTrialPill, TrialWelcomeModal } from "@/components/subscription/trial-experience";
+
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -189,6 +191,8 @@ export function Navbar() {
                 </div>
               ) : user ? (
                 <>
+                  <NavbarTrialPill subscription={subscription} />
+
                   <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4DD4C4]/10 border border-[#4DD4C4]/20 rounded-lg">
                     <span className="text-sm font-bold text-[#4DD4C4]">{streak}</span>
                     <Flame size={14} className="text-[#4DD4C4] fill-[#4DD4C4]" />
@@ -381,6 +385,8 @@ export function Navbar() {
           </div>
         )}
       </div>
+
+      <TrialWelcomeModal />
     </nav>
   );
 }

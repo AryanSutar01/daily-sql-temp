@@ -57,6 +57,7 @@ import { api } from "@/lib/api";
 import { Problem, DailyPractice, Dataset, ExecutionResponse } from "@/types/api";
 import { WalkthroughTour, PRACTICE_TOUR_STEPS } from "@/components/walkthrough/WalkthroughTour";
 import { useWalkthrough } from "@/hooks/useWalkthrough";
+import { PracticeTrialBanner } from "@/components/subscription/trial-experience";
 
 SyntaxHighlighter.registerLanguage('sql', sql);
 
@@ -249,6 +250,7 @@ export function DailySetClient() {
     const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
     const [feedbackSuccess, setFeedbackSuccess] = useState(false);
     const [lockedModalProblem, setLockedModalProblem] = useState<Problem | null>(null);
+    const [userSubscription, setUserSubscription] = useState<any>(null);
 
     // ── Refs ─────────────────────────────────────────────
     const containerRef = useRef<HTMLDivElement>(null);
@@ -510,6 +512,8 @@ export function DailySetClient() {
                         setTimeout(() => tryAutoStart(), 500);
                     }
                 }
+                // Fetch subscription state for trial banner and access
+                api.getMySubscription().then(sub => setUserSubscription(sub)).catch(() => {});
             } catch (err) {
                 console.error("Failed to load initial data", err);
             } finally {
@@ -1596,6 +1600,9 @@ export function DailySetClient() {
                     )}
                 </div>
             </div>
+
+            {/* ── Contextual Trial Status / Expiry Banner ── */}
+            <PracticeTrialBanner subscription={userSubscription} />
 
             {/* ════════════════════════════════════════════
                 MAIN WORKSPACE
