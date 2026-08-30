@@ -6,7 +6,7 @@ import {
     Database, Plus, Calendar, Lock, Search, CheckCircle2,
     AlertCircle, Loader2, ChevronRight, Edit3, Eye,
     Code, FileText, Clock, Trash2, MessageSquare, X, Save, ThumbsDown, Phone, Download, BarChart3, TrendingUp, Users, Activity, Target, Zap,
-    CreditCard, Ticket, Sparkles, Copy, Check, DollarSign, Gift, RefreshCw, Sliders, ShieldCheck, ArrowUpRight, UserCheck
+    CreditCard, Ticket, Sparkles, Copy, Check, DollarSign, Gift, RefreshCw, Sliders, ShieldCheck, ArrowUpRight, UserCheck, Crown
 } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -353,14 +353,36 @@ export default function AdminDashboard() {
         setLaunchTrialLoading(false);
     };
 
+    const exportGeneratedCouponsCsv = (couponList: any[]) => {
+        if (!couponList || couponList.length === 0) return;
+        const headers = ["Email", "Coupon Code", "Plan Granted", "Redemption Status", "Expires At", "Created At"];
+        const rows = couponList.map(c => [
+            `"${c.email || ''}"`,
+            `"${c.coupon_code || c.code || ''}"`,
+            `"${c.plan_granted || 'lifetime'}"`,
+            `"${c.is_used ? 'Redeemed' : (c.status || 'Active')}"`,
+            `"${c.expires_at || ''}"`,
+            `"${c.created_at || new Date().toISOString()}"`,
+        ].join(',')).join('\n');
+
+        const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + rows;
+        const link = document.createElement("a");
+        link.setAttribute("href", encodeURI(csvContent));
+        link.setAttribute("download", `dailysql_coupons_batch_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const handleGenerateCoupons = async () => {
         setCouponGenLoading(true);
         try {
             let emails: string[] | null = null;
             if (couponGenMode === 'custom') {
-                emails = couponGenEmails.split(/[\n,]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
+                const matches = couponGenEmails.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g);
+                emails = matches ? Array.from(new Set(matches.map(e => e.toLowerCase()))) : [];
                 if (emails.length === 0) {
-                    showToast('error', 'Please enter at least one valid email address.');
+                    showToast('error', 'Please enter or paste at least one valid email address.');
                     setCouponGenLoading(false);
                     return;
                 }
@@ -375,10 +397,16 @@ export default function AdminDashboard() {
             });
             if (res.ok) {
                 const data = await res.json();
-                setGeneratedCouponsModal(data.coupons || []);
+                const list = data.coupons || [];
+                setGeneratedCouponsModal(list);
                 showToast('success', `Successfully generated ${data.count} lifetime coupon(s)!`);
                 setCouponGenEmails('');
                 loadCoupons();
+
+                // Auto-download batch CSV
+                if (list.length > 0) {
+                    exportGeneratedCouponsCsv(list);
+                }
             } else {
                 const err = await res.json().catch(() => ({}));
                 showToast('error', err.detail || 'Failed to generate coupons');
@@ -3155,18 +3183,37 @@ export default function AdminDashboard() {
                                 <div className="text-[11px] text-zinc-500 mt-1">365-day annual pass</div>
                             </div>
 
-                            <div className="bg-[#121826] border border-amber-500/20 rounded-xl p-5 relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl pointer-events-none" />
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400">Lifetime VIP (₹4,999)</span>
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
-                                        {subAnalytics?.plan_breakdown?.lifetime?.count || 0} active
+                            <div className="bg-[#121826] border border-amber-500/30 rounded-xl p-5 relative overflow-hidden space-y-3">
+                                <div className="absolute top-0 right-0 w-28 h-28 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                                        <Crown size={14} className="text-amber-400" /> Lifetime VIP Access
+                                    </span>
+                                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                        {subAnalytics?.lifetime_metrics?.total_lifetime_members ?? (subAnalytics?.plan_breakdown?.lifetime?.count || 0)} Total VIPs
                                     </span>
                                 </div>
-                                <div className="text-2xl font-bold font-mono text-white mt-1">
-                                    ₹{(subAnalytics?.plan_breakdown?.lifetime?.revenue || 0).toLocaleString('en-IN')}
+
+                                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
+                                    <div className="bg-[#0b101c] p-2.5 rounded-lg border border-amber-500/20">
+                                        <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider block">💰 Paid (₹4,999)</span>
+                                        <span className="text-sm font-bold font-mono text-white">
+                                            {subAnalytics?.lifetime_metrics?.paid_lifetime_count ?? (subAnalytics?.plan_breakdown?.lifetime?.count || 0)} users
+                                        </span>
+                                        <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">
+                                            ₹{(subAnalytics?.lifetime_metrics?.paid_lifetime_revenue ?? (subAnalytics?.plan_breakdown?.lifetime?.revenue || 0)).toLocaleString('en-IN')}
+                                        </span>
+                                    </div>
+                                    <div className="bg-[#0b101c] p-2.5 rounded-lg border border-amber-500/20">
+                                        <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider block">🎟️ Early Coupons</span>
+                                        <span className="text-sm font-bold font-mono text-amber-300">
+                                            {subAnalytics?.lifetime_metrics?.coupon_redeemed_count ?? 0} redeemed
+                                        </span>
+                                        <span className="text-[10px] text-zinc-500 font-mono block mt-0.5">
+                                            {subAnalytics?.lifetime_metrics?.unredeemed_coupons_count ?? 0} active codes
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="text-[11px] text-zinc-500 mt-1">Permanent access with zero renewals</div>
                             </div>
                         </div>
 
@@ -3443,15 +3490,22 @@ export default function AdminDashboard() {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                                 {couponGenMode === 'custom' ? (
                                     <div className="md:col-span-2 space-y-1.5">
-                                        <label className="text-xs font-bold text-zinc-300">
-                                            Target Email Addresses (comma or newline separated)
-                                        </label>
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-xs font-bold text-zinc-300">
+                                                Target Email Addresses (WhatsApp text, CSV, or comma/newline separated)
+                                            </label>
+                                            {couponGenEmails.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g)?.length ? (
+                                                <span className="text-[11px] font-extrabold text-[#4DD4C4] font-mono bg-[#4DD4C4]/10 px-2 py-0.5 rounded border border-[#4DD4C4]/25">
+                                                    ✓ {Array.from(new Set(couponGenEmails.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g)!.map(e => e.toLowerCase()))).length} unique email(s) detected
+                                                </span>
+                                            ) : null}
+                                        </div>
                                         <textarea
-                                            rows={2}
+                                            rows={3}
                                             value={couponGenEmails}
                                             onChange={e => setCouponGenEmails(e.target.value)}
-                                            placeholder="user1@example.com, user2@example.com"
-                                            className="w-full bg-[#0b101c] border border-[#202736] rounded-lg p-2.5 text-xs text-white focus:border-violet-400 focus:outline-none font-mono"
+                                            placeholder="Paste WhatsApp messages or emails directly, e.g.&#10;user1@gmail.com&#10;Aryan Sutar <sutararyan1304@gmail.com>, test@dailysql.in"
+                                            className="w-full bg-[#0b101c] border border-[#202736] rounded-lg p-2.5 text-xs text-white focus:border-violet-400 focus:outline-none font-mono placeholder:text-zinc-600"
                                         />
                                     </div>
                                 ) : (
@@ -3792,7 +3846,27 @@ export default function AdminDashboard() {
                             </table>
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-2">
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#202736]">
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    onClick={() => exportGeneratedCouponsCsv(generatedCouponsModal)}
+                                    variant="outline"
+                                    className="border-violet-500/40 text-violet-300 hover:text-white bg-[#0b101c] text-xs font-bold"
+                                >
+                                    <Download size={13} className="mr-1.5 text-violet-400" /> Download Batch CSV
+                                </Button>
+                                <Button
+                                    onClick={() => {
+                                        const text = generatedCouponsModal.map(c => `${c.email}: ${c.coupon_code || c.code}`).join('\n');
+                                        copyToClipboard(text);
+                                    }}
+                                    variant="outline"
+                                    className="border-[#202736] text-zinc-300 hover:text-white bg-[#0b101c] text-xs"
+                                >
+                                    <Copy size={13} className="mr-1.5 text-[#4DD4C4]" /> Copy All (Email : Code)
+                                </Button>
+                            </div>
+
                             <Button
                                 onClick={() => setGeneratedCouponsModal(null)}
                                 className="bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs"
