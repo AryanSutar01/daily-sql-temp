@@ -11,7 +11,7 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-const OG_IMAGE_URL = 'https://res.cloudinary.com/dfkbfv9op/image/upload/v1788882180/dailysql/dailysql-og-image.jpg';
+const OG_IMAGE_URL = 'https://res.cloudinary.com/dfkbfv9op/image/upload/c_pad,w_1600,h_900,b_rgb:0a0f1e/v1788882180/dailysql/dailysql-og-image.jpg';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://dailysql.in'),

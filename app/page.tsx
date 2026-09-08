@@ -37,15 +37,24 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Daily SQL — Master SQL, Python & PySpark in 15 Minutes a Day",
-    description: "9 problems a day across SQL, Python (Pandas), and PySpark. Built for working data professionals.",
+    description: "9 curated problems every day — SQL (PostgreSQL), Python (Pandas), and PySpark. Built for working data professionals who want to stay interview-ready.",
     url: "https://dailysql.in",
     siteName: "Daily SQL",
     type: "website",
+    images: [
+      {
+        url: "https://res.cloudinary.com/dfkbfv9op/image/upload/c_pad,w_1600,h_900,b_rgb:0a0f1e/v1788882180/dailysql/dailysql-og-image.jpg",
+        width: 1600,
+        height: 900,
+        alt: "Daily SQL — Master SQL, Python & PySpark in 15 Minutes a Day",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Daily SQL — Master SQL, Python & PySpark in 15 Minutes a Day",
-    description: "9 problems a day across SQL, Python (Pandas), and PySpark. Built for working data professionals.",
+    description: "9 curated problems every day — SQL (PostgreSQL), Python (Pandas), and PySpark. Built for working data professionals who want to stay interview-ready.",
+    images: ["https://res.cloudinary.com/dfkbfv9op/image/upload/c_pad,w_1600,h_900,b_rgb:0a0f1e/v1788882180/dailysql/dailysql-og-image.jpg"],
   },
 };
 
