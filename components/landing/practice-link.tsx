@@ -10,6 +10,8 @@ interface PracticeLinkProps {
     label?: string;
     /** Extra Tailwind classes to apply to the anchor */
     className?: string;
+    /** Inline styles */
+    style?: React.CSSProperties;
     /** Whether to render an arrow icon after the label */
     showArrow?: boolean;
 }
@@ -21,6 +23,7 @@ interface PracticeLinkProps {
 export function PracticeLink({
     label = "Start your daily practice",
     className = "",
+    style,
     showArrow = false,
 }: PracticeLinkProps) {
     const router = useRouter();
@@ -35,7 +38,7 @@ export function PracticeLink({
     };
 
     return (
-        <a href="/practice/daily" onClick={handleClick} className={className}>
+        <a href="/practice/daily" onClick={handleClick} className={className} style={style}>
             {label}
             {showArrow && <ArrowRight className="w-4 h-4" />}
         </a>

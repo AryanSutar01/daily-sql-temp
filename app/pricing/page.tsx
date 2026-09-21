@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { PricingTeaser } from "@/components/landing/pricing-teaser";
+import { PricingPageContent } from "@/components/pricing/pricing-page-content";
 
 export const metadata: Metadata = {
-  title: "Pricing | Daily SQL",
-  description: "View pricing plans for Daily SQL. Choose the best plan to level up your SQL skills.",
+  title: "Pricing | Daily SQL — Master SQL, Python & PySpark",
+  description: "Simple, transparent pricing for data engineering and analytics mastery. Lifetime access, annual, quarterly, and monthly plans with localized purchasing power.",
   alternates: {
     canonical: 'https://dailysql.in/pricing',
   }
@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 
 export default function PricingPage() {
   return (
-    <main className="min-h-screen pt-20">
-      <PricingTeaser />
+    <main className="landing-light min-h-screen bg-[#fafafa]">
+      <PricingPageContent />
     </main>
   );
 }
