@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { getToken } from "@/lib/auth";
+import { CheckCircle2, AlertCircle, Loader2, ArrowRight, Sparkles, ShieldCheck } from "lucide-react";
 
 interface SubscriptionData {
   plan_id: string;
@@ -52,7 +53,6 @@ function SuccessContent() {
           setSubscription(data.subscription);
           setStatus("success");
         } else if (data.order_status === "ACTIVE") {
-          // Payment still processing — retry
           setStatus("pending");
           setAttempts((a) => a + 1);
         } else {
@@ -75,7 +75,6 @@ function SuccessContent() {
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payments/verify-order/${orderId}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
-
           .then((r) => r.json())
           .then((data: VerifyResponse) => {
             if (data.order_status === "PAID" && data.subscription) {
@@ -95,99 +94,99 @@ function SuccessContent() {
   }, [status, attempts, orderId]);
 
   const planLabels: Record<string, string> = {
-    monthly: "Monthly",
-    yearly: "Yearly",
-    lifetime: "Lifetime",
+    monthly: "Monthly Pro",
+    yearly: "Yearly Pro",
+    lifetime: "Lifetime VIP",
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
+    <div className="landing-light min-h-screen bg-[#fafafa] text-zinc-900 flex items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-md">
         {status === "loading" && (
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-violet-500/30 border-t-violet-500 rounded-full animate-spin mx-auto mb-6" />
-            <p className="text-slate-300 text-lg font-medium">Verifying your payment…</p>
-            <p className="text-slate-500 text-sm mt-2">This will only take a moment.</p>
+          <div className="bg-white border border-[#dedee2] rounded-2xl p-8 text-center shadow-xs">
+            <Loader2 className="w-10 h-10 animate-spin text-[#1f9e8e] mx-auto mb-4" />
+            <h2 className="text-lg font-bold font-mono text-zinc-900">Verifying Payment...</h2>
+            <p className="text-zinc-500 text-xs mt-1.5 font-mono">Confirming transaction with Cashfree Gateway</p>
           </div>
         )}
 
         {status === "pending" && (
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-amber-500/30 border-t-amber-500 rounded-full animate-spin mx-auto mb-6" />
-            <p className="text-slate-300 text-lg font-medium">Payment is being confirmed…</p>
-            <p className="text-slate-500 text-sm mt-2">
-              Waiting for confirmation from Cashfree. Please don't close this tab.
+          <div className="bg-white border border-[#dedee2] rounded-2xl p-8 text-center shadow-xs">
+            <div className="w-12 h-12 border-3 border-amber-200 border-t-amber-500 rounded-full animate-spin mx-auto mb-4" />
+            <h2 className="text-lg font-bold font-mono text-zinc-900">Payment is being confirmed…</h2>
+            <p className="text-zinc-500 text-xs mt-2 leading-relaxed">
+              Waiting for confirmation from Cashfree. Please keep this tab open.
             </p>
           </div>
         )}
 
         {status === "success" && subscription && (
-          <div className="bg-[#12121a] border border-emerald-500/20 rounded-2xl p-8 text-center shadow-2xl shadow-emerald-500/5">
-            {/* Success icon */}
-            <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-6 animate-[pulse_2s_ease-in-out_infinite]">
-              <svg className="w-10 h-10 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
+          <div className="bg-white border border-[#dedee2] rounded-2xl p-8 text-center shadow-xs">
+            <div className="w-16 h-16 bg-[#e6f7f5] border border-[#1f9e8e]/30 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-2xs">
+              <CheckCircle2 className="w-9 h-9 text-[#1f9e8e]" />
             </div>
 
-            <h1 className="text-2xl font-bold text-white mb-2">You're all set! 🎉</h1>
-            <p className="text-slate-400 mb-6">
-              Your <span className="text-violet-400 font-semibold">{planLabels[subscription.plan_id] || subscription.plan_id} Plan</span> is now active.
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold font-mono uppercase tracking-wider mb-2">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              Activated
+            </div>
+
+            <h1 className="text-2xl font-bold font-mono text-zinc-900 mb-1 tracking-tight">You're all set! 🎉</h1>
+            <p className="text-zinc-500 text-xs mb-6">
+              Your <strong className="text-zinc-900">{planLabels[subscription.plan_id] || subscription.plan_id}</strong> is now active.
             </p>
 
-            <div className="bg-[#0a0a0f] rounded-xl p-4 mb-6 text-left space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Plan</span>
-                <span className="text-white font-medium">{subscription.plan_name ?? planLabels[subscription.plan_id]}</span>
+            <div className="bg-zinc-50 rounded-xl p-4 mb-6 text-left space-y-2.5 border border-zinc-200 text-xs">
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Plan</span>
+                <span className="text-zinc-900 font-bold font-mono">{subscription.plan_name ?? planLabels[subscription.plan_id]}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Started</span>
-                <span className="text-white font-medium">
-                  {new Date(subscription.starts_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Started</span>
+                <span className="text-zinc-900 font-medium font-mono">
+                  {new Date(subscription.starts_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                 </span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Expires</span>
-                <span className="text-white font-medium">
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Validity</span>
+                <span className="text-zinc-900 font-medium font-mono">
                   {subscription.is_lifetime || !subscription.expires_at
-                    ? "Never (Lifetime)"
-                    : new Date(subscription.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+                    ? "Lifetime ♾️ (Permanent)"
+                    : new Date(subscription.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                 </span>
               </div>
             </div>
 
             <Link
               href="/practice/daily"
-              className="block w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-violet-500/20 hover:shadow-violet-500/30 hover:-translate-y-0.5"
+              className="w-full inline-flex items-center justify-center gap-2 bg-[#1f9e8e] hover:bg-[#177a6d] text-white font-bold py-3 px-6 rounded-xl transition-all shadow-2xs text-xs"
             >
-              Start Practicing →
+              Start Practicing Daily SQL <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         )}
 
         {status === "failed" && (
-          <div className="bg-[#12121a] border border-red-500/20 rounded-2xl p-8 text-center shadow-2xl">
-            <div className="w-20 h-20 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+          <div className="bg-white border border-[#dedee2] rounded-2xl p-8 text-center shadow-xs">
+            <div className="w-16 h-16 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-center mx-auto mb-5">
+              <AlertCircle className="w-9 h-9 text-rose-600" />
             </div>
 
-            <h1 className="text-2xl font-bold text-white mb-2">Payment Not Confirmed</h1>
-            <p className="text-slate-400 mb-6">
-              We couldn't verify your payment. If money was deducted, it will be refunded automatically. Please contact support.
+            <h1 className="text-xl font-bold font-mono text-zinc-900 mb-1">Payment Not Confirmed</h1>
+            <p className="text-zinc-500 text-xs mb-6 leading-relaxed">
+              We couldn't verify your payment. If money was deducted, it will be refunded automatically by your bank.
             </p>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2.5">
               <Link
                 href="/payment"
-                className="block w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200"
+                className="w-full inline-flex items-center justify-center bg-[#1f9e8e] hover:bg-[#177a6d] text-white font-bold py-2.5 px-4 rounded-xl transition-all text-xs shadow-2xs"
               >
                 Try Again
               </Link>
               <Link
                 href="/"
-                className="block w-full bg-white/5 hover:bg-white/10 text-slate-300 font-semibold py-3 px-6 rounded-xl transition-all duration-200"
+                className="w-full inline-flex items-center justify-center bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold py-2.5 px-4 rounded-xl transition-all text-xs"
               >
                 Go Home
               </Link>
@@ -201,11 +200,13 @@ function SuccessContent() {
 
 export default function PaymentSuccessPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="landing-light min-h-screen bg-[#fafafa] flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#1f9e8e]" />
+        </div>
+      }
+    >
       <SuccessContent />
     </Suspense>
   );

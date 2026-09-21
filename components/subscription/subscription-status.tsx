@@ -126,10 +126,10 @@ export default function SubscriptionStatus() {
 
   if (loading) {
     return (
-      <div className="rounded-[28px] bg-[#131924]/80 border border-[#202736]/80 p-6 animate-pulse">
-        <div className="h-4 bg-white/10 rounded w-1/3 mb-3" />
-        <div className="h-8 bg-white/10 rounded w-1/2 mb-6" />
-        <div className="h-4 bg-white/10 rounded w-full" />
+      <div className="rounded-2xl bg-white border border-[#dedee2] p-6 shadow-xs animate-pulse">
+        <div className="h-4 bg-zinc-200 rounded w-1/3 mb-3" />
+        <div className="h-7 bg-zinc-200 rounded w-1/2 mb-5" />
+        <div className="h-4 bg-zinc-100 rounded w-full" />
       </div>
     );
   }
@@ -137,27 +137,27 @@ export default function SubscriptionStatus() {
   const planLabels: Record<string, { label: string; color: string; border: string; bg: string }> = {
     free: {
       label: "Free Tier",
-      color: "text-zinc-400",
-      border: "border-zinc-700/50",
-      bg: "bg-zinc-800/30",
+      color: "text-zinc-600",
+      border: "border-zinc-200",
+      bg: "bg-zinc-100",
     },
     monthly: {
       label: "Monthly Pro",
-      color: "text-[#4DD4C4]",
-      border: "border-[#4DD4C4]/30",
-      bg: "bg-[#4DD4C4]/10",
+      color: "text-[#1f9e8e]",
+      border: "border-[#1f9e8e]/30",
+      bg: "bg-[#e6f7f5]",
     },
     yearly: {
       label: "Yearly Pro",
-      color: "text-cyan-400",
-      border: "border-cyan-500/30",
-      bg: "bg-cyan-500/10",
+      color: "text-[#1f9e8e]",
+      border: "border-[#1f9e8e]/30",
+      bg: "bg-[#e6f7f5]",
     },
     lifetime: {
       label: "Lifetime VIP",
-      color: "text-amber-400",
-      border: "border-amber-500/30",
-      bg: "bg-amber-500/10",
+      color: "text-amber-800",
+      border: "border-amber-200",
+      bg: "bg-amber-50",
     },
   };
 
@@ -168,43 +168,43 @@ export default function SubscriptionStatus() {
   const sub = data?.subscription;
 
   return (
-    <div className="group relative bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 hover:border-[#4DD4C4]/20 rounded-[28px] p-6 shadow-xl transition-all duration-300 overflow-hidden">
+    <div className="group relative bg-white border border-[#dedee2] hover:border-zinc-300 rounded-2xl p-6 shadow-xs transition-all duration-300 overflow-hidden text-zinc-900">
       {/* Top Accent Line */}
       <div
         className={`absolute top-0 left-0 right-0 h-1 ${
           plan === "lifetime"
-            ? "bg-gradient-to-r from-amber-500 via-orange-400 to-amber-500"
+            ? "bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500"
             : isPaid
-            ? "bg-gradient-to-r from-[#4DD4C4] via-teal-400 to-[#30B5A6]"
+            ? "bg-gradient-to-r from-[#1f9e8e] via-teal-400 to-[#135d54]"
             : isTrial
-            ? "bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500"
-            : "bg-gradient-to-r from-zinc-700 via-zinc-600 to-zinc-700"
+            ? "bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500"
+            : "bg-gradient-to-r from-zinc-300 via-zinc-400 to-zinc-300"
         }`}
       />
 
       {/* Header Badge */}
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-          <Shield className="w-3.5 h-3.5 text-[#4DD4C4]" /> Membership Status
+        <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+          <Shield className="w-3.5 h-3.5 text-[#1f9e8e]" /> Membership Status
         </span>
 
         {isPaid && (
           <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${meta.bg} ${meta.color} border ${meta.border} flex items-center gap-1 uppercase tracking-wider`}>
-            {plan === "lifetime" ? <Crown className="w-3 h-3 text-amber-400" /> : <Sparkles className="w-3 h-3 text-[#4DD4C4]" />}
+            {plan === "lifetime" ? <Crown className="w-3 h-3 text-amber-600" /> : <Sparkles className="w-3 h-3 text-[#1f9e8e]" />}
             ACTIVE
           </span>
         )}
 
         {isTrial && !isPaid && (
-          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 uppercase tracking-wider">
-            <Gift className="w-3 h-3 text-emerald-400" />
+          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 uppercase tracking-wider">
+            <Gift className="w-3 h-3 text-emerald-600" />
             {data?.trial_type === "new_signup" ? `7-Day Pro Pass (${data?.trial_days_remaining ?? 7}d left)` : "30-Day Launch Access"}
           </span>
         )}
 
         {!isPaid && !isTrial && (
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-            data?.trial_expired ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30' : 'bg-zinc-800 text-zinc-400 border border-zinc-700/50'
+            data?.trial_expired ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-zinc-100 text-zinc-600 border border-zinc-200'
           }`}>
             {data?.trial_expired ? "Trial Expired" : "Free Tier"}
           </span>
@@ -212,22 +212,22 @@ export default function SubscriptionStatus() {
       </div>
 
       {/* Plan Title */}
-      <h3 className={`text-xl font-black tracking-tight mb-1 ${meta.color}`}>
-        {isPaid ? meta.label : isTrial ? (data?.trial_type === "new_signup" ? "7-Day Pro Pass (Full Access)" : "Launch Trial (Full Access)") : "Free Tier"}
+      <h3 className="text-xl font-bold font-mono tracking-tight text-zinc-900 mb-1">
+        {isPaid ? meta.label : isTrial ? (data?.trial_type === "new_signup" ? "7-Day Pro Pass" : "Launch Trial") : "Free Tier"}
       </h3>
 
       {/* Paid Active Subscription Details */}
       {isPaid && sub && (
-        <div className="space-y-2 mt-4 pt-3 border-t border-white/5 text-xs">
+        <div className="space-y-2 mt-4 pt-3 border-t border-zinc-100 text-xs">
           <div className="flex justify-between">
-            <span className="text-zinc-400">Activated:</span>
-            <span className="text-zinc-200 font-medium">
+            <span className="text-zinc-500 font-medium">Activated:</span>
+            <span className="text-zinc-900 font-semibold font-mono">
               {new Date(sub.starts_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-zinc-400">Validity:</span>
-            <span className="text-zinc-200 font-medium">
+            <span className="text-zinc-500 font-medium">Validity:</span>
+            <span className="text-zinc-900 font-semibold font-mono">
               {sub.is_lifetime || !sub.expires_at
                 ? "Lifetime ♾️ (Permanent)"
                 : new Date(sub.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
@@ -235,8 +235,8 @@ export default function SubscriptionStatus() {
           </div>
           {sub.amount_paid != null && sub.amount_paid > 0 && (
             <div className="flex justify-between">
-              <span className="text-zinc-400">Amount:</span>
-              <span className="text-zinc-200 font-medium">₹{sub.amount_paid.toLocaleString("en-IN")}</span>
+              <span className="text-zinc-500 font-medium">Amount:</span>
+              <span className="text-zinc-900 font-semibold font-mono">₹{sub.amount_paid.toLocaleString("en-IN")}</span>
             </div>
           )}
         </div>
@@ -244,19 +244,19 @@ export default function SubscriptionStatus() {
 
       {/* Trial Active Banner */}
       {isTrial && !isPaid && (
-        <div className="mt-3 pt-3 border-t border-white/5 space-y-2">
-          <div className="p-3.5 bg-[#4DD4C4]/10 border border-[#4DD4C4]/25 rounded-2xl space-y-1.5">
+        <div className="mt-3 pt-3 border-t border-zinc-100 space-y-2">
+          <div className="p-3.5 bg-[#e6f7f5] border border-[#1f9e8e]/30 rounded-xl space-y-1.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[#4DD4C4] font-bold flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 fill-[#4DD4C4]" /> All 110 Challenges Unlocked
+              <span className="text-[#135d54] font-bold flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 fill-[#1f9e8e] text-[#1f9e8e]" /> All Challenges Unlocked
               </span>
               {data?.trial_expires_at && (
-                <span className="text-[11px] text-zinc-300 font-mono">
+                <span className="text-[11px] text-zinc-600 font-mono font-medium">
                   {data?.trial_days_remaining ?? 0} days remaining
                 </span>
               )}
             </div>
-            <p className="text-zinc-400 text-[11px] leading-relaxed">
+            <p className="text-zinc-600 text-[11px] leading-relaxed">
               Enjoy unrestricted access across all SQL, Python &amp; PySpark tracks. Access ends automatically with zero hidden fees.
             </p>
           </div>
@@ -265,18 +265,18 @@ export default function SubscriptionStatus() {
 
       {/* Free Tier Info */}
       {!isPaid && !isTrial && (
-        <div className="mt-3 pt-3 border-t border-white/5 text-xs text-zinc-400 space-y-2">
+        <div className="mt-3 pt-3 border-t border-zinc-100 text-xs text-zinc-500 space-y-2">
           {data?.trial_expired ? (
-            <div className="p-3 bg-violet-500/10 border border-violet-500/25 rounded-xl text-violet-300 text-xs">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs">
               <strong>Your Pro Pass has expired.</strong> Upgrade to continue solving advanced SQL, Python &amp; PySpark questions.
             </div>
           ) : (
-            <p className="mb-1 text-zinc-300">
-              Current access: <span className="text-white font-semibold">First 30 SQL questions</span> + daily practice sets.
+            <p className="mb-1 text-zinc-700">
+              Current access: <span className="text-zinc-900 font-semibold">First 30 SQL questions</span> + daily practice sets.
             </p>
           )}
           <p className="text-[11px] text-zinc-500">
-            Upgrade to unlock all premium challenges, company interview sets, Python, PySpark &amp; DSA.
+            Upgrade to unlock all premium challenges, company interview sets, Python, PySpark &amp; DSA tracks.
           </p>
         </div>
       )}
@@ -285,8 +285,8 @@ export default function SubscriptionStatus() {
       <div className="mt-5 space-y-2.5">
         {!isPaid && (
           <Link
-            href="/payment"
-            className="w-full bg-gradient-to-r from-[#4DD4C4] to-[#34b6a5] hover:opacity-90 text-[#080c16] font-bold rounded-xl py-2.5 text-xs transition-all duration-200 flex items-center justify-center gap-1.5 shadow-lg shadow-[#4DD4C4]/20"
+            href="/pricing"
+            className="w-full bg-[#1f9e8e] hover:bg-[#177a6d] text-white font-bold rounded-xl py-2.5 text-xs transition-all duration-150 flex items-center justify-center gap-1.5 shadow-2xs"
           >
             {isTrial ? "Lock In Lifetime VIP Deal →" : "Upgrade to Pro →"}
           </Link>
@@ -298,16 +298,16 @@ export default function SubscriptionStatus() {
             {!showCouponInput ? (
               <button
                 onClick={() => setShowCouponInput(true)}
-                className="w-full text-center text-xs text-zinc-400 hover:text-amber-400 transition-colors flex items-center justify-center gap-1.5 py-1"
+                className="w-full text-center text-xs text-zinc-500 hover:text-amber-600 transition-colors flex items-center justify-center gap-1.5 py-1"
               >
-                <Gift className="w-3.5 h-3.5 text-amber-400" />
+                <Gift className="w-3.5 h-3.5 text-amber-600" />
                 Have an early user invite code?
               </button>
             ) : (
-              <form onSubmit={handleRedeemCoupon} className="space-y-2 bg-[#0b101c] p-3 rounded-2xl border border-[#202736]">
+              <form onSubmit={handleRedeemCoupon} className="space-y-2 bg-zinc-50 p-3 rounded-xl border border-zinc-200">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-300 font-semibold flex items-center gap-1 text-[11px]">
-                    <Gift className="w-3 h-3 text-amber-400" /> Enter Invite Code
+                  <span className="text-zinc-800 font-semibold flex items-center gap-1 text-[11px]">
+                    <Gift className="w-3 h-3 text-amber-600" /> Enter Invite Code
                   </span>
                   <button
                     type="button"
@@ -315,7 +315,7 @@ export default function SubscriptionStatus() {
                       setShowCouponInput(false);
                       setCouponMessage(null);
                     }}
-                    className="text-zinc-500 hover:text-zinc-300 text-[10px]"
+                    className="text-zinc-400 hover:text-zinc-700 text-[10px]"
                   >
                     Close
                   </button>
@@ -326,12 +326,12 @@ export default function SubscriptionStatus() {
                     placeholder="DSQL-LT-XXXXXXXX"
                     value={couponCode}
                     onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    className="flex-1 bg-[#131924] border border-[#202736] rounded-lg px-2.5 py-1.5 text-xs text-white font-mono placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/50 uppercase"
+                    className="flex-1 bg-white border border-zinc-300 rounded-lg px-2.5 py-1.5 text-xs text-zinc-900 font-mono placeholder:text-zinc-400 focus:outline-none focus:border-[#1f9e8e] uppercase"
                   />
                   <button
                     type="submit"
                     disabled={redeeming || !couponCode.trim()}
-                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-black font-bold px-3 py-1.5 rounded-lg text-xs transition-all shrink-0 flex items-center gap-1"
+                    className="bg-[#1f9e8e] hover:bg-[#177a6d] disabled:opacity-50 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-all shrink-0 flex items-center gap-1 shadow-2xs"
                   >
                     {redeeming ? <Loader2 className="w-3 h-3 animate-spin" /> : "Redeem"}
                   </button>
@@ -341,14 +341,14 @@ export default function SubscriptionStatus() {
                   <div
                     className={`text-[11px] p-2 rounded-lg flex items-start gap-1.5 ${
                       couponMessage.type === "success"
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        : "bg-red-500/10 text-red-400 border border-red-500/20"
+                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                        : "bg-rose-50 text-rose-800 border border-rose-200"
                     }`}
                   >
                     {couponMessage.type === "success" ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-600" />
                     ) : (
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-600" />
                     )}
                     <span>{couponMessage.text}</span>
                   </div>
@@ -362,7 +362,7 @@ export default function SubscriptionStatus() {
           <button
             onClick={handleCancel}
             disabled={cancelling}
-            className="w-full bg-[#0b101c] hover:bg-red-500/10 border border-[#202736] hover:border-red-500/30 text-zinc-400 hover:text-red-400 font-medium py-2 rounded-xl text-xs transition-colors disabled:opacity-50"
+            className="w-full bg-white hover:bg-rose-50 border border-zinc-200 hover:border-rose-200 text-zinc-600 hover:text-rose-700 font-medium py-2 rounded-xl text-xs transition-colors disabled:opacity-50"
           >
             {cancelling ? "Cancelling…" : "Cancel Subscription"}
           </button>

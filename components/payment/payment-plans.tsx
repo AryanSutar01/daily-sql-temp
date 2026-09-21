@@ -26,7 +26,6 @@ declare global {
   }
 }
 
-
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -52,9 +51,9 @@ const PLANS: Plan[] = [
     tagline: "Flexible short-term interview preparation.",
     features: [
       "Full access to all SQL interview questions",
-      "All Python, PySpark & DSA challenge types",
+      "All Python, PySpark & DSA challenge tracks",
       "Unlimited query executions & editor access",
-      "Company-wise SQL & data engineering question sets",
+      "Company-wise SQL & data engineering sets",
       "Standard community support",
     ],
   },
@@ -132,8 +131,6 @@ export function PaymentPlans() {
       document.body.appendChild(script);
     }
 
-    // Fetch user subscription if token present
-
     const token = getToken();
     if (token) {
       fetch(`${API_BASE_URL}/api/payments/my-subscription`, {
@@ -155,9 +152,7 @@ export function PaymentPlans() {
       return;
     }
 
-
     try {
-      // 1. Call Backend to create order (auth required)
       const response = await fetch(`${API_BASE_URL}/api/payments/create-order`, {
         method: "POST",
         headers: {
@@ -190,7 +185,6 @@ export function PaymentPlans() {
 
       const { payment_session_id, order_id } = data;
 
-      // 2. Open Cashfree Drop-in Checkout Modal
       if (!cashfreeInstance) {
         throw new Error("Cashfree Web SDK is not ready yet. Please try again.");
       }
@@ -213,7 +207,6 @@ export function PaymentPlans() {
       }
 
       if (result.paymentDetails) {
-        // 3. Redirect to success page for verification
         window.location.href = `/payment/success?order_id=${order_id}`;
       }
     } catch (err: any) {
@@ -229,20 +222,19 @@ export function PaymentPlans() {
   const isCurrentPlan = (planId: string) => userSubscription?.plan === planId && userSubscription?.is_paid;
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 text-zinc-900">
       {/* Test Sandbox Alert Banner */}
-
-      <div className="bg-[#30B5A6]/10 border border-[#30B5A6]/30 rounded-2xl p-4 max-w-4xl mx-auto flex items-center justify-between text-xs sm:text-sm text-[#30B5A6] backdrop-blur-sm">
+      <div className="bg-[#e6f7f5] border border-[#1f9e8e]/30 rounded-2xl p-4 max-w-4xl mx-auto flex items-center justify-between text-xs sm:text-sm text-[#135d54] shadow-2xs">
         <div className="flex items-center gap-3">
-          <CreditCard className="w-5 h-5 shrink-0" />
+          <CreditCard className="w-5 h-5 shrink-0 text-[#1f9e8e]" />
           <div>
-            <span className="font-bold">Sandbox Mode:</span> Test payments safely with Cashfree test cards (Card: <code className="font-mono text-white bg-black/40 px-1 py-0.5 rounded">4706131211212123</code> / OTP: <code className="font-mono text-white bg-black/40 px-1 py-0.5 rounded">111000</code>) or Test UPI (<code className="font-mono text-white bg-black/40 px-1 py-0.5 rounded">testsuccess@gocash</code>).
+            <span className="font-bold">Sandbox Mode:</span> Test payments safely with Cashfree test cards (Card: <code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200">4706131211212123</code> / OTP: <code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200">111000</code>) or Test UPI (<code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200">testsuccess@gocash</code>).
           </div>
         </div>
       </div>
 
       {/* Pricing Cards Grid */}
-      <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch">
+      <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto items-stretch">
         {PLANS.map((plan) => {
           const isLoading = loadingPlan === plan.id;
           const isOwned = isCurrentPlan(plan.id);
@@ -250,15 +242,15 @@ export function PaymentPlans() {
           return (
             <div
               key={plan.id}
-              className={`relative rounded-[32px] border flex flex-col transition-all duration-300 backdrop-blur-xl p-8 ${
+              className={`relative rounded-2xl border flex flex-col transition-all duration-200 p-7 sm:p-8 bg-white ${
                 plan.highlighted
-                  ? "border-[#4DD4C4]/50 bg-[#131924]/95 shadow-[0_0_40px_-10px_rgba(77,212,196,0.25)] md:-translate-y-3 z-10"
-                  : "border-[#202736]/80 bg-[#131924]/70 hover:border-white/20"
+                  ? "border-[#1f9e8e] ring-1 ring-[#1f9e8e]/40 shadow-md md:-translate-y-2 z-10"
+                  : "border-[#dedee2] shadow-xs hover:border-zinc-300"
               }`}
             >
               {plan.badge && (
-                <div className="absolute -top-3.5 right-6">
-                  <span className="px-3.5 py-1 rounded-full bg-[#4DD4C4] text-[#080C16] text-xs font-black uppercase tracking-wider shadow-md flex items-center gap-1">
+                <div className="absolute -top-3 right-6">
+                  <span className="px-3 py-0.5 rounded-full bg-[#1f9e8e] text-white text-[11px] font-bold uppercase tracking-wider font-mono shadow-xs flex items-center gap-1">
                     {plan.id === "lifetime" ? (
                       <Crown className="w-3.5 h-3.5 inline" />
                     ) : (
@@ -270,42 +262,42 @@ export function PaymentPlans() {
               )}
 
               <div className="mb-6">
-                <h3 className="text-xl font-bold text-white mb-2">{plan.name}</h3>
+                <h3 className="text-xl font-bold font-mono text-zinc-900 mb-2">{plan.name}</h3>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-white tracking-tight">
+                  <span className="text-4xl font-extrabold font-mono text-zinc-900 tracking-tight">
                     {plan.price}
                   </span>
-                  <span className="text-zinc-400 text-sm font-medium">
+                  <span className="text-zinc-500 text-xs font-medium">
                     {plan.period}
                   </span>
                 </div>
-                <p className="text-xs text-zinc-400 mt-3 h-8 leading-relaxed">{plan.tagline}</p>
+                <p className="text-xs text-zinc-500 mt-2.5 h-8 leading-relaxed">{plan.tagline}</p>
               </div>
 
-              <div className="flex-1 py-4 border-t border-white/5">
-                <ul className="space-y-3.5">
+              <div className="flex-1 py-4 border-t border-zinc-100">
+                <ul className="space-y-3">
                   {plan.features.map((feature, idx) => (
                     <li
                       key={idx}
-                      className="flex items-start gap-2.5 text-xs sm:text-sm text-zinc-300 leading-snug"
+                      className="flex items-start gap-2.5 text-xs text-zinc-700 leading-snug font-medium"
                     >
-                      <Check className="w-4 h-4 text-[#4DD4C4] shrink-0 mt-0.5" />
+                      <Check className="w-4 h-4 text-[#1f9e8e] shrink-0 mt-0.5 stroke-[2.5]" />
                       <span>{feature}</span>
                     </li>
                   ))}
                 </ul>
               </div>
 
-              <div className="mt-8 pt-6 border-t border-white/5 space-y-3">
+              <div className="mt-6 pt-5 border-t border-zinc-100 space-y-2.5">
                 <Button
                   onClick={() => handlePayment(plan)}
                   disabled={isLoading || !cashfreeLoaded || isOwned}
-                  className={`w-full h-11 text-sm font-bold rounded-xl transition-all ${
+                  className={`w-full h-11 text-xs font-bold rounded-xl transition-all ${
                     isOwned
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 cursor-default"
+                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-default"
                       : plan.highlighted
-                      ? "bg-gradient-to-r from-[#4DD4C4] to-[#34b6a5] hover:opacity-90 text-[#080C16] shadow-lg shadow-[#4DD4C4]/25"
-                      : "bg-white/10 hover:bg-white/20 text-white border border-white/10"
+                      ? "bg-[#1f9e8e] hover:bg-[#177a6d] text-white shadow-2xs"
+                      : "bg-zinc-900 hover:bg-zinc-800 text-white"
                   }`}
                 >
                   {isOwned ? (
@@ -320,8 +312,8 @@ export function PaymentPlans() {
                     `Pay ${plan.price}`
                   )}
                 </Button>
-                <p className="text-[11px] text-zinc-500 text-center flex items-center justify-center gap-1">
-                  <Shield className="w-3 h-3 text-[#4DD4C4]" /> 256-bit encrypted • Cashfree Gateway
+                <p className="text-[11px] text-zinc-400 text-center flex items-center justify-center gap-1 font-mono">
+                  <Shield className="w-3 h-3 text-[#1f9e8e]" /> 256-bit encrypted • Cashfree Gateway
                 </p>
               </div>
             </div>
@@ -330,62 +322,62 @@ export function PaymentPlans() {
       </div>
 
       {/* Early Adopter Coupon Banner */}
-      <div className="max-w-4xl mx-auto bg-amber-500/10 border border-amber-500/20 rounded-[28px] p-6 backdrop-blur-sm shadow-xl shadow-amber-500/5">
+      <div className="max-w-4xl mx-auto bg-amber-50/80 border border-amber-200 rounded-2xl p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-5">
           <div className="text-left flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
-              <Gift className="w-6 h-6" />
+            <div className="w-11 h-11 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-700 shrink-0 mt-0.5">
+              <Gift className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-base font-bold text-white mb-1 flex items-center gap-2">
-                Early Adopter or Community Member? <Sparkles className="w-4 h-4 text-amber-400" />
+              <h4 className="text-sm font-bold text-zinc-900 mb-0.5 flex items-center gap-1.5">
+                Early Adopter or Community Member? <Sparkles className="w-4 h-4 text-amber-600" />
               </h4>
-              <p className="text-xs text-zinc-300 leading-relaxed max-w-xl">
-                If you were granted a unique lifetime coupon code for supporting Daily SQL, redeem it to unlock Lifetime VIP Access for free.
+              <p className="text-xs text-zinc-600 leading-relaxed max-w-xl">
+                If you were granted a unique lifetime coupon code for supporting Daily SQL, redeem it to activate your Lifetime VIP Pass for free.
               </p>
             </div>
           </div>
           <Link
             href="/redeem"
-            className="shrink-0 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-xs py-3 px-5 rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center gap-1.5"
+            className="shrink-0 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-xs py-2.5 px-4 rounded-xl transition-all shadow-2xs flex items-center gap-1.5"
           >
-            Redeem Coupon Code <ArrowRight className="w-3.5 h-3.5" />
+            Redeem Invite Code <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
       </div>
 
       {/* Payment Result Status Dialog */}
       {paymentResult && (
-        <div className="max-w-xl mx-auto rounded-3xl border border-white/10 bg-[#131924] p-6 shadow-2xl space-y-4">
+        <div className="max-w-xl mx-auto rounded-2xl border border-zinc-300 bg-white p-6 shadow-xl space-y-4">
           <div className="flex items-center gap-3">
             {paymentResult.status === "PAID" ? (
-              <CheckCircle2 className="w-8 h-8 text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-7 h-7 text-emerald-600 shrink-0" />
             ) : (
-              <AlertCircle className="w-8 h-8 text-amber-400 shrink-0" />
+              <AlertCircle className="w-7 h-7 text-amber-600 shrink-0" />
             )}
             <div>
-              <h4 className="text-lg font-bold text-white">
+              <h4 className="text-base font-bold text-zinc-900">
                 {paymentResult.status === "PAID"
                   ? "Payment Completed Successfully!"
-                  : "Payment Status / Result"}
+                  : "Payment Status"}
               </h4>
-              <p className="text-xs text-zinc-400">{paymentResult.message}</p>
+              <p className="text-xs text-zinc-600">{paymentResult.message}</p>
             </div>
           </div>
 
           {paymentResult.orderId && (
-            <div className="bg-black/40 rounded-xl p-3 text-xs space-y-1 font-mono text-zinc-300 border border-white/5">
+            <div className="bg-zinc-50 rounded-xl p-3 text-xs space-y-1 font-mono text-zinc-700 border border-zinc-200">
               <div>
-                <span className="text-zinc-500">Order ID:</span> {paymentResult.orderId}
+                <span className="text-zinc-400">Order ID:</span> {paymentResult.orderId}
               </div>
               {paymentResult.planName && (
                 <div>
-                  <span className="text-zinc-500">Plan:</span> {paymentResult.planName}
+                  <span className="text-zinc-400">Plan:</span> {paymentResult.planName}
                 </div>
               )}
               {paymentResult.amount && (
                 <div>
-                  <span className="text-zinc-500">Amount:</span> ₹{paymentResult.amount}
+                  <span className="text-zinc-400">Amount:</span> ₹{paymentResult.amount}
                 </div>
               )}
             </div>
@@ -395,7 +387,7 @@ export function PaymentPlans() {
             variant="outline"
             size="sm"
             onClick={() => setPaymentResult(null)}
-            className="w-full border-white/10 text-zinc-300 hover:text-white"
+            className="w-full border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-bold"
           >
             Close Notice
           </Button>
@@ -403,12 +395,12 @@ export function PaymentPlans() {
       )}
 
       {/* Security & Features Footer */}
-      <div className="max-w-3xl mx-auto text-center bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
-        <h4 className="text-base font-bold text-white mb-2 flex items-center justify-center gap-2">
-          <Zap className="w-4 h-4 text-[#4DD4C4]" /> Safe & Instant Activation
+      <div className="max-w-3xl mx-auto text-center bg-zinc-50 border border-zinc-200 rounded-2xl p-6">
+        <h4 className="text-xs font-bold font-mono text-zinc-700 mb-1 flex items-center justify-center gap-1.5 uppercase tracking-wider">
+          <Zap className="w-3.5 h-3.5 text-[#1f9e8e]" /> Safe & Instant Activation
         </h4>
-        <p className="text-xs text-zinc-400 leading-relaxed">
-          Payments are processed securely via Cashfree Payments Payment Gateway. Instant automated order verification & real-time membership activation.
+        <p className="text-xs text-zinc-500 leading-relaxed max-w-xl mx-auto">
+          Payments are processed securely via Cashfree Payments Payment Gateway. Instant automated order verification and real-time membership activation.
         </p>
       </div>
     </div>
