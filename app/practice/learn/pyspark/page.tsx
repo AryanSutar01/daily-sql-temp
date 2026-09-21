@@ -1,80 +1,50 @@
-import { Card } from "@/components/learn/card"
+import { Card } from "@/components/learn/card";
 import { getTutorialsByCategory } from "@/tutorials/pyspark/manifest";
+import { Server, BookOpen } from "lucide-react";
+import type { Metadata } from "next";
 
-export default function LearnPage() {
-  const tutorialsByCategory = getTutorialsByCategory()
+export const metadata: Metadata = {
+  title: "Learn PySpark | Daily SQL — Distributed Big Data Processing",
+  description: "Master Spark architecture, RDDs, DataFrames, Spark SQL, joins, window functions, Delta Lake, streaming, and performance optimization.",
+  alternates: {
+    canonical: "https://dailysql.in/practice/learn/pyspark",
+  },
+};
+
+export default function LearnPySparkPage() {
+  const tutorialsByCategory = getTutorialsByCategory();
 
   return (
-    <main className="min-h-screen bg-[#080c16]">
-      {/* Hero Header - matching landing page theme */}
-      <section className="relative overflow-hidden pt-8 -mt-16 pb-16">
-        {/* Grid pattern */}
-        <div
-          className="absolute inset-0 pointer-events-none z-0 opacity-[0.07]"
-          style={{
-            backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.003) 1px, transparent 1px)`,
-            backgroundSize: '40px 40px'
-          }}
-        />
-
-        {/* Strong top-left glow */}
-        <div className="absolute top-0 left-0 w-[700px] h-[500px] bg-[#4DD4C4]/25 blur-[120px] rounded-full pointer-events-none z-0 -translate-x-1/4 -translate-y-1/4" />
-
-        {/* Secondary ambient glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl pointer-events-none z-0">
-          <div className="absolute right-0 top-1/3 w-[400px] h-[400px] bg-[#30B5A6]/8 rounded-full blur-[100px]" />
-        </div>
-
-        {/* Bottom fade line */}
-        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#30B5A6]/40 to-transparent" />
-
-        <div className="relative z-10 mx-auto max-w-5xl px-6 pt-24">
-          {/* Badge */}
-          <div className="flex justify-center md:justify-start mb-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#30B5A6]/20 bg-[#30B5A6]/5 backdrop-blur-sm">
-              <div className="w-2 h-2 rounded-full bg-[#4DD4C4] animate-pulse" />
-              <span className="text-sm text-zinc-400">Interview-ready PySpark & Spark theory</span>
-            </div>
+    <main className="landing-light min-h-screen bg-[#fafafa] text-zinc-900 font-sans pb-24">
+      {/* Hero Header */}
+      <section className="pt-24 pb-12 px-4 sm:px-6 lg:px-8 border-b border-[#dedee2] bg-white">
+        <div className="max-w-5xl mx-auto space-y-4">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#e6f7f5] text-[#1f9e8e] border border-[#1f9e8e]/30 text-[11px] font-mono font-bold uppercase tracking-wider shadow-2xs">
+            <Server className="w-3.5 h-3.5" /> 46 Lessons · Distributed Big Data
           </div>
 
-          {/* Icon + Title */}
-          <div className="mb-5 flex items-center gap-5">
-            <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-[#263247] bg-[#111b2d] shadow-[0_16px_40px_rgba(0,0,0,0.3)]">
-              <div className="absolute h-7 w-7 translate-x-1 translate-y-1 rounded-md bg-[#6186EF]" />
-              <div className="absolute h-7 w-7 -translate-x-0.5 translate-y-0.5 rounded-md bg-[#F277A1]" />
-              <div className="absolute h-7 w-7 -translate-x-2 -translate-y-1 rounded-md border border-white/20 bg-[#30B5A6]" />
-              <div className="absolute bottom-3 h-0.5 w-8 rounded-full bg-white/70" />
-            </div>
-
-            <div>
-              <h1 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-                Learn PySpark
-              </h1>
-              <p className="mt-1.5 text-base text-zinc-400">
-                Master big data processing with Apache Spark
-              </p>
-            </div>
+          <div className="space-y-2">
+            <h1 className="text-3xl sm:text-5xl font-extrabold font-mono tracking-tight text-zinc-900">
+              Learn <span className="text-[#1f9e8e]">PySpark</span>
+            </h1>
+            <p className="text-sm sm:text-base text-zinc-500 max-w-2xl leading-relaxed">
+              Master Apache Spark architecture, distributed DataFrames, window operations, Catalyst internals, and performance tuning for big data engineering.
+            </p>
           </div>
-
-          {/* Description */}
-          <p className="max-w-2xl text-lg leading-relaxed text-[#b5bfd4]">
-            Master Spark architecture, RDDs, DataFrames, joins, window functions, Delta Lake,
-            streaming, and performance tuning with focused theory and interview-ready coverage.
-          </p>
         </div>
       </section>
 
-      {/* Content Section */}
-      <div className="mx-auto px-6 py-12 space-y-20">
+      {/* Content Curriculum Categories */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-16">
         {tutorialsByCategory.beginner.length > 0 && (
           <section>
-            <div className="mb-8 mt-8">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-6 w-1 rounded-full bg-gradient-to-b from-[#4DD4C4] to-[#30B5A6]" />
-                <h2 className="text-2xl font-bold text-white">Foundation</h2>
+            <div className="mb-6">
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <div className="h-5 w-1 rounded-full bg-[#1f9e8e]" />
+                <h2 className="text-xl font-bold font-mono text-zinc-900">Foundation</h2>
               </div>
-              <p className="text-sm text-[#7b8ca3] ml-4 pl-px">
-                Spark architecture, SparkSession, RDDs, DataFrames, reading/writing data, lazy evaluation, and transformations vs actions.
+              <p className="text-xs text-zinc-500 ml-3.5">
+                Spark architecture, SparkSession, RDDs, DataFrames, lazy evaluation, and reading/writing formats.
               </p>
             </div>
             <Card tutorials={tutorialsByCategory.beginner} basePath="pyspark" />
@@ -83,13 +53,13 @@ export default function LearnPage() {
 
         {tutorialsByCategory.intermediate.length > 0 && (
           <section>
-            <div className="mb-8 mt-8">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-6 w-1 rounded-full bg-gradient-to-b from-[#4DD4C4] to-[#30B5A6]" />
-                <h2 className="text-2xl font-bold text-white">Intermediate</h2>
+            <div className="mb-6">
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <div className="h-5 w-1 rounded-full bg-[#1f9e8e]" />
+                <h2 className="text-xl font-bold font-mono text-zinc-900">Intermediate PySpark</h2>
               </div>
-              <p className="text-sm text-[#7b8ca3] ml-4 pl-px">
-                select, filter, groupBy, joins, nulls, built-in functions, Spark SQL, and conditional logic - the core of everyday PySpark work.
+              <p className="text-xs text-zinc-500 ml-3.5">
+                Transformations, filters, groupBy, multi-table joins, built-in functions, and Spark SQL expressions.
               </p>
             </div>
             <Card tutorials={tutorialsByCategory.intermediate} basePath="pyspark" />
@@ -98,13 +68,13 @@ export default function LearnPage() {
 
         {tutorialsByCategory.advance.length > 0 && (
           <section>
-            <div className="mb-8 mt-8">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-6 w-1 rounded-full bg-gradient-to-b from-[#4DD4C4] to-[#30B5A6]" />
-                <h2 className="text-2xl font-bold text-white">Advanced Topics</h2>
+            <div className="mb-6">
+              <div className="flex items-center gap-2.5 mb-1.5">
+                <div className="h-5 w-1 rounded-full bg-[#1f9e8e]" />
+                <h2 className="text-xl font-bold font-mono text-zinc-900">Advanced PySpark</h2>
               </div>
-              <p className="text-sm text-[#7b8ca3] ml-4 pl-px">
-                Window functions, UDFs, Delta Lake, Structured Streaming, Kafka, MLlib, data skew, Catalyst optimizer, and Spark tuning.
+              <p className="text-xs text-zinc-500 ml-3.5">
+                Distributed window functions, UDFs, partitioning, caching, broadcast joins, and Catalyst optimizer internals.
               </p>
             </div>
             <Card tutorials={tutorialsByCategory.advance} basePath="pyspark" />
@@ -112,5 +82,5 @@ export default function LearnPage() {
         )}
       </div>
     </main>
-  )
+  );
 }
