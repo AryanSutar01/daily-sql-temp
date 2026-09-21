@@ -1,18 +1,13 @@
 import type { Metadata } from "next";
 import { Hero } from "@/components/landing/hero";
-import { TargetAudience } from "@/components/landing/target-audience-new";
-import { Problem } from "@/components/landing/problem";
-import { Comparison } from "@/components/landing/comparison";
-import { HowItWorks } from "@/components/landing/how-it-works";
+import { CompanyCarousel } from "@/components/landing/company-carousel";
+import { PickYourPath } from "@/components/landing/pick-your-path";
 import { ProductPreview } from "@/components/landing/product-preview";
-import { BentoGrid } from "@/components/landing/bento-grid";
+import { HowItWorks } from "@/components/landing/how-it-works";
+import { SocialProof } from "@/components/landing/social-proof";
+import { LeaderboardSection } from "@/components/landing/leaderboard-section";
 import { CTASection } from "@/components/landing/cta-section";
 import { FaqSection } from "@/components/landing/faq-section";
-import { ProfessionAnimation } from "@/components/landing/profession-animation";
-import { SocialProof } from "@/components/landing/social-proof";
-import { CompanyCarousel } from "@/components/landing/company-carousel";
-import { LeaderboardSection } from "@/components/landing/leaderboard-section";
-import { DisciplinesSection } from "@/components/landing/disciplines-section";
 
 export const metadata: Metadata = {
   title: "Daily SQL — Master SQL, Python & PySpark in 15 Minutes a Day",
@@ -60,21 +55,33 @@ export const metadata: Metadata = {
 
 export default function Home() {
   return (
-    <main className="min-h-screen">
+    <div className="landing-light">
+      {/* Hero — editorial headline + floating cards */}
       <Hero />
+
+      {/* Social proof logos */}
       <CompanyCarousel />
-      <Problem />
-      <Comparison />
-      <HowItWorks />
-      <ProductPreview />
+
+      {/* Pick your path — SQL / PySpark / Python */}
+      <PickYourPath />
+
+      {/* Testimonials — build trust before showing the product */}
       <SocialProof />
-      <ProfessionAnimation />
-      <DisciplinesSection />
+
+      {/* Interactive editor demo */}
+      <ProductPreview />
+
+      {/* How it works */}
+      <HowItWorks />
+
+      {/* Community / leaderboard */}
       <LeaderboardSection />
-      <BentoGrid />
-      <TargetAudience />
+
+      {/* Pricing CTA */}
       <CTASection />
+
+      {/* FAQ */}
       <FaqSection />
-    </main>
+    </div>
   );
 }

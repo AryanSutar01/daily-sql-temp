@@ -58,8 +58,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default function DailyProblemPage() {
     return (
-        <Suspense fallback={<DailySetSkeleton />}>
-            <DailySetClient />
-        </Suspense>
+        <div className="landing-light h-screen w-screen overflow-hidden">
+            <Suspense fallback={<DailySetSkeleton />}>
+                <DailySetClient />
+            </Suspense>
+        </div>
     );
 }

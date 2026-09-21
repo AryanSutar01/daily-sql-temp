@@ -11,6 +11,7 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+
 const OG_IMAGE_URL = 'https://res.cloudinary.com/dfkbfv9op/image/upload/c_pad,w_1600,h_900,b_rgb:0a0f1e/v1788882180/dailysql/dailysql-og-image.jpg';
 
 export const metadata: Metadata = {
@@ -49,6 +50,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
+        {/* Overused Grotesk — not in Next.js font catalog, load via CDN */}
+        <link rel="preconnect" href="https://fonts.bunny.net" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.bunny.net/css?family=overused-grotesk:300,400,500,600,700&display=swap"
+        />
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-93XK08X7L0"
           strategy="afterInteractive"

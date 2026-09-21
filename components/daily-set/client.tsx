@@ -65,16 +65,19 @@ const sqlHighlightStyle = {
     ...vscDarkPlus,
     'pre[class*="language-"]': {
         ...vscDarkPlus['pre[class*="language-"]'],
-        background: '#0b101c',
+        background: '#f8fafc',
+        color: '#18181b',
         margin: 0,
         padding: '10px 12px',
         fontSize: '11px',
         lineHeight: '1.6',
-        borderRadius: '6px',
+        borderRadius: '8px',
+        border: '1px solid #e2e8f0',
     },
     'code[class*="language-"]': {
         ...vscDarkPlus['code[class*="language-"]'],
         background: 'none',
+        color: '#18181b',
         fontSize: '11px',
         lineHeight: '1.6',
         fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
@@ -85,78 +88,78 @@ type Difficulty = 'easy' | 'medium' | 'hard' | 'advanced';
 
 export function DailySetSkeleton() {
     return (
-        <div className="h-screen bg-[#080c16] flex flex-col overflow-hidden">
+        <div className="landing-light h-screen bg-[#f7f7f8] flex flex-col overflow-hidden">
             {/* Top Bar Skeleton */}
-            <div className="h-14 bg-[#0d121c] border-b border-[#202736] flex items-center px-6 shrink-0 justify-between">
+            <div className="h-14 bg-white border-b border-[#dedee2] flex items-center px-6 shrink-0 justify-between">
                 <div className="flex items-center gap-4">
-                    <div className="w-20 h-5 bg-[#202736] rounded animate-pulse" />
-                    <div className="w-px h-5 bg-[#202736]" />
-                    <div className="w-32 h-8 bg-[#202736] rounded animate-pulse" />
+                    <div className="w-20 h-5 bg-zinc-200 rounded animate-pulse" />
+                    <div className="w-px h-5 bg-zinc-200" />
+                    <div className="w-32 h-8 bg-zinc-100 border border-zinc-200 rounded-lg animate-pulse" />
                 </div>
                 <div className="flex gap-3">
-                    <div className="w-24 h-8 bg-[#202736] rounded animate-pulse" />
-                    <div className="w-8 h-8 bg-[#202736] rounded-full animate-pulse" />
+                    <div className="w-24 h-8 bg-[#1f9e8e]/20 rounded-lg animate-pulse" />
+                    <div className="w-8 h-8 bg-zinc-200 rounded-full animate-pulse" />
                 </div>
             </div>
 
             {/* Main Workspace Skeleton */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Sidebar */}
-                <div className="w-[280px] bg-[#080c16] border-r border-[#202736] flex flex-col shrink-0">
-                    <div className="h-[52px] border-b border-[#202736] bg-[#0d121c] flex items-center px-4 justify-between">
-                        <div className="w-24 h-4 bg-[#202736] rounded animate-pulse" />
-                        <div className="w-6 h-6 bg-[#202736] rounded animate-pulse" />
+                <div className="w-[280px] bg-[#fafafa] border-r border-[#dedee2] flex flex-col shrink-0">
+                    <div className="h-[52px] border-b border-[#dedee2] bg-white flex items-center px-4 justify-between">
+                        <div className="w-24 h-4 bg-zinc-200 rounded animate-pulse" />
+                        <div className="w-6 h-6 bg-zinc-200 rounded animate-pulse" />
                     </div>
                     <div className="p-3 space-y-3">
                         {[1, 2, 3, 4, 5].map(i => (
-                            <div key={i} className="h-16 bg-[#131924] border border-[#202736] rounded-lg animate-pulse" />
+                            <div key={i} className="h-16 bg-white border border-[#dedee2] rounded-xl animate-pulse" />
                         ))}
                     </div>
                 </div>
 
                 {/* Question Details */}
-                <div className="flex-1 border-r border-[#202736] bg-[#080c16] flex flex-col">
-                    <div className="h-[52px] border-b border-[#202736] bg-[#0d121c] px-4 flex items-center gap-4">
-                        <div className="w-20 h-6 bg-[#202736] rounded animate-pulse" />
-                        <div className="w-20 h-6 bg-[#202736] rounded animate-pulse" />
+                <div className="flex-1 border-r border-[#dedee2] bg-white flex flex-col">
+                    <div className="h-[52px] border-b border-[#dedee2] bg-[#fafafa] px-4 flex items-center gap-4">
+                        <div className="w-20 h-6 bg-zinc-200 rounded animate-pulse" />
+                        <div className="w-20 h-6 bg-zinc-200 rounded animate-pulse" />
                     </div>
                     <div className="p-6 space-y-6">
                         <div className="space-y-3">
-                            <div className="w-3/4 h-8 bg-[#202736] rounded animate-pulse" />
-                            <div className="w-1/4 h-5 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-3/4 h-8 bg-zinc-200 rounded animate-pulse" />
+                            <div className="w-1/4 h-5 bg-zinc-200 rounded animate-pulse" />
                         </div>
                         <div className="space-y-3 mt-8">
-                            <div className="w-full h-4 bg-[#202736] rounded animate-pulse" />
-                            <div className="w-full h-4 bg-[#202736] rounded animate-pulse" />
-                            <div className="w-5/6 h-4 bg-[#202736] rounded animate-pulse" />
-                            <div className="w-4/6 h-4 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-full h-4 bg-zinc-200 rounded animate-pulse" />
+                            <div className="w-full h-4 bg-zinc-200 rounded animate-pulse" />
+                            <div className="w-5/6 h-4 bg-zinc-200 rounded animate-pulse" />
+                            <div className="w-4/6 h-4 bg-zinc-200 rounded animate-pulse" />
                         </div>
-                        <div className="h-48 mt-8 bg-[#131924] border border-[#202736] rounded-xl animate-pulse" />
+                        <div className="h-48 mt-8 bg-[#fafafa] border border-[#dedee2] rounded-xl animate-pulse" />
                     </div>
                 </div>
 
                 {/* Code Editor */}
-                <div className="flex-1 flex flex-col bg-[#080c16]">
-                    <div className="h-[52px] border-b border-[#202736] bg-[#0d121c] flex items-center justify-between px-4">
+                <div className="flex-1 flex flex-col bg-white">
+                    <div className="h-[52px] border-b border-[#dedee2] bg-[#fafafa] flex items-center justify-between px-4">
                         <div className="flex gap-2">
-                            <div className="w-20 h-8 bg-[#202736] rounded animate-pulse" />
-                            <div className="w-20 h-8 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-20 h-8 bg-zinc-200 rounded animate-pulse" />
+                            <div className="w-20 h-8 bg-zinc-200 rounded animate-pulse" />
                         </div>
-                        <div className="w-24 h-8 bg-[#202736] rounded animate-pulse" />
+                        <div className="w-24 h-8 bg-zinc-200 rounded animate-pulse" />
                     </div>
                     <div className="flex-1 p-4">
-                        <div className="w-1/2 h-4 bg-[#202736] rounded animate-pulse mb-3" />
-                        <div className="w-1/3 h-4 bg-[#202736] rounded animate-pulse mb-3" />
-                        <div className="w-2/3 h-4 bg-[#202736] rounded animate-pulse mb-3" />
-                        <div className="w-1/4 h-4 bg-[#202736] rounded animate-pulse" />
+                        <div className="w-1/2 h-4 bg-zinc-200 rounded animate-pulse mb-3" />
+                        <div className="w-1/3 h-4 bg-zinc-200 rounded animate-pulse mb-3" />
+                        <div className="w-2/3 h-4 bg-zinc-200 rounded animate-pulse mb-3" />
+                        <div className="w-1/4 h-4 bg-zinc-200 rounded animate-pulse" />
                     </div>
-                    <div className="h-[280px] border-t border-[#202736] bg-[#0b101c] flex flex-col">
-                        <div className="h-[42px] border-b border-[#202736] flex items-center px-4">
-                            <div className="w-32 h-5 bg-[#202736] rounded animate-pulse" />
+                    <div className="h-[280px] border-t border-[#dedee2] bg-[#fafafa] flex flex-col">
+                        <div className="h-[42px] border-b border-[#dedee2] flex items-center px-4">
+                            <div className="w-32 h-5 bg-zinc-200 rounded animate-pulse" />
                         </div>
                         <div className="flex-1 p-4">
-                            <div className="w-1/3 h-4 bg-[#202736] rounded animate-pulse mb-3" />
-                            <div className="w-1/4 h-4 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-1/3 h-4 bg-zinc-200 rounded animate-pulse mb-3" />
+                            <div className="w-1/4 h-4 bg-zinc-200 rounded animate-pulse" />
                         </div>
                     </div>
                 </div>
@@ -363,7 +366,12 @@ export function DailySetClient() {
                         }
                         return prev;
                     });
-                } catch (err) {
+                } catch (err: any) {
+                    if (err?.message === 'subscription_required' || err?.message?.includes('subscription_required')) {
+                        setError("SUBSCRIPTION_REQUIRED");
+                        setShowResult(true);
+                        return;
+                    }
                     console.error("Failed to load problem metadata from API", err);
                 }
             }
@@ -381,10 +389,16 @@ export function DailySetClient() {
 
             const [datasets, savedSol] = await Promise.all([
                 // DSA problems have no datasets table — skip the call to avoid a 404
-                isDsa ? Promise.resolve([]) : api.getDatasets(id),
+                isDsa ? Promise.resolve([]) : api.getDatasets(id).catch((err: any) => {
+                    if (err?.message === 'subscription_required' || err?.message?.includes('subscription_required')) {
+                        setError("SUBSCRIPTION_REQUIRED");
+                        setShowResult(true);
+                    }
+                    return [];
+                }),
                 api.getSavedSolution(id).catch(() => ({ submitted_query: null }))
             ]);
-            const normalizedDatasets = datasets.map(ds => ({
+            const normalizedDatasets = (datasets || []).map(ds => ({
                 ...ds,
                 sample_rows: typeof ds.sample_rows === 'string'
                     ? JSON.parse(ds.sample_rows)
@@ -397,7 +411,7 @@ export function DailySetClient() {
             } else if (savedSol?.submitted_query) {
                 setCode(savedSol.submitted_query);
             } else {
-                const firstDsName = datasets[0]?.table_name || 'table_name';
+                const firstDsName = datasets?.[0]?.table_name || 'table_name';
                 if (isDsa) {
                     if (p?.starter_code) {
                         // Admin defined a full stub with params — use it directly
@@ -410,15 +424,15 @@ export function DailySetClient() {
                         setCode(`from typing import List, Optional\n\ndef ${fnName}():\n    # Write your solution here\n    pass\n`);
                     }
                 } else if (p?.challenge_type === 'python') {
-                    const dfList = datasets.map(d => `'${d.table_name}_df'`).join(', ');
-                    const dfLabel = datasets.length > 1
+                    const dfList = (datasets || []).map(d => `'${d.table_name}_df'`).join(', ');
+                    const dfLabel = (datasets || []).length > 1
                         ? `DataFrames are available as: ${dfList}`
                         : `DataFrame is available as '${firstDsName}_df'`;
                     setCode(`# Write your Python (Pandas) code for: ${p?.title}\n# The input ${dfLabel}.\n# Assign your final DataFrame to the 'result' variable.\n\nresult = ${firstDsName}_df\n`);
                 } else if (p?.challenge_type === 'pyspark') {
-                    const dfList = datasets.map(d => `'${d.table_name}_df'`).join(', ');
-                    const viewList = datasets.map(d => `'${d.table_name}'`).join(', ');
-                    const dfLabel = datasets.length > 1
+                    const dfList = (datasets || []).map(d => `'${d.table_name}_df'`).join(', ');
+                    const viewList = (datasets || []).map(d => `'${d.table_name}'`).join(', ');
+                    const dfLabel = (datasets || []).length > 1
                         ? `DataFrames are available as: ${dfList} (or as temp views: ${viewList})`
                         : `DataFrame is available as '${firstDsName}_df' or as a temp view '${firstDsName}'`;
                     setCode(`# Write your PySpark code for: ${p?.title}\n# The input ${dfLabel}.\n# Assign your final DataFrame to the 'result' variable.\n\nresult = ${firstDsName}_df\n`);
@@ -439,9 +453,13 @@ export function DailySetClient() {
             api.getProblemVotes(id).then(v => setProblemVotes(v)).catch(() => setProblemVotes({ likes: 0, user_has_voted: false }));
             api.getCommentCount(id).then(({ count }) => setCommentCount(count)).catch(() => setCommentCount(0));
 
-
-        } catch (err) {
-            console.error("Failed to load datasets", err);
+        } catch (err: any) {
+            if (err?.message === 'subscription_required' || err?.message?.includes('subscription_required')) {
+                setError("SUBSCRIPTION_REQUIRED");
+                setShowResult(true);
+            } else {
+                console.error("Failed to load problem data", err);
+            }
         }
     }, [problems, dailySet]);
 
@@ -882,31 +900,31 @@ export function DailySetClient() {
         };
 
         const TestDataRow = ({ label, value, color }: { label: string; value: any; color: string }) => (
-            <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold">{label}</span>
-                <pre className={`text-[11px] font-mono ${color} bg-[#080c16] border border-[#202736] rounded-md px-3 py-2 whitespace-pre-wrap break-all leading-relaxed`}>{typeof value === 'string' ? value : formatValue(value)}</pre>
+            <div className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold font-mono">{label}</span>
+                <pre className={`text-[12px] font-mono ${color} bg-[#f8fafc] border border-[#dedee2] rounded-lg px-3 py-2 whitespace-pre-wrap break-all leading-relaxed`}>{typeof value === 'string' ? value : formatValue(value)}</pre>
             </div>
         );
 
         if (activeOutputTab === 'test') {
             return (
-                <div className="space-y-4">
+                <div className="space-y-4 font-mono">
                     {/* ── Sample Pass / Fail count badge ── */}
                     <div className="flex items-center gap-3">
-                        <div className={`text-xs font-bold px-2.5 py-1 rounded-full ${sampleTests.every(r => r.passed) ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                                'bg-red-500/10 text-red-400 border border-red-500/20'
+                        <div className={`text-xs font-bold px-3 py-1 rounded-full font-mono ${sampleTests.every(r => r.passed) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                'bg-rose-50 text-rose-700 border border-rose-200'
                             }`}>
                             {sampleTests.filter(r => r.passed).length} / {sampleTests.length} sample cases passed
                         </div>
                         {executionResult.status === 'run_result' && (
-                            <span className="text-[10px] text-zinc-500 italic">Sample tests only · Press Submit to run all tests</span>
+                            <span className="text-[11px] text-zinc-500 italic font-mono">Sample tests only · Press Submit to run all tests</span>
                         )}
                     </div>
 
                     {/* ── Sample Test Cases (Tabbed) ── */}
                     {sampleTests.length > 0 && (
                         <div className="space-y-3">
-                            <div className="flex flex-wrap gap-1.5 border-b border-[#202736]/40 pb-2">
+                            <div className="flex flex-wrap gap-1.5 border-b border-[#dedee2] pb-2">
                                 {sampleTests.map((tc, idx) => {
                                     const isActive = activeSampleTab === idx;
                                     return (
@@ -914,14 +932,14 @@ export function DailySetClient() {
                                             key={idx}
                                             onClick={() => setActiveSampleTab(idx)}
                                             className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 border ${isActive
-                                                    ? 'bg-[#182235] text-[#4DD4C4] border-[#4DD4C4]/30 shadow-md shadow-[#4DD4C4]/5'
-                                                    : 'bg-[#0d121c] text-zinc-400 hover:text-zinc-200 border-[#202736]/50 hover:bg-[#131924]'
+                                                    ? 'bg-[#e6f7f5] text-[#1f9e8e] border-[#1f9e8e]/40 shadow-sm'
+                                                    : 'bg-[#f8fafc] text-zinc-600 hover:text-zinc-900 border-[#dedee2] hover:bg-white'
                                                 }`}
                                         >
                                             {tc.passed ? (
-                                                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                                             ) : (
-                                                <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                                                <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
                                             )}
                                             {tc.label ? tc.label : `Case ${idx + 1}`}
                                         </button>
@@ -934,19 +952,19 @@ export function DailySetClient() {
                                 if (!tc) return null;
                                 return (
                                     <div
-                                        className={`rounded-xl border p-3.5 flex flex-col gap-3 ${tc.passed
-                                                ? 'bg-green-500/5 border-green-500/20'
-                                                : 'bg-red-500/5 border-red-500/20'
+                                        className={`rounded-xl border p-4 flex flex-col gap-3 font-mono ${tc.passed
+                                                ? 'bg-emerald-50/30 border-emerald-200'
+                                                : 'bg-rose-50/30 border-rose-200'
                                             }`}
                                     >
                                         {/* Input */}
                                         {tc.input_data !== undefined && tc.input_data !== null && (
-                                            <TestDataRow label="Input" value={formatInput(tc.input_data)} color="text-zinc-300" />
+                                            <TestDataRow label="Input" value={formatInput(tc.input_data)} color="text-zinc-800" />
                                         )}
 
                                         {/* Expected */}
                                         {tc.expected !== undefined && tc.expected !== 'hidden' && (
-                                            <TestDataRow label="Expected Output" value={tc.expected} color="text-green-300" />
+                                            <TestDataRow label="Expected Output" value={tc.expected} color="text-emerald-700" />
                                         )}
 
                                         {/* Actual (got) */}
@@ -954,13 +972,13 @@ export function DailySetClient() {
                                             <TestDataRow
                                                 label="Actual Output"
                                                 value={tc.got}
-                                                color={tc.passed ? 'text-green-300' : 'text-red-300'}
+                                                color={tc.passed ? 'text-emerald-700' : 'text-rose-700'}
                                             />
                                         )}
 
                                         {/* Error */}
                                         {tc.error && (
-                                            <TestDataRow label="Error" value={tc.error} color="text-red-400" />
+                                            <TestDataRow label="Error" value={tc.error} color="text-rose-600" />
                                         )}
                                     </div>
                                 );
@@ -974,66 +992,66 @@ export function DailySetClient() {
         // ── Submission Results Tab ──
         if (executionResult.status === 'run_result') {
             return (
-                <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-3">
-                    <div className="w-12 h-12 rounded-xl bg-zinc-800/20 flex items-center justify-center border border-[#202736] text-zinc-500 mb-2">
-                        <Sparkles size={22} className="opacity-80" />
+                <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-3 font-mono">
+                    <div className="w-12 h-12 rounded-xl bg-zinc-100 flex items-center justify-center border border-[#dedee2] text-zinc-500 mb-2">
+                        <Sparkles size={22} className="opacity-80 text-[#1f9e8e]" />
                     </div>
-                    <h3 className="text-sm font-bold text-zinc-300">No Submission Result</h3>
-                    <p className="text-zinc-500 text-xs max-w-xs leading-relaxed">You only executed Sample tests. Click the Submit button to run your solution against the complete validation suite.</p>
+                    <h3 className="text-sm font-bold text-zinc-800 font-sans">No Submission Result</h3>
+                    <p className="text-zinc-500 text-xs max-w-xs leading-relaxed font-sans">You only executed Sample tests. Click the Submit button to run your solution against the complete validation suite.</p>
                 </div>
             );
         }
 
         return (
-            <div className="space-y-4">
+            <div className="space-y-4 font-mono">
                 {/* ── Summary Badge ── */}
                 <div className="flex items-center gap-3">
-                    <div className={`text-xs font-bold px-2.5 py-1 rounded-full ${executionResult.status === 'correct' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                            'bg-red-500/10 text-red-400 border border-red-500/20'
+                    <div className={`text-xs font-bold px-3 py-1 rounded-full font-mono ${executionResult.status === 'correct' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                            'bg-rose-50 text-rose-700 border border-rose-200'
                         }`}>
                         {summary.passed} / {summary.total} test cases passed
                     </div>
                 </div>
 
                 {firstFailing ? (
-                    <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3.5 flex flex-col gap-3">
+                    <div className="rounded-xl border border-rose-200 bg-rose-50/40 p-4 flex flex-col gap-3 font-mono">
                         <div className="flex items-center gap-2">
-                            <XCircle size={13} className="text-red-400 shrink-0" />
-                            <span className="text-xs font-bold text-red-400">
+                            <XCircle size={15} className="text-rose-600 shrink-0" />
+                            <span className="text-xs font-bold text-rose-700 font-mono">
                                 {firstFailing.is_hidden ? "Hidden Test Failed" : "Sample Test Failed"}
                             </span>
                             {firstFailing.is_hidden ? (
-                                <span className="ml-auto text-[9px] text-zinc-600 uppercase tracking-wider border border-[#202736] rounded px-1.5 py-0.5">Hidden</span>
+                                <span className="ml-auto text-[9px] text-zinc-500 uppercase tracking-wider border border-[#dedee2] bg-white rounded px-1.5 py-0.5 font-mono">Hidden</span>
                             ) : (
-                                <span className="ml-auto text-[9px] text-[#4DD4C4] uppercase tracking-wider border border-[#4DD4C4]/20 rounded px-1.5 py-0.5">{firstFailing.label || "Sample"}</span>
+                                <span className="ml-auto text-[9px] text-[#1f9e8e] uppercase tracking-wider border border-[#1f9e8e]/30 bg-white rounded px-1.5 py-0.5 font-mono">{firstFailing.label || "Sample"}</span>
                             )}
                         </div>
 
                         {/* Input (only if not hidden) */}
                         {!firstFailing.is_hidden && firstFailing.input_data !== undefined && firstFailing.input_data !== null && (
-                            <TestDataRow label="Input" value={formatInput(firstFailing.input_data)} color="text-zinc-300" />
+                            <TestDataRow label="Input" value={formatInput(firstFailing.input_data)} color="text-zinc-800" />
                         )}
 
                         {/* Expected */}
                         {firstFailing.expected !== undefined && firstFailing.expected !== 'hidden' && (
-                            <TestDataRow label="Expected Output" value={firstFailing.expected} color="text-green-300" />
+                            <TestDataRow label="Expected Output" value={firstFailing.expected} color="text-emerald-700" />
                         )}
 
                         {/* Actual */}
                         {firstFailing.got !== undefined && (
-                            <TestDataRow label="Actual Output" value={firstFailing.got} color="text-red-300" />
+                            <TestDataRow label="Actual Output" value={firstFailing.got} color="text-rose-700" />
                         )}
 
                         {/* Error */}
                         {firstFailing.error && (
-                            <TestDataRow label="Error" value={firstFailing.error} color="text-red-400" />
+                            <TestDataRow label="Error" value={firstFailing.error} color="text-rose-600" />
                         )}
                     </div>
                 ) : (
-                    <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-5 flex flex-col items-center justify-center text-center space-y-2">
-                        <CheckCircle2 size={24} className="text-green-400" />
-                        <h4 className="text-sm font-bold text-green-400">Submission Accepted!</h4>
-                        <p className="text-zinc-500 text-xs max-w-xs leading-relaxed">Your code successfully passes all standard validation checks and hidden edge-case testing constraints.</p>
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-6 flex flex-col items-center justify-center text-center space-y-2 font-sans">
+                        <CheckCircle2 size={28} className="text-emerald-600" />
+                        <h4 className="text-sm font-bold text-emerald-800 font-sans">Submission Accepted!</h4>
+                        <p className="text-zinc-600 text-xs max-w-xs leading-relaxed font-sans">Your code successfully passes all standard validation checks and hidden edge-case testing constraints.</p>
                     </div>
                 )}
             </div>
@@ -1057,9 +1075,14 @@ export function DailySetClient() {
                 setActiveOutputTab('test');
             }
             if (res.status === 'error' && res.error === 'PROFILE_REQUIRED') { setError("PROFILE_REQUIRED"); return; }
+            if (res.status === 'error' && (res.error === 'subscription_required' || res.error?.includes('subscription_required'))) { setError("SUBSCRIPTION_REQUIRED"); return; }
             if (res.status === 'error' && res.error) setError(res.error);
         } catch (err: any) {
-            setError(err.message || "Execution failed");
+            if (err?.message === 'subscription_required' || err?.message?.includes('subscription_required')) {
+                setError("SUBSCRIPTION_REQUIRED");
+            } else {
+                setError(err.message || "Execution failed");
+            }
             setExecutionResult(null);
         } finally {
             setIsRunning(false);
@@ -1084,6 +1107,7 @@ export function DailySetClient() {
                     setActiveOutputTab('submit');
                 }
                 if (res.status === 'error' && res.error === 'PROFILE_REQUIRED') { setError("PROFILE_REQUIRED"); return; }
+                if (res.status === 'error' && (res.error === 'subscription_required' || res.error?.includes('subscription_required'))) { setError("SUBSCRIPTION_REQUIRED"); return; }
                 if (res.status === 'error' && res.error) { setError(res.error); return; }
                 if (res.status === 'correct') {
                     setSolvedIds(prev => new Set(prev).add(activeProblemId));
@@ -1101,7 +1125,11 @@ export function DailySetClient() {
                     setTimeout(() => setToast(null), 5000);
                 }
             } catch (err: any) {
-                setError(err.message || "Execution failed");
+                if (err?.message === 'subscription_required' || err?.message?.includes('subscription_required')) {
+                    setError("SUBSCRIPTION_REQUIRED");
+                } else {
+                    setError(err.message || "Execution failed");
+                }
                 setExecutionResult(null);
             } finally {
                 setIsRunning(false);
@@ -1340,19 +1368,91 @@ export function DailySetClient() {
 
     const getDiffStyle = (diff: string) => {
         const d = diff?.toLowerCase();
-        if (d === 'easy') return { label: 'BASIC', color: 'text-[#4DD4C4]', bg: 'bg-[#4DD4C4]/10', border: 'border-[#4DD4C4]/30', hex: '#4DD4C4' };
-        if (d === 'medium') return { label: 'INTERMEDIATE', color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', hex: '#eab308' };
-        return { label: 'ADVANCED', color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/30', hex: '#f87171' };
+        if (d === 'easy') return { label: 'BASIC', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', hex: '#10b981' };
+        if (d === 'medium') return { label: 'INTERMEDIATE', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', hex: '#f59e0b' };
+        return { label: 'ADVANCED', color: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-200', hex: '#f43f5e' };
     };
 
     const handleEditorWillMount = (monaco: any) => {
         monaco.editor.defineTheme('dailySqlTheme', {
-            base: 'vs-dark', inherit: true, rules: [],
+            base: 'vs',
+            inherit: true,
+            rules: [
+                // Comments (VS Code Light green italic)
+                { token: 'comment', foreground: '008000', fontStyle: 'italic' },
+                { token: 'comment.sql', foreground: '008000', fontStyle: 'italic' },
+                { token: 'comment.python', foreground: '008000', fontStyle: 'italic' },
+                { token: 'comment.doc', foreground: '008000', fontStyle: 'italic' },
+
+                // Keywords (VS Code Blue #0000ff / Purple for Python flow control)
+                { token: 'keyword', foreground: '0000ff', fontStyle: 'bold' },
+                { token: 'keyword.sql', foreground: '0000ff', fontStyle: 'bold' },
+                { token: 'keyword.python', foreground: 'af00db', fontStyle: 'bold' },
+                { token: 'keyword.control', foreground: 'af00db', fontStyle: 'bold' },
+                { token: 'keyword.operator', foreground: '0000ff' },
+
+                // Functions & Methods (VS Code signature golden brown #795e26)
+                { token: 'entity.name.function', foreground: '795e26', fontStyle: 'bold' },
+                { token: 'support.function', foreground: '795e26', fontStyle: 'bold' },
+                { token: 'function', foreground: '795e26', fontStyle: 'bold' },
+                { token: 'predefined', foreground: '795e26', fontStyle: 'bold' },
+                { token: 'predefined.sql', foreground: '795e26', fontStyle: 'bold' },
+
+                // Strings (VS Code burgundy #a31515)
+                { token: 'string', foreground: 'a31515' },
+                { token: 'string.sql', foreground: 'a31515' },
+                { token: 'string.python', foreground: 'a31515' },
+                { token: 'string.quote', foreground: 'a31515' },
+
+                // Numbers (VS Code emerald #098658)
+                { token: 'number', foreground: '098658' },
+                { token: 'number.float', foreground: '098658' },
+                { token: 'number.hex', foreground: '098658' },
+                { token: 'constant.numeric', foreground: '098658' },
+
+                // Types & Classes (VS Code Teal #267f99)
+                { token: 'type', foreground: '267f99' },
+                { token: 'type.identifier', foreground: '267f99' },
+                { token: 'entity.name.type', foreground: '267f99' },
+                { token: 'class', foreground: '267f99', fontStyle: 'bold' },
+                { token: 'storage.type', foreground: '0000ff' },
+
+                // Variables & Parameters (VS Code Navy #001080)
+                { token: 'variable', foreground: '001080' },
+                { token: 'variable.parameter', foreground: '001080' },
+                { token: 'variable.other', foreground: '001080' },
+                { token: 'identifier', foreground: '1e293b' },
+
+                // Constants (VS Code blue)
+                { token: 'constant', foreground: '0000ff' },
+                { token: 'constant.language', foreground: '0000ff' },
+
+                // Operators & Delimiters
+                { token: 'operator', foreground: '000000' },
+                { token: 'operator.sql', foreground: '000000' },
+                { token: 'delimiter', foreground: '000000' },
+                { token: 'delimiter.parenthesis', foreground: '000000' },
+                { token: 'delimiter.bracket', foreground: '000000' },
+
+                // Decorators (Python @decorator)
+                { token: 'tag', foreground: 'af00db' },
+                { token: 'meta.decorator', foreground: 'af00db' },
+            ],
             colors: {
-                'editor.background': '#0b101c',
-                'editor.lineHighlightBackground': '#ffffff0a',
-                'editorLineNumber.foreground': '#4f5b72',
-                'editorGutter.background': '#0b101c'
+                'editor.background': '#ffffff',
+                'editor.foreground': '#1e293b',
+                'editor.lineHighlightBackground': '#f8fafc',
+                'editor.lineHighlightBorder': '#e2e8f0',
+                'editorLineNumber.foreground': '#94a3b8',
+                'editorLineNumber.activeForeground': '#0f172a',
+                'editorGutter.background': '#ffffff',
+                'editorCursor.foreground': '#1f9e8e',
+                'editor.selectionBackground': '#b3d7ff',
+                'editor.inactiveSelectionBackground': '#e2e8f0',
+                'editorIndentGuide.background': '#e2e8f0',
+                'editorIndentGuide.activeBackground': '#cbd5e1',
+                'editorBracketMatch.background': '#dbeafe',
+                'editorBracketMatch.border': '#93c5fd',
             }
         });
     };
@@ -1380,7 +1480,7 @@ export function DailySetClient() {
     return (
         <div
             ref={containerRef}
-            className="h-screen bg-[#080c16] text-white flex flex-col font-sans overflow-hidden [&_*::-webkit-scrollbar]:w-1.5 [&_*::-webkit-scrollbar-track]:bg-transparent [&_*::-webkit-scrollbar-thumb]:bg-[#202736] [&_*::-webkit-scrollbar-thumb]:rounded-full hover:[&_*::-webkit-scrollbar-thumb]:bg-zinc-600"
+            className="landing-light h-screen bg-[#f7f7f8] text-zinc-900 flex flex-col font-sans overflow-hidden [&_*::-webkit-scrollbar]:w-1.5 [&_*::-webkit-scrollbar-track]:bg-transparent [&_*::-webkit-scrollbar-thumb]:bg-zinc-300 [&_*::-webkit-scrollbar-thumb]:rounded-full hover:[&_*::-webkit-scrollbar-thumb]:bg-zinc-400"
         >
             {/* ════════════════════════════════════════════
                 INTEGRATED TOP BAR
@@ -2395,19 +2495,19 @@ export function DailySetClient() {
                     {/* ── RIGHT PANE: Editor + Output ── */}
                     <Panel minSize="30" className="flex flex-col bg-[#0b101c]">
                         {/* Editor toolbar */}
-                        <div className="h-[52px] border-b border-[#202736] bg-[#131924] flex items-center justify-between px-4 shrink-0">
+                        <div className="h-[52px] border-b border-[#dedee2] bg-[#fafafa] flex items-center justify-between px-4 shrink-0">
                             <div className="flex items-center gap-3">
                                 {/* Language / dialect label */}
                                 {!isDualDialect && (
-                                    <span className="text-xs font-mono font-medium text-[#4DD4C4] flex items-center gap-2">
-                                        <span className="text-zinc-500">&gt;_</span>
+                                    <span className="text-xs font-mono font-medium text-[#1f9e8e] flex items-center gap-2">
+                                        <span className="text-zinc-400">&gt;_</span>
                                         {activeProblem?.challenge_type === 'python' ? 'Python (Pandas)' : activeProblem?.challenge_type === 'pyspark' ? 'PySpark' : activeProblem?.challenge_type === 'python_dsa' ? 'Python' : activeProblem?.challenge_type === 'sql' ? 'PostgreSQL' : 'SQL'}
                                     </span>
                                 )}
 
                                 {/* Dialect toggle — only shown for dual-dialect SQL problems */}
                                 {isDualDialect && (
-                                    <div className="flex items-center gap-1 bg-[#0b101c] border border-[#202736] rounded-lg p-0.5">
+                                    <div className="flex items-center gap-1 bg-white border border-[#dedee2] rounded-lg p-0.5 shadow-sm">
                                         {(['postgresql', 'mysql'] as const).map(d => (
                                             <button
                                                 key={d}
@@ -2415,8 +2515,8 @@ export function DailySetClient() {
                                                 title={d === 'postgresql' ? 'Run with PostgreSQL' : 'Run with MySQL'}
                                                 className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold transition-all duration-150 ${
                                                     sqlDialect === d
-                                                        ? 'bg-[#4DD4C4]/15 text-[#4DD4C4] border border-[#4DD4C4]/30'
-                                                        : 'text-zinc-500 hover:text-zinc-300'
+                                                        ? 'bg-[#1f9e8e]/15 text-[#1f9e8e] border border-[#1f9e8e]/30 shadow-xs'
+                                                        : 'text-zinc-500 hover:text-zinc-800'
                                                 }`}
                                             >
                                                 {d === 'postgresql' ? 'PostgreSQL' : 'MySQL'}
@@ -2425,7 +2525,7 @@ export function DailySetClient() {
                                     </div>
                                 )}
                             </div>
-                            <div className="flex items-center gap-3 text-zinc-400">
+                            <div className="flex items-center gap-3 text-zinc-500">
                                 <button
                                     onClick={() => {
                                         setCode('');
@@ -2433,7 +2533,7 @@ export function DailySetClient() {
                                             localStorage.removeItem(`draft_query_${activeProblemId}`);
                                         }
                                     }}
-                                    className="hover:text-zinc-200 transition-colors"
+                                    className="hover:text-zinc-900 transition-colors"
                                     title="Clear Code"
                                 >
                                     <Undo size={14} />
@@ -2442,7 +2542,7 @@ export function DailySetClient() {
                         </div>
 
                         {/* Monaco */}
-                        <div id="tour-code-editor" className="flex-1 relative overflow-hidden bg-[#0b101c]">
+                        <div id="tour-code-editor" className="flex-1 relative overflow-hidden bg-white">
                             <Editor
                                 height="100%"
                                 language={activeProblem?.challenge_type === 'sql' ? 'sql' : 'python'}
@@ -2464,17 +2564,19 @@ export function DailySetClient() {
                                     overviewRulerBorder: false,
                                     scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
                                     fontSize: 14,
-                                    fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+                                    fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Consolas, monospace",
+                                    fontLigatures: true,
                                     lineHeight: 24,
-                                    padding: { top: 4 },
+                                    padding: { top: 8, bottom: 8 },
                                     scrollBeyondLastLine: false,
                                     smoothScrolling: true,
                                     cursorBlinking: "smooth",
                                     cursorSmoothCaretAnimation: "on",
                                     formatOnPaste: true,
+                                    renderLineHighlight: "all",
                                 }}
                             />
-                            <div className="absolute right-16 bottom-3 text-[10px] text-zinc-500 font-mono pointer-events-none px-2 py-1 rounded">
+                            <div className="absolute right-16 bottom-3 text-[10px] text-zinc-400 font-mono pointer-events-none px-2 py-1 rounded bg-white/80 border border-[#dedee2]">
                                 Ln {cursorPos.lineNumber}, Col {cursorPos.column}
                             </div>
 
@@ -2482,7 +2584,7 @@ export function DailySetClient() {
                             <button
                                 onClick={() => openFeedbackModal('fab')}
                                 title="Send Feedback"
-                                className="absolute bottom-3 right-6 z-[30] w-8 h-8 rounded-full bg-[#131924] border border-[#202736] text-zinc-400 hover:text-[#4DD4C4] hover:border-[#4DD4C4]/50 transition-all shadow-lg flex items-center justify-center group"
+                                className="absolute bottom-3 right-6 z-[30] w-8 h-8 rounded-full bg-white border border-[#dedee2] text-zinc-500 hover:text-[#1f9e8e] hover:border-[#1f9e8e]/50 transition-all shadow-md flex items-center justify-center group"
                             >
                                 <MessageCircle size={14} className="group-hover:scale-110 transition-transform" />
                             </button>
@@ -2493,21 +2595,21 @@ export function DailySetClient() {
                             <>
                                 {/* Drag handle for resizing output */}
                                 <div
-                                    className="h-1.5 bg-[#080c16] hover:bg-[#4DD4C4]/20 transition-colors cursor-row-resize flex items-center justify-center shrink-0 border-t border-[#202736]"
+                                    className="h-1.5 bg-[#f4f4f5] hover:bg-[#1f9e8e]/20 transition-colors cursor-row-resize flex items-center justify-center shrink-0 border-t border-[#dedee2]"
                                     onMouseDown={handleOutputResizeStart}
                                 >
-                                    <div className="w-8 h-0.5 bg-[#202736] rounded-full" />
+                                    <div className="w-8 h-0.5 bg-[#cbd5e1] rounded-full" />
                                 </div>
 
-                                <div className="flex flex-col bg-[#0d121c] shrink-0 overflow-hidden" style={{ height: outputHeight }}>
-                                    <div className="h-10 border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0">
+                                <div className="flex flex-col bg-white shrink-0 overflow-hidden" style={{ height: outputHeight }}>
+                                    <div className="h-10 border-b border-[#dedee2] bg-[#f8fafc] px-4 flex items-center justify-between shrink-0">
                                         {isDsaProblem ? (
                                             <div className="flex items-center h-full">
                                                 <button
                                                     onClick={() => setActiveOutputTab('test')}
                                                     className={`h-full px-4 text-xs font-mono font-bold border-b-2 flex items-center gap-1.5 transition-all ${activeOutputTab === 'test'
-                                                            ? 'border-[#4DD4C4] text-[#4DD4C4] bg-[#4DD4C4]/5'
-                                                            : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                                                            ? 'border-[#1f9e8e] text-[#1f9e8e] bg-[#1f9e8e]/5'
+                                                            : 'border-transparent text-zinc-500 hover:text-zinc-800'
                                                         }`}
                                                 >
                                                     <TerminalSquare size={13} /> Test Results
@@ -2515,31 +2617,31 @@ export function DailySetClient() {
                                                 <button
                                                     onClick={() => setActiveOutputTab('submit')}
                                                     className={`h-full px-4 text-xs font-mono font-bold border-b-2 flex items-center gap-1.5 transition-all ${activeOutputTab === 'submit'
-                                                            ? 'border-[#4DD4C4] text-[#4DD4C4] bg-[#4DD4C4]/5'
-                                                            : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                                                            ? 'border-[#1f9e8e] text-[#1f9e8e] bg-[#1f9e8e]/5'
+                                                            : 'border-transparent text-zinc-500 hover:text-zinc-800'
                                                         }`}
                                                 >
                                                     <Sparkles size={13} /> Submission
                                                 </button>
                                             </div>
                                         ) : (
-                                            <span className="text-xs font-bold uppercase tracking-widest text-white font-mono flex items-center gap-2">
-                                                <TerminalSquare size={14} /> Query Output
+                                            <span className="text-xs font-bold uppercase tracking-wider text-zinc-800 font-mono flex items-center gap-2">
+                                                <TerminalSquare size={14} className="text-[#1f9e8e]" /> Query Output
                                             </span>
                                         )}
                                         <span className={`text-xs font-bold font-mono flex items-center gap-1.5 ${isDsaProblem ? (
                                                 activeOutputTab === 'test' ? (
                                                     executionResult?.test_summary
-                                                        ? (executionResult.test_summary.results.filter(r => !r.is_hidden).every(r => r.passed) ? 'text-green-400' : 'text-red-400')
-                                                        : 'text-zinc-400'
+                                                        ? (executionResult.test_summary.results.filter(r => !r.is_hidden).every(r => r.passed) ? 'text-emerald-600' : 'text-rose-600')
+                                                        : 'text-zinc-500'
                                                 ) : (
                                                     executionResult && executionResult.status !== 'run_result'
-                                                        ? (executionResult.status === 'correct' ? 'text-green-400' : 'text-red-400')
-                                                        : 'text-zinc-400'
+                                                        ? (executionResult.status === 'correct' ? 'text-emerald-600' : 'text-rose-600')
+                                                        : 'text-zinc-500'
                                                 )
                                             ) : (
-                                                executionResult?.status === 'correct' ? 'text-green-400' :
-                                                    executionResult?.status === 'incorrect' ? 'text-red-400' : 'text-zinc-400'
+                                                executionResult?.status === 'correct' ? 'text-emerald-600' :
+                                                    executionResult?.status === 'incorrect' ? 'text-rose-600' : 'text-zinc-500'
                                             )
                                             }`}>
                                             {isDsaProblem ? (
@@ -2565,58 +2667,76 @@ export function DailySetClient() {
                                         </span>
                                     </div>
 
-                                    <div className="flex-1 overflow-auto p-4 bg-[#0d121c]">
+                                    <div className="flex-1 overflow-auto p-4 bg-white font-mono">
                                         {error === "LOGIN_REQUIRED" ? (
                                             <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
-                                                <div className="w-12 h-12 rounded-xl bg-[#4DD4C4]/10 flex items-center justify-center border border-[#4DD4C4]/20 mb-2 shadow-inner">
-                                                    <Lock size={24} className="text-[#4DD4C4]" />
+                                                <div className="w-12 h-12 rounded-xl bg-[#1f9e8e]/10 flex items-center justify-center border border-[#1f9e8e]/20 mb-2 shadow-inner">
+                                                    <Lock size={24} className="text-[#1f9e8e]" />
                                                 </div>
-                                                <h3 className="text-lg font-bold text-white tracking-tight">Practice is Locked</h3>
-                                                <p className="text-zinc-500 text-sm max-w-xs leading-relaxed">Join our community of data pros to run queries, track streaks, and save your progress.</p>
+                                                <h3 className="text-lg font-bold text-zinc-900 tracking-tight font-sans">Practice is Locked</h3>
+                                                <p className="text-zinc-500 text-sm max-w-xs leading-relaxed font-sans">Join our community of data pros to run queries, track streaks, and save your progress.</p>
                                                 <div className="flex gap-4 pt-2">
-                                                    <Link href="/login" className="px-6 py-2 bg-[#4DD4C4] text-[#080c16] rounded-xl font-bold text-sm hover:bg-[#3dbdb0] transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-[#4DD4C4]/20">Log In</Link>
-                                                    <Link href="/signup" className="px-6 py-2 bg-[#131924] border border-[#202736] text-white rounded-xl font-bold text-sm hover:bg-[#202736] transition-all">Sign Up</Link>
+                                                    <Link href="/login" className="px-6 py-2 bg-[#1f9e8e] text-white rounded-xl font-bold text-sm hover:bg-[#177a6d] transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-[#1f9e8e]/20 font-sans">Log In</Link>
+                                                    <Link href="/signup" className="px-6 py-2 bg-white border border-[#dedee2] text-zinc-800 rounded-xl font-bold text-sm hover:bg-zinc-50 transition-all font-sans">Sign Up</Link>
                                                 </div>
                                             </div>
                                         ) : error === "PROFILE_REQUIRED" ? (
                                             <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
-                                                <div className="w-12 h-12 rounded-xl bg-[#60a5fa]/10 flex items-center justify-center border border-[#60a5fa]/20 mb-2">
-                                                    <Sparkles size={24} className="text-[#60a5fa]" />
+                                                <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-200 mb-2">
+                                                    <Sparkles size={24} className="text-blue-600" />
                                                 </div>
-                                                <h3 className="text-lg font-bold text-white tracking-tight">One Last Step!</h3>
-                                                <p className="text-zinc-500 text-sm max-w-xs leading-relaxed">Complete your profile setup to unlock full access to the daily practice engine.</p>
+                                                <h3 className="text-lg font-bold text-zinc-900 tracking-tight font-sans">One Last Step!</h3>
+                                                <p className="text-zinc-500 text-sm max-w-xs leading-relaxed font-sans">Complete your profile setup to unlock full access to the daily practice engine.</p>
                                                 <button
                                                     onClick={() => router.push('/profile')}
-                                                    className="px-8 py-2.5 bg-[#60a5fa] text-white rounded-xl font-bold text-sm hover:bg-[#4f83cc] transition-all flex items-center gap-2 group shadow-lg shadow-[#60a5fa]/20"
+                                                    className="px-8 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all flex items-center gap-2 group shadow-lg shadow-blue-500/20 font-sans"
                                                 >
                                                     Complete Setup <ArrowRightIcon size={16} className="group-hover:translate-x-1 transition-transform" />
                                                 </button>
                                             </div>
+                                        ) : error === "SUBSCRIPTION_REQUIRED" ? (
+                                            <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-4 font-sans">
+                                                <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center border border-amber-200 mb-2 shadow-sm">
+                                                    <Lock size={24} className="text-amber-600" />
+                                                </div>
+                                                <h3 className="text-lg font-bold text-zinc-900 tracking-tight font-sans">DailySQL Pro Required</h3>
+                                                <p className="text-zinc-500 text-sm max-w-sm leading-relaxed font-sans">
+                                                    This problem is part of the Pro Practice Library (SQL #31+, Python & PySpark full archive). Upgrade to Pro for unlimited access across all problems and sandboxes.
+                                                </p>
+                                                <div className="flex gap-3 pt-2">
+                                                    <Link href="/pricing" className="px-6 py-2.5 bg-[#1f9e8e] text-white rounded-xl font-bold text-sm hover:bg-[#177a6d] transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-[#1f9e8e]/20 font-sans">
+                                                        View Pro Plans
+                                                    </Link>
+                                                    <Link href="/practice/daily" className="px-5 py-2.5 bg-white border border-[#dedee2] text-zinc-800 rounded-xl font-bold text-sm hover:bg-zinc-50 transition-all font-sans">
+                                                        Today&apos;s Free Set
+                                                    </Link>
+                                                </div>
+                                            </div>
                                         ) : error ? (
-                                            <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-xl text-red-400 font-mono text-sm flex flex-col gap-3">
-                                                <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-widest opacity-80">
+                                            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 font-mono text-sm flex flex-col gap-3">
+                                                <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-widest text-red-700">
                                                     <AlertCircle size={14} /> Execution Error
                                                 </div>
-                                                <div className="p-4 bg-[#080c16] border border-red-500/20 rounded-lg text-red-200/90 leading-relaxed whitespace-pre-wrap">{error}</div>
+                                                <div className="p-4 bg-white border border-red-200 rounded-lg text-red-800 leading-relaxed whitespace-pre-wrap">{error}</div>
                                             </div>
                                         ) : isDsaProblem && executionResult?.test_summary ? (
                                             renderDsaPanel()
                                         ) : executionResult?.user ? (
-                                            <div className="rounded-xl border border-[#202736] overflow-hidden bg-[#080c16] shadow-2xl">
+                                            <div className="rounded-xl border border-[#dedee2] overflow-hidden bg-white shadow-sm font-mono">
                                                 <div className="overflow-x-auto custom-scrollbar">
-                                                    <table className="w-full text-left text-[10px] border-collapse">
-                                                        <thead className="bg-[#131924] text-zinc-400">
+                                                    <table className="w-full text-left text-[11px] border-collapse font-mono">
+                                                        <thead className="bg-[#f8fafc] text-zinc-700 border-b border-[#dedee2]">
                                                             <tr>
                                                                 {executionResult.user.columns.map((k: string) => (
-                                                                    <th key={k} className="px-4 py-2.5 border-b border-[#202736] font-mono font-bold text-[9px] uppercase tracking-wider whitespace-nowrap">{k}</th>
+                                                                    <th key={k} className="px-4 py-2.5 font-mono font-bold text-[10px] uppercase tracking-wider whitespace-nowrap border-r last:border-r-0 border-[#dedee2]">{k}</th>
                                                                 ))}
                                                             </tr>
                                                         </thead>
-                                                        <tbody className="divide-y divide-[#202736]/20">
+                                                        <tbody className="divide-y divide-[#dedee2]">
                                                             {executionResult.user.rows.map((row: any[], i: number) => (
-                                                                <tr key={i} className="hover:bg-[#4DD4C4]/5 transition-colors group">
+                                                                <tr key={i} className="hover:bg-[#f8fafc] transition-colors group">
                                                                     {row.map((cell: any, j: number) => (
-                                                                        <td key={j} className="px-4 py-2.5 text-zinc-300 font-mono group-hover:text-white transition-colors whitespace-nowrap">{cell?.toString()}</td>
+                                                                        <td key={j} className="px-4 py-2.5 text-zinc-800 font-mono group-hover:text-black transition-colors whitespace-nowrap border-r last:border-r-0 border-[#dedee2]">{cell?.toString()}</td>
                                                                     ))}
                                                                 </tr>
                                                             ))}
@@ -2624,7 +2744,7 @@ export function DailySetClient() {
                                                     </table>
                                                 </div>
                                                 {executionResult?.diff_reason && (
-                                                    <div className="bg-red-500/10 text-red-400 w-full p-3 font-mono mt-4 rounded-b-lg border-t border-red-500/20">
+                                                    <div className="bg-red-50 text-red-700 w-full p-3 font-mono text-xs border-t border-red-200">
                                                         Failed against expected output: {executionResult.diff_reason}
                                                     </div>
                                                 )}
@@ -2633,12 +2753,12 @@ export function DailySetClient() {
                                     </div>
 
 
-                                    <div className="p-4 border-t border-[#202736] bg-[#0b101c] flex justify-between items-center shrink-0">
+                                    <div className="p-3.5 border-t border-[#dedee2] bg-[#fafafa] flex justify-between items-center shrink-0">
                                         <div className="flex text-xs text-zinc-500 gap-4 font-mono">
                                             {!isDsaProblem && (
                                                 <button
                                                     onClick={() => setShowHint(!showHint)}
-                                                    className="cursor-pointer hover:text-zinc-300 transition-colors"
+                                                    className="cursor-pointer hover:text-zinc-800 transition-colors"
                                                 >
                                                     Hint
                                                 </button>
@@ -2649,8 +2769,8 @@ export function DailySetClient() {
                                                 onClick={handleSubmit}
                                                 disabled={!activeProblemId || isRunning}
                                                 className={`px-6 py-2 rounded text-xs font-bold transition-all flex items-center gap-1.5 ${!activeProblemId || isRunning
-                                                        ? 'bg-[#18212f] text-zinc-500 cursor-not-allowed border border-[#202736]'
-                                                        : 'bg-[#4DD4C4] text-[#080C16] hover:bg-[#3dbdb0] shadow-[0_0_10px_rgba(77,212,196,0.2)]'
+                                                        ? 'bg-zinc-200 text-zinc-400 cursor-not-allowed border border-[#dedee2]'
+                                                        : 'bg-[#1f9e8e] text-white hover:bg-[#177a6d] shadow-md'
                                                     }`}
                                             >
                                                 {isRunning ? <Loader2 size={12} className="animate-spin" /> : <UploadCloud size={12} />}
@@ -2660,7 +2780,7 @@ export function DailySetClient() {
                                             <button
                                                 onClick={handleSubmit}
                                                 disabled={executionResult?.status !== 'correct'}
-                                                className={`px-6 py-2 rounded text-xs font-bold transition-all ${executionResult?.status === 'correct' ? 'bg-[#4DD4C4] text-[#080C16] hover:bg-[#3dbdb0] shadow-[0_0_10px_rgba(77,212,196,0.2)]' : 'bg-[#18212f] text-zinc-500 cursor-not-allowed border border-[#202736]'}`}
+                                                className={`px-6 py-2 rounded text-xs font-bold transition-all ${executionResult?.status === 'correct' ? 'bg-[#1f9e8e] text-white hover:bg-[#177a6d] shadow-md' : 'bg-zinc-200 text-zinc-400 cursor-not-allowed border border-[#dedee2]'}`}
                                             >
                                                 SUBMIT
                                             </button>

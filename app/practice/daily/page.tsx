@@ -12,8 +12,10 @@ export const metadata: Metadata = {
 
 export default function DailySetPage() {
     return (
-        <Suspense fallback={<DailySetSkeleton />}>
-            <DailySetClient />
-        </Suspense>
+        <div className="landing-light h-screen w-screen overflow-hidden">
+            <Suspense fallback={<DailySetSkeleton />}>
+                <DailySetClient />
+            </Suspense>
+        </div>
     );
 }

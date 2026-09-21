@@ -58,8 +58,17 @@ export function StandaloneNavbar() {
     return (
         <nav className="sticky top-0 relative w-full h-16 border-b border-white/5 bg-[#0a0f1c]/95 backdrop-blur z-[100] px-12 sm:px-20 lg:px-40 flex items-center justify-between shrink-0">
             {/* Logo */}
-            <Link href="/" className="flex items-center space-x-2">
-                <span className="text-xl font-bold text-white">DailySQL</span>
+            <Link href="/" className="flex items-center gap-3 shrink-0 group">
+                <img
+                    src="/dailysql-logo-bg-removed.png"
+                    alt="DailySQL Logo"
+                    className="h-9 w-auto object-contain transition-transform group-hover:scale-105"
+                />
+                <img
+                    src="/dailysql-wordmark-bg-removed.png"
+                    alt="DailySQL"
+                    className="h-7 w-auto object-contain block transition-opacity group-hover:opacity-90"
+                />
             </Link>
 
             {/* Nav Items - Center (Hidden on Profile) */}

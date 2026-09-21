@@ -3,6 +3,9 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ============================================================
+   TAILWIND THEME MAPPING
+   ============================================================ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -44,20 +47,18 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
-
-  /* Brand Colors */
   --color-brand-light: var(--brand-light);
   --color-brand-base: var(--brand-base);
   --color-brand-dark: var(--brand-dark);
 }
 
+/* ============================================================
+   ROOT (light defaults — dark pages override via .dark)
+   ============================================================ */
 :root {
-  /* --- CUSTOMIZABLE BRAND COLORS --- */
-  /* Change these values to try different themes */
-  /* Current: Vibrant Teal/Cyan - #30B5A6 */
   --brand-light: #4DD4C4;
-  --brand-base: #30B5A6;
-  --brand-dark: #2A9D90;
+  --brand-base:  #1f9e8e;
+  --brand-dark:  #177a6d;
 
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -93,32 +94,28 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* ============================================================
+   DARK MODE  (practice pages, etc.)
+   ============================================================ */
 .dark {
   --background: #080C16;
-  /* Deep navy blue */
   --foreground: #F9FAFB;
-  /* Off-white */
   --card: #0F1419;
-  /* Slightly lighter navy for cards */
   --card-foreground: #F9FAFB;
   --popover: #0F1419;
   --popover-foreground: #F9FAFB;
   --primary: #F9FAFB;
   --primary-foreground: #080C16;
   --secondary: #1A2332;
-  /* Dark blue-grey */
   --secondary-foreground: #F9FAFB;
   --muted: #1A2332;
   --muted-foreground: #7588A3;
-  /* Blue-grey muted text */
   --accent: #1A2332;
   --accent-foreground: #F9FAFB;
   --destructive: oklch(0.704 0.191 22.216);
   --border: #20283C;
-  /* Muted blue border */
   --input: #20283C;
-  --ring: #30B5A6;
-  /* Teal ring */
+  --ring: #1f9e8e;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -126,16 +123,97 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: #0F1419;
   --sidebar-foreground: #F9FAFB;
-  --sidebar-primary: #30B5A6;
-  /* Teal */
+  --sidebar-primary: #1f9e8e;
   --sidebar-primary-foreground: #080C16;
   --sidebar-accent: #1A2332;
   --sidebar-accent-foreground: #F9FAFB;
   --sidebar-border: #20283C;
-  --sidebar-ring: #30B5A6;
-  /* Teal */
+  --sidebar-ring: #1f9e8e;
 }
 
+/* ============================================================
+   LANDING LIGHT MODE
+   Wraps the homepage in a div.landing-light.
+   This OVERRIDES every single .dark variable back to light
+   so the landing page is always light regardless of html.dark.
+   ============================================================ */
+.landing-light {
+  /* ── Reset all dark-mode Tailwind vars to light ── */
+  --background:           #f7f7f8;
+  --foreground:           #272727;
+  --card:                 #ffffff;
+  --card-foreground:      #272727;
+  --popover:              #ffffff;
+  --popover-foreground:   #272727;
+  --primary:              #1f9e8e;
+  --primary-foreground:   #ffffff;
+  --secondary:            #f4f4f5;
+  --secondary-foreground: #272727;
+  --muted:                #f4f4f5;
+  --muted-foreground:     #6e6e6e;
+  --accent:               #f4f4f5;
+  --accent-foreground:    #272727;
+  --destructive:          oklch(0.577 0.245 27.325);
+  --border:               #dedee2;
+  --input:                #dedee2;
+  --ring:                 #1f9e8e;
+  --sidebar:              #fafafa;
+  --sidebar-foreground:   #272727;
+  --sidebar-primary:      #1f9e8e;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent:       #f4f4f5;
+  --sidebar-accent-foreground:  #272727;
+  --sidebar-border:       #dedee2;
+  --sidebar-ring:         #1f9e8e;
+
+  /* ── Fanout landing surface tokens ── */
+  --ls-bg:                  #f7f7f8;
+  --ls-surface:             #ffffff;
+  --ls-surface-low:         #fafafa;
+  --ls-surface-container:   #f4f4f5;
+  --ls-surface-high:        #f0f0f2;
+  --ls-surface-highest:     #e1e1e1;
+  --ls-outline:             #dedee2;
+  --ls-outline-variant:     #c9c9cf;
+
+  /* Text */
+  --ls-on-surface:          #272727;
+  --ls-on-surface-muted:    #6e6e6e;
+  --ls-on-surface-subtle:   #9e9e9e;
+
+  /* Primary (teal) */
+  --ls-primary:             #1f9e8e;
+  --ls-primary-hover:       #177a6d;
+  --ls-primary-active:      #0f5c52;
+  --ls-primary-container:   #e6f7f5;
+  --ls-on-primary:          #ffffff;
+
+  /* Elevation */
+  --ls-shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.06);
+  --ls-shadow-md:  0 3px 8px rgba(0, 0, 0, 0.10);
+  --ls-shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.10);
+  --ls-shadow-xl:  0 16px 40px rgba(0, 0, 0, 0.12);
+
+  /* Force light background on this element */
+  background-color: var(--ls-bg);
+  color: var(--ls-on-surface);
+  color-scheme: light;
+
+  /* Overused Grotesk — loaded via Bunny Fonts CDN link in layout.tsx head */
+  --font-og: 'Overused Grotesk';
+  font-family: 'Overused Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Beat Tailwind's body font-sans (Inter) for all landing text.
+   Exclude code/mono elements. */
+.landing-light,
+.landing-light *:not(code):not(pre):not([class*='font-mono']) {
+  font-family: 'Overused Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -149,64 +227,280 @@
     scroll-behavior: smooth;
   }
 
-  /* Custom Global Scrollbars */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #202736;
-    border-radius: 9999px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #52525b; /* zinc-600 */
-  }
-
-  @keyframes gradient-x {
-    0%, 100% { background-position: 0% 50% }
-    50% { background-position: 100% 50% }
-  }
-
-  .animate-gradient-x {
-    animation: gradient-x 8s ease-in-out infinite;
-    background-size: 200% 200%;
-  }
-
-  @keyframes slide-up-fade {
-    from { opacity: 0; transform: translateY(24px) scale(0.97); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-  }
-
-  .animate-premium-entry {
-    animation: slide-up-fade 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-
-  @keyframes float {
-    0%, 100% { transform: translateY(0px) }
-    50% { transform: translateY(-8px) }
-  }
-
-  .animate-float {
-    animation: float 4s ease-in-out infinite;
-  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #202736; border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #52525b; }
 }
 
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up              { animation: fade-up 0.7s cubic-bezier(0.2,0.8,0.2,1) both; }
+.animate-fade-up-delay-1      { animation-delay: 0.1s; }
+.animate-fade-up-delay-2      { animation-delay: 0.2s; }
+.animate-fade-up-delay-3      { animation-delay: 0.35s; }
+.animate-fade-up-delay-4      { animation-delay: 0.5s; }
+
+@keyframes float-card {
+  0%, 100% { transform: translateY(0px) rotate(-2deg); }
+  50%       { transform: translateY(-10px) rotate(-2deg); }
+}
+@keyframes float-card-r {
+  0%, 100% { transform: translateY(0px) rotate(2deg); }
+  50%       { transform: translateY(-12px) rotate(2deg); }
+}
+.animate-float-card   { animation: float-card   5s ease-in-out infinite; }
+.animate-float-card-r { animation: float-card-r 6s ease-in-out infinite; }
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-40px) rotate(-2deg); }
+  to   { opacity: 1; transform: translateX(0) rotate(-2deg); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(40px) rotate(2deg); }
+  to   { opacity: 1; transform: translateX(0) rotate(2deg); }
+}
+.animate-slide-in-left  { animation: slide-in-left  0.9s 0.3s cubic-bezier(0.2,0.8,0.2,1) both; }
+.animate-slide-in-right { animation: slide-in-right 0.9s 0.5s cubic-bezier(0.2,0.8,0.2,1) both; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+.animate-pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+/* Marquee — company carousel */
+@keyframes marquee-left {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-33.333%); }
+}
+@keyframes marquee-right {
+  0%   { transform: translateX(-33.333%); }
+  100% { transform: translateX(0); }
+}
+
+/* Legacy — kept for backward compat with practice pages */
+@keyframes gradient-x {
+  0%, 100% { background-position: 0% 50% }
+  50% { background-position: 100% 50% }
+}
+.animate-gradient-x {
+  animation: gradient-x 8s ease-in-out infinite;
+  background-size: 200% 200%;
+}
+
+@keyframes slide-up-fade {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-premium-entry {
+  animation: slide-up-fade 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) }
+  50% { transform: translateY(-8px) }
+}
+.animate-float { animation: float 4s ease-in-out infinite; }
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
 @layer utilities {
+  /* Dark page grids */
   .bg-grid-white {
     background-size: 50px 50px;
-    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-image:
+      linear-gradient(to right,  rgba(255,255,255,0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
     mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
     -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
   }
 
   .bg-dot-white {
     background-size: 40px 40px;
-    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    background-image: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
     mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
     -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
   }
+
+  /* Landing page dot grid */
+  .bg-dot-light {
+    background-size: 32px 32px;
+    background-image: radial-gradient(circle, rgba(0,0,0,0.055) 1px, transparent 1px);
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .line-clamp-4 {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* ============================================================
+   PRACTICE LIGHT WORKSPACE THEME
+   ============================================================ */
+.landing-light .bg-\[\#080c16\],
+.landing-light [class*="bg-[#080c16]"] {
+  background-color: #f7f7f8 !important;
+  color: #18181b !important;
+}
+
+.landing-light .bg-\[\#0d121c\],
+.landing-light [class*="bg-[#0d121c]"] {
+  background-color: #ffffff !important;
+  border-color: #dedee2 !important;
+}
+
+.landing-light .bg-\[\#131924\],
+.landing-light [class*="bg-[#131924]"] {
+  background-color: #ffffff !important;
+  border-color: #dedee2 !important;
+}
+
+.landing-light .bg-\[\#0b101c\],
+.landing-light [class*="bg-[#0b101c]"] {
+  background-color: #fafafa !important;
+  border-color: #dedee2 !important;
+}
+
+.landing-light .border-\[\#202736\],
+.landing-light [class*="border-[#202736]"],
+.landing-light [class*="border-[#202736]/"] {
+  border-color: #dedee2 !important;
+}
+
+.landing-light .divide-\[\#202736\/20\] > :not([hidden]) ~ :not([hidden]),
+.landing-light .divide-\[\#202736\/30\] > :not([hidden]) ~ :not([hidden]),
+.landing-light .divide-\[\#202736\/60\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #dedee2 !important;
+}
+
+.landing-light .text-\[\#4DD4C4\],
+.landing-light [class*="text-[#4DD4C4]"] {
+  color: #1f9e8e !important;
+}
+
+.landing-light .bg-\[\#4DD4C4\],
+.landing-light [class*="bg-[#4DD4C4]"] {
+  background-color: #1f9e8e !important;
+  color: #ffffff !important;
+}
+
+.landing-light [class*="bg-[#4DD4C4]/"] {
+  background-color: #e6f7f5 !important;
+  color: #1f9e8e !important;
+}
+
+.landing-light [class*="border-[#4DD4C4]/"] {
+  border-color: rgba(31, 158, 142, 0.35) !important;
+}
+
+.landing-light .text-zinc-200,
+.landing-light .text-zinc-300 {
+  color: #27272a !important;
+}
+
+.landing-light .text-zinc-400 {
+  color: #52525b !important;
+}
+
+.landing-light .text-zinc-500 {
+  color: #71717a !important;
+}
+
+.landing-light .text-zinc-600 {
+  color: #a1a1aa !important;
+}
+
+.landing-light .text-white {
+  color: #18181b !important;
+}
+
+/* Practice tables & datasets */
+.landing-light table th {
+  background-color: #f4f4f5 !important;
+  color: #52525b !important;
+  border-color: #dedee2 !important;
+}
+
+.landing-light table td {
+  border-color: #dedee2 !important;
+}
+
+.landing-light table tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Form inputs & textareas in practice workspace */
+.landing-light textarea,
+.landing-light input[type="text"] {
+  background-color: #ffffff !important;
+  color: #18181b !important;
+  border-color: #dedee2 !important;
+}
+
+.landing-light textarea::placeholder,
+.landing-light input::placeholder {
+  color: #a1a1aa !important;
+}
+
+/* Modals, popups, dropdowns */
+.landing-light .shadow-2xl,
+.landing-light .shadow-xl {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+}
+
+.landing-light .prose-invert {
+  color: #27272a !important;
+}
+
+.landing-light .prose-invert h1,
+.landing-light .prose-invert h2,
+.landing-light .prose-invert h3,
+.landing-light .prose-invert h4,
+.landing-light .prose-invert strong {
+  color: #09090b !important;
+}
+
+.landing-light .prose-invert code {
+  background-color: #f4f4f5 !important;
+  color: #09090b !important;
+  border: 1px solid #e4e4e7 !important;
+}
+
+.landing-light .monaco-editor,
+.landing-light .monaco-editor .margin,
+.landing-light .monaco-editor-background {
+  background-color: #ffffff !important;
+}
+
+.landing-light .monaco-editor .view-lines {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Consolas, monospace !important;
+  font-variant-ligatures: contextual !important;
+}
+
+.landing-light pre,
+.landing-light code,
+.landing-light .font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Consolas, 'Courier New', monospace !important;
+}
+
+.landing-light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important;
+}
+.landing-light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8 !important;
 }
