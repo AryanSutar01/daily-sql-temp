@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
+import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 function WaitlistCallbackContent() {
@@ -71,10 +71,10 @@ function WaitlistCallbackContent() {
 
   if (status === "loading") {
     return (
-      <main className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-base mx-auto"></div>
-          <p className="text-muted-foreground">Completing your registration...</p>
+      <main className="landing-light min-h-screen flex items-center justify-center px-4 bg-[#fafafa]">
+        <div className="text-center space-y-3">
+          <Loader2 className="animate-spin text-[#1f9e8e] w-8 h-8 mx-auto" />
+          <p className="text-zinc-600 font-mono text-xs">Completing your registration...</p>
         </div>
       </main>
     );
@@ -82,33 +82,44 @@ function WaitlistCallbackContent() {
 
   if (status === "error") {
     return (
-      <main className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8 text-center">
-          <div className="space-y-4">
-            <h1 className="text-4xl font-bold text-destructive">Something went wrong</h1>
-            <p className="text-muted-foreground">{errorMessage}</p>
+      <main className="landing-light min-h-screen flex items-center justify-center px-4 bg-[#fafafa]">
+        <div className="max-w-md w-full bg-white border border-[#dedee2] rounded-2xl p-8 text-center space-y-6 shadow-xs">
+          <div className="w-12 h-12 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto text-rose-600">
+            <AlertCircle size={24} />
           </div>
-          <Button asChild>
-            <Link href="/waitlist">Try again</Link>
-          </Button>
+          <div className="space-y-2">
+            <h1 className="text-xl font-bold font-mono text-zinc-900">Something went wrong</h1>
+            <p className="text-xs text-zinc-600">{errorMessage}</p>
+          </div>
+          <Link
+            href="/onboarding"
+            className="inline-block px-5 py-2.5 bg-[#1f9e8e] hover:bg-[#177a6d] text-white rounded-xl text-xs font-mono font-bold transition-all shadow-2xs"
+          >
+            Try Again
+          </Link>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 text-center">
-        <div className="space-y-4">
-          <div className="text-6xl mb-4 text-brand-base">✓</div>
-          <h1 className="text-4xl font-bold text-brand-base">You're on the list!</h1>
-          <p className="text-muted-foreground text-lg">
-            Thanks for joining the waitlist. We'll notify you as soon as Daily SQL is ready.
+    <main className="landing-light min-h-screen flex items-center justify-center px-4 bg-[#fafafa]">
+      <div className="max-w-md w-full bg-white border border-[#dedee2] rounded-2xl p-8 text-center space-y-6 shadow-xs">
+        <div className="w-14 h-14 rounded-2xl bg-[#e6f7f5] border border-[#1f9e8e]/30 flex items-center justify-center mx-auto text-[#1f9e8e]">
+          <CheckCircle2 size={28} />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold font-mono text-zinc-900">You&apos;re all set!</h1>
+          <p className="text-xs text-zinc-600 leading-relaxed">
+            Thank you for completing your onboarding. You are ready to start solving daily data challenges.
           </p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/">Back to home</Link>
-        </Button>
+        <Link
+          href="/practice/daily"
+          className="inline-block px-6 py-2.5 bg-[#1f9e8e] hover:bg-[#177a6d] text-white rounded-xl text-xs font-mono font-bold transition-all shadow-2xs"
+        >
+          Go to Daily Practice
+        </Link>
       </div>
     </main>
   );
@@ -118,10 +129,10 @@ export default function WaitlistCallback() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
-          <div className="text-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-base mx-auto"></div>
-            <p className="text-muted-foreground">Loading...</p>
+        <main className="landing-light min-h-screen flex items-center justify-center px-4 bg-[#fafafa]">
+          <div className="text-center space-y-3">
+            <Loader2 className="animate-spin text-[#1f9e8e] w-8 h-8 mx-auto" />
+            <p className="text-zinc-600 font-mono text-xs">Loading...</p>
           </div>
         </main>
       }
@@ -130,4 +141,3 @@ export default function WaitlistCallback() {
     </Suspense>
   );
 }
-
