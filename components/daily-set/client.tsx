@@ -1506,20 +1506,20 @@ export function DailySetClient() {
                     <div className="relative" ref={sidebarDropdownRef}>
                         <button
                             onClick={() => setSidebarDropdownOpen(!sidebarDropdownOpen)}
-                            className="flex items-center gap-2 text-sm font-medium text-zinc-300 hover:text-white bg-[#131924] border border-[#202736] rounded px-3 py-1.5 transition-colors"
+                            className="flex items-center gap-2 text-xs font-semibold text-zinc-800 bg-white border border-[#dedee2] hover:border-[#1f9e8e] rounded-lg px-3 py-1.5 transition-colors shadow-2xs"
                         >
                             {activeSidebarTab === 'today' ? "Today's Set" : "Problem List"}
-                            <ChevronDown size={13} className={`transition-transform duration-200 ${sidebarDropdownOpen ? 'rotate-180' : ''}`} />
+                            <ChevronDown size={13} className={`transition-transform duration-200 text-zinc-500 ${sidebarDropdownOpen ? 'rotate-180' : ''}`} />
                         </button>
                         {sidebarDropdownOpen && (
-                            <div className="absolute top-full left-0 mt-1.5 w-40 bg-[#131924] border border-[#202736] rounded-lg overflow-hidden py-1 z-[300] shadow-xl">
+                            <div className="absolute top-full left-0 mt-1.5 w-44 bg-white border border-[#dedee2] rounded-xl overflow-hidden py-1 z-[300] shadow-xl">
                                 <button
                                     onClick={() => { setActiveSidebarTab('today'); setSidebarDropdownOpen(false); }}
-                                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${activeSidebarTab === 'today' ? 'text-[#4DD4C4] bg-[#4DD4C4]/5' : 'text-zinc-300 hover:text-white hover:bg-[#202736]'}`}
+                                    className={`w-full text-left px-3.5 py-2 text-xs font-medium transition-colors ${activeSidebarTab === 'today' ? 'text-[#1f9e8e] bg-[#e6f7f5] font-semibold' : 'text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50'}`}
                                 >Today&apos;s Set</button>
                                 <button
                                     onClick={() => { setActiveSidebarTab('list'); setSidebarDropdownOpen(false); }}
-                                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${activeSidebarTab === 'list' ? 'text-[#4DD4C4] bg-[#4DD4C4]/5' : 'text-zinc-300 hover:text-white hover:bg-[#202736]'}`}
+                                    className={`w-full text-left px-3.5 py-2 text-xs font-medium transition-colors ${activeSidebarTab === 'list' ? 'text-[#1f9e8e] bg-[#e6f7f5] font-semibold' : 'text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50'}`}
                                 >Problem List</button>
                             </div>
                         )}
@@ -1670,20 +1670,20 @@ export function DailySetClient() {
                                 )}
                             </button>
                             {profileDropdownOpen && (
-                                <div className="absolute top-10 right-0 w-48 bg-[#131924] border border-[#202736] rounded-xl shadow-2xl overflow-hidden py-1 z-[300]">
-                                    <div className="px-4 py-3 border-b border-[#202736] bg-[#0b101c]">
-                                        <p className="text-xs font-semibold text-white truncate">
+                                <div className="absolute top-10 right-0 w-48 bg-white border border-[#dedee2] rounded-xl shadow-2xl overflow-hidden py-1 z-[300]">
+                                    <div className="px-4 py-3 border-b border-[#dedee2] bg-zinc-50">
+                                        <p className="text-xs font-semibold text-zinc-900 truncate">
                                             {userProfile?.full_name || userProfile?.email?.split('@')[0]}
                                         </p>
-                                        <p className="text-xs text-zinc-400 truncate">{userProfile?.email}</p>
+                                        <p className="text-xs text-zinc-500 truncate">{userProfile?.email}</p>
                                     </div>
                                     <Link href="/profile" onClick={() => setProfileDropdownOpen(false)}>
-                                        <div className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-[#202736] transition-colors cursor-pointer">
-                                            <User size={14} /> My Profile
+                                        <div className="flex items-center gap-2 px-4 py-2 text-xs text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50 transition-colors cursor-pointer font-medium">
+                                            <User size={14} className="text-zinc-500" /> My Profile
                                         </div>
                                     </Link>
                                     <button onClick={() => { handleLogout(); setProfileDropdownOpen(false); }} className="w-full text-left">
-                                        <div className="flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer">
+                                        <div className="flex items-center gap-2 px-4 py-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer font-medium">
                                             <LogOut size={14} /> Log Out
                                         </div>
                                     </button>
@@ -2128,33 +2128,33 @@ export function DailySetClient() {
                                         <div className="relative" ref={shareDropdownRef}>
                                             <button
                                                 onClick={() => setShareDropdownOpen(!shareDropdownOpen)}
-                                                className="flex items-center gap-2 px-3 py-1.5 bg-[#4DD4C4]/5 border border-[#4DD4C4]/20 rounded-md text-[#4DD4C4] text-[11px] font-bold hover:bg-[#4DD4C4]/10 transition-all shadow-[0_0_15px_rgba(77,212,196,0.05)]"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#e6f7f5] border border-[#1f9e8e]/30 rounded-lg text-[#1f9e8e] text-xs font-semibold hover:bg-[#1f9e8e]/15 transition-all shadow-2xs"
                                             >
-                                                <Share2 size={14} />
+                                                <Share2 size={13} />
                                                 <span>Share</span>
                                             </button>
 
                                             {shareDropdownOpen && (
-                                                <div className="absolute top-full right-0 mt-2 w-48 bg-[#131924] border border-[#202736] rounded-xl shadow-2xl overflow-hidden py-1 z-[300]">
-                                                    <div className="px-4 py-2 border-b border-[#202736] bg-[#0b101c]">
-                                                        <p className="text-[10px] font-bold text-[#4DD4C4] uppercase tracking-wider">Share Question</p>
+                                                <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-[#dedee2] rounded-xl shadow-2xl overflow-hidden py-1 z-[300]">
+                                                    <div className="px-4 py-2 border-b border-[#dedee2] bg-zinc-50">
+                                                        <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider font-mono">Share Question</p>
                                                     </div>
                                                     <div className="p-1">
-                                                        <button onClick={() => handleShare('twitter')} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#202736] rounded-lg transition-colors">
+                                                        <button onClick={() => handleShare('twitter')} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50 rounded-lg transition-colors font-medium">
                                                             <div className="w-6 h-6 rounded bg-[#1DA1F2]/10 flex items-center justify-center">
                                                                 <Twitter size={13} className="text-[#1DA1F2]" />
                                                             </div>
                                                             Twitter
                                                         </button>
-                                                        <button onClick={() => handleShare('linkedin')} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#202736] rounded-lg transition-colors">
+                                                        <button onClick={() => handleShare('linkedin')} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50 rounded-lg transition-colors font-medium">
                                                             <div className="w-6 h-6 rounded bg-[#0A66C2]/10 flex items-center justify-center">
                                                                 <Linkedin size={13} className="text-[#0A66C2]" />
                                                             </div>
                                                             LinkedIn
                                                         </button>
-                                                        <button onClick={() => handleShare('copy')} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#202736] rounded-lg transition-colors">
-                                                            <div className="w-6 h-6 rounded bg-zinc-700/30 flex items-center justify-center">
-                                                                <Copy size={13} className="text-zinc-400" />
+                                                        <button onClick={() => handleShare('copy')} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50 rounded-lg transition-colors font-medium">
+                                                            <div className="w-6 h-6 rounded bg-zinc-100 flex items-center justify-center">
+                                                                <Copy size={13} className="text-zinc-500" />
                                                             </div>
                                                             Copy Link
                                                         </button>

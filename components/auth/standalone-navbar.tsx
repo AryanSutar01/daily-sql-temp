@@ -95,30 +95,30 @@ export function StandaloneNavbar() {
                         <div className="relative" ref={dropdownRef}>
                             <button
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                className="w-9 h-9 rounded-full bg-[#131924] border-2 border-[#202736] hover:border-[#4DD4C4] transition-colors flex items-center justify-center overflow-hidden focus:outline-none"
+                                className="w-9 h-9 rounded-full bg-zinc-100 border-2 border-[#dedee2] hover:border-[#1f9e8e] transition-colors flex items-center justify-center overflow-hidden focus:outline-none"
                             >
                                 {user.profile?.avatar_url ? (
                                     <img src={user.profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                                 ) : (
-                                    <svg className="w-6 h-6 text-[#4DD4C4] mt-1" fill="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-6 h-6 text-[#1f9e8e] mt-1" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                                     </svg>
                                 )}
                             </button>
 
                             {isDropdownOpen && (
-                                <div className="absolute top-12 right-0 w-48 bg-[#131924] border border-[#202736] rounded-xl shadow-2xl overflow-hidden py-1 z-[200]">
-                                    <div className="px-4 py-3 border-b border-[#202736] bg-[#0b101c]">
-                                        <p className="text-sm font-semibold text-white truncate">{user.profile?.full_name || user.email?.split('@')[0]}</p>
-                                        <p className="text-xs text-zinc-400 truncate">{user.email}</p>
+                                <div className="absolute top-12 right-0 w-48 bg-white border border-[#dedee2] rounded-xl shadow-2xl overflow-hidden py-1 z-[200]">
+                                    <div className="px-4 py-3 border-b border-[#dedee2] bg-zinc-50">
+                                        <p className="text-xs font-semibold text-zinc-900 truncate">{user.profile?.full_name || user.email?.split('@')[0]}</p>
+                                        <p className="text-xs text-zinc-500 truncate">{user.email}</p>
                                     </div>
                                     <Link href="/profile" onClick={() => setIsDropdownOpen(false)}>
-                                        <div className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-[#202736] transition-colors cursor-pointer">
-                                            <User size={14} /> My Profile
+                                        <div className="flex items-center gap-2 px-4 py-2 text-xs text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50 transition-colors cursor-pointer font-medium">
+                                            <User size={14} className="text-zinc-500" /> My Profile
                                         </div>
                                     </Link>
                                     <button onClick={() => { handleLogout(); setIsDropdownOpen(false); }} className="w-full text-left">
-                                        <div className="flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer">
+                                        <div className="flex items-center gap-2 px-4 py-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer font-medium">
                                             <LogOut size={14} /> Log Out
                                         </div>
                                     </button>
