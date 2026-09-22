@@ -1495,14 +1495,14 @@ export function DailySetClient() {
             {/* ════════════════════════════════════════════
                 INTEGRATED TOP BAR
             ════════════════════════════════════════════ */}
-            <div className="h-14 bg-[#0d121c] border-b border-[#202736] flex items-center px-6 shrink-0 relative z-[100] gap-3">
+            <div className="h-14 bg-[#f8f9fa] border-b border-[#dedee2] flex items-center px-6 shrink-0 relative z-[100] gap-3">
 
                 {/* ── LEFT: Logo + Set selector ── */}
                 <div className="flex items-center gap-3 shrink-0">
-                    <Link href="/" className="text-base font-bold text-white hover:opacity-80 transition-opacity">
+                    <Link href="/" className="text-base font-bold text-zinc-900 hover:text-[#1f9e8e] transition-colors">
                         DailySQL
                     </Link>
-                    <div className="w-px h-5 bg-[#202736]" />
+                    <div className="w-px h-5 bg-[#dedee2]" />
                     <div className="relative" ref={sidebarDropdownRef}>
                         <button
                             onClick={() => setSidebarDropdownOpen(!sidebarDropdownOpen)}
@@ -1533,7 +1533,7 @@ export function DailySetClient() {
                         <button
                             onClick={handleRun}
                             disabled={!activeProblemId}
-                            className={`flex items-center gap-2 px-5 py-2 text-[#080C16] text-sm font-bold rounded transition-colors shadow-[0_0_10px_rgba(77,212,196,0.2)] ${activeProblemId ? 'bg-[#4DD4C4] hover:bg-[#3dbdb0]' : 'bg-zinc-700 cursor-not-allowed shadow-none text-zinc-500'}`}
+                            className={`flex items-center gap-2 px-5 py-2 text-white text-sm font-bold rounded-lg transition-colors shadow-sm ${activeProblemId ? 'bg-[#1f9e8e] hover:bg-[#177a6d]' : 'bg-zinc-300 cursor-not-allowed shadow-none text-zinc-500'}`}
                         >
                             {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} fill="currentColor" />}
                             Run
@@ -1547,13 +1547,13 @@ export function DailySetClient() {
                             onClick={handleSubmit}
                             disabled={isDsaProblem ? (!activeProblemId || isRunning) : executionResult?.status !== 'correct'}
                             title={isDsaProblem ? 'Submit against all test cases' : 'Submit solution'}
-                            className={`flex items-center gap-1.5 px-4 py-2 rounded text-sm font-bold transition-colors ${isDsaProblem
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${isDsaProblem
                                     ? (!activeProblemId || isRunning)
-                                        ? 'bg-zinc-700 cursor-not-allowed text-zinc-500'
-                                        : 'bg-[#4DD4C4]/15 border border-[#4DD4C4]/40 text-[#4DD4C4] hover:bg-[#4DD4C4]/25 shadow-[0_0_8px_rgba(77,212,196,0.15)]'
+                                        ? 'bg-zinc-100 border border-[#dedee2] cursor-not-allowed text-zinc-400'
+                                        : 'bg-[#e6f7f5] border border-[#1f9e8e]/40 text-[#1f9e8e] hover:bg-[#1f9e8e]/20 shadow-2xs'
                                     : executionResult?.status === 'correct'
-                                        ? 'bg-[#4DD4C4]/15 border border-[#4DD4C4]/40 text-[#4DD4C4] hover:bg-[#4DD4C4]/25 shadow-[0_0_8px_rgba(77,212,196,0.15)]'
-                                        : 'text-zinc-600 border border-[#202736] cursor-not-allowed'
+                                        ? 'bg-[#e6f7f5] border border-[#1f9e8e]/40 text-[#1f9e8e] hover:bg-[#1f9e8e]/20 shadow-2xs'
+                                        : 'text-zinc-400 bg-zinc-100 border border-[#dedee2] cursor-not-allowed'
                                 }`}
                         >
                             <UploadCloud size={14} />
@@ -1570,7 +1570,7 @@ export function DailySetClient() {
                     <button
                         onClick={startTour}
                         title="Take the Tour"
-                        className="flex items-center gap-1.5 text-zinc-500 hover:text-[#4DD4C4] transition-colors text-[11px] font-semibold"
+                        className="flex items-center gap-1.5 text-zinc-600 hover:text-[#1f9e8e] transition-colors text-[11px] font-semibold"
                     >
                         <Info size={14} />
                         <span className="hidden sm:inline">Tour</span>
@@ -1581,7 +1581,7 @@ export function DailySetClient() {
                         <button
                             onClick={() => setTimerExpanded(!timerExpanded)}
                             title={timerExpanded ? 'Collapse timer' : 'Expand timer'}
-                            className={`flex items-center gap-2 transition-colors ${timerRunning ? 'text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}
+                            className={`flex items-center gap-2 transition-colors ${timerRunning ? 'text-[#1f9e8e] font-bold' : 'text-zinc-600 hover:text-zinc-900'}`}
                         >
                             <Timer size={16} />
                             {timerExpanded && (
@@ -1591,11 +1591,11 @@ export function DailySetClient() {
                             )}
                         </button>
                         {timerExpanded && (
-                            <div className="flex items-center gap-1.5 pl-2 border-l border-[#202736]">
+                            <div className="flex items-center gap-1.5 pl-2 border-l border-[#dedee2]">
                                 <button
                                     onClick={() => setTimerRunning(!timerRunning)}
                                     title={timerRunning ? 'Pause' : 'Start'}
-                                    className="text-zinc-400 hover:text-white transition-colors"
+                                    className="text-zinc-600 hover:text-zinc-900 transition-colors"
                                 >
                                     {timerRunning ? <Pause size={14} /> : <Play size={14} />}
                                 </button>
@@ -1605,7 +1605,7 @@ export function DailySetClient() {
                                         setTimerSeconds(timerMode === 'timer' ? ((activeProblem?.estimated_time_minutes || 15) * 60) : 0);
                                     }}
                                     title="Reset"
-                                    className="text-zinc-400 hover:text-white transition-colors"
+                                    className="text-zinc-600 hover:text-zinc-900 transition-colors"
                                 >
                                     <RotateCcw size={14} />
                                 </button>
@@ -1617,23 +1617,23 @@ export function DailySetClient() {
                                         setTimerSeconds(newMode === 'timer' ? ((activeProblem?.estimated_time_minutes || 15) * 60) : 0);
                                     }}
                                     title={timerMode === 'stopwatch' ? 'Switch to Countdown Timer' : 'Switch to Stopwatch'}
-                                    className="text-xs font-mono font-bold text-zinc-500 hover:text-zinc-200 bg-[#0b101c] border border-[#202736] rounded px-1.5 py-0.5 transition-colors"
+                                    className="text-xs font-mono font-bold text-zinc-700 hover:text-zinc-900 bg-white border border-[#dedee2] rounded px-1.5 py-0.5 transition-colors shadow-2xs"
                                 >
                                     {timerMode === 'stopwatch' ? 'SW' : 'TM'}
                                 </button>
                                 {timerMode === 'timer' && !timerRunning && (
-                                    <div className="h-[52px] flex items-center justify-between px-2 border-b border-[#202736] bg-[#0d121c]/50">
+                                    <div className="h-[52px] flex items-center justify-between px-2 border-b border-[#dedee2] bg-zinc-50">
                                         <button
                                             onClick={() => setTimerSeconds(s => Math.max(60, s - 60))}
                                             title="-1 minute"
-                                            className="text-zinc-500 hover:text-white bg-[#0b101c] border border-[#202736] rounded w-5 h-5 flex items-center justify-center font-mono text-xs leading-none transition-colors"
+                                            className="text-zinc-600 hover:text-zinc-900 bg-white border border-[#dedee2] rounded w-5 h-5 flex items-center justify-center font-mono text-xs leading-none transition-colors"
                                         >
                                             -
                                         </button>
                                         <button
                                             onClick={() => setTimerSeconds(s => s + 60)}
                                             title="+1 minute"
-                                            className="text-zinc-500 hover:text-white bg-[#0b101c] border border-[#202736] rounded w-5 h-5 flex items-center justify-center font-mono text-xs leading-none transition-colors"
+                                            className="text-zinc-600 hover:text-zinc-900 bg-white border border-[#dedee2] rounded w-5 h-5 flex items-center justify-center font-mono text-xs leading-none transition-colors"
                                         >
                                             +
                                         </button>
@@ -1647,7 +1647,7 @@ export function DailySetClient() {
                     <button
                         onClick={handleFullscreen}
                         title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-                        className="text-zinc-400 hover:text-white transition-colors"
+                        className="text-zinc-600 hover:text-zinc-900 transition-colors"
                     >
                         {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                     </button>
@@ -1659,12 +1659,12 @@ export function DailySetClient() {
                         <div className="relative" ref={profileDropdownRef}>
                             <button
                                 onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                                className="w-9 h-9 rounded-full bg-[#131924] border-2 border-[#202736] hover:border-[#4DD4C4] transition-colors flex items-center justify-center overflow-hidden focus:outline-none"
+                                className="w-9 h-9 rounded-full bg-white border-2 border-[#dedee2] hover:border-[#1f9e8e] transition-colors flex items-center justify-center overflow-hidden focus:outline-none shadow-2xs"
                             >
                                 {userProfile?.avatar_url ? (
                                     <img src={userProfile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                                 ) : (
-                                    <svg className="w-6 h-6 text-[#4DD4C4] mt-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-6 h-6 text-[#1f9e8e] mt-0.5" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                                     </svg>
                                 )}
@@ -1693,7 +1693,7 @@ export function DailySetClient() {
                     ) : (
                         <Link
                             href="/login"
-                            className="text-xs font-semibold text-[#4DD4C4] hover:text-white border border-[#4DD4C4]/30 hover:border-[#4DD4C4] rounded px-2.5 py-1 transition-colors"
+                            className="text-xs font-semibold text-[#1f9e8e] hover:text-[#177a6d] bg-[#e6f7f5] border border-[#1f9e8e]/30 rounded-lg px-3 py-1.5 transition-colors shadow-2xs"
                         >
                             Log In
                         </Link>
@@ -1716,11 +1716,11 @@ export function DailySetClient() {
                         minWidth: sidebarCollapsed ? '52px' : '220px',
                         transition: 'width 250ms ease, min-width 250ms ease'
                     }}
-                    className="flex flex-col bg-[#fafafa] border-r border-[#dedee2] overflow-visible shrink-0"
+                    className="flex flex-col bg-[#f4f6f8] border-r border-[#dedee2] overflow-visible shrink-0"
                 >
                     <div className={`flex-1 flex flex-col h-full ${sidebarCollapsed ? 'overflow-visible' : 'overflow-hidden'}`}>
                         {/* Header / Tabs */}
-                        <div className={`h-[52px] border-b border-[#dedee2] bg-white flex ${sidebarCollapsed ? 'flex-col justify-center' : 'flex-row'} items-center px-3 shrink-0 transition-all gap-1.5`}>
+                        <div className={`h-[52px] border-b border-[#dedee2] bg-[#eaedf1] flex ${sidebarCollapsed ? 'flex-col justify-center' : 'flex-row'} items-center px-3 shrink-0 transition-all gap-1.5`}>
                             {!sidebarCollapsed ? (
                                 <>
                                     {/* Discipline tabs inline in header */}
@@ -2052,11 +2052,11 @@ export function DailySetClient() {
                 <Group orientation="horizontal" className="flex-1 h-full overflow-hidden">
 
                     {/* ── COLUMN 2: PROBLEM DETAILS ── */}
-                    <Panel defaultSize="35" minSize="25" maxSize="50" className="flex flex-col bg-[#0d121c] border-r border-[#202736]">
+                    <Panel defaultSize="35" minSize="25" maxSize="50" className="flex flex-col bg-white border-r border-[#dedee2]">
                         {activeProblemId ? (
                             <div className="flex-1 flex flex-col h-full overflow-hidden">
                                 {/* Tab Bar */}
-                                <div className="h-[52px] border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0 relative">
+                                <div className="h-[52px] border-b border-[#dedee2] bg-[#f8f9fa] px-4 flex items-center justify-between shrink-0 relative">
                                     <div className="flex items-center gap-2">
                                         {/* Prev / Next navigation */}
                                         <div className="flex items-center gap-0.5">
@@ -2064,7 +2064,7 @@ export function DailySetClient() {
                                                 onClick={handlePrevProblem}
                                                 disabled={currentNavIndex <= 0}
                                                 title="Previous problem"
-                                                className="p-1 rounded text-zinc-500 hover:text-white hover:bg-[#202736] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                                                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
                                             >
                                                 <ChevronLeft size={15} />
                                             </button>
@@ -2072,7 +2072,7 @@ export function DailySetClient() {
                                                 onClick={handleNextProblem}
                                                 disabled={currentNavIndex >= navigationList.length - 1}
                                                 title="Next problem"
-                                                className="p-1 rounded text-zinc-500 hover:text-white hover:bg-[#202736] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                                                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
                                             >
                                                 <ChevronRight size={15} />
                                             </button>
@@ -2083,43 +2083,43 @@ export function DailySetClient() {
                                     <div className="flex items-center h-full">
                                         <button
                                             onClick={() => setActiveDetailTab('question')}
-                                            className={`flex items-center gap-1.5 h-full px-4 text-xs font-medium border-b-2 transition-colors ${activeDetailTab === 'question' ? 'text-white border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
+                                            className={`flex items-center gap-1.5 h-full px-4 text-xs font-semibold border-b-2 transition-colors ${activeDetailTab === 'question' ? 'text-[#1f9e8e] border-[#1f9e8e]' : 'text-zinc-500 border-transparent hover:text-zinc-800'}`}
                                         >
                                             Question
                                         </button>
                                         <button
                                             onClick={handleOpenDiscussion}
-                                            className={`flex items-center gap-1.5 h-full px-4 text-xs font-medium border-b-2 transition-colors ${activeDetailTab === 'discussion' ? 'text-white border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
+                                            className={`flex items-center gap-1.5 h-full px-4 text-xs font-semibold border-b-2 transition-colors ${activeDetailTab === 'discussion' ? 'text-[#1f9e8e] border-[#1f9e8e]' : 'text-zinc-500 border-transparent hover:text-zinc-800'}`}
                                         >
                                             Discussion
-                                            {commentCount > 0 && <span className="ml-1 text-[10px] bg-[#4DD4C4]/15 text-[#4DD4C4] rounded-full px-1.5 font-mono leading-tight">{commentCount}</span>}
+                                            {commentCount > 0 && <span className="ml-1 text-[10px] bg-[#e6f7f5] text-[#1f9e8e] rounded-full px-1.5 font-mono leading-tight">{commentCount}</span>}
                                         </button>
                                     </div>
 
                                     {/* Action buttons (Share/Vote) */}
                                     <div className="flex items-center gap-2 shrink-0">
-                                        <div className="flex items-center bg-[#0d121c] border border-[#202736] rounded-md px-1.5 py-1 gap-3">
+                                        <div className="flex items-center bg-white border border-[#dedee2] rounded-lg px-2 py-1 gap-3 shadow-2xs">
                                             <div className="relative group">
                                                 <button
                                                     onClick={handleVote}
                                                     disabled={isVoting}
-                                                    className={`flex items-center gap-1.5 text-xs transition-colors ${problemVotes?.user_has_voted ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-[#4DD4C4]'}`}
+                                                    className={`flex items-center gap-1.5 text-xs transition-colors ${problemVotes?.user_has_voted ? 'text-[#1f9e8e] font-bold' : 'text-zinc-500 hover:text-[#1f9e8e]'}`}
                                                 >
-                                                    <ThumbsUp size={14} fill={problemVotes?.user_has_voted ? 'currentColor' : 'none'} />
+                                                    <ThumbsUp size={13} fill={problemVotes?.user_has_voted ? 'currentColor' : 'none'} />
                                                     {problemVotes !== null && <span className="font-mono text-[11px] font-bold">{problemVotes.likes}</span>}
                                                 </button>
                                                 {authStatus === 'unauthenticated' && <LoginTooltip text="Sign in to like" />}
                                             </div>
 
-                                            <div className="w-[1px] h-3 bg-[#202736]" />
+                                            <div className="w-[1px] h-3 bg-[#dedee2]" />
 
                                             <div className="relative group">
                                                 <button
                                                     onClick={handleDislike}
-                                                    className="text-zinc-500 hover:text-red-400 transition-colors"
+                                                    className="text-zinc-400 hover:text-red-500 transition-colors"
                                                     title="Dislike / Report Issue"
                                                 >
-                                                    <ThumbsDown size={14} />
+                                                    <ThumbsDown size={13} />
                                                 </button>
                                                 {authStatus === 'unauthenticated' && <LoginTooltip text="Sign in to report" />}
                                             </div>
@@ -2167,54 +2167,54 @@ export function DailySetClient() {
 
                                 {/* Content */}
                                 {activeDetailTab === 'question' ? (
-                                    <div id="tour-problem-description" className="flex-1 overflow-y-auto p-5 space-y-8 scrollbar-thin scrollbar-thumb-zinc-700">
+                                    <div id="tour-problem-description" className="flex-1 overflow-y-auto p-5 space-y-7 scrollbar-thin scrollbar-thumb-zinc-300">
                                         <div>
                                             {activeProblem && (
-                                                <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border mb-2 ${getDiffStyle(activeProblem.difficulty).color} ${getDiffStyle(activeProblem.difficulty).bg} ${getDiffStyle(activeProblem.difficulty).border}`}>
+                                                <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border mb-2.5 ${getDiffStyle(activeProblem.difficulty).color} ${getDiffStyle(activeProblem.difficulty).bg} ${getDiffStyle(activeProblem.difficulty).border}`}>
                                                     {getDiffStyle(activeProblem.difficulty).label}
                                                 </span>
                                             )}
-                                            <h1 className="text-xl font-bold text-white mb-1 tracking-tight">{activeProblem?.title}</h1>
+                                            <h1 className="text-xl font-bold text-zinc-900 mb-1.5 tracking-tight">{activeProblem?.title}</h1>
                                             <div className="flex gap-3 text-xs text-zinc-500 mb-3 font-mono font-medium">
-                                                <span className="flex items-center gap-1.5"><Timer size={11} /> {activeProblem?.estimated_time_minutes}m Avg</span>
+                                                <span className="flex items-center gap-1.5"><Timer size={12} className="text-zinc-400" /> {activeProblem?.estimated_time_minutes}m Avg</span>
                                             </div>
-                                            <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Task</h3>
-                                            <div className="h-px w-full bg-[#202736] mb-3" />
-                                            <div className="text-zinc-400 text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
+                                            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 font-mono">Task</h3>
+                                            <div className="h-px w-full bg-[#dedee2] mb-3" />
+                                            <div className="text-zinc-700 text-sm leading-relaxed prose prose-zinc prose-sm max-w-none">
                                                 <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>{mainDesc}</ReactMarkdown>
                                             </div>
                                         </div>
 
                                         {!isDsaProblem && (
                                             <div>
-                                                <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                                                    <Database size={11} /> Datasets
+                                                <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5 font-mono">
+                                                    <Database size={12} className="text-[#1f9e8e]" /> Datasets
                                                 </h3>
-                                                <div className="h-px w-full bg-[#202736] mb-3" />
+                                                <div className="h-px w-full bg-[#dedee2] mb-3" />
                                                 {activeDatasets.map((ds, idx) => {
                                                     const colOrder = getColumnOrder(ds.schema_sql, ds.sample_rows[0], ds.seed_data_json);
                                                     return (
                                                         <div key={idx} className="mb-6 last:mb-0 space-y-3">
                                                             <div className="flex items-center gap-2">
-                                                                <div className="h-4 w-1 bg-[#4DD4C4] rounded-full" />
-                                                                <span className="text-xs font-bold text-zinc-300 font-mono uppercase tracking-wider">{ds.table_name}</span>
+                                                                <div className="h-4 w-1 bg-[#1f9e8e] rounded-full" />
+                                                                <span className="text-xs font-bold text-zinc-800 font-mono uppercase tracking-wider">{ds.table_name}</span>
                                                             </div>
 
-                                                            {/* Schema */}
-                                                            <div className="border border-[#202736] rounded-xl overflow-hidden max-w-sm bg-[#080c16] shadow-lg">
-                                                                <table className="w-full text-[10px] text-left border-collapse">
-                                                                    <thead className="bg-[#131924] text-zinc-400">
+                                                            {/* Schema Table */}
+                                                            <div className="border border-[#dedee2] rounded-xl overflow-hidden max-w-sm bg-white shadow-2xs">
+                                                                <table className="w-full text-xs text-left border-collapse">
+                                                                    <thead className="bg-[#f4f6f8] text-zinc-700 font-semibold border-b border-[#dedee2]">
                                                                         <tr>
-                                                                            <th className="px-4 py-2.5 border-b border-[#202736] font-bold uppercase tracking-wider text-[9px]">Column</th>
-                                                                            <th className="px-4 py-2.5 border-b border-[#202736] font-bold uppercase tracking-wider text-[9px]">Type</th>
+                                                                            <th className="px-4 py-2 font-mono font-bold uppercase tracking-wider text-[10px]">Column</th>
+                                                                            <th className="px-4 py-2 font-mono font-bold uppercase tracking-wider text-[10px]">Type</th>
                                                                         </tr>
                                                                     </thead>
-                                                                    <tbody className="divide-y divide-[#202736]/30">
+                                                                    <tbody className="divide-y divide-[#dedee2]">
                                                                         {colOrder.map(col => (
-                                                                            <tr key={col} className="hover:bg-white/[0.02] transition-colors group">
-                                                                                <td className="px-4 py-2 font-mono font-medium text-zinc-300 group-hover:text-[#4DD4C4] transition-colors">{col}</td>
+                                                                            <tr key={col} className="hover:bg-zinc-50 transition-colors group">
+                                                                                <td className="px-4 py-2 font-mono font-medium text-zinc-800 group-hover:text-[#1f9e8e] transition-colors">{col}</td>
                                                                                 <td className="px-4 py-2">
-                                                                                    <span className="bg-[#4DD4C4]/5 text-[#4DD4C4]/80 px-1.5 py-0.5 rounded border border-[#4DD4C4]/20 text-[8px] font-bold font-mono uppercase">
+                                                                                    <span className="bg-[#e6f7f5] text-[#135d54] border border-[#1f9e8e]/20 px-1.5 py-0.5 rounded text-[9px] font-bold font-mono uppercase">
                                                                                         {ds.column_types?.[col] || 'string'}
                                                                                     </span>
                                                                                 </td>
@@ -2225,28 +2225,28 @@ export function DailySetClient() {
                                                             </div>
 
                                                             {/* Sample Data */}
-                                                            <div className="border border-[#202736] rounded-xl overflow-hidden shadow-2xl bg-[#080c16]">
-                                                                <div className="bg-[#131924] px-4 py-2 text-[9px] font-bold text-[#4DD4C4] uppercase tracking-widest border-b border-[#202736] flex items-center justify-between">
+                                                            <div className="border border-[#dedee2] rounded-xl overflow-hidden shadow-2xs bg-[#f8fafb]">
+                                                                <div className="bg-[#edf2f6] px-4 py-2 text-[10px] font-bold text-[#135d54] uppercase tracking-widest border-b border-[#dedee2] flex items-center justify-between font-mono">
                                                                     <span className="flex items-center gap-2">
-                                                                        <div className="w-1 h-1 rounded-full bg-[#4DD4C4]" />
+                                                                        <div className="w-1.5 h-1.5 rounded-full bg-[#1f9e8e]" />
                                                                         Sample Rows
                                                                     </span>
-                                                                    <span className="text-[8px] text-zinc-500 font-normal">Showing first {ds.sample_rows.length} rows</span>
+                                                                    <span className="text-[9px] text-zinc-500 font-normal">Showing first {ds.sample_rows.length} rows</span>
                                                                 </div>
                                                                 <div className="overflow-x-auto custom-scrollbar">
-                                                                    <table className="w-full text-[10px] text-left border-collapse">
-                                                                        <thead className="bg-[#0b101c] text-zinc-500">
+                                                                    <table className="w-full text-xs text-left border-collapse">
+                                                                        <thead className="bg-[#f4f6f8] text-zinc-700 border-b border-[#dedee2]">
                                                                             <tr>
                                                                                 {colOrder.map(h => (
-                                                                                    <th key={h} className="px-4 py-2.5 border-b border-[#202736] font-mono font-bold text-[9px] uppercase tracking-wider">{h}</th>
+                                                                                    <th key={h} className="px-4 py-2 border-r last:border-r-0 border-[#dedee2] font-mono font-bold text-[10px] uppercase tracking-wider">{h}</th>
                                                                                 ))}
                                                                             </tr>
                                                                         </thead>
-                                                                        <tbody className="divide-y divide-[#202736]/20">
+                                                                        <tbody className="divide-y divide-[#dedee2]/60">
                                                                             {ds.sample_rows.map((row: any, i: number) => (
-                                                                                <tr key={i} className="hover:bg-[#4DD4C4]/5 transition-colors group">
+                                                                                <tr key={i} className="hover:bg-[#e6f7f5]/30 transition-colors group">
                                                                                     {colOrder.map((col: string) => (
-                                                                                        <td key={col} className="px-4 py-2.5 text-zinc-400 font-mono group-hover:text-zinc-200 transition-colors">{row[col]?.toString() ?? ''}</td>
+                                                                                        <td key={col} className="px-4 py-2 text-zinc-700 font-mono border-r last:border-r-0 border-[#dedee2]/60 group-hover:text-zinc-950 transition-colors">{row[col]?.toString() ?? ''}</td>
                                                                                     ))}
                                                                                 </tr>
                                                                             ))}
@@ -2262,22 +2262,22 @@ export function DailySetClient() {
 
                                         {!isDsaProblem && (
                                             <div>
-                                                <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Expected Output</h3>
-                                                <div className="h-px w-full bg-[#202736] mb-3" />
+                                                <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 font-mono">Expected Output</h3>
+                                                <div className="h-px w-full bg-[#dedee2] mb-3" />
                                                 {(() => {
                                                     const output = executionResult?.expected || expectedOutput;
                                                     if (output && output.columns.length > 0) {
                                                         return (
-                                                            <div className="border border-[#202736] rounded-xl overflow-hidden shadow-lg bg-[#080c16]">
+                                                            <div className="border border-[#dedee2] rounded-xl overflow-hidden shadow-2xs bg-white">
                                                                 <div className="overflow-x-auto custom-scrollbar">
-                                                                    <table className="w-full text-[10px] text-left border-collapse">
-                                                                        <thead className="bg-[#131924] text-zinc-400">
-                                                                            <tr>{output.columns.map(h => <th key={h} className="px-4 py-2.5 border-b border-[#202736] font-mono font-bold text-[9px] uppercase tracking-wider">{h}</th>)}</tr>
+                                                                    <table className="w-full text-xs text-left border-collapse">
+                                                                        <thead className="bg-[#f0f9f7] text-[#135d54] border-b border-[#dedee2]">
+                                                                            <tr>{output.columns.map(h => <th key={h} className="px-4 py-2 border-r last:border-r-0 border-[#dedee2] font-mono font-bold text-[10px] uppercase tracking-wider">{h}</th>)}</tr>
                                                                         </thead>
-                                                                        <tbody className="divide-y divide-[#202736]/20">
+                                                                        <tbody className="divide-y divide-[#dedee2]">
                                                                             {output.rows.map((row: any, i: number) => (
-                                                                                <tr key={i} className="hover:bg-green-400/[0.03] transition-colors group">
-                                                                                    {row.map((cell: any, j: number) => <td key={j} className="px-4 py-2.5 text-green-400/80 font-mono group-hover:text-green-400 transition-colors">{cell?.toString()}</td>)}
+                                                                                <tr key={i} className="hover:bg-emerald-50/50 transition-colors group">
+                                                                                    {row.map((cell: any, j: number) => <td key={j} className="px-4 py-2 text-emerald-700 font-mono border-r last:border-r-0 border-[#dedee2] group-hover:text-emerald-900 transition-colors">{cell?.toString()}</td>)}
                                                                                 </tr>
                                                                             ))}
                                                                         </tbody>
@@ -2286,7 +2286,7 @@ export function DailySetClient() {
                                                             </div>
                                                         );
                                                     }
-                                                    return <div className="p-3 bg-[#131924] rounded-lg border border-[#202736] text-xs text-zinc-500 font-mono italic">Loading...</div>;
+                                                    return <div className="p-3 bg-zinc-50 rounded-xl border border-[#dedee2] text-xs text-zinc-500 font-mono italic">Loading expected output...</div>;
                                                 })()}
                                             </div>
                                         )}
@@ -2294,15 +2294,15 @@ export function DailySetClient() {
                                         {hintText && (
                                             <div>
                                                 <h3
-                                                    className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5 cursor-pointer hover:text-white transition-colors flex justify-between items-center"
+                                                    className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 cursor-pointer hover:text-zinc-900 transition-colors flex justify-between items-center font-mono"
                                                     onClick={() => setShowHint(!showHint)}
                                                 >
                                                     <span>Hints</span>
                                                     <span className={`text-[10px] transform transition-transform ${showHint ? 'rotate-180' : ''}`}>&darr;</span>
                                                 </h3>
-                                                <div className="h-px w-full bg-[#202736] mb-3" />
+                                                <div className="h-px w-full bg-[#dedee2] mb-3" />
                                                 {showHint && (
-                                                    <div className="p-3 bg-[#131924] rounded-lg border border-[#202736] text-zinc-400 text-sm leading-relaxed">
+                                                    <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-200 text-amber-900 text-sm leading-relaxed">
                                                         <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>{hintText}</ReactMarkdown>
                                                     </div>
                                                 )}
@@ -2311,100 +2311,100 @@ export function DailySetClient() {
                                     </div>
                                 ) : (
                                     /* Discussion View */
-                                    <div className="flex-1 flex flex-col overflow-hidden">
-                                        <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-zinc-700">
-                                            {isLoadingComments && <div className="flex justify-center pt-8"><Loader2 size={20} className="animate-spin text-[#4DD4C4]" /></div>}
+                                    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                                        <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-zinc-300">
+                                            {isLoadingComments && <div className="flex justify-center pt-8"><Loader2 size={20} className="animate-spin text-[#1f9e8e]" /></div>}
                                             {!isLoadingComments && comments.length === 0 && (
                                                 <div className="text-center text-xs text-zinc-500 pt-10 space-y-2">
-                                                    <MessageCircle size={28} className="mx-auto text-zinc-700" />
+                                                    <MessageCircle size={28} className="mx-auto text-zinc-400" />
                                                     <p>No comments yet.</p>
                                                 </div>
                                             )}
                                             {comments.map(comment => (
                                                 <div key={comment.id} className="space-y-2">
-                                                    <div className="bg-[#131924] rounded-lg p-3 border border-[#202736]">
+                                                    <div className="bg-[#f8fafb] rounded-xl p-4 border border-[#dedee2]">
                                                         <div className="flex items-start justify-between mb-1.5">
                                                             <div className="flex items-center gap-2">
-                                                                <div className="w-6 h-6 rounded-full bg-[#4DD4C4]/20 flex items-center justify-center text-[10px] font-bold text-[#4DD4C4] shrink-0">{comment.user.initials}</div>
+                                                                <div className="w-6 h-6 rounded-full bg-[#e6f7f5] flex items-center justify-center text-[10px] font-bold text-[#1f9e8e] shrink-0">{comment.user.initials}</div>
                                                                 <div>
-                                                                    <span className="text-xs font-semibold text-zinc-300">{comment.user.full_name}</span>
-                                                                    <span className="text-[10px] text-zinc-600 ml-2">{new Date(comment.created_at).toLocaleDateString()}</span>
+                                                                    <span className="text-xs font-semibold text-zinc-900">{comment.user.full_name}</span>
+                                                                    <span className="text-[10px] text-zinc-500 ml-2">{new Date(comment.created_at).toLocaleDateString()}</span>
                                                                 </div>
                                                             </div>
                                                             {comment.is_own && (
-                                                                <button onClick={() => handleDeleteComment(comment.id)} className="text-zinc-600 hover:text-red-400 transition-colors ml-2 shrink-0"><Trash2 size={12} /></button>
+                                                                <button onClick={() => handleDeleteComment(comment.id)} className="text-zinc-400 hover:text-red-600 transition-colors ml-2 shrink-0"><Trash2 size={13} /></button>
                                                             )}
                                                         </div>
-                                                        <div className="text-xs text-zinc-300 leading-relaxed prose prose-invert prose-xs">
+                                                        <div className="text-xs text-zinc-700 leading-relaxed prose prose-zinc prose-xs">
                                                             <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{comment.body}</ReactMarkdown>
                                                         </div>
                                                         {authStatus === 'authenticated' && (
                                                             <div className="mt-3 flex items-center gap-4">
                                                                 <div className="flex items-center gap-2">
-                                                                    <button onClick={() => handleCommentVote(comment.id, 1)} className={`flex items-center gap-1 text-[10px] transition-colors ${comment.user_vote === 1 ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-[#4DD4C4]'}`}>
+                                                                    <button onClick={() => handleCommentVote(comment.id, 1)} className={`flex items-center gap-1 text-[10px] font-semibold transition-colors ${comment.user_vote === 1 ? 'text-[#1f9e8e]' : 'text-zinc-500 hover:text-[#1f9e8e]'}`}>
                                                                         <ThumbsUp size={12} fill={comment.user_vote === 1 ? 'currentColor' : 'none'} />
                                                                         <span>{comment.likes || 0}</span>
                                                                     </button>
-                                                                    <button onClick={() => handleCommentVote(comment.id, -1)} className={`flex items-center gap-1 text-[10px] transition-colors ${comment.user_vote === -1 ? 'text-red-400' : 'text-zinc-500 hover:text-red-400'}`}>
+                                                                    <button onClick={() => handleCommentVote(comment.id, -1)} className={`flex items-center gap-1 text-[10px] font-semibold transition-colors ${comment.user_vote === -1 ? 'text-red-600' : 'text-zinc-500 hover:text-red-600'}`}>
                                                                         <ThumbsDown size={12} fill={comment.user_vote === -1 ? 'currentColor' : 'none'} />
                                                                         <span>{comment.dislikes || 0}</span>
                                                                     </button>
                                                                 </div>
-                                                                <button onClick={() => setReplyingTo(replyingTo?.id === comment.id ? null : { id: comment.id, userName: comment.user.full_name })} className="text-[10px] text-zinc-500 hover:text-[#4DD4C4] transition-colors flex items-center gap-1"><Reply size={10} /> Reply</button>
+                                                                <button onClick={() => setReplyingTo(replyingTo?.id === comment.id ? null : { id: comment.id, userName: comment.user.full_name })} className="text-[10px] text-zinc-500 hover:text-[#1f9e8e] transition-colors flex items-center gap-1"><Reply size={10} /> Reply</button>
                                                             </div>
                                                         )}
                                                     </div>
 
                                                     {/* Reply Input */}
                                                     {replyingTo && replyingTo.id === comment.id && (
-                                                        <div className="ml-5 bg-[#080c16] rounded-2xl border border-[#4DD4C4]/20 overflow-hidden mb-4">
+                                                        <div className="ml-5 bg-[#f8fafb] rounded-2xl border border-[#dedee2] overflow-hidden mb-4">
                                                             <div
-                                                                className="h-[52px] px-4 border-b border-[#202736] flex items-center justify-between bg-[#0d121c]/50 cursor-row-resize select-none"
+                                                                className="h-[44px] px-4 border-b border-[#dedee2] flex items-center justify-between bg-zinc-100/60 cursor-row-resize select-none"
                                                                 onMouseDown={handleReplyResizeStart}
                                                             >
                                                                 <div className="flex items-center gap-4">
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); setIsReplyPreview(false); }}
-                                                                        className={`text-[9px] font-bold uppercase tracking-widest transition-colors relative py-1 ${!isReplyPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                                        className={`text-[9px] font-bold uppercase tracking-widest transition-colors relative py-1 ${!isReplyPreview ? 'text-[#1f9e8e]' : 'text-zinc-500 hover:text-zinc-800'}`}
                                                                     >
                                                                         Write
-                                                                        {!isReplyPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
+                                                                        {!isReplyPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1f9e8e]" />}
                                                                     </button>
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); setIsReplyPreview(true); }}
-                                                                        className={`text-[9px] font-bold uppercase tracking-widest transition-colors relative py-1 ${isReplyPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                                        className={`text-[9px] font-bold uppercase tracking-widest transition-colors relative py-1 ${isReplyPreview ? 'text-[#1f9e8e]' : 'text-zinc-500 hover:text-zinc-800'}`}
                                                                     >
                                                                         Preview
-                                                                        {isReplyPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
+                                                                        {isReplyPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1f9e8e]" />}
                                                                     </button>
                                                                 </div>
                                                                 <span className="text-[9px] font-bold text-zinc-500 uppercase">Reply to {replyingTo?.userName}</span>
-                                                                <button onClick={(e) => { e.stopPropagation(); setReplyingTo(null); }} className="text-zinc-500 hover:text-white"><X size={12} /></button>
+                                                                <button onClick={(e) => { e.stopPropagation(); setReplyingTo(null); }} className="text-zinc-400 hover:text-zinc-800"><X size={12} /></button>
                                                             </div>
                                                             <div className="flex items-end gap-2 p-2">
-                                                                <div className="flex-1 relative bg-[#080c16] rounded-2xl border border-[#4DD4C4]/20 overflow-hidden">
+                                                                <div className="flex-1 relative bg-white rounded-xl border border-[#dedee2] overflow-hidden">
                                                                     {!isReplyPreview ? (
                                                                         <textarea
                                                                             value={replyText}
                                                                             onChange={e => setReplyText(e.target.value)}
                                                                             placeholder="Write a reply..."
-                                                                            className="w-full bg-transparent p-4 text-[11px] text-zinc-300 outline-none resize-none font-sans"
+                                                                            className="w-full bg-transparent p-4 text-xs text-zinc-800 outline-none resize-none font-sans"
                                                                             style={{ height: replyEditorHeight }}
                                                                             onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handlePostReply(comment.id); }}
                                                                         />
                                                                     ) : (
-                                                                        <div className="p-4 text-[11px] text-zinc-300 overflow-y-auto scrollbar-thin" style={{ height: replyEditorHeight }}>
+                                                                        <div className="p-4 text-xs text-zinc-800 overflow-y-auto scrollbar-thin" style={{ height: replyEditorHeight }}>
                                                                             {replyText ? (
                                                                                 <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{replyText}</ReactMarkdown>
                                                                             ) : (
-                                                                                <span className="text-zinc-600 italic">Nothing to preview</span>
+                                                                                <span className="text-zinc-400 italic">Nothing to preview</span>
                                                                             )}
                                                                         </div>
                                                                     )}
                                                                 </div>
                                                                 <button
                                                                     onClick={() => handlePostReply(comment.id)}
-                                                                    className="text-zinc-600 hover:text-[#4DD4C4] transition-colors p-1.5 shrink-0 mb-1"
+                                                                    className="text-zinc-500 hover:text-[#1f9e8e] transition-colors p-1.5 shrink-0 mb-1"
                                                                 >
                                                                     <Send size={15} />
                                                                 </button>
@@ -2413,14 +2413,14 @@ export function DailySetClient() {
                                                     )}
 
                                                     {comment.replies?.map((reply: any) => (
-                                                        <div key={reply.id} className="ml-5 bg-[#0b101c] rounded-lg p-3 border border-[#202736]/60">
+                                                        <div key={reply.id} className="ml-5 bg-[#f8fafb] rounded-xl p-3 border border-[#dedee2]">
                                                             <div className="flex items-start justify-between mb-1">
                                                                 <div className="flex items-center gap-2">
-                                                                    <div className="w-5 h-5 rounded-full bg-[#4DD4C4]/10 flex items-center justify-center text-[9px] font-bold text-[#4DD4C4] shrink-0">{reply.user.initials}</div>
-                                                                    <span className="text-[11px] font-semibold text-zinc-400">{reply.user.full_name}</span>
+                                                                    <div className="w-5 h-5 rounded-full bg-[#e6f7f5] flex items-center justify-center text-[9px] font-bold text-[#1f9e8e] shrink-0">{reply.user.initials}</div>
+                                                                    <span className="text-xs font-semibold text-zinc-800">{reply.user.full_name}</span>
                                                                 </div>
                                                             </div>
-                                                            <div className="text-[11px] text-zinc-400 leading-relaxed">
+                                                            <div className="text-xs text-zinc-700 leading-relaxed">
                                                                 <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{reply.body}</ReactMarkdown>
                                                             </div>
                                                         </div>
@@ -2430,61 +2430,59 @@ export function DailySetClient() {
                                         </div>
                                         {/* Resize Handle Separator */}
                                         <div
-                                            className="h-[1px] w-full bg-[#202736] hover:bg-[#4DD4C4]/50 cursor-row-resize transition-colors relative shrink-0"
+                                            className="h-[1px] w-full bg-[#dedee2] hover:bg-[#1f9e8e]/50 cursor-row-resize transition-colors relative shrink-0"
                                             onMouseDown={handleCommentResizeStart}
                                         >
                                             <div className="absolute -top-2 -bottom-2 left-0 right-0 z-10" />
                                         </div>
-                                        <div className="p-4 bg-[#0d121c] shrink-0">
+                                        <div className="p-4 bg-[#f8f9fa] border-t border-[#dedee2] shrink-0">
                                             {authStatus === 'authenticated' ? (
                                                 <div className="flex flex-col">
-
-
                                                     {/* Tabs Bar */}
                                                     <div className="flex items-center gap-6 mb-3 px-1 select-none">
                                                         <button
                                                             onClick={() => setIsCommentPreview(false)}
-                                                            className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${!isCommentPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                            className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${!isCommentPreview ? 'text-[#1f9e8e]' : 'text-zinc-500 hover:text-zinc-800'}`}
                                                         >
                                                             Write
-                                                            {!isCommentPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
+                                                            {!isCommentPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1f9e8e]" />}
                                                         </button>
                                                         <button
                                                             onClick={() => setIsCommentPreview(true)}
-                                                            className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${isCommentPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                            className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${isCommentPreview ? 'text-[#1f9e8e]' : 'text-zinc-500 hover:text-zinc-800'}`}
                                                         >
                                                             Preview
-                                                            {isCommentPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
+                                                            {isCommentPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1f9e8e]" />}
                                                         </button>
                                                     </div>
 
                                                     <div className="flex items-end gap-2">
-                                                        <div className="flex-1 relative bg-[#080c16] rounded-2xl border border-[#202736] overflow-hidden group focus-within:border-[#4DD4C4]/30 transition-all">
+                                                        <div className="flex-1 relative bg-white rounded-2xl border border-[#dedee2] overflow-hidden group focus-within:border-[#1f9e8e]/50 transition-all shadow-2xs">
                                                             {!isCommentPreview ? (
                                                                 <textarea
                                                                     value={newComment}
                                                                     onChange={e => setNewComment(e.target.value)}
                                                                     placeholder="Add to discussion..."
-                                                                    className="w-full bg-transparent p-5 text-[12px] text-zinc-300 outline-none resize-none font-sans"
+                                                                    className="w-full bg-transparent p-4 text-xs text-zinc-800 outline-none resize-none font-sans placeholder:text-zinc-400"
                                                                     style={{ height: commentEditorHeight }}
                                                                     onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handlePostComment(); }}
                                                                 />
                                                             ) : (
-                                                                <div className="p-5 text-[12px] text-zinc-300 overflow-y-auto scrollbar-thin" style={{ height: commentEditorHeight }}>
+                                                                <div className="p-4 text-xs text-zinc-800 overflow-y-auto scrollbar-thin" style={{ height: commentEditorHeight }}>
                                                                     {newComment ? (
                                                                         <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{newComment}</ReactMarkdown>
                                                                     ) : (
-                                                                        <span className="text-zinc-600 italic">Nothing to preview</span>
+                                                                        <span className="text-zinc-400 italic">Nothing to preview</span>
                                                                     )}
                                                                 </div>
                                                             )}
                                                         </div>
                                                         <button
                                                             onClick={handlePostComment}
-                                                            className="text-zinc-600 hover:text-[#4DD4C4] transition-colors p-1.5 shrink-0 mb-2"
+                                                            className="text-zinc-500 hover:text-[#1f9e8e] transition-colors p-2 shrink-0 mb-1"
                                                             title="Ctrl + Enter to send"
                                                         >
-                                                            <Send size={18} />
+                                                            <Send size={16} />
                                                         </button>
                                                     </div>
 
@@ -2495,11 +2493,11 @@ export function DailySetClient() {
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="text-center space-y-2 flex flex-col justify-center h-full">
+                                                <div className="text-center space-y-2 flex flex-col justify-center h-full py-4">
                                                     <p className="text-xs text-zinc-500">Sign in to join the discussion</p>
                                                     <div className="flex gap-2 justify-center">
-                                                        <Link href="/login" className="px-4 py-1.5 bg-[#4DD4C4] text-[#080c16] rounded text-xs font-bold hover:bg-[#3dbdb0] transition-colors">Log In</Link>
-                                                        <Link href="/signup" className="px-4 py-1.5 bg-[#131924] border border-[#202736] text-white rounded text-xs font-bold hover:bg-[#202736] transition-colors">Sign Up</Link>
+                                                        <Link href="/login" className="px-4 py-1.5 bg-[#1f9e8e] text-white rounded-lg text-xs font-bold hover:bg-[#177a6d] transition-colors shadow-2xs">Log In</Link>
+                                                        <Link href="/signup" className="px-4 py-1.5 bg-white border border-[#dedee2] text-zinc-800 rounded-lg text-xs font-bold hover:bg-zinc-50 transition-colors shadow-2xs">Sign Up</Link>
                                                     </div>
                                                 </div>
                                             )}
@@ -2508,25 +2506,25 @@ export function DailySetClient() {
                                 )}
                             </div>
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-zinc-500 gap-4">
-                                <div className="w-16 h-16 rounded-2xl bg-[#131924] border border-[#202736] flex items-center justify-center">
-                                    <Database size={24} className="text-[#4DD4C4]/50" />
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-zinc-500 gap-4 bg-zinc-50/50">
+                                <div className="w-16 h-16 rounded-2xl bg-white border border-[#dedee2] flex items-center justify-center shadow-sm">
+                                    <Database size={24} className="text-[#1f9e8e]" />
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-sm font-bold text-white">No Problem Selected</p>
-                                    <p className="text-xs leading-relaxed max-w-[200px]">Choose a question from the sidebar to view details and start practice.</p>
+                                    <p className="text-sm font-bold text-zinc-900">No Problem Selected</p>
+                                    <p className="text-xs leading-relaxed max-w-[200px] text-zinc-500">Choose a question from the sidebar to view details and start practice.</p>
                                 </div>
                             </div>
                         )}
                     </Panel>
 
                     {/* Resize Handle */}
-                    <Separator className="w-1.5 bg-[#080c16] hover:bg-[#4DD4C4]/20 transition-colors cursor-col-resize flex flex-col items-center justify-center relative">
-                        <div className="h-8 w-0.5 bg-[#202736] rounded-full" />
+                    <Separator className="w-2 bg-[#f0f2f5] hover:bg-[#1f9e8e]/30 border-x border-[#dedee2] transition-colors cursor-col-resize flex flex-col items-center justify-center relative">
+                        <div className="h-8 w-0.5 bg-zinc-300 rounded-full" />
                     </Separator>
 
                     {/* ── RIGHT PANE: Editor + Output ── */}
-                    <Panel minSize="30" className="flex flex-col bg-[#0b101c]">
+                    <Panel minSize="30" className="flex flex-col bg-white">
                         {/* Editor toolbar */}
                         <div className="h-[52px] border-b border-[#dedee2] bg-[#fafafa] flex items-center justify-between px-4 shrink-0">
                             <div className="flex items-center gap-3">
