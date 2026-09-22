@@ -1716,24 +1716,24 @@ export function DailySetClient() {
                         minWidth: sidebarCollapsed ? '52px' : '220px',
                         transition: 'width 250ms ease, min-width 250ms ease'
                     }}
-                    className="flex flex-col bg-[#080c16] border-r border-[#202736] overflow-visible shrink-0"
+                    className="flex flex-col bg-[#fafafa] border-r border-[#dedee2] overflow-visible shrink-0"
                 >
                     <div className={`flex-1 flex flex-col h-full ${sidebarCollapsed ? 'overflow-visible' : 'overflow-hidden'}`}>
                         {/* Header / Tabs */}
-                        <div className={`h-[52px] border-b border-[#202736] bg-[#0d121c] flex ${sidebarCollapsed ? 'flex-col justify-center' : 'flex-row'} items-center px-3 shrink-0 transition-all gap-1.5`}>
+                        <div className={`h-[52px] border-b border-[#dedee2] bg-white flex ${sidebarCollapsed ? 'flex-col justify-center' : 'flex-row'} items-center px-3 shrink-0 transition-all gap-1.5`}>
                             {!sidebarCollapsed ? (
                                 <>
                                     {/* Discipline tabs inline in header */}
                                     {activeSidebarTab === 'today' ? (
-                                        <div className="flex gap-0.5 flex-1 overflow-hidden">
-                                            {([{ id: 'sql', label: 'SQL', Icon: Database, color: 'text-sky-400', bg: 'bg-sky-400/10', border: 'border-sky-400/40' }, { id: 'python', label: 'Python', Icon: Code2, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/40' }, { id: 'pyspark', label: 'PySpark', Icon: Server, color: 'text-violet-400', bg: 'bg-violet-400/10', border: 'border-violet-400/40' }] as const).map(({ id, label, Icon, color, bg, border }) => (
+                                        <div className="flex gap-1 flex-1 overflow-hidden">
+                                            {([{ id: 'sql', label: 'SQL', Icon: Database, color: 'text-sky-700', bg: 'bg-sky-50', border: 'border-sky-200' }, { id: 'python', label: 'Python', Icon: Code2, color: 'text-amber-800', bg: 'bg-amber-50', border: 'border-amber-200' }, { id: 'pyspark', label: 'PySpark', Icon: Server, color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200' }] as const).map(({ id, label, Icon, color, bg, border }) => (
                                                 <button
                                                     key={id}
                                                     onClick={() => setActiveDisciplineTab(id)}
-                                                    className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-[10px] font-bold border transition-all ${
+                                                    className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
                                                         activeDisciplineTab === id
-                                                            ? `${bg} ${color} ${border}`
-                                                            : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.03] border-transparent'
+                                                            ? `${bg} ${color} ${border} shadow-2xs`
+                                                            : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 border-transparent'
                                                     }`}
                                                 >
                                                     <Icon size={11} />
@@ -1742,15 +1742,15 @@ export function DailySetClient() {
                                             ))}
                                         </div>
                                     ) : (
-                                        <div className="flex gap-0.5 flex-1 overflow-hidden">
+                                        <div className="flex gap-1 flex-1 overflow-hidden">
                                             {([{ id: 'all', label: 'All' }, { id: 'sql', label: 'SQL' }, { id: 'python', label: 'Python' }, { id: 'pyspark', label: 'PySpark' }] as const).map(({ id, label }) => (
                                                 <button
                                                     key={id}
                                                     onClick={() => setTypeFilter(id)}
-                                                    className={`flex-1 flex items-center justify-center py-1.5 rounded text-[10px] font-bold border transition-all ${
+                                                    className={`flex-1 flex items-center justify-center py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
                                                         typeFilter === id
-                                                            ? 'bg-[#4DD4C4]/10 text-[#4DD4C4] border-[#4DD4C4]/40'
-                                                            : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.03] border-transparent'
+                                                            ? 'bg-[#1f9e8e] text-white border-[#1f9e8e] shadow-2xs'
+                                                            : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 border-transparent'
                                                     }`}
                                                 >
                                                     {label}
@@ -1761,16 +1761,16 @@ export function DailySetClient() {
                                     {/* Collapse button */}
                                     <button
                                         onClick={() => setSidebarCollapsed(true)}
-                                        className="p-1.5 hover:bg-[#202736] rounded text-zinc-500 hover:text-white transition-colors shrink-0"
+                                        className="p-1.5 hover:bg-zinc-100 rounded-lg text-zinc-500 hover:text-zinc-900 transition-colors shrink-0"
                                         title="Collapse Sidebar"
                                     >
-                                        <ChevronLeft size={13} />
+                                        <ChevronLeft size={14} />
                                     </button>
                                 </>
                             ) : (
                                 <button
                                     onClick={() => setSidebarCollapsed(false)}
-                                    className="p-2 hover:bg-[#202736] rounded text-zinc-500 hover:text-white transition-colors"
+                                    className="p-2 hover:bg-zinc-100 rounded-lg text-zinc-500 hover:text-zinc-900 transition-colors"
                                     title="Expand Sidebar"
                                 >
                                     <ChevronRight size={16} />
@@ -1813,20 +1813,20 @@ export function DailySetClient() {
                                                     onClick={() => handleProblemSelect(pId)}
                                                     className={`relative group cursor-pointer`}
                                                 >
-                                                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${isActive ? 'ring-4 ring-offset-2 ring-offset-[#080c16] scale-125' : 'hover:scale-150'}`}
+                                                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${isActive ? 'ring-4 ring-offset-2 ring-offset-white scale-125' : 'hover:scale-150'}`}
                                                         style={{
                                                             backgroundColor: dStyle.hex,
-                                                            boxShadow: isActive ? `0 0 12px ${dStyle.hex}` : 'none',
+                                                            boxShadow: isActive ? `0 0 10px ${dStyle.hex}` : 'none',
                                                         }}
                                                     />
                                                     {isSolved && (
-                                                        <div className="absolute -top-1.5 -right-1.5 bg-[#080c16] rounded-full p-0.5">
-                                                            <CheckCircle2 size={10} className="text-[#4DD4C4]" />
+                                                        <div className="absolute -top-1.5 -right-1.5 bg-white rounded-full p-0.5 shadow-2xs">
+                                                            <CheckCircle2 size={10} className="text-[#1f9e8e]" />
                                                         </div>
                                                     )}
-                                                    {/* Tooltip — rendered at fixed z-index to escape overflow clipping */}
-                                                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 bg-[#131924] border border-[#4DD4C4]/20 rounded-lg text-[10px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 shadow-2xl z-[9999]">
-                                                        <div className="absolute right-full top-1/2 -translate-y-1/2 mr-0 border-4 border-transparent border-r-[#131924]" />
+                                                    {/* Tooltip */}
+                                                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-[10px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 shadow-xl z-[9999]">
+                                                        <div className="absolute right-full top-1/2 -translate-y-1/2 mr-0 border-4 border-transparent border-r-zinc-900" />
                                                         <span className="font-medium">{pInfo.title}</span>
                                                     </div>
                                                 </div>
@@ -1835,12 +1835,12 @@ export function DailySetClient() {
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {/* ── Discipline Tab content (tabs are now in header) ── */}
+                                        {/* ── Discipline Tab content ── */}
                                         {(() => {
                                             const DISC_TABS = [
-                                                { id: 'sql' as const, label: 'SQL', Icon: Database, color: 'text-sky-400', bg: 'bg-sky-400/10', border: 'border-sky-400/30' },
-                                                { id: 'python' as const, label: 'Python', Icon: Code2, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/30' },
-                                                { id: 'pyspark' as const, label: 'PySpark', Icon: Server, color: 'text-violet-400', bg: 'bg-violet-400/10', border: 'border-violet-400/30' },
+                                                { id: 'sql' as const, label: 'SQL', Icon: Database, color: 'text-sky-700', bg: 'bg-sky-50', border: 'border-sky-200' },
+                                                { id: 'python' as const, label: 'Python', Icon: Code2, color: 'text-amber-800', bg: 'bg-amber-50', border: 'border-amber-200' },
+                                                { id: 'pyspark' as const, label: 'PySpark', Icon: Server, color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200' },
                                             ];
                                             const DISC_KEYS: Record<string, Array<keyof DailyPractice>> = {
                                                 sql: ['easy', 'medium', 'advanced'],
@@ -1858,9 +1858,6 @@ export function DailySetClient() {
 
                                             return (
                                                 <>
-
-
-
                                                     {/* Problem cards for the active discipline */}
                                                     {catProblems.length > 0 ? (
                                                         <div className="space-y-2">
@@ -1875,18 +1872,18 @@ export function DailySetClient() {
                                                                         id={cardIdx === 0 ? 'tour-problem-card' : undefined}
                                                                         key={`card-${id ?? cardIdx}`}
                                                                         onClick={() => handleProblemSelect(id!)}
-                                                                        className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${isActive
-                                                                                ? `${activeTabMeta.bg} ${activeTabMeta.border}`
-                                                                                : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'
+                                                                        className={`p-3 rounded-xl cursor-pointer border transition-all flex flex-col gap-2 group ${isActive
+                                                                                ? `bg-[#e6f7f5] border-[#1f9e8e] shadow-2xs`
+                                                                                : 'bg-white border-[#dedee2] hover:border-[#1f9e8e]/40 shadow-2xs'
                                                                             }`}
                                                                     >
                                                                         <div className="flex justify-between items-center">
-                                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
+                                                                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
                                                                                 {dStyle.label}
                                                                             </span>
-                                                                            <CheckCircle2 size={14} className={isSolved ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
+                                                                            <CheckCircle2 size={14} className={isSolved ? 'text-[#1f9e8e]' : 'text-zinc-300'} />
                                                                         </div>
-                                                                        <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'
+                                                                        <div className={`text-xs font-semibold transition-colors line-clamp-2 ${isActive ? 'text-[#135d54]' : 'text-zinc-800 group-hover:text-zinc-950'
                                                                             }`}>
                                                                             {pInfo.title}
                                                                         </div>
@@ -1895,7 +1892,7 @@ export function DailySetClient() {
                                                             })}
                                                         </div>
                                                     ) : (
-                                                        <div className="text-xs text-zinc-500 italic p-4 text-center border border-[#202736] rounded bg-[#131924]">
+                                                        <div className="text-xs text-zinc-500 italic p-4 text-center border border-[#dedee2] rounded-xl bg-white shadow-2xs">
                                                             {dailySet ? `No ${activeDisciplineTab.toUpperCase()} problems today.` : 'No daily set found.'}
                                                         </div>
                                                     )}
@@ -1910,61 +1907,61 @@ export function DailySetClient() {
                                     {!sidebarCollapsed && (
                                         <div className="flex gap-2 mb-2 shrink-0">
                                             <div className="flex-1 relative">
-                                                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                                                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
                                                 <input
                                                     type="text"
-                                                    placeholder="Search..."
+                                                    placeholder="Search questions..."
                                                     value={searchQuery}
                                                     onChange={e => setSearchQuery(e.target.value)}
-                                                    className="w-full bg-[#131924] border border-[#202736] rounded text-[11px] py-1.5 pl-8 pr-2 text-zinc-300 outline-none focus:border-[#4DD4C4]/50 transition-colors"
+                                                    className="w-full bg-white border border-[#dedee2] rounded-lg text-xs py-1.5 pl-8 pr-2 text-zinc-800 placeholder:text-zinc-400 outline-none focus:border-[#1f9e8e] transition-colors shadow-2xs"
                                                 />
                                             </div>
                                             <div className="relative" ref={filterDropdownRef}>
                                                 <button
                                                     onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                                                    className={`p-1.5 border rounded transition-colors ${(difficultyFilter !== 'all' || typeFilter !== 'all' || statusFilter !== 'all') ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/30 text-[#4DD4C4]' : 'bg-[#131924] border-[#202736] text-[#4DD4C4] hover:bg-[#1a2230]'}`}
+                                                    className={`p-1.5 border rounded-lg transition-colors ${(difficultyFilter !== 'all' || typeFilter !== 'all' || statusFilter !== 'all') ? 'bg-[#e6f7f5] border-[#1f9e8e]/40 text-[#1f9e8e]' : 'bg-white border-[#dedee2] text-zinc-600 hover:bg-zinc-50'}`}
                                                     title="Filters"
                                                 >
-                                                    <Filter size={12} />
+                                                    <Filter size={13} />
                                                 </button>
                                                 {showFilterDropdown && (
-                                                    <div className="absolute top-full right-0 mt-1.5 w-48 bg-[#131924] border border-[#202736] rounded-lg overflow-hidden p-3 z-[300] shadow-xl space-y-3">
+                                                    <div className="absolute top-full right-0 mt-1.5 w-48 bg-white border border-[#dedee2] rounded-xl overflow-hidden p-3 z-[300] shadow-xl space-y-3">
                                                         <div>
-                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Difficulty</div>
+                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1 font-mono">Difficulty</div>
                                                             <div className="flex flex-wrap gap-1">
                                                                 {['all', 'easy', 'medium', 'advanced'].map((lvl) => (
                                                                     <button
                                                                         key={lvl}
                                                                         onClick={() => setDifficultyFilter(lvl)}
-                                                                        className={`px-2 py-1 text-[9px] font-bold rounded uppercase transition-colors ${difficultyFilter === lvl ? 'text-[#080c16] bg-[#4DD4C4]' : 'text-zinc-400 bg-[#080c16] border border-[#202736] hover:text-white hover:bg-[#202736]'}`}
+                                                                        className={`px-2 py-1 text-[9px] font-bold rounded-md uppercase transition-colors ${difficultyFilter === lvl ? 'text-white bg-[#1f9e8e]' : 'text-zinc-600 bg-zinc-100 border border-zinc-200 hover:text-zinc-900 hover:bg-zinc-200'}`}
                                                                     >
                                                                         {lvl === 'advanced' ? 'hard' : lvl}
                                                                     </button>
                                                                 ))}
                                                             </div>
                                                         </div>
-                                                        <div className="border-t border-[#202736]/50 pt-2">
-                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Category</div>
+                                                        <div className="border-t border-zinc-100 pt-2">
+                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1 font-mono">Category</div>
                                                             <div className="flex flex-wrap gap-1">
                                                                 {[{ val: 'all', label: 'All' }, { val: 'sql', label: 'SQL' }, { val: 'python', label: 'Python' }, { val: 'pyspark', label: 'PySpark' }, { val: 'python_dsa', label: 'DSA' }].map((cat) => (
                                                                     <button
                                                                         key={cat.val}
                                                                         onClick={() => setTypeFilter(cat.val)}
-                                                                        className={`px-2 py-1 text-[9px] font-bold rounded uppercase transition-colors ${typeFilter === cat.val ? 'text-[#080c16] bg-[#4DD4C4]' : 'text-zinc-400 bg-[#080c16] border border-[#202736] hover:text-white hover:bg-[#202736]'}`}
+                                                                        className={`px-2 py-1 text-[9px] font-bold rounded-md uppercase transition-colors ${typeFilter === cat.val ? 'text-white bg-[#1f9e8e]' : 'text-zinc-600 bg-zinc-100 border border-zinc-200 hover:text-zinc-900 hover:bg-zinc-200'}`}
                                                                     >
                                                                         {cat.label}
                                                                     </button>
                                                                 ))}
                                                             </div>
                                                         </div>
-                                                        <div className="border-t border-[#202736]/50 pt-2">
-                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Status</div>
+                                                        <div className="border-t border-zinc-100 pt-2">
+                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1 font-mono">Status</div>
                                                             <div className="flex flex-wrap gap-1">
                                                                 {['all', 'solved', 'unsolved'].map((stat) => (
                                                                     <button
                                                                         key={stat}
                                                                         onClick={() => setStatusFilter(stat)}
-                                                                        className={`px-2 py-1 text-[9px] font-bold rounded uppercase transition-colors ${statusFilter === stat ? 'text-[#080c16] bg-[#4DD4C4]' : 'text-zinc-400 bg-[#080c16] border border-[#202736] hover:text-white hover:bg-[#202736]'}`}
+                                                                        className={`px-2 py-1 text-[9px] font-bold rounded-md uppercase transition-colors ${statusFilter === stat ? 'text-white bg-[#1f9e8e]' : 'text-zinc-600 bg-zinc-100 border border-zinc-200 hover:text-zinc-900 hover:bg-zinc-200'}`}
                                                                     >
                                                                         {stat}
                                                                     </button>
@@ -1990,33 +1987,33 @@ export function DailySetClient() {
                                                 <div
                                                     key={p.id}
                                                     onClick={() => handleProblemSelect(p.id)}
-                                                    className={`flex flex-col gap-2 p-3 rounded border cursor-pointer transition-all group ${
+                                                    className={`flex flex-col gap-2 p-3 rounded-xl border cursor-pointer transition-all group ${
                                                         p.is_locked
-                                                            ? 'bg-[#10141e]/80 border-[#202736]/60 hover:border-amber-500/40 opacity-85 hover:opacity-100'
+                                                            ? 'bg-zinc-50/90 border-zinc-200 hover:border-amber-400/60 shadow-2xs'
                                                             : isActive
-                                                            ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40'
-                                                            : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'
+                                                            ? 'bg-[#e6f7f5] border-[#1f9e8e] shadow-2xs'
+                                                            : 'bg-white border-[#dedee2] hover:border-[#1f9e8e]/40 shadow-2xs'
                                                     }`}
                                                 >
                                                     <div className="flex justify-between items-center">
                                                         <div className="flex items-center gap-1.5">
-                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
+                                                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
                                                                 {dStyle.label}
                                                             </span>
                                                             {p.is_locked && (
-                                                                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                                                                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 font-mono">
                                                                     <Lock size={9} /> PRO
                                                                 </span>
                                                             )}
                                                         </div>
                                                         {p.is_locked ? (
-                                                            <Lock size={13} className="text-amber-400/80 group-hover:text-amber-400 transition-colors" />
+                                                            <Lock size={13} className="text-amber-600 group-hover:text-amber-700 transition-colors" />
                                                         ) : (
-                                                            <CheckCircle2 size={14} className={solvedIds.has(p.id) ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
+                                                            <CheckCircle2 size={14} className={solvedIds.has(p.id) ? 'text-[#1f9e8e]' : 'text-zinc-300'} />
                                                         )}
                                                     </div>
-                                                    <div className={`text-sm font-medium transition-colors line-clamp-2 ${
-                                                        p.is_locked ? 'text-zinc-400 group-hover:text-zinc-200' : isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'
+                                                    <div className={`text-xs font-semibold transition-colors line-clamp-2 ${
+                                                        p.is_locked ? 'text-zinc-600 group-hover:text-zinc-900' : isActive ? 'text-[#135d54]' : 'text-zinc-800 group-hover:text-zinc-950'
                                                     }`}>
                                                         {p.title}
                                                     </div>
@@ -2031,16 +2028,16 @@ export function DailySetClient() {
 
                         {/* Streak Footer */}
                         {!sidebarCollapsed && (
-                            <div id="tour-streak" className="p-4 border-t border-[#202736] bg-[#0d121c] shrink-0">
+                            <div id="tour-streak" className="p-4 border-t border-[#dedee2] bg-white shrink-0">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Daily Streak</span>
-                                    <span className="text-sm font-bold text-white flex items-center gap-1">
-                                        {streak} <Flame size={14} className="text-[#4DD4C4] fill-[#4DD4C4]" />
+                                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">Daily Streak</span>
+                                    <span className="text-sm font-bold text-zinc-900 flex items-center gap-1">
+                                        {streak} <Flame size={14} className="text-amber-500 fill-amber-500" />
                                     </span>
                                 </div>
-                                <div className="h-1.5 w-full bg-[#080c16] rounded-full overflow-hidden border border-[#202736]">
+                                <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden border border-zinc-200">
                                     <div
-                                        className="h-full bg-[#4DD4C4] shadow-[0_0_10px_rgba(77,212,196,0.5)] transition-all duration-1000"
+                                        className="h-full bg-[#1f9e8e] transition-all duration-1000"
                                         style={{ width: `${Math.min(100, (streak / 30) * 100)}%` }}
                                     ></div>
                                 </div>
@@ -2900,28 +2897,28 @@ export function DailySetClient() {
 
             {/* ══ Pro / Locked Challenge Modal ══ */}
             {lockedModalProblem && (
-                <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
-                    <div className="bg-[#131924] border border-amber-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 relative overflow-hidden text-center">
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-orange-400 to-amber-500" />
+                <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="bg-white border border-[#dedee2] rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 relative overflow-hidden text-center">
+                        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400" />
                         <button
                             onClick={() => setLockedModalProblem(null)}
-                            className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+                            className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-800 transition-colors p-1 rounded-lg hover:bg-zinc-100"
                         >
                             <X size={18} />
                         </button>
 
-                        <div className="w-16 h-16 rounded-3xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto shadow-lg shadow-amber-500/10">
+                        <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mx-auto shadow-sm">
                             <Lock size={28} />
                         </div>
 
                         <div className="space-y-2">
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full font-mono">
                                 Pro Challenge Locked
                             </span>
-                            <h3 className="text-lg font-bold text-white tracking-tight mt-2">
+                            <h3 className="text-lg font-bold text-zinc-900 tracking-tight mt-2">
                                 {lockedModalProblem.title}
                             </h3>
-                            <p className="text-xs text-zinc-400 leading-relaxed max-w-xs mx-auto">
+                            <p className="text-xs text-zinc-600 leading-relaxed max-w-xs mx-auto">
                                 Free tier includes the first 30 SQL questions and the daily practice set. Upgrade to unlock all questions across SQL, Python, PySpark &amp; DSA.
                             </p>
                         </div>
@@ -2930,16 +2927,16 @@ export function DailySetClient() {
                             <Link
                                 href="/payment"
                                 onClick={() => setLockedModalProblem(null)}
-                                className="w-full bg-gradient-to-r from-[#4DD4C4] to-[#34b6a5] hover:opacity-90 text-[#080c16] font-bold rounded-xl py-3 text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#4DD4C4]/20"
+                                className="w-full bg-[#1f9e8e] hover:bg-[#177a6d] text-white font-bold rounded-xl py-3 text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm"
                             >
                                 Upgrade to Pro Plan →
                             </Link>
                             <Link
                                 href="/redeem"
                                 onClick={() => setLockedModalProblem(null)}
-                                className="w-full bg-[#0b101c] hover:bg-[#202736] border border-[#202736] text-amber-400 hover:text-amber-300 font-semibold rounded-xl py-2.5 text-xs transition-colors flex items-center justify-center gap-1.5"
+                                className="w-full bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-700 hover:text-zinc-900 font-semibold rounded-xl py-2.5 text-xs transition-colors flex items-center justify-center gap-1.5"
                             >
-                                <Sparkles size={12} /> Have an early invite code? Redeem here
+                                <Sparkles size={13} className="text-amber-500" /> Have an invite code or coupon? Redeem here
                             </Link>
                         </div>
                     </div>

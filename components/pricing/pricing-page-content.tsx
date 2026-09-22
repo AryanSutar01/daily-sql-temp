@@ -208,7 +208,7 @@ export function PricingPageContent() {
             </div>
 
             {/* 2. CONTROLS BAR (PPP & Currency Toggle) */}
-            <div className="max-w-[1340px] mx-auto px-4 sm:px-6 mb-8">
+            <div className="max-w-[1340px] mx-auto px-4 sm:px-6 mb-4">
                 <div className="flex flex-wrap items-center justify-between gap-4 py-3 px-5 bg-white rounded-xl border border-[#dedee2] shadow-2xs">
 
                     {/* Left: PPP indicator */}
@@ -240,6 +240,22 @@ export function PricingPageContent() {
                         </button>
                     </div>
 
+                </div>
+            </div>
+
+            {/* 2.1 COUPON REDEMPTION PROMO BANNER */}
+            <div className="max-w-[1340px] mx-auto px-4 sm:px-6 mb-8">
+                <div className="flex flex-wrap items-center justify-between gap-3 py-2.5 px-5 bg-[#e6f7f5] rounded-xl border border-[#1f9e8e]/25 text-xs text-[#135d54]">
+                    <div className="flex items-center gap-2 font-medium">
+                        <span className="text-sm">🎟️</span>
+                        <span>Have an early access invite code or gift coupon?</span>
+                    </div>
+                    <Link
+                        href="/redeem"
+                        className="inline-flex items-center gap-1.5 font-bold text-[#1f9e8e] hover:text-[#177a6d] underline underline-offset-2 transition-colors"
+                    >
+                        Redeem Code Now <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
                 </div>
             </div>
 

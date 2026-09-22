@@ -199,12 +199,8 @@ export function CTASection() {
 
             <div>
               <Link
-                href="/waitlist"
-                className="w-full inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl text-xs font-semibold transition-all duration-150 hover:bg-zinc-800"
-                style={{
-                  background: "#18181b",
-                  color: "#ffffff",
-                }}
+                href="/payment?plan=monthly"
+                className="w-full inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl text-xs font-semibold transition-all duration-150 bg-[#1f9e8e] text-white hover:bg-[#177a6d]"
               >
                 Get Monthly Access
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -296,7 +292,7 @@ export function CTASection() {
 
             <div>
               <Link
-                href="/waitlist"
+                href="/payment?plan=annual"
                 className="w-full inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl text-xs font-semibold transition-all duration-150 hover:opacity-95 shadow-sm"
                 style={{
                   background: "var(--ls-primary)",
@@ -313,6 +309,22 @@ export function CTASection() {
             </div>
           </div>
 
+        </div>
+
+        {/* Voucher / Coupon Promotion Bar */}
+        <div className="max-w-4xl mx-auto mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 py-3 px-6 bg-[#e6f7f5] rounded-2xl border border-[#1f9e8e]/25 text-xs text-[#135d54]">
+            <div className="flex items-center gap-2 font-medium">
+              <span className="text-sm">🎟️</span>
+              <span>Have an invite voucher code or early access gift pass?</span>
+            </div>
+            <Link
+              href="/redeem"
+              className="inline-flex items-center gap-1.5 font-bold text-[#1f9e8e] hover:text-[#177a6d] underline underline-offset-2 transition-colors"
+            >
+              Redeem Code Here <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
         </div>
 
         {/* Value / ROI Callout */}
