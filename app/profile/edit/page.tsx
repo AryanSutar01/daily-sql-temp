@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Edit2, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
-import { StandaloneNavbar } from "@/components/auth/standalone-navbar";
 
 export default function ProfileEditPage() {
     const router = useRouter();
@@ -56,7 +55,6 @@ export default function ProfileEditPage() {
 
     return (
         <div className="landing-light min-h-screen bg-[#fafafa] text-zinc-900 flex flex-col">
-            <StandaloneNavbar />
             <div className="py-10 px-4 sm:px-6 lg:px-8 shrink-0 flex-1">
                 <div className="max-w-3xl mx-auto">
                     <div className="mb-6 flex items-center justify-between">

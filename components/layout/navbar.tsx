@@ -38,8 +38,7 @@ export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const isAdmin = pathname.startsWith("/admin");
-  const isLanding = pathname === "/";
-  const isLightNav = isLanding || pathname.startsWith("/problems") || pathname.startsWith("/pricing");
+  const isLightNav = true;
 
   const practiceHref = user ? "/practice/daily" : "/login";
 
@@ -142,42 +141,31 @@ export function Navbar() {
   };
 
   // Light nav: solid at top, liquid-glass when scrolled
-  const navStyle = isLightNav
-    ? scrolled
-      ? {
-          // Liquid glass
-          backgroundColor: "rgba(247,247,248,0.75)",
-          backdropFilter: "blur(20px) saturate(180%)",
-          WebkitBackdropFilter: "blur(20px) saturate(180%)",
-          borderBottomColor: "rgba(0,0,0,0.07)",
-          boxShadow: "0 1px 0 rgba(255,255,255,0.6) inset, 0 4px 24px rgba(0,0,0,0.06)",
-        }
-      : {
-          // Solid / opaque at top
-          backgroundColor: "#f7f7f8",
-          backdropFilter: "none",
-          WebkitBackdropFilter: "none",
-          borderBottomColor: "rgba(0,0,0,0.07)",
-          boxShadow: "none",
-        }
-    : {};
+  const navStyle = scrolled
+    ? {
+        // Liquid glass
+        backgroundColor: "rgba(247,247,248,0.75)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        borderBottomColor: "rgba(0,0,0,0.07)",
+        boxShadow: "0 1px 0 rgba(255,255,255,0.6) inset, 0 4px 24px rgba(0,0,0,0.06)",
+      }
+    : {
+        // Solid / opaque at top
+        backgroundColor: "#f7f7f8",
+        backdropFilter: "none",
+        WebkitBackdropFilter: "none",
+        borderBottomColor: "rgba(0,0,0,0.07)",
+        boxShadow: "none",
+      };
 
-  const linkClass = isLightNav
-    ? "text-sm transition-colors duration-150 hover:opacity-70"
-    : "text-sm text-zinc-400 hover:text-white transition-colors";
-
-  const linkStyle = isLightNav
-    ? { color: "var(--ls-on-surface-muted)" }
-    : {};
+  const linkClass = "text-sm transition-colors duration-150 hover:opacity-70";
+  const linkStyle = { color: "var(--ls-on-surface-muted)" };
 
   return (
     <nav
-      className={`w-full overflow-visible transition-all duration-300 ${
-        isLightNav
-          ? "border-b"
-          : "border-b border-white/5 bg-[#0a0f1c]/95 backdrop-blur supports-[backdrop-filter]:bg-[#0a0f1c]/80"
-      }`}
-      style={isLightNav ? navStyle : {}}
+      className="w-full overflow-visible transition-all duration-300 border-b border-[#dedee2]"
+      style={navStyle}
     >
       <div
         className="mx-auto px-6 lg:px-8 overflow-visible"
@@ -458,7 +446,7 @@ export function Navbar() {
             className="md:hidden p-2 rounded-lg transition-colors"
             onClick={() => setIsOpen(!isOpen)}
             aria-label="Toggle menu"
-            style={{ color: isLightNav ? "var(--ls-on-surface)" : "#fff" }}
+            style={{ color: "var(--ls-on-surface)" }}
           >
             <svg className="h-5 w-5" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" stroke="currentColor">
               {isOpen ? <path d="M6 18L18 6M6 6l12 12" /> : <path d="M4 6h16M4 12h16M4 18h16" />}
@@ -471,7 +459,7 @@ export function Navbar() {
           <div
             className="md:hidden py-4 space-y-1 border-t"
             style={{
-              borderColor: isLightNav ? "var(--ls-outline)" : "rgba(255,255,255,0.05)",
+              borderColor: "var(--ls-outline)",
             }}
           >
             <p

@@ -56,7 +56,7 @@ export function StandaloneNavbar() {
     const isAuthPage = pathname === "/login" || pathname === "/signup";
 
     return (
-        <nav className="sticky top-0 relative w-full h-16 border-b border-white/5 bg-[#0a0f1c]/95 backdrop-blur z-[100] px-12 sm:px-20 lg:px-40 flex items-center justify-between shrink-0">
+        <nav className="sticky top-0 relative w-full h-16 border-b border-[#dedee2] bg-[#f7f7f8]/95 backdrop-blur z-[100] px-6 sm:px-12 lg:px-20 flex items-center justify-between shrink-0">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-3 shrink-0 group">
                 <img
@@ -74,23 +74,23 @@ export function StandaloneNavbar() {
             {/* Nav Items - Center (Hidden on Profile) */}
             {!pathname.startsWith('/profile') && (
                 <div className="hidden md:flex items-center justify-center flex-1 space-x-12">
-                    <Link href="/practice/daily" className={`text-sm font-semibold transition-colors ${pathname === '/practice/daily' ? 'text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}>Practice</Link>
+                    <Link href="/practice/daily" className={`text-sm font-semibold transition-colors ${pathname === '/practice/daily' ? 'text-[#1f9e8e]' : 'text-zinc-600 hover:text-zinc-900'}`}>Practice</Link>
                 </div>
             )}
 
             {/* Right side CTA or User Menu */}
             <div className={`hidden md:flex items-center gap-4 relative ${!pathname.startsWith('/profile') ? '' : 'flex-1 justify-end gap-8'}`}>
                 {pathname.startsWith('/profile') && (
-                    <Link href="/practice/daily" className={`text-sm font-semibold transition-colors ${pathname === '/practice/daily' ? 'text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}>Practice</Link>
+                    <Link href="/practice/daily" className={`text-sm font-semibold transition-colors ${pathname === '/practice/daily' ? 'text-[#1f9e8e]' : 'text-zinc-600 hover:text-zinc-900'}`}>Practice</Link>
                 )}
                 <div className="flex items-center gap-4 relative">
                 {isLoading ? (
                     <Loader2 size={18} className="animate-spin text-zinc-500" />
                 ) : user ? (
                     <>
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4DD4C4]/10 border border-[#4DD4C4]/20 rounded-lg">
-                            <span className="text-sm font-bold text-[#4DD4C4]">{streak}</span>
-                            <Flame size={14} className="text-[#4DD4C4] fill-[#4DD4C4]" />
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1f9e8e]/10 border border-[#1f9e8e]/20 rounded-lg">
+                            <span className="text-sm font-bold text-[#1f9e8e]">{streak}</span>
+                            <Flame size={14} className="text-[#f97316] fill-[#f97316]" />
                         </div>
                         <div className="relative" ref={dropdownRef}>
                             <button
@@ -130,13 +130,13 @@ export function StandaloneNavbar() {
                     <>
                         <Link
                             href="/login"
-                            className="text-sm text-zinc-400 hover:text-white font-medium transition-colors"
+                            className="text-sm text-zinc-600 hover:text-zinc-900 font-medium transition-colors"
                         >
                             Log In
                         </Link>
                         <Link
                             href="/signup"
-                            className="text-sm text-[#0a0f1c] bg-[#4DD4C4] hover:bg-[#3dbdb0] px-4 py-1.5 rounded font-bold transition-colors shadow-lg shadow-[#4DD4C4]/20"
+                            className="text-sm text-white bg-[#1f9e8e] hover:bg-[#177a6d] px-4 py-1.5 rounded font-bold transition-colors shadow-2xs"
                         >
                             Sign Up
                         </Link>
