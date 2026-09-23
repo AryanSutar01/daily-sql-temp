@@ -6,7 +6,7 @@ import {
     Database, Plus, Calendar, Lock, Search, CheckCircle2,
     AlertCircle, Loader2, ChevronRight, Edit3, Eye,
     Code, FileText, Clock, Trash2, MessageSquare, X, Save, ThumbsDown, Phone, Download, BarChart3, TrendingUp, Users, Activity, Target, Zap,
-    CreditCard, Ticket, Sparkles, Copy, Check, DollarSign, Gift, RefreshCw, Sliders, ShieldCheck, ArrowUpRight, UserCheck, Crown
+    CreditCard, Ticket, Sparkles, Copy, Check, DollarSign, Gift, RefreshCw, Sliders, ShieldCheck, ArrowUpRight, ArrowRight, UserCheck, Crown, Megaphone
 } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -91,7 +91,7 @@ interface ScheduleEntry {
     pyspark_advanced?: { id: string; title: string } | null;
 }
 
-type Tab = 'problems' | 'create' | 'schedule' | 'feedback' | 'members' | 'analytics' | 'subscriptions' | 'coupons';
+type Tab = 'problems' | 'create' | 'schedule' | 'feedback' | 'members' | 'analytics' | 'subscriptions' | 'coupons' | 'announcements';
 type CreateStep = 'problem' | 'datasets' | 'test-cases' | 'solution' | 'preview' | 'done';
 
 export default function AdminDashboard() {
@@ -143,6 +143,17 @@ export default function AdminDashboard() {
     const [coupons, setCoupons] = useState<any[]>([]);
     const [launchConfig, setLaunchConfig] = useState<any>(null);
     const [couponFilter, setCouponFilter] = useState<string>('all');
+
+    // Announcement Banner State
+    const [announcementActive, setAnnouncementActive] = useState(true);
+    const [announcementBadge, setAnnouncementBadge] = useState("NEW");
+    const [announcementMessage, setAnnouncementMessage] = useState("9 fresh problems every day — SQL, Python & PySpark.");
+    const [announcementLinkText, setAnnouncementLinkText] = useState("Sign up free");
+    const [announcementLinkUrl, setAnnouncementLinkUrl] = useState("/signup");
+    const [loadingAnnouncement, setLoadingAnnouncement] = useState(false);
+    const [savingAnnouncement, setSavingAnnouncement] = useState(false);
+    const [announcementSaveMsg, setAnnouncementSaveMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
     const [couponSearch, setCouponSearch] = useState<string>('');
     const [couponGenMode, setCouponGenMode] = useState<'all' | 'custom'>('all');
     const [couponGenEmails, setCouponGenEmails] = useState('');
@@ -326,6 +337,50 @@ export default function AdminDashboard() {
             }
         } catch (e) { console.error(e); }
         setLoading(false);
+    };
+
+    const loadAnnouncement = async (token?: string) => {
+        setLoadingAnnouncement(true);
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/announcement`, {}, token);
+            if (res.ok) {
+                const data = await res.json();
+                setAnnouncementActive(data.is_active ?? true);
+                setAnnouncementBadge(data.badge_text ?? "NEW");
+                setAnnouncementMessage(data.message_text ?? "");
+                setAnnouncementLinkText(data.link_text ?? "");
+                setAnnouncementLinkUrl(data.link_url ?? "");
+            }
+        } catch (e) { console.error(e); }
+        setLoadingAnnouncement(false);
+    };
+
+    const handleSaveAnnouncement = async () => {
+        setSavingAnnouncement(true);
+        setAnnouncementSaveMsg(null);
+        try {
+            const res = await fetchWithAuth(`${API_URL}/admin/announcement`, {
+                method: "PUT",
+                body: JSON.stringify({
+                    is_active: announcementActive,
+                    badge_text: announcementBadge,
+                    message_text: announcementMessage,
+                    link_text: announcementLinkText,
+                    link_url: announcementLinkUrl,
+                }),
+            });
+            if (res.ok) {
+                setAnnouncementSaveMsg({ type: 'success', text: 'Announcement banner updated live!' });
+                setTimeout(() => setAnnouncementSaveMsg(null), 4000);
+            } else {
+                const err = await res.text();
+                setAnnouncementSaveMsg({ type: 'error', text: `Failed: ${err}` });
+            }
+        } catch (err: any) {
+            setAnnouncementSaveMsg({ type: 'error', text: `Error: ${err.message}` });
+        } finally {
+            setSavingAnnouncement(false);
+        }
     };
 
     const handleToggleLaunchTrial = async (isActive: boolean) => {
@@ -770,6 +825,7 @@ export default function AdminDashboard() {
             if (activeTab === 'analytics') loadAnalytics();
             if (activeTab === 'subscriptions') loadSubscriptions();
             if (activeTab === 'coupons') loadCoupons();
+            if (activeTab === 'announcements') loadAnnouncement();
         }
     }, [activeTab, isAuthenticated]);
 
@@ -1469,6 +1525,13 @@ export default function AdminDashboard() {
                             className={`${activeTab === 'members' ? 'bg-[#10b981]/10 text-[#10b981]' : 'text-zinc-400 hover:text-white'}`}
                         >
                             <Lock size={16} className="mr-2" /> Members
+                        </Button>
+                        <Button
+                            onClick={() => setActiveTab('announcements')}
+                            variant="ghost"
+                            className={`${activeTab === 'announcements' ? 'bg-[#1f9e8e]/20 text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}
+                        >
+                            <Megaphone size={16} className="mr-2" /> Announcement
                         </Button>
                         <Button
                             onClick={() => setActiveTab('analytics')}
@@ -3712,6 +3775,212 @@ export default function AdminDashboard() {
                                         No coupons generated yet. Click &quot;Generate Now&quot; above to create early access coupons.
                                     </div>
                                 )}
+                            </div>
+                        </Card>
+                    </div>
+                )}
+
+                {/* ============ ANNOUNCEMENT BANNER TAB ============ */}
+                {activeTab === 'announcements' && (
+                    <div className="space-y-6">
+                        {/* Header card */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#121826] border border-[#202736] p-6 rounded-2xl">
+                            <div>
+                                <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
+                                    <Megaphone className="text-[#4DD4C4]" size={22} />
+                                    Announcement Banner Manager
+                                </h2>
+                                <p className="text-xs text-zinc-400 mt-1">
+                                    Control and edit the top announcement banner displayed across the landing page and public pages in real time.
+                                </p>
+                            </div>
+                            <Button
+                                onClick={() => loadAnnouncement()}
+                                disabled={loadingAnnouncement}
+                                variant="outline"
+                                className="border-[#202736] text-zinc-300 hover:text-white bg-[#0b101c] text-xs self-start sm:self-auto"
+                            >
+                                <RefreshCw size={13} className={`mr-1.5 ${loadingAnnouncement ? 'animate-spin' : ''}`} />
+                                Refresh Live Data
+                            </Button>
+                        </div>
+
+                        {/* Live Interactive Preview Card */}
+                        <Card className="bg-[#121826] border-[#202736] p-6 rounded-2xl space-y-4">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                                    <Sparkles size={14} className="text-amber-400" /> Live Banner Preview
+                                </span>
+                                <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
+                                    announcementActive
+                                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                        : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/30'
+                                }`}>
+                                    {announcementActive ? '● Status: Live / Visible' : '○ Status: Hidden / Inactive'}
+                                </span>
+                            </div>
+
+                            {/* Simulated Banner Container */}
+                            <div className={`p-4 rounded-xl border transition-all ${
+                                announcementActive
+                                    ? 'bg-[#e6f7f5] border-[#1f9e8e]/30'
+                                    : 'bg-zinc-900/50 border-zinc-800 opacity-60'
+                            }`}>
+                                <div className="flex flex-wrap items-center justify-center gap-2.5 text-xs text-[#135d54] text-center">
+                                    <Sparkles className="w-3.5 h-3.5 text-[#1f9e8e] shrink-0" />
+                                    {announcementBadge && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#1f9e8e] text-white">
+                                            {announcementBadge}
+                                        </span>
+                                    )}
+                                    <span className="font-medium text-zinc-800">
+                                        {announcementMessage || "Your announcement message will appear here..."}
+                                    </span>
+                                    {announcementLinkText && (
+                                        <span className="inline-flex items-center gap-1 font-bold text-[#1f9e8e] underline underline-offset-2">
+                                            {announcementLinkText} <ArrowRight className="w-3 h-3" />
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            {!announcementActive && (
+                                <p className="text-[11px] text-zinc-500 italic text-center">
+                                    Note: Banner is currently deactivated and will not be displayed to site visitors.
+                                </p>
+                            )}
+                        </Card>
+
+                        {/* Editor Form Card */}
+                        <Card className="bg-[#121826] border-[#202736] p-6 rounded-2xl space-y-6">
+                            <div className="border-b border-[#202736] pb-4">
+                                <h3 className="text-sm font-bold text-white">Banner Configuration</h3>
+                                <p className="text-xs text-zinc-400 mt-0.5">Customize text, badge, link destination, and toggle live status.</p>
+                            </div>
+
+                            <div className="space-y-5">
+                                {/* 1. Active Toggle */}
+                                <div className="flex items-center justify-between p-4 bg-[#0b101c] border border-[#202736] rounded-xl">
+                                    <div>
+                                        <div className="text-xs font-bold text-white">Display Banner on Website</div>
+                                        <div className="text-[11px] text-zinc-400">Enable or temporarily disable the announcement bar for all visitors.</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAnnouncementActive(!announcementActive)}
+                                        className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors ${
+                                            announcementActive ? 'bg-[#1f9e8e]' : 'bg-zinc-700'
+                                        }`}
+                                    >
+                                        <div
+                                            className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                                                announcementActive ? 'translate-x-6' : 'translate-x-0'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+
+                                {/* 2. Badge Text + Quick Presets */}
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-zinc-300">Badge Tag (Optional)</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. NEW, LIMITED OFFER, UPDATE"
+                                        value={announcementBadge}
+                                        onChange={e => setAnnouncementBadge(e.target.value)}
+                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-lg p-2.5 text-xs text-white focus:border-[#4DD4C4] focus:outline-none"
+                                    />
+                                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                                        <span className="text-[10px] text-zinc-500 mr-1">Presets:</span>
+                                        {['NEW', 'OFFER', 'UPDATE', 'LAUNCH', 'PROMO'].map(preset => (
+                                            <button
+                                                key={preset}
+                                                type="button"
+                                                onClick={() => setAnnouncementBadge(preset)}
+                                                className="text-[10px] px-2 py-0.5 rounded bg-[#202736] hover:bg-[#2c364c] text-zinc-300 transition-colors font-mono"
+                                            >
+                                                {preset}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* 3. Message Text */}
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-zinc-300">Announcement Message</label>
+                                    <textarea
+                                        rows={2}
+                                        placeholder="e.g. 9 fresh problems every day — SQL, Python & PySpark."
+                                        value={announcementMessage}
+                                        onChange={e => setAnnouncementMessage(e.target.value)}
+                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-lg p-2.5 text-xs text-white focus:border-[#4DD4C4] focus:outline-none resize-none leading-relaxed"
+                                    />
+                                </div>
+
+                                {/* 4. Link Text & Link URL */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-zinc-300">Action Link Label</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Sign up free, Get Pro Access"
+                                            value={announcementLinkText}
+                                            onChange={e => setAnnouncementLinkText(e.target.value)}
+                                            className="w-full bg-[#0b101c] border border-[#202736] rounded-lg p-2.5 text-xs text-white focus:border-[#4DD4C4] focus:outline-none"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-zinc-300">Target URL / Route</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. /signup, /pricing, /redeem"
+                                            value={announcementLinkUrl}
+                                            onChange={e => setAnnouncementLinkUrl(e.target.value)}
+                                            className="w-full bg-[#0b101c] border border-[#202736] rounded-lg p-2.5 text-xs text-white focus:border-[#4DD4C4] focus:outline-none font-mono"
+                                        />
+                                        <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                                            <span className="text-[10px] text-zinc-500 mr-1">Quick Links:</span>
+                                            {['/signup', '/pricing', '/redeem', '/practice/daily'].map(link => (
+                                                <button
+                                                    key={link}
+                                                    type="button"
+                                                    onClick={() => setAnnouncementLinkUrl(link)}
+                                                    className="text-[10px] px-2 py-0.5 rounded bg-[#202736] hover:bg-[#2c364c] text-zinc-300 transition-colors font-mono"
+                                                >
+                                                    {link}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Save Button & Feedback Message */}
+                                <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#202736]">
+                                    {announcementSaveMsg ? (
+                                        <div className={`text-xs font-bold flex items-center gap-1.5 ${
+                                            announcementSaveMsg.type === 'success' ? 'text-emerald-400' : 'text-red-400'
+                                        }`}>
+                                            {announcementSaveMsg.type === 'success' ? <Check size={14} /> : <AlertCircle size={14} />}
+                                            {announcementSaveMsg.text}
+                                        </div>
+                                    ) : <div />}
+
+                                    <Button
+                                        onClick={handleSaveAnnouncement}
+                                        disabled={savingAnnouncement}
+                                        className="bg-[#1f9e8e] hover:bg-[#177a6d] text-white font-bold text-xs px-6 shadow-md w-full sm:w-auto"
+                                    >
+                                        {savingAnnouncement ? (
+                                            <>
+                                                <Loader2 className="animate-spin mr-1.5" size={14} /> Saving Changes...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save size={14} className="mr-1.5" /> Save & Update Live Banner
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
                             </div>
                         </Card>
                     </div>

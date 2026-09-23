@@ -22,7 +22,11 @@ const FAQS = [
   },
   {
     question: "Is Daily SQL free?",
-    answer: "Yes, Daily SQL is free to start. Sign up with Google or email and get immediate access to the daily problem set, streak tracking, leaderboard, and discussion threads.",
+    answer: "Yes, Daily SQL offers a 100% Free Tier (₹0) with immediate access to daily problems (SQL, Python, PySpark), streak tracking, live code execution, and leaderboards. To unlock the full archive, step-by-step editorial solutions, and advanced interview prep tracks, we offer flexible paid plans.",
+  },
+  {
+    question: "What plans and pricing options are available?",
+    answer: "We offer 4 simple options: Free Tier (₹0 forever for daily practice), Monthly Pro (₹899/month for targeted 30-day interview prep), Yearly Pro (₹1,499/year — just ₹125/month for annual mastery), and Lifetime VIP (₹4,999 one-time payment for permanent unlimited access with no recurring fees).",
   },
   {
     question: "Can I practice more than 9 problems per day?",

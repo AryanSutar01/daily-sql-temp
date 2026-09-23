@@ -796,32 +796,32 @@ export function DailySetClient() {
     };
 
     const markdownComponents = {
-        h1: ({ node, ...props }: any) => <h1 className="text-lg font-bold text-white mt-4 mb-2.5" {...props} />,
-        h2: ({ node, ...props }: any) => <h2 className="text-md font-bold text-white mt-4 mb-2" {...props} />,
-        h3: ({ node, ...props }: any) => <h3 className="text-sm font-bold text-zinc-300 mt-3 mb-1.5" {...props} />,
-        p: ({ node, ...props }: any) => <p className="mb-2.5 leading-relaxed" {...props} />,
-        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-2.5" {...props} />,
-        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-2.5" {...props} />,
-        li: ({ node, ...props }: any) => <li className="mb-1 last:mb-0" {...props} />,
+        h1: ({ node, ...props }: any) => <h1 className="text-lg font-bold text-zinc-900 mt-4 mb-2.5 font-mono" {...props} />,
+        h2: ({ node, ...props }: any) => <h2 className="text-base font-bold text-zinc-900 mt-4 mb-2 font-mono" {...props} />,
+        h3: ({ node, ...props }: any) => <h3 className="text-sm font-bold text-zinc-800 mt-3 mb-1.5 font-mono" {...props} />,
+        p: ({ node, ...props }: any) => <p className="mb-2.5 text-zinc-700 leading-relaxed text-sm" {...props} />,
+        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-2.5 text-zinc-700 text-sm space-y-1" {...props} />,
+        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-2.5 text-zinc-700 text-sm space-y-1" {...props} />,
+        li: ({ node, ...props }: any) => <li className="mb-1 last:mb-0 text-zinc-700 text-sm" {...props} />,
         table: ({ node, ...props }: any) => (
-            <div className="overflow-x-auto my-6 rounded-xl border border-[#202736] bg-[#0d121c] shadow-xl">
-                <table className="w-full border-collapse text-sm text-left" {...props} />
+            <div className="overflow-x-auto my-5 rounded-xl border border-[#dedee2] bg-white shadow-2xs">
+                <table className="w-full border-collapse text-xs text-left" {...props} />
             </div>
         ),
-        thead: ({ node, ...props }: any) => <thead className="bg-[#131924] border-b border-[#202736]" {...props} />,
-        tbody: ({ node, ...props }: any) => <tbody className="divide-y divide-[#202736]/30" {...props} />,
-        tr: ({ node, ...props }: any) => <tr className="hover:bg-[#4DD4C4]/5 transition-colors group" {...props} />,
-        th: ({ node, ...props }: any) => <th className="px-4 py-3 text-[10px] font-bold text-[#4DD4C4] uppercase tracking-widest font-mono" {...props} />,
-        td: ({ node, ...props }: any) => <td className="px-4 py-3 text-xs text-zinc-300 font-mono group-hover:text-white transition-colors" {...props} />,
-        strong: ({ node, ...props }: any) => <strong className="font-bold text-white shadow-[#4DD4C4]/20 text-shadow-sm" {...props} />,
+        thead: ({ node, ...props }: any) => <thead className="bg-[#f8f9fa] border-b border-[#dedee2]" {...props} />,
+        tbody: ({ node, ...props }: any) => <tbody className="divide-y divide-[#dedee2] bg-white" {...props} />,
+        tr: ({ node, ...props }: any) => <tr className="hover:bg-zinc-50 transition-colors group" {...props} />,
+        th: ({ node, ...props }: any) => <th className="px-4 py-2.5 text-[10px] font-bold text-zinc-700 uppercase tracking-widest font-mono" {...props} />,
+        td: ({ node, ...props }: any) => <td className="px-4 py-2 text-xs text-zinc-800 font-mono" {...props} />,
+        strong: ({ node, ...props }: any) => <strong className="font-bold text-zinc-900" {...props} />,
         code: ({ node, className, children, ...props }: any) => {
             const match = /language-(\w+)/.exec(className || '');
             const isInline = !match && !className;
             return isInline ? (
-                <code className="bg-[#202736] px-1.5 py-0.5 rounded text-[11px] text-[#4DD4C4] font-mono" {...props}>{children}</code>
+                <code className="bg-[#e6f7f5] text-[#135d54] border border-[#1f9e8e]/30 px-1.5 py-0.5 rounded-md text-[11.5px] font-mono font-semibold shadow-2xs inline-block align-baseline mx-0.5" {...props}>{children}</code>
             ) : (
-                <div className="bg-[#131924] p-3 rounded border border-[#202736] overflow-x-auto text-[11px] my-3 font-mono">
-                    <code className="text-[#4DD4C4]" {...props}>{children}</code>
+                <div className="bg-[#f8fafc] p-3.5 rounded-xl border border-[#dedee2] overflow-x-auto text-[11px] my-3 font-mono shadow-2xs">
+                    <code className="text-zinc-800 font-mono" {...props}>{children}</code>
                 </div>
             );
         },
@@ -829,16 +829,16 @@ export function DailySetClient() {
 
     // Compact markdown components for discussion drawer (smaller fonts/spacing)
     const discussionMarkdownComponents = {
-        p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0" {...props} />,
-        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-1.5 space-y-1 text-xs" {...props} />,
-        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-1.5 space-y-1 text-xs" {...props} />,
-        li: ({ node, ...props }: any) => <li className="text-xs mb-0.5 last:mb-0" {...props} />,
-        pre: ({ node, children, ...props }: any) => <div className="my-2 first:mt-0 last:mb-0 rounded-md border border-[#202736] overflow-hidden" {...props}>{children}</div>,
+        p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0 text-zinc-700" {...props} />,
+        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-1.5 space-y-1 text-xs text-zinc-700" {...props} />,
+        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-1.5 space-y-1 text-xs text-zinc-700" {...props} />,
+        li: ({ node, ...props }: any) => <li className="text-xs mb-0.5 last:mb-0 text-zinc-700" {...props} />,
+        pre: ({ node, children, ...props }: any) => <div className="my-2 first:mt-0 last:mb-0 rounded-lg border border-[#dedee2] overflow-hidden shadow-2xs" {...props}>{children}</div>,
         code: ({ node, className, children, ...props }: any) => {
             const match = /language-(\w+)/.exec(className || '');
             const isInline = !match && !className;
             if (isInline) {
-                return <code className="bg-[#202736] px-1 py-0.5 rounded text-[11px] text-[#4DD4C4] font-mono" {...props}>{children}</code>;
+                return <code className="bg-[#e6f7f5] text-[#135d54] border border-[#1f9e8e]/30 px-1.5 py-0.5 rounded-md text-[11px] font-mono font-semibold" {...props}>{children}</code>;
             }
             const lang = match?.[1] || 'sql';
             const codeString = String(children).replace(/\n$/, '');
@@ -852,8 +852,8 @@ export function DailySetClient() {
                 </SyntaxHighlighter>
             );
         },
-        strong: ({ node, ...props }: any) => <strong className="font-semibold text-zinc-200" {...props} />,
-        em: ({ node, ...props }: any) => <em className="italic text-zinc-400" {...props} />,
+        strong: ({ node, ...props }: any) => <strong className="font-semibold text-zinc-900" {...props} />,
+        em: ({ node, ...props }: any) => <em className="italic text-zinc-500" {...props} />,
     };
 
 
@@ -1499,8 +1499,12 @@ export function DailySetClient() {
 
                 {/* ── LEFT: Logo + Set selector ── */}
                 <div className="flex items-center gap-3 shrink-0">
-                    <Link href="/" className="text-base font-bold text-zinc-900 hover:text-[#1f9e8e] transition-colors">
-                        DailySQL
+                    <Link href="/" className="flex items-center group shrink-0">
+                        <img
+                            src="/dailysql-wordmark-bg-removed.png"
+                            alt="DailySQL"
+                            className="h-6 w-auto object-contain transition-transform group-hover:scale-105"
+                        />
                     </Link>
                     <div className="w-px h-5 bg-[#dedee2]" />
                     <div className="relative" ref={sidebarDropdownRef}>

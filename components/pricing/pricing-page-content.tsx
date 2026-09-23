@@ -37,31 +37,24 @@ export function PricingPageContent() {
 
     const prices = {
         lifetime: {
-            original: isINR ? "₹9,900" : "$149",
-            discounted: isINR ? "₹6,510" : "$99",
+            original: isINR ? "₹9,999" : "$149",
+            discounted: isINR ? "₹4,999" : "$79",
             billing: "paid once",
             note: "One payment, no renewal · Full access forever"
         },
         annual: {
-            original: isINR ? "₹2,850" : "$49",
-            discounted: isINR ? "₹1,999" : "$34",
+            original: isINR ? "₹3,499" : "$59",
+            discounted: isINR ? "₹1,499" : "$29",
             period: "/year",
-            monthlyEquivalent: isINR ? "just ₹166/mo" : "$2.83/mo",
-            todayText: isINR ? "₹1,999 today · then ₹2,850/year" : "$34 today · then $49/year"
-        },
-        quarterly: {
-            original: isINR ? "₹1,800" : "$29",
-            discounted: isINR ? "₹1,260" : "$19.50",
-            period: "/3 months",
-            monthlyEquivalent: isINR ? "₹420/mo" : "$6.50/mo",
-            todayText: isINR ? "₹1,260 today · then ₹1,800 every 3 months" : "$19.50 today · then $29 every 3 months"
+            monthlyEquivalent: isINR ? "just ₹125/mo" : "$2.41/mo",
+            todayText: isINR ? "₹1,499 today · then ₹3,499/year" : "$29 today · then $59/year"
         },
         monthly: {
-            original: isINR ? "₹899" : "$15",
-            discounted: isINR ? "₹629" : "$9.99",
+            original: isINR ? "₹1,299" : "$19",
+            discounted: isINR ? "₹899" : "$12.99",
             period: "/month",
             monthlyEquivalent: "",
-            todayText: isINR ? "₹629 today · then ₹899/month" : "$9.99 today · then $15/month"
+            todayText: isINR ? "₹899 today · then ₹1,299/month" : "$12.99 today · then $19/month"
         }
     };
 
@@ -150,6 +143,10 @@ export function PricingPageContent() {
     // Real DailySQL FAQs
     const faqs = [
         {
+            q: "What plans and pricing options are available?",
+            a: "We offer four straightforward tiers: Free Tier (₹0 forever for daily habit building), Monthly Pro (₹899/month for targeted interview sprints), Yearly Pro (₹1,499/year at just ₹125/month for comprehensive year-round mastery), and Lifetime VIP (₹4,999 one-time payment for permanent unlimited access with zero renewals forever)."
+        },
+        {
             q: "What disciplines and skills does DailySQL cover?",
             a: "DailySQL covers the three indispensable technical pillars of modern data engineering and analytics: SQL (PostgreSQL), Python with Pandas/NumPy, and distributed PySpark. Every morning, you get 9 curated problems — 3 per discipline in Easy, Medium, and Advanced difficulties."
         },
@@ -159,11 +156,11 @@ export function PricingPageContent() {
         },
         {
             q: "What does the Lifetime Plan include?",
-            a: "Lifetime gives you permanent, unrestricted access to the complete DailySQL platform. This includes all current and future problem tracks (SQL, Python, PySpark, dbt, etc.), all editorial solutions, test cases, streak history, and future platform feature updates with zero renewal fees forever."
+            a: "Lifetime gives you permanent, unrestricted access to the complete DailySQL platform for ₹4,999 paid once. This includes all current and future problem tracks (SQL, Python, PySpark, dbt, etc.), all editorial solutions, test cases, streak history, and future platform feature updates with zero renewal fees forever."
         },
         {
-            q: "Do Monthly, Quarterly, and Annual unlock different content?",
-            a: "No. All paid subscription plans unlock the complete problem archive, in-depth step-by-step editorial solutions, and execution breakdowns. The only difference is the duration of your billing cycle and the higher savings on longer-term plans."
+            q: "Do Free, Monthly, Yearly, and Lifetime unlock different content?",
+            a: "Free Tier (₹0) includes access to the daily 9 problem sets, leaderboard rank, streak tracking, and community discussions. All paid plans (Monthly ₹899, Yearly ₹1,499, and Lifetime ₹4,999) unlock the complete 250+ problem archive, in-depth step-by-step editorial solutions, and execution breakdowns."
         },
         {
             q: "How much time do I need each day?",
@@ -214,8 +211,8 @@ export function PricingPageContent() {
                     {/* Left: PPP indicator */}
                     <div className="flex items-center gap-2 text-xs text-zinc-700 font-medium">
                         <span className="text-sm">🌐</span>
-                        <span>Purchasing power pricing for <strong>{isINR ? "India" : "International"}</strong> applied</span>
-                        <span className="text-zinc-400 cursor-help" title="Localized pricing for data practitioners">ⓘ</span>
+                        <span>Purchasing power pricing for <strong>{isINR ? "India" : "International"}</strong> applied {!isINR && <span className="text-[11px] text-zinc-500 font-normal">(Billed in INR equivalent at checkout via international cards)</span>}</span>
+                        <span className="text-zinc-400 cursor-help" title="International cards (Visa, Mastercard, Amex) are accepted at checkout">ⓘ</span>
                     </div>
 
                     {/* Right: Currency Toggle */}
@@ -401,52 +398,6 @@ export function PricingPageContent() {
                             </div>
                         </div>
 
-                        {/* ── CARD 3: QUARTERLY PLAN ── */}
-                        <div className="bg-white rounded-xl border border-[#dedee2] p-5 sm:p-6 shadow-2xs hover:border-zinc-300 transition-all">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div>
-                                    <h4 className="text-lg font-bold font-mono text-zinc-900 mb-1">
-                                        Quarterly plan
-                                    </h4>
-                                    <p className="text-xs text-zinc-500">
-                                        Three months of full access ({prices.quarterly.monthlyEquivalent}) for interview preparation.
-                                    </p>
-                                </div>
-
-                                <div className="flex items-center sm:items-end flex-row sm:flex-col justify-between sm:justify-center gap-3">
-                                    <div className="text-left sm:text-right">
-                                        <div className="flex items-center sm:justify-end gap-1.5">
-                                            <span className="text-xs line-through text-zinc-400 font-mono">
-                                                {prices.quarterly.original}
-                                            </span>
-                                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1 rounded">
-                                                Save 30%
-                                            </span>
-                                        </div>
-                                        <div className="flex items-baseline sm:justify-end gap-1">
-                                            <span className="text-2xl font-extrabold font-mono text-zinc-900">
-                                                {prices.quarterly.discounted}
-                                            </span>
-                                            <span className="text-xs text-zinc-500 font-medium">
-                                                {prices.quarterly.period}
-                                            </span>
-                                        </div>
-                                        <p className="text-[10px] text-zinc-400 font-mono">
-                                            {prices.quarterly.todayText}
-                                        </p>
-                                    </div>
-
-                                    <Link
-                                        href={getPlanUrl("quarterly")}
-                                        className="inline-flex items-center justify-center gap-2 py-2 px-5 rounded-lg text-xs font-bold transition-all bg-white border border-[#dedee2] text-zinc-800 hover:bg-zinc-50 shadow-2xs shrink-0"
-                                    >
-                                        Get full access
-                                        <ArrowRight className="w-3.5 h-3.5" />
-                                    </Link>
-                                </div>
-                            </div>
-                        </div>
-
                         {/* ── CARD 4: MONTHLY PLAN ── */}
                         <div className="bg-white rounded-xl border border-[#dedee2] p-5 sm:p-6 shadow-2xs hover:border-zinc-300 transition-all">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -493,6 +444,49 @@ export function PricingPageContent() {
                             </div>
                         </div>
 
+                        {/* ── CARD 4: FREE TIER ── */}
+                        <div className="bg-zinc-50/70 rounded-xl border border-dashed border-[#dedee2] p-5 sm:p-6 shadow-2xs hover:border-zinc-300 transition-all">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h4 className="text-lg font-bold font-mono text-zinc-900">
+                                            Free tier
+                                        </h4>
+                                        <span className="text-[10px] font-bold text-zinc-600 bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200">
+                                            Free Forever
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-zinc-500">
+                                        Solve 9 daily problems (SQL, Python & PySpark) and build streaks at zero cost.
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center sm:items-end flex-row sm:flex-col justify-between sm:justify-center gap-3">
+                                    <div className="text-left sm:text-right">
+                                        <div className="flex items-baseline sm:justify-end gap-1">
+                                            <span className="text-2xl font-extrabold font-mono text-zinc-900">
+                                                ₹0
+                                            </span>
+                                            <span className="text-xs text-zinc-500 font-medium">
+                                                / forever
+                                            </span>
+                                        </div>
+                                        <p className="text-[10px] text-zinc-400 font-mono">
+                                            No credit card required
+                                        </p>
+                                    </div>
+
+                                    <Link
+                                        href="/practice/daily"
+                                        className="inline-flex items-center justify-center gap-2 py-2 px-5 rounded-lg text-xs font-bold transition-all bg-white border border-[#dedee2] text-zinc-800 hover:bg-zinc-100 shadow-2xs shrink-0"
+                                    >
+                                        Start practicing
+                                        <ArrowRight className="w-3.5 h-3.5" />
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* ── "EVERY SUBSCRIPTION INCLUDES" ── */}
                         <div className="pt-6 pb-2">
                             <h5 className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-500 mb-4 flex items-center gap-1.5">
@@ -515,7 +509,7 @@ export function PricingPageContent() {
                             </div>
 
                             <p className="text-[11px] text-zinc-400 leading-relaxed mb-4">
-                                Full catalogue on every plan, no usage limits. Taxes may apply, checkout with UPI, Cards & Netbanking.
+                                Full catalogue on every plan, no usage limits. Checkout supports UPI, Netbanking, and domestic & international cards (Visa, Mastercard, Amex).
                             </p>
 
                             {/* Expensing Box */}

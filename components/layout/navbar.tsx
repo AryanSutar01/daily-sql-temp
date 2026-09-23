@@ -56,7 +56,7 @@ export function Navbar() {
       href: "/problems",
       icon: Database,
       color: "#1f9e8e",
-      bg: "rgba(31,158,142,0.08)",
+      bg: "rgba(31,158,142,0.1)",
     },
     {
       title: "Daily Quest",
@@ -64,31 +64,31 @@ export function Navbar() {
       href: practiceHref,
       icon: Zap,
       color: "#f59e0b",
-      bg: "rgba(245,158,11,0.08)",
+      bg: "rgba(245,158,11,0.1)",
     },
     {
       title: "Learn SQL",
-      description: "52 lessons — window functions, CTEs, aggregations.",
+      description: "52 lessons — window functions, CTEs & aggregations.",
       href: "/practice/learn/sql",
       icon: BookOpen,
       color: "#d97706",
-      bg: "rgba(217,119,6,0.08)",
+      bg: "rgba(217,119,6,0.1)",
     },
     {
       title: "Learn Python",
-      description: "52 lessons — Pandas, data wrangling, interview prep.",
+      description: "52 lessons — Pandas, data wrangling & interview prep.",
       href: "/practice/learn/python",
       icon: Code2,
       color: "#3b82f6",
-      bg: "rgba(59,130,246,0.08)",
+      bg: "rgba(59,130,246,0.1)",
     },
     {
       title: "Learn PySpark",
-      description: "46 lessons — distributed data, Spark SQL, window ops.",
+      description: "46 lessons — distributed data, Spark SQL & optimization.",
       href: "/practice/learn/pyspark",
       icon: Server,
       color: "#8b5cf6",
-      bg: "rgba(139,92,246,0.08)",
+      bg: "rgba(139,92,246,0.1)",
     },
   ];
 
@@ -208,9 +208,9 @@ export function Navbar() {
                 {/* Dropdown Menu */}
                 {isPracticeOpen && (
                   <div
-                    className="absolute top-full mt-3 left-0 rounded-2xl p-3 z-[200] grid grid-cols-2 gap-2"
+                    className="absolute top-full mt-3 -left-32 sm:-left-48 md:left-1/2 md:-translate-x-1/2 rounded-2xl p-3.5 z-[200] grid grid-cols-1 md:grid-cols-3 gap-2.5 animate-in fade-in-0 zoom-in-95 duration-150"
                     style={{
-                      width: 520,
+                      width: 780,
                       maxWidth: "calc(100vw - 2rem)",
                       background: "var(--ls-surface)",
                       border: "1px solid var(--ls-outline)",
@@ -219,33 +219,27 @@ export function Navbar() {
                   >
                     {practiceOptions.map((option) => (
                       <Link
-                        key={option.href}
+                        key={option.title}
                         href={option.href}
                         onClick={() => setIsPracticeOpen(false)}
-                        className="flex items-start gap-3 p-3 rounded-xl transition-colors group"
+                        className="flex items-start gap-3 p-3 rounded-xl transition-all duration-150 group border border-transparent hover:border-[#dedee2] hover:bg-zinc-50/80 shadow-2xs"
                         style={{ background: "transparent" }}
-                        onMouseEnter={(e) =>
-                          ((e.currentTarget as HTMLElement).style.background = "var(--ls-surface-container)")
-                        }
-                        onMouseLeave={(e) =>
-                          ((e.currentTarget as HTMLElement).style.background = "transparent")
-                        }
                       >
                         <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+                          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 shadow-2xs transition-transform group-hover:scale-105"
                           style={{ background: option.bg }}
                         >
-                          <option.icon size={15} style={{ color: option.color }} />
+                          <option.icon size={18} style={{ color: option.color }} />
                         </div>
-                        <div>
+                        <div className="flex-1 min-w-0">
                           <p
-                            className="text-sm font-medium leading-tight"
+                            className="text-sm font-bold leading-tight group-hover:text-[#1f9e8e] transition-colors"
                             style={{ color: "var(--ls-on-surface)" }}
                           >
                             {option.title}
                           </p>
                           <p
-                            className="text-xs mt-0.5 leading-snug"
+                            className="text-xs mt-1 leading-snug line-clamp-2"
                             style={{ color: "var(--ls-on-surface-muted)" }}
                           >
                             {option.description}

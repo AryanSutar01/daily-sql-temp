@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Sparkles, Shield, Zap, ArrowRight, Star } from "lucide-react";
+import { Check, Sparkles, Shield, Zap, ArrowRight, Star, Crown } from "lucide-react";
 import Link from "next/link";
 import { PracticeLink } from "@/components/landing/practice-link";
 
@@ -14,7 +14,7 @@ export function CTASection() {
         borderBottom: "1px solid var(--ls-outline)",
       }}
     >
-      <div className="mx-auto px-6 lg:px-8" style={{ maxWidth: 1280 }}>
+      <div className="mx-auto px-4 sm:px-6 lg:px-8" style={{ maxWidth: 1400 }}>
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div
@@ -52,12 +52,12 @@ export function CTASection() {
           </p>
         </div>
 
-        {/* Pricing Cards Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch max-w-6xl mx-auto mb-16">
+        {/* Pricing Cards Grid (4 Columns) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-stretch max-w-7xl mx-auto mb-16">
 
           {/* ────── 1. FREE PLAN ────── */}
           <div
-            className="rounded-2xl p-8 flex flex-col justify-between transition-all duration-300 hover:translate-y-[-4px]"
+            className="rounded-2xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 hover:translate-y-[-4px]"
             style={{
               background: "var(--ls-surface)",
               border: "1px solid var(--ls-outline)",
@@ -76,7 +76,7 @@ export function CTASection() {
                 >
                   Free Forever
                 </span>
-                <h3 className="text-2xl font-semibold mt-3" style={{ color: "var(--ls-on-surface)" }}>
+                <h3 className="text-xl font-semibold mt-3" style={{ color: "var(--ls-on-surface)" }}>
                   Free
                 </h3>
                 <p className="text-xs mt-1.5 min-h-[32px]" style={{ color: "var(--ls-on-surface-muted)" }}>
@@ -87,7 +87,7 @@ export function CTASection() {
               <div className="mb-6 pb-6 border-b" style={{ borderColor: "var(--ls-outline)" }}>
                 <div className="flex items-baseline gap-1">
                   <span
-                    className="text-4xl font-bold font-mono tracking-tight"
+                    className="text-3xl sm:text-4xl font-bold font-mono tracking-tight"
                     style={{ color: "var(--ls-on-surface)" }}
                   >
                     ₹0
@@ -139,7 +139,7 @@ export function CTASection() {
 
           {/* ────── 2. MONTHLY PLAN ────── */}
           <div
-            className="rounded-2xl p-8 flex flex-col justify-between transition-all duration-300 hover:translate-y-[-4px]"
+            className="rounded-2xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 hover:translate-y-[-4px]"
             style={{
               background: "var(--ls-surface)",
               border: "1px solid var(--ls-outline)",
@@ -151,9 +151,9 @@ export function CTASection() {
                 <span
                   className="px-2.5 py-1 rounded-md text-xs font-mono font-bold uppercase tracking-wider text-sky-700 bg-sky-50 border border-sky-200"
                 >
-                  Interview Prep Sprint
+                  Prep Sprint
                 </span>
-                <h3 className="text-2xl font-semibold mt-3" style={{ color: "var(--ls-on-surface)" }}>
+                <h3 className="text-xl font-semibold mt-3" style={{ color: "var(--ls-on-surface)" }}>
                   Monthly
                 </h3>
                 <p className="text-xs mt-1.5 min-h-[32px]" style={{ color: "var(--ls-on-surface-muted)" }}>
@@ -164,7 +164,7 @@ export function CTASection() {
               <div className="mb-6 pb-6 border-b" style={{ borderColor: "var(--ls-outline)" }}>
                 <div className="flex items-baseline gap-1">
                   <span
-                    className="text-4xl font-bold font-mono tracking-tight"
+                    className="text-3xl sm:text-4xl font-bold font-mono tracking-tight"
                     style={{ color: "var(--ls-on-surface)" }}
                   >
                     ₹899
@@ -179,11 +179,10 @@ export function CTASection() {
               <ul className="space-y-3 mb-8">
                 {[
                   "Access to entire past problem archive",
-                  "Detailed step-by-step editorial solutions",
-                  "Query optimization & execution breakdowns",
+                  "Step-by-step editorial solutions",
+                  "Query optimization & breakdowns",
                   "Unlimited sandbox runs & retries",
-                  "Advanced interview question sets",
-                  "Priority discussion support",
+                  "Company-wise SQL & data sets",
                 ].map((feat, i) => (
                   <li key={i} className="flex items-start gap-2.5 text-xs leading-relaxed" style={{ color: "var(--ls-on-surface)" }}>
                     <div
@@ -211,9 +210,9 @@ export function CTASection() {
             </div>
           </div>
 
-          {/* ────── 3. YEARLY PLAN (HIGHLIGHTED) ────── */}
+          {/* ────── 3. YEARLY PLAN (RECOMMENDED) ────── */}
           <div
-            className="rounded-2xl p-8 flex flex-col justify-between relative transition-all duration-300 hover:translate-y-[-4px]"
+            className="rounded-2xl p-6 sm:p-7 flex flex-col justify-between relative transition-all duration-300 hover:translate-y-[-4px]"
             style={{
               background: "var(--ls-surface)",
               border: "2px solid var(--ls-primary)",
@@ -221,13 +220,13 @@ export function CTASection() {
             }}
           >
             {/* Top Badge */}
-            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap">
               <span
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider text-white shadow-xs"
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-white shadow-xs"
                 style={{ background: "var(--ls-primary)" }}
               >
                 <Star className="w-3 h-3 fill-white" />
-                Best Value • Save 80%
+                Best Value • Save 86%
               </span>
             </div>
 
@@ -243,24 +242,24 @@ export function CTASection() {
                 >
                   Full Mastery
                 </span>
-                <h3 className="text-2xl font-semibold mt-3" style={{ color: "var(--ls-on-surface)" }}>
+                <h3 className="text-xl font-semibold mt-3" style={{ color: "var(--ls-on-surface)" }}>
                   Yearly
                 </h3>
                 <p className="text-xs mt-1.5 min-h-[32px]" style={{ color: "var(--ls-on-surface-muted)" }}>
-                  Year-round consistency for high-paying data roles.
+                  Year-round consistency for data career growth.
                 </p>
               </div>
 
               <div className="mb-6 pb-6 border-b" style={{ borderColor: "var(--ls-outline)" }}>
                 <div className="flex items-baseline gap-1.5">
                   <span
-                    className="text-4xl font-bold font-mono tracking-tight"
+                    className="text-3xl sm:text-4xl font-bold font-mono tracking-tight"
                     style={{ color: "var(--ls-primary)" }}
                   >
-                    ₹1,999
+                    ₹1,499
                   </span>
                   <span className="text-xs font-medium" style={{ color: "var(--ls-on-surface-subtle)" }}>
-                    / year (just ₹166/mo)
+                    / yr (₹125/mo)
                   </span>
                 </div>
               </div>
@@ -269,11 +268,10 @@ export function CTASection() {
               <ul className="space-y-3 mb-8">
                 {[
                   "Everything in Monthly included",
-                  "3,200+ new daily interview problems a year",
-                  "Official verifiable completion certificates",
-                  "Private VIP community of practitioners",
+                  "3,200+ new daily interview problems/yr",
+                  "Verifiable completion certificates",
+                  "Mock tests & advanced scenario paths",
                   "Priority support directly from engineers",
-                  "Early access to upcoming DBT & Kafka modules",
                 ].map((feat, i) => (
                   <li key={i} className="flex items-start gap-2.5 text-xs leading-relaxed" style={{ color: "var(--ls-on-surface)" }}>
                     <div
@@ -304,7 +302,89 @@ export function CTASection() {
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
               <p className="text-[11px] text-center mt-3 font-medium text-emerald-700">
-                100% money-back guarantee within 7 days
+                100% money-back in 7 days
+              </p>
+            </div>
+          </div>
+
+          {/* ────── 4. LIFETIME VIP PLAN ────── */}
+          <div
+            className="rounded-2xl p-6 sm:p-7 flex flex-col justify-between relative transition-all duration-300 hover:translate-y-[-4px]"
+            style={{
+              background: "var(--ls-surface)",
+              border: "1px solid rgba(245, 158, 11, 0.4)",
+              boxShadow: "0 8px 24px rgba(245, 158, 11, 0.08)",
+            }}
+          >
+            {/* Top Badge */}
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap">
+              <span
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-amber-950 bg-amber-400 shadow-xs"
+              >
+                <Crown className="w-3 h-3 fill-amber-950" />
+                VIP Deal • Permanent
+              </span>
+            </div>
+
+            <div>
+              <div className="mb-6">
+                <span
+                  className="px-2.5 py-1 rounded-md text-xs font-mono font-bold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200"
+                >
+                  Lifetime VIP
+                </span>
+                <h3 className="text-xl font-semibold mt-3" style={{ color: "var(--ls-on-surface)" }}>
+                  Lifetime
+                </h3>
+                <p className="text-xs mt-1.5 min-h-[32px]" style={{ color: "var(--ls-on-surface-muted)" }}>
+                  One single payment. Unlimited access forever.
+                </p>
+              </div>
+
+              <div className="mb-6 pb-6 border-b" style={{ borderColor: "var(--ls-outline)" }}>
+                <div className="flex items-baseline gap-1.5">
+                  <span
+                    className="text-3xl sm:text-4xl font-bold font-mono tracking-tight text-amber-600 dark:text-amber-400"
+                  >
+                    ₹4,999
+                  </span>
+                  <span className="text-xs font-medium" style={{ color: "var(--ls-on-surface-subtle)" }}>
+                    / paid once
+                  </span>
+                </div>
+              </div>
+
+              {/* Features */}
+              <ul className="space-y-3 mb-8">
+                {[
+                  "Everything in Yearly included",
+                  "One payment, permanent access forever",
+                  "All future courses, tracks & content releases",
+                  "Official Certificate of Completion",
+                  "Exclusive VIP community role & support",
+                ].map((feat, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-xs leading-relaxed" style={{ color: "var(--ls-on-surface)" }}>
+                    <div
+                      className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-amber-50"
+                    >
+                      <Check className="w-2.5 h-2.5 text-amber-600" />
+                    </div>
+                    <span className={i === 0 || i === 1 ? "font-semibold" : ""}>{feat}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <Link
+                href="/payment?plan=lifetime"
+                className="w-full inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl text-xs font-semibold transition-all duration-150 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold shadow-xs"
+              >
+                Get Lifetime Access
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <p className="text-[11px] text-center mt-3 font-medium text-amber-800 dark:text-amber-300">
+                Pay once · Never pay again
               </p>
             </div>
           </div>
@@ -344,7 +424,7 @@ export function CTASection() {
               </h4>
             </div>
             <p className="text-xs leading-relaxed max-w-xl" style={{ color: "var(--ls-on-surface-muted)" }}>
-              Senior Data Engineer and Analyst roles in India pay <strong>₹15 LPA to ₹30+ LPA</strong>. Investing ₹1,999 to stay sharp and breeze through live SQL & data pipeline interview rounds is a no-brainer.
+              Senior Data Engineer and Analyst roles in India pay <strong>₹15 LPA to ₹30+ LPA</strong>. Investing ₹1,499 to stay sharp and breeze through live SQL & data pipeline interview rounds is a no-brainer.
             </p>
           </div>
 

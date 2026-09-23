@@ -30,6 +30,10 @@ export function FAQ() {
       answer: "Yes! Pro and Lifetime members have complete access to the full problem archive, custom topic filters, and self-paced interview paths across SQL, Python, and PySpark.",
     },
     {
+      question: "What pricing plans and options do you have?",
+      answer: "We have four clear plans: Free Tier (₹0 forever for daily problems and habit building), Monthly Pro (₹899/month for 30-day interview prep), Yearly Pro (₹1,499/year — just ₹125/month for annual mastery), and Lifetime VIP (₹4,999 one-time payment for permanent unlimited access with zero recurring fees).",
+    },
+    {
       question: "What happens if I miss a day?",
       answer: "Your streak resets, but you can always catch up using the archive. Consistency is the goal, and the platform makes it effortless to jump right back in.",
     },
