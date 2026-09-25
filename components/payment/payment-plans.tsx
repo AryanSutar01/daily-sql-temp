@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getToken } from "@/lib/auth";
+import { isPlanId, takePendingPlan, type PlanId } from "@/lib/pending-plan";
 
 declare global {
   interface Window {
@@ -96,6 +97,7 @@ export function PaymentPlans() {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [cashfreeLoaded, setCashfreeLoaded] = useState(false);
   const [cashfreeInstance, setCashfreeInstance] = useState<any>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<PlanId | null>(null);
   const [userSubscription, setUserSubscription] = useState<any>(null);
   const [paymentResult, setPaymentResult] = useState<{
     status: "PAID" | "PENDING" | "FAILED" | "EXPIRED" | "TEST_MODE_WARNING";
@@ -142,13 +144,26 @@ export function PaymentPlans() {
     }
   }, []);
 
+  // Preselect the plan chosen on /pricing (?plan=…) or remembered through signup/login
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("plan");
+    const chosen = isPlanId(fromUrl) ? fromUrl : takePendingPlan();
+    if (isPlanId(fromUrl)) takePendingPlan(); // drop any stale remembered pick
+    if (chosen) setSelectedPlanId(chosen);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedPlanId) return;
+    document.getElementById(`plan-${selectedPlanId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [selectedPlanId]);
+
   const handlePayment = async (plan: Plan) => {
     setLoadingPlan(plan.id);
     setPaymentResult(null);
 
     const token = getToken();
     if (!token) {
-      window.location.href = "/login?redirect=/payment";
+      window.location.href = `/login?plan=${plan.id}&redirect=${encodeURIComponent(`/payment?plan=${plan.id}`)}`;
       return;
     }
 
@@ -238,16 +253,27 @@ export function PaymentPlans() {
         {PLANS.map((plan) => {
           const isLoading = loadingPlan === plan.id;
           const isOwned = isCurrentPlan(plan.id);
+          const isSelected = selectedPlanId === plan.id;
+          // When the visitor arrived with a chosen plan, that card leads; otherwise the default "Best Value" one does
+          const emphasized = selectedPlanId ? isSelected : !!plan.highlighted;
 
           return (
             <div
               key={plan.id}
+              id={`plan-${plan.id}`}
               className={`relative rounded-2xl border flex flex-col transition-all duration-200 p-7 sm:p-8 bg-white ${
-                plan.highlighted
-                  ? "border-[#1f9e8e] ring-1 ring-[#1f9e8e]/40 shadow-md md:-translate-y-2 z-10"
+                emphasized
+                  ? `border-[#1f9e8e] ${isSelected ? "ring-2 ring-[#1f9e8e]" : "ring-1 ring-[#1f9e8e]/40"} shadow-md md:-translate-y-2 z-10`
                   : "border-[#dedee2] shadow-xs hover:border-zinc-300"
               }`}
             >
+              {isSelected && (
+                <div className="absolute -top-3 left-6">
+                  <span className="px-3 py-0.5 rounded-full bg-zinc-900 text-zinc-50 text-[11px] font-bold uppercase tracking-wider font-mono shadow-xs flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Your selection
+                  </span>
+                </div>
+              )}
               {plan.badge && (
                 <div className="absolute -top-3 right-6">
                   <span className="px-3 py-0.5 rounded-full bg-[#1f9e8e] text-white text-[11px] font-bold uppercase tracking-wider font-mono shadow-xs flex items-center gap-1">
@@ -295,7 +321,7 @@ export function PaymentPlans() {
                   className={`w-full h-11 text-xs font-bold rounded-xl transition-all ${
                     isOwned
                       ? "bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-default dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30"
-                      : plan.highlighted
+                      : emphasized
                       ? "bg-[#1f9e8e] hover:bg-[#177a6d] text-white shadow-2xs"
                       : "bg-zinc-900 hover:bg-zinc-800 text-white"
                   }`}

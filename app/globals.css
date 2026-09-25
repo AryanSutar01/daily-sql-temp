@@ -433,7 +433,9 @@
   color: #a1a1aa !important;
 }
 
-.landing-light .text-white {
+/* Legacy: headings written for dark sections become dark on light pages.
+   Skip elements with their own background (buttons, pills, badges) — their white text is intentional. */
+.landing-light .text-white:not([class*="bg-"]) {
   color: #18181b !important;
 }
 

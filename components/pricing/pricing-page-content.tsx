@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { isLoggedIn as hasSessionToken } from "@/lib/auth";
 import {
     Check,
     ArrowRight,
@@ -22,7 +23,9 @@ export function PricingPageContent() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
 
     useEffect(() => {
-        api.getProfile().then(() => setIsLoggedIn(true)).catch(() => setIsLoggedIn(false));
+        if (!hasSessionToken()) return;                    // no session cookie: logged out, nothing to verify
+        queueMicrotask(() => setIsLoggedIn(true));         // cookie present: link straight to /payment (no wrong-page race)
+        api.getProfile().catch(() => setIsLoggedIn(false)); // …and fall back if the token turns out to be invalid
     }, []);
 
     const getPlanUrl = (plan: string) => {

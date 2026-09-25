@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { saveToken } from "@/lib/auth";
+import { isPlanId, setPendingPlan } from "@/lib/pending-plan";
 import { api } from "@/lib/api";
 import { Mail, Lock, AlertCircle, X, ArrowRight, Loader2 } from "lucide-react";
 
@@ -15,6 +16,12 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 export function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
+
+    // Remember a plan picked on /pricing so checkout can resume after auth (incl. Google OAuth)
+    useEffect(() => {
+        const plan = searchParams.get("plan");
+        if (isPlanId(plan)) setPendingPlan(plan);
+    }, [searchParams]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
