@@ -48,7 +48,7 @@ export function CTASection() {
             className="mt-4 text-base leading-relaxed max-w-xl mx-auto"
             style={{ color: "var(--ls-on-surface-muted)" }}
           >
-            Start practicing for free today, or upgrade to unlock complete archives, deep explanations, and interview mastery.
+            Start with 3 free SQL questions every day, or upgrade to unlock every question across all disciplines, plus step-by-step editorial solutions.
           </p>
         </div>
 
@@ -101,9 +101,9 @@ export function CTASection() {
               {/* Features */}
               <ul className="space-y-3 mb-8">
                 {[
-                  "9 new daily problems (SQL, Python & Spark)",
-                  "Isolated in-browser code execution",
-                  "Instant automated test results",
+                  "3 SQL questions every day — today's daily set",
+                  "First 30 SQL questions of the archive, free",
+                  "In-browser code execution with instant test results",
                   "Daily streak & solve history tracking",
                   "Global weekly leaderboard rank",
                 ].map((feat, i) => (
@@ -114,10 +114,13 @@ export function CTASection() {
                     >
                       <Check className="w-2.5 h-2.5" style={{ color: "var(--ls-on-surface-muted)" }} />
                     </div>
-                    <span>{feat}</span>
+                    <span className={i < 2 ? "font-semibold" : ""}>{feat}</span>
                   </li>
                 ))}
               </ul>
+              <p className="text-[11px] leading-relaxed -mt-4 mb-6" style={{ color: "var(--ls-on-surface-subtle)" }}>
+                Python, PySpark and DSA tracks and the full archive are part of paid plans.
+              </p>
             </div>
 
             <div>
@@ -178,9 +181,9 @@ export function CTASection() {
               {/* Features */}
               <ul className="space-y-3 mb-8">
                 {[
-                  "Access to entire past problem archive",
-                  "Step-by-step editorial solutions",
-                  "Query optimization & breakdowns",
+                  "Full access to every question, across all disciplines",
+                  "SQL, Python (Pandas), PySpark & DSA — nothing locked",
+                  "Step-by-step editorial solutions & query breakdowns",
                   "Unlimited sandbox runs & retries",
                   "Company-wise SQL & data sets",
                 ].map((feat, i) => (
@@ -190,7 +193,7 @@ export function CTASection() {
                     >
                       <Check className="w-2.5 h-2.5 text-sky-600 dark:text-sky-300" />
                     </div>
-                    <span>{feat}</span>
+                    <span className={i === 0 ? "font-semibold" : ""}>{feat}</span>
                   </li>
                 ))}
               </ul>
@@ -205,7 +208,7 @@ export function CTASection() {
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
               <p className="text-[11px] text-center mt-3" style={{ color: "var(--ls-on-surface-subtle)" }}>
-                Cancel anytime with 1 click
+                One-time payment · 30 days of access
               </p>
             </div>
           </div>
@@ -267,11 +270,10 @@ export function CTASection() {
               {/* Features */}
               <ul className="space-y-3 mb-8">
                 {[
-                  "Everything in Monthly included",
-                  "3,200+ new daily interview problems/yr",
-                  "Verifiable completion certificates",
-                  "Mock tests & advanced scenario paths",
-                  "Priority support directly from engineers",
+                  "Full access to every question, across all disciplines",
+                  "Everything in Monthly, for a full year",
+                  "New problems added every day",
+                  "Save 86% compared to buying Monthly for 12 months",
                 ].map((feat, i) => (
                   <li key={i} className="flex items-start gap-2.5 text-xs leading-relaxed" style={{ color: "var(--ls-on-surface)" }}>
                     <div
@@ -290,7 +292,7 @@ export function CTASection() {
 
             <div>
               <Link
-                href="/payment?plan=annual"
+                href="/payment?plan=yearly"
                 className="w-full inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl text-xs font-semibold transition-all duration-150 hover:opacity-95 shadow-sm"
                 style={{
                   background: "var(--ls-primary)",
@@ -302,7 +304,7 @@ export function CTASection() {
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
               <p className="text-[11px] text-center mt-3 font-medium text-emerald-700 dark:text-emerald-300">
-                100% money-back in 7 days
+                One-time payment · 12 months of access
               </p>
             </div>
           </div>
@@ -357,11 +359,11 @@ export function CTASection() {
               {/* Features */}
               <ul className="space-y-3 mb-8">
                 {[
+                  "Full access to every question, across all disciplines — for life",
                   "Everything in Yearly included",
-                  "One payment, permanent access forever",
-                  "All future courses, tracks & content releases",
-                  "Official Certificate of Completion",
-                  "Exclusive VIP community role & support",
+                  "One payment, permanent access. No renewals",
+                  "New problems and tracks added to the Platform",
+                  "Exclusive VIP community role",
                 ].map((feat, i) => (
                   <li key={i} className="flex items-start gap-2.5 text-xs leading-relaxed" style={{ color: "var(--ls-on-surface)" }}>
                     <div
@@ -384,7 +386,10 @@ export function CTASection() {
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
               <p className="text-[11px] text-center mt-3 font-medium text-amber-800 dark:text-amber-300">
-                Pay once · Never pay again
+                Pay once · 7-day refund window ·{" "}
+                <Link href="/refund" className="underline underline-offset-2 hover:opacity-80">
+                  See policy
+                </Link>
               </p>
             </div>
           </div>
@@ -420,11 +425,11 @@ export function CTASection() {
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
               <h4 className="text-sm font-semibold" style={{ color: "var(--ls-on-surface)" }}>
-                Why practicing daily delivers 100x return
+                Why daily practice is worth it
               </h4>
             </div>
             <p className="text-xs leading-relaxed max-w-xl" style={{ color: "var(--ls-on-surface-muted)" }}>
-              Senior Data Engineer and Analyst roles in India pay <strong>₹15 LPA to ₹30+ LPA</strong>. Investing ₹1,499 to stay sharp and breeze through live SQL & data pipeline interview rounds is a no-brainer.
+              Senior Data Engineer and Analyst roles in India often pay <strong>₹15 LPA to ₹30+ LPA</strong>. Daily practice helps you stay sharp for live SQL and data pipeline interview rounds, though we can&apos;t guarantee interview outcomes.
             </p>
           </div>
 

@@ -31,7 +31,7 @@ export function FAQ() {
     },
     {
       question: "What pricing plans and options do you have?",
-      answer: "We have four clear plans: Free Tier (₹0 forever for daily problems and habit building), Monthly Pro (₹899/month for 30-day interview prep), Yearly Pro (₹1,499/year — just ₹125/month for annual mastery), and Lifetime VIP (₹4,999 one-time payment for permanent unlimited access with zero recurring fees).",
+      answer: "We have four clear plans: Free Tier (₹0 forever, with 3 SQL questions a day plus the first 30 SQL questions), Monthly Pro (₹899/month for 30-day interview prep), Yearly Pro (₹1,499/year — just ₹125/month for annual mastery), and Lifetime VIP (₹4,999 one-time payment for permanent unlimited access with zero recurring fees).",
     },
     {
       question: "What happens if I miss a day?",

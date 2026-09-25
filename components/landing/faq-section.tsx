@@ -6,7 +6,7 @@ import { ChevronDown } from "lucide-react";
 const FAQS = [
   {
     question: "What disciplines does Daily SQL cover?",
-    answer: "Daily SQL covers three core data skills: SQL (PostgreSQL), Python with Pandas, and PySpark. Every day you get 9 problems total — 3 per discipline — each available in Easy, Medium, and Advanced difficulty.",
+    answer: "Daily SQL covers three core data skills: SQL (PostgreSQL), Python with Pandas, and PySpark. Every day you get 9 problems total — 3 per discipline — each available in Easy, Medium, and Advanced difficulty. The Free Tier includes the 3 SQL problems; paid plans unlock the Python and PySpark problems and the full archive.",
   },
   {
     question: "Is this for beginners or experienced professionals?",
@@ -22,7 +22,7 @@ const FAQS = [
   },
   {
     question: "Is Daily SQL free?",
-    answer: "Yes, Daily SQL offers a 100% Free Tier (₹0) with immediate access to daily problems (SQL, Python, PySpark), streak tracking, live code execution, and leaderboards. To unlock the full archive, step-by-step editorial solutions, and advanced interview prep tracks, we offer flexible paid plans.",
+    answer: "Yes. The Free Tier (₹0) gives you 3 SQL questions every day (today's daily set) plus the first 30 SQL questions in the archive, with streak tracking, live code execution, and leaderboards. Every question across SQL, Python, PySpark and DSA, plus step-by-step editorial solutions, comes with a paid plan.",
   },
   {
     question: "What plans and pricing options are available?",

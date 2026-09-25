@@ -69,10 +69,8 @@ const PLANS: Plan[] = [
     highlighted: true,
     features: [
       "Everything in Monthly Plan",
-      "Save 86% compared to monthly renewal",
+      "Save 86% compared to buying Monthly for 12 months",
       "Full 12 months of all new question releases",
-      "Advanced interview scenario mock tests",
-      "Priority resolution & community badge",
     ],
   },
   {
@@ -81,14 +79,13 @@ const PLANS: Plan[] = [
     price: "₹4,999",
     numericPrice: 4999,
     period: "one-time",
-    tagline: "Unlimited permanent access forever with zero renewals.",
+    tagline: "One payment, lifetime access, zero renewals.",
     badge: "VIP Deal",
     features: [
       "Everything in Yearly Plan",
-      "One-time payment, permanent lifetime access",
-      "All future courses, tracks & content releases included",
-      "Exclusive Discord VIP role & priority support",
-      "Official Certificate of Completion",
+      "One-time payment, lifetime access",
+      "New problems and tracks added to the platform",
+      "Exclusive VIP community role",
     ],
   },
 ];

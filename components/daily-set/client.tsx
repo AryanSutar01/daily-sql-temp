@@ -3000,7 +3000,7 @@ export function DailySetClient() {
                                 {lockedModalProblem.title}
                             </h3>
                             <p className="text-xs text-zinc-600 leading-relaxed max-w-xs mx-auto">
-                                Free tier includes the first 30 SQL questions and the daily practice set. Upgrade to unlock all questions across SQL, Python, PySpark &amp; DSA.
+                                Free tier includes the first 30 SQL questions and today&apos;s 3 SQL daily questions. Upgrade to unlock all questions across SQL, Python, PySpark &amp; DSA.
                             </p>
                         </div>
 

@@ -50,14 +50,14 @@ export function PricingPageContent() {
             discounted: isINR ? "₹1,499" : "$29",
             period: "/year",
             monthlyEquivalent: isINR ? "just ₹125/mo" : "$2.41/mo",
-            todayText: isINR ? "₹1,499 today · then ₹3,499/year" : "$29 today · then $59/year"
+            todayText: isINR ? "₹1,499 one-time · 12 months of access" : "$29 one-time · 12 months of access"
         },
         monthly: {
             original: isINR ? "₹1,299" : "$19",
             discounted: isINR ? "₹899" : "$12.99",
             period: "/month",
             monthlyEquivalent: "",
-            todayText: isINR ? "₹899 today · then ₹1,299/month" : "$12.99 today · then $19/month"
+            todayText: isINR ? "₹899 one-time · 30 days of access" : "$12.99 one-time · 30 days of access"
         }
     };
 
@@ -159,11 +159,11 @@ export function PricingPageContent() {
         },
         {
             q: "What does the Lifetime Plan include?",
-            a: "Lifetime gives you permanent, unrestricted access to the complete DailySQL platform for ₹4,999 paid once. This includes all current and future problem tracks (SQL, Python, PySpark, dbt, etc.), all editorial solutions, test cases, streak history, and future platform feature updates with zero renewal fees forever."
+            a: "Lifetime gives you access to the complete DailySQL platform for ₹4,999 paid once, for as long as we operate it. This includes every current problem track, the new problems and tracks we add to the platform, and the VIP community role, with no renewal fees. Separately priced products or add-ons are not included. See the Terms of Service for details."
         },
         {
             q: "Do Free, Monthly, Yearly, and Lifetime unlock different content?",
-            a: "Free Tier (₹0) includes access to the daily 9 problem sets, leaderboard rank, streak tracking, and community discussions. All paid plans (Monthly ₹899, Yearly ₹1,499, and Lifetime ₹4,999) unlock the complete 250+ problem archive, in-depth step-by-step editorial solutions, and execution breakdowns."
+            a: "Free Tier (₹0) includes 3 SQL questions every day (today's daily set) and the first 30 SQL questions of the archive, plus leaderboard rank, streak tracking, and community discussions. All paid plans (Monthly ₹899, Yearly ₹1,499, and Lifetime ₹4,999) unlock every question across SQL, Python, PySpark and DSA, plus step-by-step editorial solutions and execution breakdowns."
         },
         {
             q: "How much time do I need each day?",
@@ -325,14 +325,14 @@ export function PricingPageContent() {
                                 <div className="md:col-span-7 flex flex-col justify-between">
                                     <div>
                                         <h4 className="text-base sm:text-lg font-bold text-zinc-900 tracking-tight leading-snug mb-4">
-                                            Get every DailySQL problem forever, including future tracks and updates
+                                            Get every DailySQL problem with one payment, including the new tracks we add
                                         </h4>
                                         <ul className="space-y-2.5 mb-6">
                                             {[
                                                 "Every current DailySQL track (SQL, Python & PySpark)",
-                                                "Every problem track released in the future",
+                                                "New problems and tracks we add to the Platform",
                                                 "All past archives, editorial solutions, and test suites",
-                                                "One payment with zero renewal fees forever"
+                                                "One payment, no renewal fees"
                                             ].map((feat, i) => (
                                                 <li key={i} className="flex items-start gap-2 text-xs text-zinc-700 leading-relaxed font-medium">
                                                     <Check className="w-3.5 h-3.5 text-[#1f9e8e] shrink-0 mt-0.5 stroke-[2.5]" />
@@ -343,7 +343,7 @@ export function PricingPageContent() {
                                     </div>
 
                                     <p className="text-[11px] text-zinc-400 leading-relaxed border-t border-[#dedee2] pt-3">
-                                        Lifetime is attached to your DailySQL account. It does not renew and it is not removed when subscription prices change later. Anything included on your purchase date stays included, at no extra cost, for as long as you hold the plan.
+                                        Lifetime is attached to your DailySQL account. It does not renew and it is not removed when subscription prices change later. Anything included on your purchase date stays included, at no extra cost, for as long as you hold the plan. Lifetime purchases can be refunded within 7 days (see our Refund Policy).
                                     </p>
                                 </div>
 
@@ -460,7 +460,7 @@ export function PricingPageContent() {
                                         </span>
                                     </div>
                                     <p className="text-xs text-zinc-500">
-                                        Solve 9 daily problems (SQL, Python & PySpark) and build streaks at zero cost.
+                                        Get 3 SQL questions every day plus the first 30 SQL questions, and build streaks at zero cost.
                                     </p>
                                 </div>
 
@@ -502,7 +502,7 @@ export function PricingPageContent() {
                                     "Access to entire past problem archive (SQL, Python, PySpark)",
                                     "Step-by-step editorial solutions & query optimization breakdowns",
                                     "Isolated sandbox executions with automated test suite",
-                                    "Cancel anytime with 1-click from your billing portal"
+                                    "One-time payment with no auto-renewal"
                                 ].map((inc, i) => (
                                     <div key={i} className="flex items-start gap-2 text-xs text-zinc-700">
                                         <Check className="w-3.5 h-3.5 text-[#1f9e8e] shrink-0 mt-0.5" />
