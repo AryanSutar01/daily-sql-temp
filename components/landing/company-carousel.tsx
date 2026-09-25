@@ -63,7 +63,7 @@ function LogoItem({ company, priority }: { company: Company; priority?: boolean 
           width: 3,
           height: 3,
           borderRadius: "50%",
-          background: "#c4c4cc",
+          background: "var(--ls-outline-variant)",
           flexShrink: 0,
         }}
       />
@@ -94,7 +94,7 @@ function LogoItem({ company, priority }: { company: Company; priority?: boolean 
           fontSize: "0.8125rem",   /* 13px */
           fontWeight: 500,
           letterSpacing: "-0.01em",
-          color: "#7a7a86",
+          color: "var(--ls-on-surface-muted)",
           lineHeight: 1,
         }}
       >
@@ -123,11 +123,11 @@ function Strip({ track, direction, duration = 52, priority }: StripProps) {
       {/* Edge fades — same colour as section bg (#f7f7f8) */}
       <div
         className="absolute left-0 top-0 bottom-0 w-28 z-10 pointer-events-none"
-        style={{ background: "linear-gradient(to right, #f7f7f8, transparent)" }}
+        style={{ background: "linear-gradient(to right, var(--ls-bg, #f7f7f8), transparent)" }}
       />
       <div
         className="absolute right-0 top-0 bottom-0 w-28 z-10 pointer-events-none"
-        style={{ background: "linear-gradient(to left, #f7f7f8, transparent)" }}
+        style={{ background: "linear-gradient(to left, var(--ls-bg, #f7f7f8), transparent)" }}
       />
 
       <div
@@ -148,7 +148,7 @@ export function CompanyCarousel() {
     <section
       style={{
         /* Match hero background exactly — no visible seam */
-        background: "#f7f7f8",
+        background: "var(--ls-bg)",
         paddingTop: "64px",
         paddingBottom: "56px",
         /* No top border — hero fades into this */
@@ -157,7 +157,7 @@ export function CompanyCarousel() {
       {/* Label */}
       <p
         className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] mb-8"
-        style={{ color: "#acacb6" }}
+        style={{ color: "var(--ls-on-surface-subtle)" }}
       >
         Trusted by professionals from
       </p>

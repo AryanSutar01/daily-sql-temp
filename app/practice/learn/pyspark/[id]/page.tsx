@@ -117,7 +117,7 @@ const mdxComponents = {
     </blockquote>
   ),
   a: ({ children, href, ...props }: any) => (
-    <a href={href} {...props} className="text-[#1f9e8e] hover:text-[#177a6d] font-semibold underline underline-offset-2" target="_blank" rel="noopener noreferrer">
+    <a href={href} {...props} className="text-[#1f9e8e] hover:text-[#177a6d] font-semibold underline underline-offset-2 dark:hover:text-[#4DD4C4]" target="_blank" rel="noopener noreferrer">
       {children}
     </a>
   ),
@@ -148,7 +148,7 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
         <div className="max-w-4xl mx-auto space-y-3">
           <Link
             href="/practice/learn/pyspark"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1f9e8e] hover:text-[#177a6d] transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1f9e8e] hover:text-[#177a6d] transition-colors dark:hover:text-[#4DD4C4]"
           >
             <ArrowLeft size={13} /> Back to Learn PySpark Curriculum
           </Link>
@@ -177,7 +177,7 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
             {prevTutorial ? (
               <Link
                 href={`/practice/learn/pyspark/${prevTutorial.id}`}
-                className="group flex items-center gap-3 p-4 rounded-xl border border-[#dedee2] hover:border-zinc-300 bg-zinc-50/70 hover:bg-white transition-all shadow-2xs flex-1"
+                className="group flex items-center gap-3 p-4 rounded-xl border border-[#dedee2] hover:border-zinc-300 bg-zinc-50/70 hover:bg-white transition-all shadow-2xs flex-1 dark:bg-white/5"
               >
                 <ArrowLeft size={16} className="text-zinc-400 group-hover:text-[#1f9e8e] transition-colors" />
                 <div>
@@ -194,7 +194,7 @@ export default async function QuestionPage({ params }: { params: Promise<{ id: s
             {nextTutorial ? (
               <Link
                 href={`/practice/learn/pyspark/${nextTutorial.id}`}
-                className="group flex items-center justify-between gap-3 p-4 rounded-xl border border-[#dedee2] hover:border-zinc-300 bg-zinc-50/70 hover:bg-white transition-all shadow-2xs flex-1 text-right"
+                className="group flex items-center justify-between gap-3 p-4 rounded-xl border border-[#dedee2] hover:border-zinc-300 bg-zinc-50/70 hover:bg-white transition-all shadow-2xs flex-1 text-right dark:bg-white/5"
               >
                 <div className="flex-1">
                   <p className="text-[10px] text-zinc-400 font-mono uppercase font-bold">Next Lesson</p>

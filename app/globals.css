@@ -177,6 +177,7 @@
   --ls-outline-variant:     #c9c9cf;
 
   /* Text */
+  --ls-heading:             #1a1a1a;
   --ls-on-surface:          #272727;
   --ls-on-surface-muted:    #6e6e6e;
   --ls-on-surface-subtle:   #9e9e9e;
@@ -193,6 +194,13 @@
   --ls-shadow-md:  0 3px 8px rgba(0, 0, 0, 0.10);
   --ls-shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.10);
   --ls-shadow-xl:  0 16px 40px rgba(0, 0, 0, 0.12);
+
+  /* Navbar — CSS-driven so the first paint already matches the theme (no JS flash) */
+  --ls-nav-solid:         #f7f7f8;
+  --ls-nav-glass:         rgba(247, 247, 248, 0.75);
+  --ls-nav-border-solid:  rgba(0, 0, 0, 0.07);
+  --ls-nav-border-glass:  rgba(0, 0, 0, 0.07);
+  --ls-nav-shadow-glass:  0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 4px 24px rgba(0, 0, 0, 0.06);
 
   /* Force light background on this element */
   background-color: var(--ls-bg);
@@ -481,12 +489,7 @@
   border: 1px solid #e4e4e7 !important;
 }
 
-.landing-light .monaco-editor,
-.landing-light .monaco-editor .margin,
-.landing-light .monaco-editor-background {
-  background-color: #ffffff !important;
-}
-
+/* Monaco colors come from the dailySqlLight / dailySqlDark themes (daily-set/client.tsx) */
 .landing-light .monaco-editor .view-lines {
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Consolas, monospace !important;
   font-variant-ligatures: contextual !important;
@@ -504,3 +507,401 @@
 .landing-light ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8 !important;
 }
+
+/* ============================================================
+   DARK MODE — .landing-light dark overrides
+   When html.dark is active, remap ALL landing tokens + hardcoded
+   Tailwind classes to the original dark palette.
+   ============================================================ */
+.dark .landing-light {
+  /* ── Core Tailwind variable overrides ── */
+  --background:           #080C16;
+  --foreground:           #F9FAFB;
+  --card:                 #0F1419;
+  --card-foreground:      #F9FAFB;
+  --popover:              #0F1419;
+  --popover-foreground:   #F9FAFB;
+  --primary:              #4DD4C4;
+  --primary-foreground:   #080C16;
+  --secondary:            #1A2332;
+  --secondary-foreground: #F9FAFB;
+  --muted:                #1A2332;
+  --muted-foreground:     #7588A3;
+  --accent:               #1A2332;
+  --accent-foreground:    #F9FAFB;
+  --destructive:          oklch(0.704 0.191 22.216);
+  --border:               #20283C;
+  --input:                #20283C;
+  --ring:                 #4DD4C4;
+  --sidebar:              #0F1419;
+  --sidebar-foreground:   #F9FAFB;
+  --sidebar-primary:      #4DD4C4;
+  --sidebar-primary-foreground: #080C16;
+  --sidebar-accent:       #1A2332;
+  --sidebar-accent-foreground:  #F9FAFB;
+  --sidebar-border:       #20283C;
+  --sidebar-ring:         #4DD4C4;
+
+  /* ── Landing surface tokens (dark) ── */
+  --ls-bg:                  #080C16;
+  --ls-surface:             #0F1419;
+  --ls-surface-low:         #0d121c;
+  --ls-surface-container:   #1A2332;
+  --ls-surface-high:        #202736;
+  --ls-surface-highest:     #283040;
+  --ls-outline:             #20283C;
+  --ls-outline-variant:     #354258;
+
+  /* Text */
+  --ls-heading:             #F9FAFB;
+  --ls-on-surface:          #F9FAFB;
+  --ls-on-surface-muted:    #8fa0b8;
+  --ls-on-surface-subtle:   #6f8098;
+
+  /* Primary (teal — brighter in dark) */
+  --ls-primary:             #4DD4C4;
+  --ls-primary-hover:       #6EEADD;
+  --ls-primary-active:      #1f9e8e;
+  --ls-primary-container:   rgba(77, 212, 196, 0.12);
+  --ls-on-primary:          #080C16;
+
+  /* Elevation (darker shadows) */
+  --ls-shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.3);
+  --ls-shadow-md:  0 3px 8px rgba(0, 0, 0, 0.4);
+  --ls-shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.4);
+  --ls-shadow-xl:  0 16px 40px rgba(0, 0, 0, 0.5);
+
+  /* Navbar */
+  --ls-nav-solid:         #080C16;
+  --ls-nav-glass:         rgba(8, 12, 22, 0.8);
+  --ls-nav-border-solid:  #20283C;
+  --ls-nav-border-glass:  rgba(32, 40, 60, 0.7);
+  --ls-nav-shadow-glass:  0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 4px 24px rgba(0, 0, 0, 0.3);
+
+  /* Force dark background */
+  background-color: var(--ls-bg) !important;
+  color: var(--ls-on-surface) !important;
+  color-scheme: dark;
+}
+
+/* ── Hardcoded background remaps ── */
+.dark .landing-light .bg-white {
+  background-color: #0F1419 !important;
+}
+
+.dark .landing-light [class*="bg-[#fafafa]"] {
+  background-color: #0d121c !important;
+}
+
+.dark .landing-light [class*="bg-[#f7f7f8]"] {
+  background-color: #080C16 !important;
+}
+
+.dark .landing-light [class*="bg-[#f4f4f5]"],
+.dark .landing-light [class*="bg-[#f4f6f8]"] {
+  background-color: #1A2332 !important;
+}
+
+.dark .landing-light [class*="bg-[#f8f9fa]"],
+.dark .landing-light [class*="bg-[#f8fafc]"],
+.dark .landing-light [class*="bg-[#f8fafb]"] {
+  background-color: #131924 !important;
+}
+
+.dark .landing-light [class*="bg-[#f0f0f2]"],
+.dark .landing-light [class*="bg-[#f0f2f5]"] {
+  background-color: #1A2332 !important;
+}
+
+.dark .landing-light [class*="bg-[#eaedf1]"],
+.dark .landing-light [class*="bg-[#edf2f6]"] {
+  background-color: #1A2332 !important;
+}
+
+.dark .landing-light [class*="bg-[#e6f7f5]"] {
+  background-color: rgba(77, 212, 196, 0.12) !important;
+}
+
+.dark .landing-light .bg-zinc-50,
+.dark .landing-light .bg-zinc-100 {
+  background-color: #1A2332 !important;
+}
+
+.dark .landing-light .bg-zinc-50\/80 {
+  background-color: rgba(26, 35, 50, 0.8) !important;
+}
+
+.dark .landing-light .bg-white\/90 {
+  background-color: rgba(15, 20, 25, 0.9) !important;
+}
+
+/* ── Hardcoded text color remaps ── */
+.dark .landing-light .text-white {
+  color: #F9FAFB !important;
+}
+
+.dark .landing-light .text-zinc-950,
+.dark .landing-light .text-zinc-900,
+.dark .landing-light .text-zinc-800,
+.dark .landing-light [class*="text-[#18181b]"],
+.dark .landing-light [class*="text-[#27272a]"],
+.dark .landing-light [class*="text-[#09090b]"] {
+  color: #F9FAFB !important;
+}
+
+/* Muted text tiers — kept ≥ 4.5:1 on the dark surfaces (#0F1419 / #080C16) while preserving hierarchy */
+.dark .landing-light .text-zinc-700 {
+  color: #b4c3d6 !important;
+}
+
+.dark .landing-light .text-zinc-600 {
+  color: #95a6bd !important;
+}
+
+.dark .landing-light .text-zinc-500 {
+  color: #8496ae !important;
+}
+
+.dark .landing-light .text-zinc-400 {
+  color: #71829a !important;
+}
+
+.dark .landing-light .text-zinc-300,
+.dark .landing-light .text-zinc-200 {
+  color: #cbd5e1 !important;
+}
+
+/* ── Border remaps ── */
+.dark .landing-light [class*="border-[#dedee2]"],
+.dark .landing-light .border-zinc-200,
+.dark .landing-light .border-zinc-300 {
+  border-color: #20283C !important;
+}
+
+.dark .landing-light [class*="border-[#e4e4e7]"] {
+  border-color: #20283C !important;
+}
+
+.dark .landing-light .divide-\[#dedee2\] > :not([hidden]) ~ :not([hidden]),
+.dark .landing-light .divide-zinc-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #20283C !important;
+}
+
+/* ── Teal brand token remaps ── */
+.dark .landing-light [class*="text-[#1f9e8e]"] {
+  color: #4DD4C4 !important;
+}
+
+.dark .landing-light [class*="text-[#135d54]"] {
+  color: #4DD4C4 !important;
+}
+
+/* Solid teal fills only — translucent tints (bg-[#1f9e8e]/15) keep their own text color */
+.dark .landing-light [class*="bg-[#1f9e8e]"]:not([class*="bg-[#1f9e8e]/"]) {
+  background-color: #4DD4C4 !important;
+  color: #080C16 !important;
+}
+
+.dark .landing-light [class*="bg-[#1f9e8e]/"] {
+  background-color: rgba(77, 212, 196, 0.15) !important;
+}
+
+.dark .landing-light [class*="border-[#1f9e8e]"] {
+  border-color: #4DD4C4 !important;
+}
+
+.dark .landing-light [class*="border-[#1f9e8e]/"] {
+  border-color: rgba(77, 212, 196, 0.35) !important;
+}
+
+/* ── Dark page bg overrides (keep them dark, not re-light) ── */
+.dark .landing-light [class*="bg-[#080c16]"] {
+  background-color: #080C16 !important;
+  color: #F9FAFB !important;
+}
+
+.dark .landing-light [class*="bg-[#0d121c]"] {
+  background-color: #0d121c !important;
+  border-color: #20283C !important;
+}
+
+.dark .landing-light [class*="bg-[#131924]"] {
+  background-color: #131924 !important;
+  border-color: #20283C !important;
+}
+
+.dark .landing-light [class*="bg-[#0b101c]"] {
+  background-color: #0b101c !important;
+  border-color: #20283C !important;
+}
+
+.dark .landing-light [class*="border-[#202736]"],
+.dark .landing-light [class*="border-[#202736]/"] {
+  border-color: #20283C !important;
+}
+
+.dark .landing-light [class*="text-[#4DD4C4]"] {
+  color: #4DD4C4 !important;
+}
+
+.dark .landing-light [class*="bg-[#4DD4C4]"] {
+  background-color: #4DD4C4 !important;
+  color: #080C16 !important;
+}
+
+.dark .landing-light [class*="bg-[#4DD4C4]/"] {
+  background-color: rgba(77, 212, 196, 0.12) !important;
+  color: #4DD4C4 !important;
+}
+
+.dark .landing-light [class*="border-[#4DD4C4]/"] {
+  border-color: rgba(77, 212, 196, 0.35) !important;
+}
+
+/* ── Tables in dark mode ── */
+.dark .landing-light table th {
+  background-color: #1A2332 !important;
+  color: #a0b3c8 !important;
+  border-color: #20283C !important;
+}
+
+.dark .landing-light table td {
+  border-color: #20283C !important;
+  color: #d1d5db !important;
+}
+
+.dark .landing-light table tbody tr:hover {
+  background-color: #131924 !important;
+}
+
+/* ── Form inputs in dark mode ── */
+.dark .landing-light textarea,
+.dark .landing-light input[type="text"],
+.dark .landing-light input[type="email"],
+.dark .landing-light input[type="password"],
+.dark .landing-light input[type="number"],
+.dark .landing-light input[type="search"],
+.dark .landing-light select {
+  background-color: #131924 !important;
+  color: #F9FAFB !important;
+  border-color: #20283C !important;
+}
+
+.dark .landing-light textarea::placeholder,
+.dark .landing-light input::placeholder {
+  color: #5a6b80 !important;
+}
+
+/* ── Shadows in dark mode ── */
+.dark .landing-light .shadow-2xl,
+.dark .landing-light .shadow-xl,
+.dark .landing-light .shadow-lg {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3) !important;
+}
+
+.dark .landing-light .shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2) !important;
+}
+
+.dark .landing-light .shadow-sm,
+.dark .landing-light .shadow-2xs {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* ── Prose / markdown content ── */
+.dark .landing-light .prose-invert {
+  color: #d1d5db !important;
+}
+
+.dark .landing-light .prose-invert h1,
+.dark .landing-light .prose-invert h2,
+.dark .landing-light .prose-invert h3,
+.dark .landing-light .prose-invert h4,
+.dark .landing-light .prose-invert strong {
+  color: #F9FAFB !important;
+}
+
+.dark .landing-light .prose-invert code {
+  background-color: #1A2332 !important;
+  color: #4DD4C4 !important;
+  border: 1px solid #20283C !important;
+}
+
+/* ── Code and pre blocks ── */
+.dark .landing-light pre {
+  background-color: #131924 !important;
+  border-color: #20283C !important;
+}
+
+.dark .landing-light code {
+  background-color: #1A2332 !important;
+  color: #4DD4C4 !important;
+  border-color: #20283C !important;
+}
+
+/* ── Scrollbars ── */
+.dark .landing-light ::-webkit-scrollbar-thumb {
+  background: #354258 !important;
+}
+.dark .landing-light ::-webkit-scrollbar-thumb:hover {
+  background: #475569 !important;
+}
+
+/* ── Landing dot grid ── */
+.dark .landing-light .bg-dot-light {
+  background-image: radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px) !important;
+}
+
+/* ── Gradient overrides ── */
+.dark .landing-light [class*="from-[#e6f7f5]"],
+.dark .landing-light [class*="via-[#edf8f6]"],
+.dark .landing-light [class*="to-[#f4f6f8]"] {
+  --tw-gradient-from: rgba(77, 212, 196, 0.06) !important;
+  --tw-gradient-via: rgba(15, 20, 25, 0.8) !important;
+  --tw-gradient-to: #080C16 !important;
+}
+
+/* ── ring/focus — teal in dark ── */
+.dark .landing-light [class*="ring-[#1f9e8e]"] {
+  --tw-ring-color: #4DD4C4 !important;
+}
+
+/* ── Specific component overrides ── */
+
+/* Inline code pills (column highlights) */
+.dark .landing-light [class*="bg-[#e6f7f5]"] {
+  background-color: rgba(77, 212, 196, 0.12) !important;
+}
+
+/* Navbar: scrolled glass effect */
+.dark .landing-light nav {
+  border-color: #20283C !important;
+}
+
+/* Hover border for practice dropdown items */
+.dark .landing-light .hover\:border-\[#dedee2\]:hover {
+  border-color: #354258 !important;
+}
+
+.dark .landing-light .hover\:bg-zinc-50\/80:hover {
+  background-color: rgba(26, 35, 50, 0.8) !important;
+}
+
+/* Smooth theme transitions */
+.landing-light,
+.landing-light * {
+  transition-property: background-color, color, border-color, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease-out;
+}
+/* Exclude elements that shouldn't transition (animations, transforms) */
+.landing-light .animate-fade-up,
+.landing-light .animate-float,
+.landing-light .animate-float-card,
+.landing-light .animate-float-card-r,
+.landing-light .animate-slide-in-left,
+.landing-light .animate-slide-in-right,
+.landing-light .animate-pulse-dot,
+.landing-light .animate-premium-entry {
+  transition-property: none;
+}

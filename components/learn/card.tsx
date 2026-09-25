@@ -4,9 +4,9 @@ import Link from "next/link";
 import { Tutorial } from "@/tutorials/sql/manifest";
 
 const tagStyles: Record<string, string> = {
-  concept: "bg-sky-50 text-sky-800 border-sky-200",
-  practice: "bg-emerald-50 text-emerald-800 border-emerald-200",
-  interview: "bg-amber-50 text-amber-900 border-amber-200",
+  concept: "bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30",
+  practice: "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30",
+  interview: "bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30",
 };
 
 interface CardProps {

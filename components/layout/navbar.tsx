@@ -18,9 +18,12 @@ import {
   Crown,
   CreditCard,
   Sparkles,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { NavbarTrialPill, TrialWelcomeModal } from "@/components/subscription/trial-experience";
 
 export function Navbar() {
@@ -32,13 +35,16 @@ export function Navbar() {
   const [streak, setStreak] = useState(0);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [subscription, setSubscription] = useState<any>(null);
+  const [mounted, setMounted] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const practiceRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
+  const { theme, setTheme } = useTheme();
   const isAdmin = pathname.startsWith("/admin");
   const isLightNav = true;
+  const isDark = mounted && theme === "dark";
 
   const practiceHref = user ? "/practice/daily" : "/login";
 
@@ -93,6 +99,10 @@ export function Navbar() {
   ];
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -144,18 +154,18 @@ export function Navbar() {
   const navStyle = scrolled
     ? {
         // Liquid glass
-        backgroundColor: "rgba(247,247,248,0.75)",
+        backgroundColor: "var(--ls-nav-glass)",
         backdropFilter: "blur(20px) saturate(180%)",
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        borderBottomColor: "rgba(0,0,0,0.07)",
-        boxShadow: "0 1px 0 rgba(255,255,255,0.6) inset, 0 4px 24px rgba(0,0,0,0.06)",
+        borderBottomColor: "var(--ls-nav-border-glass)",
+        boxShadow: "var(--ls-nav-shadow-glass)",
       }
     : {
         // Solid / opaque at top
-        backgroundColor: "#f7f7f8",
+        backgroundColor: "var(--ls-nav-solid)",
         backdropFilter: "none",
         WebkitBackdropFilter: "none",
-        borderBottomColor: "rgba(0,0,0,0.07)",
+        borderBottomColor: "var(--ls-nav-border-solid)",
         boxShadow: "none",
       };
 
@@ -183,7 +193,7 @@ export function Navbar() {
             <img
               src="/dailysql-wordmark-bg-removed.png"
               alt="DailySQL"
-              className="h-7 w-auto object-contain block transition-opacity group-hover:opacity-90"
+              className="dark:invert h-7 w-auto object-contain block transition-opacity group-hover:opacity-90"
             />
           </Link>
 
@@ -222,7 +232,7 @@ export function Navbar() {
                         key={option.title}
                         href={option.href}
                         onClick={() => setIsPracticeOpen(false)}
-                        className="flex items-start gap-3 p-3 rounded-xl transition-all duration-150 group border border-transparent hover:border-[#dedee2] hover:bg-zinc-50/80 shadow-2xs"
+                        className="flex items-start gap-3 p-3 rounded-xl transition-all duration-150 group border border-transparent hover:border-[#dedee2] hover:bg-zinc-50/80 shadow-2xs dark:hover:bg-white/5"
                         style={{ background: "transparent" }}
                       >
                         <div
@@ -267,6 +277,23 @@ export function Navbar() {
           {/* Right: auth / CTA / trial badge */}
           {!isAdmin && (
             <div className="hidden md:flex items-center gap-3 relative shrink-0">
+              {/* Theme toggle */}
+              <button
+                onClick={() => setTheme(isDark ? "light" : "dark")}
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105"
+                style={{
+                  background: "var(--ls-surface-container)",
+                  border: "1px solid var(--ls-outline)",
+                  color: "var(--ls-on-surface-muted)",
+                }}
+                aria-label="Toggle dark mode"
+                title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                {/* Icons switch via the .dark class (CSS) so the first paint is already correct */}
+                <Sun size={16} className="hidden dark:block" />
+                <Moon size={16} className="dark:hidden" />
+              </button>
+
               {isAuthLoading ? (
                 <Loader2 size={16} className="animate-spin" style={{ color: "var(--ls-on-surface-muted)" }} />
               ) : user ? (
@@ -330,12 +357,12 @@ export function Navbar() {
                           </p>
                           {subscription?.is_paid ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 border border-amber-500/30 uppercase tracking-wider">
-                              <Crown className="w-3 h-3 text-amber-600" />
+                              <Crown className="w-3 h-3 text-amber-600 dark:text-amber-300" />
                               {subscription.plan === "lifetime" ? "Lifetime VIP" : `${subscription.plan} Pro`}
                             </span>
                           ) : subscription?.is_trial ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 uppercase tracking-wider">
-                              <Gift className="w-3 h-3 text-emerald-600" />
+                              <Gift className="w-3 h-3 text-emerald-600 dark:text-emerald-300" />
                               {subscription.trial_type === "new_signup" ? "7-Day Trial" : "Launch Trial"}
                             </span>
                           ) : (
@@ -372,11 +399,11 @@ export function Navbar() {
 
                         <Link href="/redeem" onClick={() => setIsDropdownOpen(false)}>
                           <div
-                            className="flex items-center gap-2.5 px-4 py-2.5 text-sm cursor-pointer transition-colors text-amber-600 font-medium"
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-sm cursor-pointer transition-colors text-amber-600 font-medium dark:text-amber-300"
                             onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--ls-surface-container)")}
                             onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
                           >
-                            <Gift size={14} className="text-amber-600" /> Redeem Invite Code
+                            <Gift size={14} className="text-amber-600 dark:text-amber-300" /> Redeem Invite Code
                           </div>
                         </Link>
 
@@ -489,6 +516,20 @@ export function Navbar() {
             ))}
 
             <div className="pt-2 border-t" style={{ borderColor: "var(--ls-outline)" }} />
+
+            {/* Mobile theme toggle */}
+            <button
+              onClick={() => setTheme(isDark ? "light" : "dark")}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors w-full"
+              style={{ color: "var(--ls-on-surface-muted)" }}
+            >
+              <Sun size={14} className="hidden dark:block" />
+              <Moon size={14} className="dark:hidden" />
+              <span className="hidden dark:inline">Light Mode</span>
+              <span className="dark:hidden">Dark Mode</span>
+            </button>
+
+            <div className="pt-1" />
             {user ? (
               <>
                 <Link href="/practice/daily" className="block px-3 py-2 text-sm font-medium" style={{ color: "var(--ls-primary)" }} onClick={() => setIsOpen(false)}>
@@ -507,7 +548,7 @@ export function Navbar() {
                 </Link>
                 <Link
                   href="/redeem"
-                  className="block px-3 py-2 text-sm text-amber-600 font-medium"
+                  className="block px-3 py-2 text-sm text-amber-600 font-medium dark:text-amber-300"
                   onClick={() => setIsOpen(false)}
                 >
                   Redeem Invite Code

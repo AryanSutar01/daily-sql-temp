@@ -59,7 +59,7 @@ export default function TeamPage() {
 
           <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
             {/* Value 1 */}
-            <div className="p-8 rounded-2xl bg-zinc-50/70 border border-[#dedee2] hover:border-[#1f9e8e]/40 transition-all hover:shadow-xs group flex flex-col justify-between">
+            <div className="p-8 rounded-2xl bg-zinc-50/70 border border-[#dedee2] hover:border-[#1f9e8e]/40 transition-all hover:shadow-xs group flex flex-col justify-between dark:bg-white/5">
               <div>
                 <div className="w-12 h-12 rounded-xl bg-[#e6f7f5] border border-[#1f9e8e]/30 flex items-center justify-center mb-6 text-[#1f9e8e] group-hover:scale-105 transition-transform">
                   <Cpu size={24} />
@@ -72,9 +72,9 @@ export default function TeamPage() {
             </div>
 
             {/* Value 2 */}
-            <div className="p-8 rounded-2xl bg-zinc-50/70 border border-[#dedee2] hover:border-[#1f9e8e]/40 transition-all hover:shadow-xs group flex flex-col justify-between">
+            <div className="p-8 rounded-2xl bg-zinc-50/70 border border-[#dedee2] hover:border-[#1f9e8e]/40 transition-all hover:shadow-xs group flex flex-col justify-between dark:bg-white/5">
               <div>
-                <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center mb-6 text-amber-600 group-hover:scale-105 transition-transform">
+                <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center mb-6 text-amber-600 group-hover:scale-105 transition-transform dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
                   <Zap size={24} />
                 </div>
                 <h3 className="text-lg font-bold font-mono text-zinc-900 mb-3">Consistency</h3>
@@ -85,9 +85,9 @@ export default function TeamPage() {
             </div>
 
             {/* Value 3 */}
-            <div className="p-8 rounded-2xl bg-zinc-50/70 border border-[#dedee2] hover:border-[#1f9e8e]/40 transition-all hover:shadow-xs group flex flex-col justify-between">
+            <div className="p-8 rounded-2xl bg-zinc-50/70 border border-[#dedee2] hover:border-[#1f9e8e]/40 transition-all hover:shadow-xs group flex flex-col justify-between dark:bg-white/5">
               <div>
-                <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mb-6 text-emerald-600 group-hover:scale-105 transition-transform">
+                <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mb-6 text-emerald-600 group-hover:scale-105 transition-transform dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-300">
                   <Users size={24} />
                 </div>
                 <h3 className="text-lg font-bold font-mono text-zinc-900 mb-3">Community</h3>

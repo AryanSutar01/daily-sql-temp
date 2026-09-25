@@ -134,8 +134,8 @@ export function NavbarTrialPill({ subscription }: { subscription?: SubscriptionD
   if (subscription.is_paid) {
     return (
       <Link href="/pricing">
-        <span className="inline-flex items-center gap-1.5 text-xs font-bold font-mono px-3 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 hover:border-amber-300 transition-colors uppercase tracking-wider shadow-2xs">
-          <Crown className="w-3.5 h-3.5 text-amber-600" />
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold font-mono px-3 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 hover:border-amber-300 transition-colors uppercase tracking-wider shadow-2xs dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30 dark:hover:border-amber-500/30">
+          <Crown className="w-3.5 h-3.5 text-amber-600 dark:text-amber-300" />
           {subscription.plan === "lifetime" ? "VIP Lifetime" : `${subscription.plan} Pro`}
         </span>
       </Link>
@@ -153,11 +153,11 @@ export function NavbarTrialPill({ subscription }: { subscription?: SubscriptionD
           onClick={() => setPopoverOpen(!popoverOpen)}
           className={`inline-flex items-center gap-1.5 text-xs font-bold font-mono px-3 py-1 rounded-lg border transition-all shadow-2xs ${
             isEndingSoon
-              ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
+              ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30 dark:hover:bg-amber-500/20"
               : "bg-[#e6f7f5] text-[#1f9e8e] border-[#1f9e8e]/40 hover:bg-[#d8f3ef]"
           }`}
         >
-          <Zap size={13} className={isEndingSoon ? "text-amber-600 fill-amber-600" : "text-[#1f9e8e] fill-[#1f9e8e]"} />
+          <Zap size={13} className={isEndingSoon ? "text-amber-600 fill-amber-600 dark:text-amber-300" : "text-[#1f9e8e] fill-[#1f9e8e]"} />
           <span>{subscription.trial_type === "new_signup" ? "7-Day Pro Pass" : "Pro Pass"}</span>
           <span className="opacity-75 font-mono">({daysLeft}d left)</span>
         </button>
@@ -176,7 +176,7 @@ export function NavbarTrialPill({ subscription }: { subscription?: SubscriptionD
 
             <p className="text-xs text-zinc-600 leading-relaxed">
               You currently have full access to all 110+ coding challenges. Your Pro Pass expires in{" "}
-              <strong className={isEndingSoon ? "text-amber-700" : "text-[#1f9e8e]"}>{daysLeft} day(s)</strong>.
+              <strong className={isEndingSoon ? "text-amber-700 dark:text-amber-300" : "text-[#1f9e8e]"}>{daysLeft} day(s)</strong>.
             </p>
 
             <div className="pt-1 flex flex-col gap-2">
@@ -206,7 +206,7 @@ export function NavbarTrialPill({ subscription }: { subscription?: SubscriptionD
   if (subscription.trial_expired) {
     return (
       <Link href="/pricing">
-        <span className="inline-flex items-center gap-1.5 text-xs font-bold font-mono px-3 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-all shadow-2xs">
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold font-mono px-3 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-all shadow-2xs dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30 dark:hover:bg-rose-500/20">
           <Lock size={12} />
           <span>Pro Expired · Upgrade</span>
         </span>
@@ -236,14 +236,14 @@ export function PracticeTrialBanner({ subscription }: { subscription?: Subscript
   // Trial Expired — Show Clear Paywall Nudge
   if (subscription.trial_expired) {
     return (
-      <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs shadow-2xs">
-        <div className="flex items-center gap-2.5 text-amber-900">
-          <div className="w-6 h-6 rounded-md bg-amber-100 border border-amber-300 flex items-center justify-center shrink-0">
-            <Lock size={12} className="text-amber-800" />
+      <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs shadow-2xs dark:bg-amber-500/10 dark:border-amber-500/30">
+        <div className="flex items-center gap-2.5 text-amber-900 dark:text-amber-300">
+          <div className="w-6 h-6 rounded-md bg-amber-100 border border-amber-300 flex items-center justify-center shrink-0 dark:bg-amber-500/20 dark:border-amber-500/30">
+            <Lock size={12} className="text-amber-800 dark:text-amber-300" />
           </div>
           <div>
             <span className="font-bold">Your Pro Pass has expired.</span>{" "}
-            <span className="text-amber-800/80 hidden sm:inline">
+            <span className="text-amber-800/80 hidden sm:inline dark:text-amber-300">
               Your solved questions and streak are safe! Upgrade or redeem a coupon to unlock all 110+ challenges.
             </span>
           </div>
@@ -259,7 +259,7 @@ export function PracticeTrialBanner({ subscription }: { subscription?: Subscript
           </Link>
           <Link
             href="/redeem"
-            className="text-amber-800 hover:text-amber-950 text-[11px] font-mono font-medium underline transition-colors hidden md:inline"
+            className="text-amber-800 hover:text-amber-950 text-[11px] font-mono font-medium underline transition-colors hidden md:inline dark:text-amber-300"
           >
             Redeem voucher
           </Link>
@@ -276,11 +276,11 @@ export function PracticeTrialBanner({ subscription }: { subscription?: Subscript
     return (
       <div className={`border-b px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs transition-colors ${
         isEndingSoon
-          ? "bg-amber-50 border-amber-200 text-amber-900"
+          ? "bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300"
           : "bg-[#e6f7f5] border-[#1f9e8e]/20 text-[#135d54]"
       }`}>
         <div className="flex items-center gap-2">
-          <Zap size={13} className={isEndingSoon ? "text-amber-600 fill-amber-600" : "text-[#1f9e8e] fill-[#1f9e8e]"} />
+          <Zap size={13} className={isEndingSoon ? "text-amber-600 fill-amber-600 dark:text-amber-300" : "text-[#1f9e8e] fill-[#1f9e8e]"} />
           <span>
             <strong>Pro Pass Active ({daysLeft} days remaining):</strong> All 110+ SQL, Python &amp; PySpark challenges are unlocked.
           </span>
@@ -290,7 +290,7 @@ export function PracticeTrialBanner({ subscription }: { subscription?: Subscript
           <Link
             href="/pricing"
             className={`font-bold font-mono text-xs hover:underline flex items-center gap-1 ${
-              isEndingSoon ? "text-amber-800" : "text-[#1f9e8e]"
+              isEndingSoon ? "text-amber-800 dark:text-amber-300" : "text-[#1f9e8e]"
             }`}
           >
             {isEndingSoon ? "Lock in Early Pro Rate →" : "View Pro Plans →"}

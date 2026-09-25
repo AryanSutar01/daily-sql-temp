@@ -98,36 +98,36 @@ export function HowItWorks() {
             >
               <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-black/5 shadow-xs">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md bg-sky-50 text-sky-600 flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-md bg-sky-50 text-sky-600 flex items-center justify-center dark:bg-sky-500/10 dark:text-sky-300">
                     <Database className="w-3.5 h-3.5" />
                   </div>
                   <span className="text-xs font-medium text-zinc-800">SQL (Postgres)</span>
                 </div>
-                <span className="text-[11px] font-mono font-semibold text-sky-600 bg-sky-50 px-2 py-0.5 rounded">
+                <span className="text-[11px] font-mono font-semibold text-sky-600 bg-sky-50 px-2 py-0.5 rounded dark:text-sky-300 dark:bg-sky-500/10">
                   3 Problems
                 </span>
               </div>
 
               <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-black/5 shadow-xs">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center dark:bg-amber-500/10 dark:text-amber-300">
                     <Code2 className="w-3.5 h-3.5" />
                   </div>
                   <span className="text-xs font-medium text-zinc-800">Python (Pandas)</span>
                 </div>
-                <span className="text-[11px] font-mono font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                <span className="text-[11px] font-mono font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded dark:text-amber-300 dark:bg-amber-500/10">
                   3 Problems
                 </span>
               </div>
 
               <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-black/5 shadow-xs">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md bg-violet-50 text-violet-600 flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-md bg-violet-50 text-violet-600 flex items-center justify-center dark:bg-violet-500/10 dark:text-violet-300">
                     <Server className="w-3.5 h-3.5" />
                   </div>
                   <span className="text-xs font-medium text-zinc-800">PySpark</span>
                 </div>
-                <span className="text-[11px] font-mono font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded">
+                <span className="text-[11px] font-mono font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded dark:text-violet-300 dark:bg-violet-500/10">
                   3 Problems
                 </span>
               </div>
@@ -284,7 +284,7 @@ export function HowItWorks() {
                     </span>
                   </div>
                 </div>
-                <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200/60 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200/60 flex items-center justify-center dark:bg-orange-500/10 dark:border-orange-500/30">
                   <Flame className="w-6 h-6 fill-orange-500 text-orange-500 animate-pulse" />
                 </div>
               </div>
@@ -310,7 +310,7 @@ export function HowItWorks() {
               </div>
 
               <div className="flex items-center justify-between pt-1 text-[11px]">
-                <span className="text-emerald-700 font-medium flex items-center gap-1">
+                <span className="text-emerald-700 font-medium flex items-center gap-1 dark:text-emerald-300">
                   <Trophy className="w-3 h-3 text-amber-500" /> Top 5% rank
                 </span>
                 <span className="text-zinc-500">Public profile active</span>

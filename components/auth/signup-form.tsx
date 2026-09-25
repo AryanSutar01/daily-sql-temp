@@ -164,8 +164,8 @@ export function SignupForm() {
                 </div>
 
                 {error && (
-                    <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-rose-800 text-xs">
-                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-rose-800 text-xs dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5 dark:text-rose-300" />
                         <p className="font-medium">{error}</p>
                     </div>
                 )}
@@ -224,8 +224,8 @@ export function SignupForm() {
             </div>
 
             {error && (
-                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-rose-800 text-xs">
-                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-rose-800 text-xs dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5 dark:text-rose-300" />
                     <p className="font-medium">{error}</p>
                 </div>
             )}
@@ -249,7 +249,7 @@ export function SignupForm() {
             <div className="text-center pt-2 border-t border-[#dedee2]">
                 <p className="text-xs text-zinc-500">
                     Already have an account?{" "}
-                    <Link href="/login" className="text-[#1f9e8e] hover:text-[#177a6d] font-bold transition-colors">
+                    <Link href="/login" className="text-[#1f9e8e] hover:text-[#177a6d] font-bold transition-colors dark:hover:text-[#4DD4C4]">
                         Sign In
                     </Link>
                 </p>

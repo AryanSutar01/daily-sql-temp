@@ -112,7 +112,7 @@ function SuccessContent() {
 
         {status === "pending" && (
           <div className="bg-white border border-[#dedee2] rounded-2xl p-8 text-center shadow-xs">
-            <div className="w-12 h-12 border-3 border-amber-200 border-t-amber-500 rounded-full animate-spin mx-auto mb-4" />
+            <div className="w-12 h-12 border-3 border-amber-200 border-t-amber-500 rounded-full animate-spin mx-auto mb-4 dark:border-amber-500/30" />
             <h2 className="text-lg font-bold font-mono text-zinc-900">Payment is being confirmed…</h2>
             <p className="text-zinc-500 text-xs mt-2 leading-relaxed">
               Waiting for confirmation from Cashfree. Please keep this tab open.
@@ -126,8 +126,8 @@ function SuccessContent() {
               <CheckCircle2 className="w-9 h-9 text-[#1f9e8e]" />
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold font-mono uppercase tracking-wider mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold font-mono uppercase tracking-wider mb-2 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-300">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" />
               Activated
             </div>
 
@@ -168,8 +168,8 @@ function SuccessContent() {
 
         {status === "failed" && (
           <div className="bg-white border border-[#dedee2] rounded-2xl p-8 text-center shadow-xs">
-            <div className="w-16 h-16 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-center mx-auto mb-5">
-              <AlertCircle className="w-9 h-9 text-rose-600" />
+            <div className="w-16 h-16 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-center mx-auto mb-5 dark:bg-rose-500/10 dark:border-rose-500/30">
+              <AlertCircle className="w-9 h-9 text-rose-600 dark:text-rose-300" />
             </div>
 
             <h1 className="text-xl font-bold font-mono text-zinc-900 mb-1">Payment Not Confirmed</h1>
@@ -186,7 +186,7 @@ function SuccessContent() {
               </Link>
               <Link
                 href="/"
-                className="w-full inline-flex items-center justify-center bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold py-2.5 px-4 rounded-xl transition-all text-xs"
+                className="w-full inline-flex items-center justify-center bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold py-2.5 px-4 rounded-xl transition-all text-xs dark:hover:bg-zinc-700"
               >
                 Go Home
               </Link>

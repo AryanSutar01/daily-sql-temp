@@ -96,12 +96,12 @@ export function LoginForm() {
 
             {/* Error Alert */}
             {error && (
-                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-rose-800 text-xs">
-                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-rose-800 text-xs dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5 dark:text-rose-300" />
                     <div className="flex-1">
                         <p className="font-medium">{error}</p>
                         {(error.toLowerCase().includes("authorized") || error.toLowerCase().includes("whitelist")) && (
-                            <Link href="/waitlist" className="inline-block mt-2 font-bold text-rose-900 underline">
+                            <Link href="/waitlist" className="inline-block mt-2 font-bold text-rose-900 underline dark:text-rose-300">
                                 Join the Waitlist →
                             </Link>
                         )}
@@ -203,7 +203,7 @@ export function LoginForm() {
             <div className="text-center pt-2 border-t border-[#dedee2]">
                 <p className="text-xs text-zinc-500">
                     New to DailySQL?{" "}
-                    <Link href="/signup" className="text-[#1f9e8e] hover:text-[#177a6d] font-bold transition-colors">
+                    <Link href="/signup" className="text-[#1f9e8e] hover:text-[#177a6d] font-bold transition-colors dark:hover:text-[#4DD4C4]">
                         Create an account
                     </Link>
                 </p>
@@ -213,7 +213,7 @@ export function LoginForm() {
             {toast && (
                 <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-3 duration-200">
                     <div className="bg-white border border-[#dedee2] rounded-2xl p-4 shadow-lg flex items-start gap-3 max-w-sm">
-                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 dark:text-amber-300" />
                         <div className="flex-1">
                             <h4 className="text-xs font-bold text-zinc-900">Notice</h4>
                             <p className="text-xs text-zinc-600 mt-0.5">{toast.message}</p>

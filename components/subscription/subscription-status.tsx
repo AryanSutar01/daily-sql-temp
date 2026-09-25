@@ -127,8 +127,8 @@ export default function SubscriptionStatus() {
   if (loading) {
     return (
       <div className="rounded-2xl bg-white border border-[#dedee2] p-6 shadow-xs animate-pulse">
-        <div className="h-4 bg-zinc-200 rounded w-1/3 mb-3" />
-        <div className="h-7 bg-zinc-200 rounded w-1/2 mb-5" />
+        <div className="h-4 bg-zinc-200 rounded w-1/3 mb-3 dark:bg-zinc-700" />
+        <div className="h-7 bg-zinc-200 rounded w-1/2 mb-5 dark:bg-zinc-700" />
         <div className="h-4 bg-zinc-100 rounded w-full" />
       </div>
     );
@@ -155,9 +155,9 @@ export default function SubscriptionStatus() {
     },
     lifetime: {
       label: "Lifetime VIP",
-      color: "text-amber-800",
-      border: "border-amber-200",
-      bg: "bg-amber-50",
+      color: "text-amber-800 dark:text-amber-300",
+      border: "border-amber-200 dark:border-amber-500/30",
+      bg: "bg-amber-50 dark:bg-amber-500/10",
     },
   };
 
@@ -190,21 +190,21 @@ export default function SubscriptionStatus() {
 
         {isPaid && (
           <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${meta.bg} ${meta.color} border ${meta.border} flex items-center gap-1 uppercase tracking-wider`}>
-            {plan === "lifetime" ? <Crown className="w-3 h-3 text-amber-600" /> : <Sparkles className="w-3 h-3 text-[#1f9e8e]" />}
+            {plan === "lifetime" ? <Crown className="w-3 h-3 text-amber-600 dark:text-amber-300" /> : <Sparkles className="w-3 h-3 text-[#1f9e8e]" />}
             ACTIVE
           </span>
         )}
 
         {isTrial && !isPaid && (
-          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 uppercase tracking-wider">
-            <Gift className="w-3 h-3 text-emerald-600" />
+          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 uppercase tracking-wider dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30">
+            <Gift className="w-3 h-3 text-emerald-600 dark:text-emerald-300" />
             {data?.trial_type === "new_signup" ? `7-Day Pro Pass (${data?.trial_days_remaining ?? 7}d left)` : "30-Day Launch Access"}
           </span>
         )}
 
         {!isPaid && !isTrial && (
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-            data?.trial_expired ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-zinc-100 text-zinc-600 border border-zinc-200'
+            data?.trial_expired ? 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30' : 'bg-zinc-100 text-zinc-600 border border-zinc-200'
           }`}>
             {data?.trial_expired ? "Trial Expired" : "Free Tier"}
           </span>
@@ -267,7 +267,7 @@ export default function SubscriptionStatus() {
       {!isPaid && !isTrial && (
         <div className="mt-3 pt-3 border-t border-zinc-100 text-xs text-zinc-500 space-y-2">
           {data?.trial_expired ? (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300">
               <strong>Your Pro Pass has expired.</strong> Upgrade to continue solving advanced SQL, Python &amp; PySpark questions.
             </div>
           ) : (
@@ -298,16 +298,16 @@ export default function SubscriptionStatus() {
             {!showCouponInput ? (
               <button
                 onClick={() => setShowCouponInput(true)}
-                className="w-full text-center text-xs text-zinc-500 hover:text-amber-600 transition-colors flex items-center justify-center gap-1.5 py-1"
+                className="w-full text-center text-xs text-zinc-500 hover:text-amber-600 transition-colors flex items-center justify-center gap-1.5 py-1 dark:hover:text-amber-200"
               >
-                <Gift className="w-3.5 h-3.5 text-amber-600" />
+                <Gift className="w-3.5 h-3.5 text-amber-600 dark:text-amber-300" />
                 Have an early user invite code?
               </button>
             ) : (
               <form onSubmit={handleRedeemCoupon} className="space-y-2 bg-zinc-50 p-3 rounded-xl border border-zinc-200">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-800 font-semibold flex items-center gap-1 text-[11px]">
-                    <Gift className="w-3 h-3 text-amber-600" /> Enter Invite Code
+                    <Gift className="w-3 h-3 text-amber-600 dark:text-amber-300" /> Enter Invite Code
                   </span>
                   <button
                     type="button"
@@ -341,14 +341,14 @@ export default function SubscriptionStatus() {
                   <div
                     className={`text-[11px] p-2 rounded-lg flex items-start gap-1.5 ${
                       couponMessage.type === "success"
-                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                        : "bg-rose-50 text-rose-800 border border-rose-200"
+                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30"
+                        : "bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30"
                     }`}
                   >
                     {couponMessage.type === "success" ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-600" />
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-300" />
                     ) : (
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-600" />
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-600 dark:text-rose-300" />
                     )}
                     <span>{couponMessage.text}</span>
                   </div>
@@ -362,7 +362,7 @@ export default function SubscriptionStatus() {
           <button
             onClick={handleCancel}
             disabled={cancelling}
-            className="w-full bg-white hover:bg-rose-50 border border-zinc-200 hover:border-rose-200 text-zinc-600 hover:text-rose-700 font-medium py-2 rounded-xl text-xs transition-colors disabled:opacity-50"
+            className="w-full bg-white hover:bg-rose-50 border border-zinc-200 hover:border-rose-200 text-zinc-600 hover:text-rose-700 font-medium py-2 rounded-xl text-xs transition-colors disabled:opacity-50 dark:hover:bg-rose-500/10 dark:hover:border-rose-500/30 dark:hover:text-rose-200"
           >
             {cancelling ? "Cancelling…" : "Cancel Subscription"}
           </button>

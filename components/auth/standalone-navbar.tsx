@@ -67,7 +67,7 @@ export function StandaloneNavbar() {
                 <img
                     src="/dailysql-wordmark-bg-removed.png"
                     alt="DailySQL"
-                    className="h-7 w-auto object-contain block transition-opacity group-hover:opacity-90"
+                    className="dark:invert h-7 w-auto object-contain block transition-opacity group-hover:opacity-90"
                 />
             </Link>
 
@@ -118,7 +118,7 @@ export function StandaloneNavbar() {
                                         </div>
                                     </Link>
                                     <button onClick={() => { handleLogout(); setIsDropdownOpen(false); }} className="w-full text-left">
-                                        <div className="flex items-center gap-2 px-4 py-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer font-medium">
+                                        <div className="flex items-center gap-2 px-4 py-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer font-medium dark:text-red-300 dark:hover:text-red-200 dark:hover:bg-red-500/10">
                                             <LogOut size={14} /> Log Out
                                         </div>
                                     </button>

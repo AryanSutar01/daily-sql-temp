@@ -84,7 +84,7 @@ function WaitlistCallbackContent() {
     return (
       <main className="landing-light min-h-screen flex items-center justify-center px-4 bg-[#fafafa]">
         <div className="max-w-md w-full bg-white border border-[#dedee2] rounded-2xl p-8 text-center space-y-6 shadow-xs">
-          <div className="w-12 h-12 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto text-rose-600">
+          <div className="w-12 h-12 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto text-rose-600 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300">
             <AlertCircle size={24} />
           </div>
           <div className="space-y-2">

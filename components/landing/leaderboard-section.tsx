@@ -17,11 +17,11 @@ interface LeaderboardEntry {
 const RANK_BADGES = ["🏆", "🥈", "🥉"];
 
 const AVATAR_COLORS = [
-  "bg-amber-100 text-amber-700 border-amber-300",
-  "bg-sky-100 text-sky-700 border-sky-300",
-  "bg-emerald-100 text-emerald-700 border-emerald-300",
-  "bg-purple-100 text-purple-700 border-purple-300",
-  "bg-rose-100 text-rose-700 border-rose-300",
+  "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30",
+  "bg-sky-100 text-sky-700 border-sky-300 dark:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/30",
+  "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30",
+  "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-500/30",
+  "bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/30",
 ];
 
 const DEMO_ENTRIES: LeaderboardEntry[] = [
@@ -176,7 +176,7 @@ export function LeaderboardSection() {
                     <span className="text-sm font-semibold tracking-tight" style={{ color: "var(--ls-on-surface)" }}>
                       Weekly Leaderboard
                     </span>
-                    <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200/60">
+                    <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-600 border border-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                       Live
                     </span>

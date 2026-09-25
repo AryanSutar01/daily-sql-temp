@@ -57,7 +57,7 @@ export default function ContactPage() {
   return (
     <main className="landing-light min-h-screen bg-[#f4f6f8] text-zinc-900 font-sans pb-24">
       {/* Hero Header with Teal Grid & Diagonal Gradient Atmosphere */}
-      <section className="relative pt-24 pb-14 px-4 sm:px-6 lg:px-8 border-b border-[#1f9e8e]/20 bg-gradient-to-br from-[#dcf4f1] via-[#ebf8f6] to-[#f4f6f8] overflow-hidden">
+      <section className="relative pt-24 pb-14 px-4 sm:px-6 lg:px-8 border-b border-[#1f9e8e]/20 bg-gradient-to-br from-[#dcf4f1] via-[#ebf8f6] to-[#f4f6f8] overflow-hidden dark:to-[#0F1419] dark:via-[#0F1419]">
         {/* Subtle Teal Geometric Grid */}
         <div 
           className="absolute inset-0 pointer-events-none opacity-75"
@@ -76,7 +76,7 @@ export default function ContactPage() {
         <div className="absolute top-0 left-0 w-[600px] h-[350px] bg-gradient-to-br from-[#1f9e8e]/25 via-[#1f9e8e]/10 to-transparent blur-3xl pointer-events-none" />
 
         <div className="relative max-w-6xl mx-auto space-y-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur text-[#1f9e8e] border border-[#1f9e8e]/35 text-xs font-mono font-bold uppercase tracking-wider shadow-2xs">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur text-[#1f9e8e] border border-[#1f9e8e]/35 text-xs font-mono font-bold uppercase tracking-wider shadow-2xs dark:bg-[#0F1419]/90">
             <MessageSquare className="w-3.5 h-3.5" /> Support &amp; Community
           </div>
 
@@ -91,12 +91,12 @@ export default function ContactPage() {
 
           {/* Quick Info Badges */}
           <div className="flex flex-wrap items-center gap-3 pt-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 backdrop-blur border border-[#1f9e8e]/25 text-xs font-medium text-zinc-700 shadow-2xs">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 backdrop-blur border border-[#1f9e8e]/25 text-xs font-medium text-zinc-700 shadow-2xs dark:bg-[#0F1419]/90">
               <Clock className="w-3.5 h-3.5 text-[#1f9e8e]" />
               <span>Average response: <strong className="text-zinc-900 font-mono">&lt; 2 hours</strong></span>
             </div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 backdrop-blur border border-[#1f9e8e]/25 text-xs font-medium text-zinc-700 shadow-2xs">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 backdrop-blur border border-[#1f9e8e]/25 text-xs font-medium text-zinc-700 shadow-2xs dark:bg-[#0F1419]/90">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" />
               <span>Direct engineer &amp; founder support</span>
             </div>
           </div>
@@ -125,7 +125,7 @@ export default function ContactPage() {
                 </p>
                 <Link
                   href="mailto:contact@dailysql.in"
-                  className="inline-flex items-center gap-1.5 pt-1 text-xs font-bold font-mono text-[#1f9e8e] hover:text-[#177a6d] transition-colors"
+                  className="inline-flex items-center gap-1.5 pt-1 text-xs font-bold font-mono text-[#1f9e8e] hover:text-[#177a6d] transition-colors dark:hover:text-[#4DD4C4]"
                 >
                   contact@dailysql.in <ArrowRight size={13} />
                 </Link>
@@ -133,14 +133,14 @@ export default function ContactPage() {
             </div>
 
             {/* Social Channels */}
-            <div className="bg-white border border-[#dedee2] rounded-2xl p-6 shadow-sm flex items-start gap-4 hover:border-sky-300 transition-all">
-              <div className="p-3 rounded-xl bg-sky-50 text-sky-600 border border-sky-200 shrink-0 shadow-2xs">
+            <div className="bg-white border border-[#dedee2] rounded-2xl p-6 shadow-sm flex items-start gap-4 hover:border-sky-300 transition-all dark:hover:border-sky-500/30">
+              <div className="p-3 rounded-xl bg-sky-50 text-sky-600 border border-sky-200 shrink-0 shadow-2xs dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30">
                 <Twitter size={20} />
               </div>
               <div className="space-y-1.5 flex-1">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold font-mono text-zinc-900">X / Twitter Community</h3>
-                  <span className="text-[11px] font-mono text-sky-600 font-semibold">@dailysqlin</span>
+                  <span className="text-[11px] font-mono text-sky-600 font-semibold dark:text-sky-300">@dailysqlin</span>
                 </div>
                 <p className="text-xs text-zinc-500 leading-relaxed">
                   Daily question discussions, problem hints, and platform release announcements.
@@ -148,7 +148,7 @@ export default function ContactPage() {
                 <Link
                   href="https://twitter.com/dailysqlin"
                   target="_blank"
-                  className="inline-flex items-center gap-1.5 pt-1 text-xs font-bold font-mono text-sky-600 hover:text-sky-700 transition-colors"
+                  className="inline-flex items-center gap-1.5 pt-1 text-xs font-bold font-mono text-sky-600 hover:text-sky-700 transition-colors dark:text-sky-300 dark:hover:text-sky-200"
                 >
                   Follow &amp; Message on X <ExternalLink size={12} />
                 </Link>
@@ -156,8 +156,8 @@ export default function ContactPage() {
             </div>
 
             {/* Quick FAQ / Knowledge Card */}
-            <div className="bg-gradient-to-br from-white via-white to-amber-50/40 border border-amber-200/80 rounded-2xl p-6 shadow-sm flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 shrink-0 shadow-2xs">
+            <div className="bg-gradient-to-br from-white via-white to-amber-50/40 border border-amber-200/80 rounded-2xl p-6 shadow-sm flex items-start gap-4 dark:to-amber-500/5 dark:border-amber-500/30 dark:from-[#0F1419] dark:via-[#0F1419]">
+              <div className="p-3 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 shrink-0 shadow-2xs dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30">
                 <HelpCircle size={20} />
               </div>
               <div className="space-y-1.5 flex-1">
@@ -167,7 +167,7 @@ export default function ContactPage() {
                 </p>
                 <Link
                   href="/#faq"
-                  className="inline-flex items-center gap-1.5 pt-1 text-xs font-bold font-mono text-amber-700 hover:text-amber-800 transition-colors"
+                  className="inline-flex items-center gap-1.5 pt-1 text-xs font-bold font-mono text-amber-700 hover:text-amber-800 transition-colors dark:text-amber-300 dark:hover:text-amber-200"
                 >
                   Browse FAQs <ArrowRight size={13} />
                 </Link>

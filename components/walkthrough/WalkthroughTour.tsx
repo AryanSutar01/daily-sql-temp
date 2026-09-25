@@ -312,7 +312,7 @@ export function WalkthroughTour({
                     className={`rounded-full transition-all duration-200 ${
                       i === currentStep
                         ? "w-4 h-1.5 bg-[#1f9e8e]"
-                        : "w-1.5 h-1.5 bg-zinc-200 hover:bg-zinc-300"
+                        : "w-1.5 h-1.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-700"
                     }`}
                   />
                 ))}

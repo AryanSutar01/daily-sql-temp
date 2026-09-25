@@ -14,8 +14,8 @@ import {
 
 const DISCIPLINE_TABS = [
     { id: "sql", label: "SQL", icon: Database, color: "text-[#1f9e8e]", bg: "bg-[#e6f7f5]", border: "border-[#1f9e8e]/40", fileLabel: "query_editor.sql" },
-    { id: "python", label: "Python", icon: Code2, color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-300", fileLabel: "solution.py" },
-    { id: "pyspark", label: "PySpark", icon: Server, color: "text-violet-700", bg: "bg-violet-50", border: "border-violet-300", fileLabel: "spark_job.py" },
+    { id: "python", label: "Python", icon: Code2, color: "text-amber-700 dark:text-amber-300", bg: "bg-amber-50 dark:bg-amber-500/10", border: "border-amber-300 dark:border-amber-500/30", fileLabel: "solution.py" },
+    { id: "pyspark", label: "PySpark", icon: Server, color: "text-violet-700 dark:text-violet-300", bg: "bg-violet-50 dark:bg-violet-500/10", border: "border-violet-300 dark:border-violet-500/30", fileLabel: "spark_job.py" },
 ];
 
 interface Question {
@@ -248,21 +248,21 @@ export const HighlightCode = ({ code, discipline }: { code: string; discipline: 
                 {parts.map((part, i) => {
                     if (!part) return null;
                     if (/^(SELECT|FROM|WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|PARTITION\s+BY|JOIN|LEFT\s+JOIN|WITH|AS|ON|AND|OVER|CASE|WHEN|THEN|ELSE|END)$/i.test(part)) {
-                        return <span key={i} className="text-[#0000ff] font-bold">{part}</span>;
+                        return <span key={i} className="text-[#0000ff] dark:text-[#569cd6] font-bold">{part}</span>;
                     }
                     if (/^(COUNT|SUM|MIN|MAX|DATE_TRUNC|FIRST_VALUE|LAG|EXTRACT|EPOCH|NULLIF)$/i.test(part)) {
-                        return <span key={i} className="text-[#795e26] font-semibold">{part}</span>;
+                        return <span key={i} className="text-[#795e26] dark:text-[#dcdcaa] font-semibold">{part}</span>;
                     }
                     if (/^'[^']*'$/.test(part)) {
-                        return <span key={i} className="text-[#a31515] font-medium">{part}</span>;
+                        return <span key={i} className="text-[#a31515] dark:text-[#ce9178] font-medium">{part}</span>;
                     }
                     if (/^\d+(\.\d+)?$/.test(part)) {
-                        return <span key={i} className="text-[#098658] font-semibold">{part}</span>;
+                        return <span key={i} className="text-[#098658] dark:text-[#b5cea8] font-semibold">{part}</span>;
                     }
                     if (/^[(),;.]|[+\-*\/%=<>!]+$/.test(part)) {
                         return <span key={i} className="text-zinc-800">{part}</span>;
                     }
-                    return <span key={i} className="text-[#1e293b]">{part}</span>;
+                    return <span key={i} className="text-[#1e293b] dark:text-[#e2e8f0]">{part}</span>;
                 })}
             </>
         );
@@ -275,21 +275,21 @@ export const HighlightCode = ({ code, discipline }: { code: string; discipline: 
             {parts.map((part, i) => {
                 if (!part) return null;
                 if (/^(import|from|def|return|as|for|in|if|else|lambda|with|pass)$/i.test(part)) {
-                    return <span key={i} className="text-[#af00db] font-bold">{part}</span>;
+                    return <span key={i} className="text-[#af00db] dark:text-[#c586c0] font-bold">{part}</span>;
                 }
                 if (/^(groupby|sum|reset_index|sort_values|head|to_datetime|nunique|rename|set_index|rolling|agg|cut|partitionby|orderby|withcolumn|filter|drop|round|avg|alias)$/i.test(part)) {
-                    return <span key={i} className="text-[#795e26] font-semibold">{part}</span>;
+                    return <span key={i} className="text-[#795e26] dark:text-[#dcdcaa] font-semibold">{part}</span>;
                 }
                 if (/^#/.test(part)) {
-                    return <span key={i} className="text-[#008000] italic">{part}</span>;
+                    return <span key={i} className="text-[#008000] dark:text-[#6a9955] italic">{part}</span>;
                 }
                 if (/^["']/.test(part)) {
-                    return <span key={i} className="text-[#a31515] font-medium">{part}</span>;
+                    return <span key={i} className="text-[#a31515] dark:text-[#ce9178] font-medium">{part}</span>;
                 }
                 if (/^\d+(\.\d+)?$/.test(part)) {
-                    return <span key={i} className="text-[#098658] font-semibold">{part}</span>;
+                    return <span key={i} className="text-[#098658] dark:text-[#b5cea8] font-semibold">{part}</span>;
                 }
-                return <span key={i} className="text-[#1e293b]">{part}</span>;
+                return <span key={i} className="text-[#1e293b] dark:text-[#e2e8f0]">{part}</span>;
             })}
         </>
     );
@@ -350,9 +350,9 @@ export function ProductPreview() {
     }, [isTyping, activeQuestion]);
 
     const getLevelBadge = (level: string) => {
-        if (level === "Basic") return "text-emerald-700 bg-emerald-50 border-emerald-200";
-        if (level === "Intermediate") return "text-amber-700 bg-amber-50 border-amber-200";
-        return "text-rose-700 bg-rose-50 border-rose-200";
+        if (level === "Basic") return "text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/30";
+        if (level === "Intermediate") return "text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/30";
+        return "text-rose-700 bg-rose-50 border-rose-200 dark:text-rose-300 dark:bg-rose-500/10 dark:border-rose-500/30";
     };
 
     return (
@@ -437,7 +437,7 @@ export function ProductPreview() {
                                                 className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-md text-[11px] font-bold transition-all ${isActive
                                                         ? `${tab.bg} ${tab.color} border ${tab.border} shadow-xs`
                                                         : "text-zinc-600 hover:text-zinc-900 hover:bg-white/60 border border-transparent"
-                                                    }`}
+                                                    } dark:hover:bg-[#0F1419]/60`}
                                             >
                                                 <Icon size={13} />
                                                 {tab.label}
@@ -457,7 +457,7 @@ export function ProductPreview() {
                                             onClick={() => setActiveQuestion(q)}
                                             className={`w-full text-left p-3.5 rounded-xl border transition-all ${isSelected
                                                 ? "bg-[#e6f7f5]/40 border-[#1f9e8e] shadow-sm"
-                                                : "bg-white border-[#dedee2] hover:border-zinc-300 hover:bg-zinc-50/80"
+                                                : "bg-white border-[#dedee2] hover:border-zinc-300 hover:bg-zinc-50/80 dark:hover:bg-white/5"
                                                 }`}
                                         >
                                             <div className="flex flex-col gap-1.5">
@@ -584,8 +584,8 @@ export function ProductPreview() {
                                                 <Terminal size={13} className="text-[#1f9e8e]" />
                                                 Output
                                             </span>
-                                            <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1.5">
-                                                <CheckCircle2 size={13} className="text-emerald-600" /> Success (14ms)
+                                            <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1.5 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/30">
+                                                <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-300" /> Success (14ms)
                                             </span>
                                         </div>
                                         {activeQuestion.result && (

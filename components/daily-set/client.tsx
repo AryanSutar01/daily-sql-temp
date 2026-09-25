@@ -48,6 +48,8 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Panel, Group, Separator } from "react-resizable-panels";
 import Editor from "@monaco-editor/react";
+import { useTheme } from "next-themes";
+import { ThemeToggle } from "@/components/theme-toggle";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -93,13 +95,13 @@ export function DailySetSkeleton() {
             {/* Top Bar Skeleton */}
             <div className="h-14 bg-white border-b border-[#dedee2] flex items-center px-6 shrink-0 justify-between">
                 <div className="flex items-center gap-4">
-                    <div className="w-20 h-5 bg-zinc-200 rounded animate-pulse" />
-                    <div className="w-px h-5 bg-zinc-200" />
+                    <div className="w-20 h-5 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                    <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700" />
                     <div className="w-32 h-8 bg-zinc-100 border border-zinc-200 rounded-lg animate-pulse" />
                 </div>
                 <div className="flex gap-3">
                     <div className="w-24 h-8 bg-[#1f9e8e]/20 rounded-lg animate-pulse" />
-                    <div className="w-8 h-8 bg-zinc-200 rounded-full animate-pulse" />
+                    <div className="w-8 h-8 bg-zinc-200 rounded-full animate-pulse dark:bg-zinc-700" />
                 </div>
             </div>
 
@@ -108,8 +110,8 @@ export function DailySetSkeleton() {
                 {/* Sidebar */}
                 <div className="w-[280px] bg-[#fafafa] border-r border-[#dedee2] flex flex-col shrink-0">
                     <div className="h-[52px] border-b border-[#dedee2] bg-white flex items-center px-4 justify-between">
-                        <div className="w-24 h-4 bg-zinc-200 rounded animate-pulse" />
-                        <div className="w-6 h-6 bg-zinc-200 rounded animate-pulse" />
+                        <div className="w-24 h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                        <div className="w-6 h-6 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                     </div>
                     <div className="p-3 space-y-3">
                         {[1, 2, 3, 4, 5].map(i => (
@@ -121,19 +123,19 @@ export function DailySetSkeleton() {
                 {/* Question Details */}
                 <div className="flex-1 border-r border-[#dedee2] bg-white flex flex-col">
                     <div className="h-[52px] border-b border-[#dedee2] bg-[#fafafa] px-4 flex items-center gap-4">
-                        <div className="w-20 h-6 bg-zinc-200 rounded animate-pulse" />
-                        <div className="w-20 h-6 bg-zinc-200 rounded animate-pulse" />
+                        <div className="w-20 h-6 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                        <div className="w-20 h-6 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                     </div>
                     <div className="p-6 space-y-6">
                         <div className="space-y-3">
-                            <div className="w-3/4 h-8 bg-zinc-200 rounded animate-pulse" />
-                            <div className="w-1/4 h-5 bg-zinc-200 rounded animate-pulse" />
+                            <div className="w-3/4 h-8 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                            <div className="w-1/4 h-5 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                         </div>
                         <div className="space-y-3 mt-8">
-                            <div className="w-full h-4 bg-zinc-200 rounded animate-pulse" />
-                            <div className="w-full h-4 bg-zinc-200 rounded animate-pulse" />
-                            <div className="w-5/6 h-4 bg-zinc-200 rounded animate-pulse" />
-                            <div className="w-4/6 h-4 bg-zinc-200 rounded animate-pulse" />
+                            <div className="w-full h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                            <div className="w-full h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                            <div className="w-5/6 h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                            <div className="w-4/6 h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                         </div>
                         <div className="h-48 mt-8 bg-[#fafafa] border border-[#dedee2] rounded-xl animate-pulse" />
                     </div>
@@ -143,24 +145,24 @@ export function DailySetSkeleton() {
                 <div className="flex-1 flex flex-col bg-white">
                     <div className="h-[52px] border-b border-[#dedee2] bg-[#fafafa] flex items-center justify-between px-4">
                         <div className="flex gap-2">
-                            <div className="w-20 h-8 bg-zinc-200 rounded animate-pulse" />
-                            <div className="w-20 h-8 bg-zinc-200 rounded animate-pulse" />
+                            <div className="w-20 h-8 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                            <div className="w-20 h-8 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                         </div>
-                        <div className="w-24 h-8 bg-zinc-200 rounded animate-pulse" />
+                        <div className="w-24 h-8 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                     </div>
                     <div className="flex-1 p-4">
-                        <div className="w-1/2 h-4 bg-zinc-200 rounded animate-pulse mb-3" />
-                        <div className="w-1/3 h-4 bg-zinc-200 rounded animate-pulse mb-3" />
-                        <div className="w-2/3 h-4 bg-zinc-200 rounded animate-pulse mb-3" />
-                        <div className="w-1/4 h-4 bg-zinc-200 rounded animate-pulse" />
+                        <div className="w-1/2 h-4 bg-zinc-200 rounded animate-pulse mb-3 dark:bg-zinc-700" />
+                        <div className="w-1/3 h-4 bg-zinc-200 rounded animate-pulse mb-3 dark:bg-zinc-700" />
+                        <div className="w-2/3 h-4 bg-zinc-200 rounded animate-pulse mb-3 dark:bg-zinc-700" />
+                        <div className="w-1/4 h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                     </div>
                     <div className="h-[280px] border-t border-[#dedee2] bg-[#fafafa] flex flex-col">
                         <div className="h-[42px] border-b border-[#dedee2] flex items-center px-4">
-                            <div className="w-32 h-5 bg-zinc-200 rounded animate-pulse" />
+                            <div className="w-32 h-5 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                         </div>
                         <div className="flex-1 p-4">
-                            <div className="w-1/3 h-4 bg-zinc-200 rounded animate-pulse mb-3" />
-                            <div className="w-1/4 h-4 bg-zinc-200 rounded animate-pulse" />
+                            <div className="w-1/3 h-4 bg-zinc-200 rounded animate-pulse mb-3 dark:bg-zinc-700" />
+                            <div className="w-1/4 h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                         </div>
                     </div>
                 </div>
@@ -171,6 +173,7 @@ export function DailySetSkeleton() {
 
 export function DailySetClient() {
     const router = useRouter();
+    const { resolvedTheme } = useTheme();
     const { isActive: tourActive, tryAutoStart, startTour, completeTour, skipTour } = useWalkthrough();
     const params = useParams();
     const searchParams = useSearchParams();
@@ -921,8 +924,8 @@ export function DailySetClient() {
                 <div className="space-y-4 font-mono">
                     {/* ── Sample Pass / Fail count badge ── */}
                     <div className="flex items-center gap-3">
-                        <div className={`text-xs font-bold px-3 py-1 rounded-full font-mono ${sampleTests.every(r => r.passed) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                                'bg-rose-50 text-rose-700 border border-rose-200'
+                        <div className={`text-xs font-bold px-3 py-1 rounded-full font-mono ${sampleTests.every(r => r.passed) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' :
+                                'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30'
                             }`}>
                             {sampleTests.filter(r => r.passed).length} / {sampleTests.length} sample cases passed
                         </div>
@@ -963,8 +966,8 @@ export function DailySetClient() {
                                 return (
                                     <div
                                         className={`rounded-xl border p-4 flex flex-col gap-3 font-mono ${tc.passed
-                                                ? 'bg-emerald-50/30 border-emerald-200'
-                                                : 'bg-rose-50/30 border-rose-200'
+                                                ? 'bg-emerald-50/30 border-emerald-200 dark:bg-emerald-500/5 dark:border-emerald-500/30'
+                                                : 'bg-rose-50/30 border-rose-200 dark:bg-rose-500/5 dark:border-rose-500/30'
                                             }`}
                                     >
                                         {/* Input */}
@@ -974,7 +977,7 @@ export function DailySetClient() {
 
                                         {/* Expected */}
                                         {tc.expected !== undefined && tc.expected !== 'hidden' && (
-                                            <TestDataRow label="Expected Output" value={tc.expected} color="text-emerald-700" />
+                                            <TestDataRow label="Expected Output" value={tc.expected} color="text-emerald-700 dark:text-emerald-300" />
                                         )}
 
                                         {/* Actual (got) */}
@@ -982,13 +985,13 @@ export function DailySetClient() {
                                             <TestDataRow
                                                 label="Actual Output"
                                                 value={tc.got}
-                                                color={tc.passed ? 'text-emerald-700' : 'text-rose-700'}
+                                                color={tc.passed ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}
                                             />
                                         )}
 
                                         {/* Error */}
                                         {tc.error && (
-                                            <TestDataRow label="Error" value={tc.error} color="text-rose-600" />
+                                            <TestDataRow label="Error" value={tc.error} color="text-rose-600 dark:text-rose-300" />
                                         )}
                                     </div>
                                 );
@@ -1016,18 +1019,18 @@ export function DailySetClient() {
             <div className="space-y-4 font-mono">
                 {/* ── Summary Badge ── */}
                 <div className="flex items-center gap-3">
-                    <div className={`text-xs font-bold px-3 py-1 rounded-full font-mono ${executionResult.status === 'correct' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                            'bg-rose-50 text-rose-700 border border-rose-200'
+                    <div className={`text-xs font-bold px-3 py-1 rounded-full font-mono ${executionResult.status === 'correct' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' :
+                            'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30'
                         }`}>
                         {summary.passed} / {summary.total} test cases passed
                     </div>
                 </div>
 
                 {firstFailing ? (
-                    <div className="rounded-xl border border-rose-200 bg-rose-50/40 p-4 flex flex-col gap-3 font-mono">
+                    <div className="rounded-xl border border-rose-200 bg-rose-50/40 p-4 flex flex-col gap-3 font-mono dark:border-rose-500/30 dark:bg-rose-500/5">
                         <div className="flex items-center gap-2">
-                            <XCircle size={15} className="text-rose-600 shrink-0" />
-                            <span className="text-xs font-bold text-rose-700 font-mono">
+                            <XCircle size={15} className="text-rose-600 shrink-0 dark:text-rose-300" />
+                            <span className="text-xs font-bold text-rose-700 font-mono dark:text-rose-300">
                                 {firstFailing.is_hidden ? "Hidden Test Failed" : "Sample Test Failed"}
                             </span>
                             {firstFailing.is_hidden ? (
@@ -1044,23 +1047,23 @@ export function DailySetClient() {
 
                         {/* Expected */}
                         {firstFailing.expected !== undefined && firstFailing.expected !== 'hidden' && (
-                            <TestDataRow label="Expected Output" value={firstFailing.expected} color="text-emerald-700" />
+                            <TestDataRow label="Expected Output" value={firstFailing.expected} color="text-emerald-700 dark:text-emerald-300" />
                         )}
 
                         {/* Actual */}
                         {firstFailing.got !== undefined && (
-                            <TestDataRow label="Actual Output" value={firstFailing.got} color="text-rose-700" />
+                            <TestDataRow label="Actual Output" value={firstFailing.got} color="text-rose-700 dark:text-rose-300" />
                         )}
 
                         {/* Error */}
                         {firstFailing.error && (
-                            <TestDataRow label="Error" value={firstFailing.error} color="text-rose-600" />
+                            <TestDataRow label="Error" value={firstFailing.error} color="text-rose-600 dark:text-rose-300" />
                         )}
                     </div>
                 ) : (
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-6 flex flex-col items-center justify-center text-center space-y-2 font-sans">
-                        <CheckCircle2 size={28} className="text-emerald-600" />
-                        <h4 className="text-sm font-bold text-emerald-800 font-sans">Submission Accepted!</h4>
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-6 flex flex-col items-center justify-center text-center space-y-2 font-sans dark:border-emerald-500/30 dark:bg-emerald-500/5">
+                        <CheckCircle2 size={28} className="text-emerald-600 dark:text-emerald-300" />
+                        <h4 className="text-sm font-bold text-emerald-800 font-sans dark:text-emerald-300">Submission Accepted!</h4>
                         <p className="text-zinc-600 text-xs max-w-xs leading-relaxed font-sans">Your code successfully passes all standard validation checks and hidden edge-case testing constraints.</p>
                     </div>
                 )}
@@ -1378,13 +1381,13 @@ export function DailySetClient() {
 
     const getDiffStyle = (diff: string) => {
         const d = diff?.toLowerCase();
-        if (d === 'easy') return { label: 'BASIC', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', hex: '#10b981' };
-        if (d === 'medium') return { label: 'INTERMEDIATE', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', hex: '#f59e0b' };
-        return { label: 'ADVANCED', color: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-200', hex: '#f43f5e' };
+        if (d === 'easy') return { label: 'BASIC', color: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/30', hex: '#10b981' };
+        if (d === 'medium') return { label: 'INTERMEDIATE', color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/30', hex: '#f59e0b' };
+        return { label: 'ADVANCED', color: 'text-rose-700 dark:text-rose-300', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/30', hex: '#f43f5e' };
     };
 
     const handleEditorWillMount = (monaco: any) => {
-        monaco.editor.defineTheme('dailySqlTheme', {
+        monaco.editor.defineTheme('dailySqlLight', {
             base: 'vs',
             inherit: true,
             rules: [
@@ -1465,6 +1468,79 @@ export function DailySetClient() {
                 'editorBracketMatch.border': '#93c5fd',
             }
         });
+
+        // Dark counterpart — VS Code Dark+ token colors on the app's dark surface (#0F1419)
+        monaco.editor.defineTheme('dailySqlDark', {
+            base: 'vs-dark',
+            inherit: true,
+            rules: [
+                { token: 'comment', foreground: '6a9955', fontStyle: 'italic' },
+                { token: 'comment.sql', foreground: '6a9955', fontStyle: 'italic' },
+                { token: 'comment.python', foreground: '6a9955', fontStyle: 'italic' },
+                { token: 'comment.doc', foreground: '6a9955', fontStyle: 'italic' },
+
+                { token: 'keyword', foreground: '569cd6', fontStyle: 'bold' },
+                { token: 'keyword.sql', foreground: '569cd6', fontStyle: 'bold' },
+                { token: 'keyword.python', foreground: 'c586c0', fontStyle: 'bold' },
+                { token: 'keyword.control', foreground: 'c586c0', fontStyle: 'bold' },
+                { token: 'keyword.operator', foreground: '569cd6' },
+
+                { token: 'entity.name.function', foreground: 'dcdcaa', fontStyle: 'bold' },
+                { token: 'support.function', foreground: 'dcdcaa', fontStyle: 'bold' },
+                { token: 'function', foreground: 'dcdcaa', fontStyle: 'bold' },
+                { token: 'predefined', foreground: 'dcdcaa', fontStyle: 'bold' },
+                { token: 'predefined.sql', foreground: 'dcdcaa', fontStyle: 'bold' },
+
+                { token: 'string', foreground: 'ce9178' },
+                { token: 'string.sql', foreground: 'ce9178' },
+                { token: 'string.python', foreground: 'ce9178' },
+                { token: 'string.quote', foreground: 'ce9178' },
+
+                { token: 'number', foreground: 'b5cea8' },
+                { token: 'number.float', foreground: 'b5cea8' },
+                { token: 'number.hex', foreground: 'b5cea8' },
+                { token: 'constant.numeric', foreground: 'b5cea8' },
+
+                { token: 'type', foreground: '4ec9b0' },
+                { token: 'type.identifier', foreground: '4ec9b0' },
+                { token: 'entity.name.type', foreground: '4ec9b0' },
+                { token: 'class', foreground: '4ec9b0', fontStyle: 'bold' },
+                { token: 'storage.type', foreground: '569cd6' },
+
+                { token: 'variable', foreground: '9cdcfe' },
+                { token: 'variable.parameter', foreground: '9cdcfe' },
+                { token: 'variable.other', foreground: '9cdcfe' },
+                { token: 'identifier', foreground: 'e2e8f0' },
+
+                { token: 'constant', foreground: '569cd6' },
+                { token: 'constant.language', foreground: '569cd6' },
+
+                { token: 'operator', foreground: 'd4d4d4' },
+                { token: 'operator.sql', foreground: 'd4d4d4' },
+                { token: 'delimiter', foreground: 'd4d4d4' },
+                { token: 'delimiter.parenthesis', foreground: 'd4d4d4' },
+                { token: 'delimiter.bracket', foreground: 'd4d4d4' },
+
+                { token: 'tag', foreground: 'c586c0' },
+                { token: 'meta.decorator', foreground: 'c586c0' },
+            ],
+            colors: {
+                'editor.background': '#0f1419',
+                'editor.foreground': '#e2e8f0',
+                'editor.lineHighlightBackground': '#1a2332',
+                'editor.lineHighlightBorder': '#20283c',
+                'editorLineNumber.foreground': '#5a6b80',
+                'editorLineNumber.activeForeground': '#e2e8f0',
+                'editorGutter.background': '#0f1419',
+                'editorCursor.foreground': '#4dd4c4',
+                'editor.selectionBackground': '#264f78',
+                'editor.inactiveSelectionBackground': '#20283c',
+                'editorIndentGuide.background': '#20283c',
+                'editorIndentGuide.activeBackground': '#354258',
+                'editorBracketMatch.background': '#1f4a5c',
+                'editorBracketMatch.border': '#4dd4c4',
+            }
+        });
     };
 
     const handleEditorMount = (editor: any) => {
@@ -1503,7 +1579,7 @@ export function DailySetClient() {
                         <img
                             src="/dailysql-wordmark-bg-removed.png"
                             alt="DailySQL"
-                            className="h-6 w-auto object-contain transition-transform group-hover:scale-105"
+                            className="dark:invert h-6 w-auto object-contain transition-transform group-hover:scale-105"
                         />
                     </Link>
                     <div className="w-px h-5 bg-[#dedee2]" />
@@ -1569,6 +1645,8 @@ export function DailySetClient() {
 
                 {/* ── RIGHT: Streak + Timer + Fullscreen + Profile ── */}
                 <div className="ml-auto flex items-center gap-4">
+
+                    <ThemeToggle />
 
                     {/* Tour Help Button */}
                     <button
@@ -1687,7 +1765,7 @@ export function DailySetClient() {
                                         </div>
                                     </Link>
                                     <button onClick={() => { handleLogout(); setProfileDropdownOpen(false); }} className="w-full text-left">
-                                        <div className="flex items-center gap-2 px-4 py-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer font-medium">
+                                        <div className="flex items-center gap-2 px-4 py-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer font-medium dark:text-red-300 dark:hover:text-red-200 dark:hover:bg-red-500/10">
                                             <LogOut size={14} /> Log Out
                                         </div>
                                     </button>
@@ -1697,7 +1775,7 @@ export function DailySetClient() {
                     ) : (
                         <Link
                             href="/login"
-                            className="text-xs font-semibold text-[#1f9e8e] hover:text-[#177a6d] bg-[#e6f7f5] border border-[#1f9e8e]/30 rounded-lg px-3 py-1.5 transition-colors shadow-2xs"
+                            className="text-xs font-semibold text-[#1f9e8e] hover:text-[#177a6d] bg-[#e6f7f5] border border-[#1f9e8e]/30 rounded-lg px-3 py-1.5 transition-colors shadow-2xs dark:hover:text-[#4DD4C4]"
                         >
                             Log In
                         </Link>
@@ -1730,7 +1808,7 @@ export function DailySetClient() {
                                     {/* Discipline tabs inline in header */}
                                     {activeSidebarTab === 'today' ? (
                                         <div className="flex gap-1 flex-1 overflow-hidden">
-                                            {([{ id: 'sql', label: 'SQL', Icon: Database, color: 'text-sky-700', bg: 'bg-sky-50', border: 'border-sky-200' }, { id: 'python', label: 'Python', Icon: Code2, color: 'text-amber-800', bg: 'bg-amber-50', border: 'border-amber-200' }, { id: 'pyspark', label: 'PySpark', Icon: Server, color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200' }] as const).map(({ id, label, Icon, color, bg, border }) => (
+                                            {([{ id: 'sql', label: 'SQL', Icon: Database, color: 'text-sky-700 dark:text-sky-300', bg: 'bg-sky-50 dark:bg-sky-500/10', border: 'border-sky-200 dark:border-sky-500/30' }, { id: 'python', label: 'Python', Icon: Code2, color: 'text-amber-800 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/30' }, { id: 'pyspark', label: 'PySpark', Icon: Server, color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/30' }] as const).map(({ id, label, Icon, color, bg, border }) => (
                                                 <button
                                                     key={id}
                                                     onClick={() => setActiveDisciplineTab(id)}
@@ -1842,9 +1920,9 @@ export function DailySetClient() {
                                         {/* ── Discipline Tab content ── */}
                                         {(() => {
                                             const DISC_TABS = [
-                                                { id: 'sql' as const, label: 'SQL', Icon: Database, color: 'text-sky-700', bg: 'bg-sky-50', border: 'border-sky-200' },
-                                                { id: 'python' as const, label: 'Python', Icon: Code2, color: 'text-amber-800', bg: 'bg-amber-50', border: 'border-amber-200' },
-                                                { id: 'pyspark' as const, label: 'PySpark', Icon: Server, color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200' },
+                                                { id: 'sql' as const, label: 'SQL', Icon: Database, color: 'text-sky-700 dark:text-sky-300', bg: 'bg-sky-50 dark:bg-sky-500/10', border: 'border-sky-200 dark:border-sky-500/30' },
+                                                { id: 'python' as const, label: 'Python', Icon: Code2, color: 'text-amber-800 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/30' },
+                                                { id: 'pyspark' as const, label: 'PySpark', Icon: Server, color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/30' },
                                             ];
                                             const DISC_KEYS: Record<string, Array<keyof DailyPractice>> = {
                                                 sql: ['easy', 'medium', 'advanced'],
@@ -1937,7 +2015,7 @@ export function DailySetClient() {
                                                                     <button
                                                                         key={lvl}
                                                                         onClick={() => setDifficultyFilter(lvl)}
-                                                                        className={`px-2 py-1 text-[9px] font-bold rounded-md uppercase transition-colors ${difficultyFilter === lvl ? 'text-white bg-[#1f9e8e]' : 'text-zinc-600 bg-zinc-100 border border-zinc-200 hover:text-zinc-900 hover:bg-zinc-200'}`}
+                                                                        className={`px-2 py-1 text-[9px] font-bold rounded-md uppercase transition-colors ${difficultyFilter === lvl ? 'text-white bg-[#1f9e8e]' : 'text-zinc-600 bg-zinc-100 border border-zinc-200 hover:text-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
                                                                     >
                                                                         {lvl === 'advanced' ? 'hard' : lvl}
                                                                     </button>
@@ -1951,7 +2029,7 @@ export function DailySetClient() {
                                                                     <button
                                                                         key={cat.val}
                                                                         onClick={() => setTypeFilter(cat.val)}
-                                                                        className={`px-2 py-1 text-[9px] font-bold rounded-md uppercase transition-colors ${typeFilter === cat.val ? 'text-white bg-[#1f9e8e]' : 'text-zinc-600 bg-zinc-100 border border-zinc-200 hover:text-zinc-900 hover:bg-zinc-200'}`}
+                                                                        className={`px-2 py-1 text-[9px] font-bold rounded-md uppercase transition-colors ${typeFilter === cat.val ? 'text-white bg-[#1f9e8e]' : 'text-zinc-600 bg-zinc-100 border border-zinc-200 hover:text-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
                                                                     >
                                                                         {cat.label}
                                                                     </button>
@@ -1965,7 +2043,7 @@ export function DailySetClient() {
                                                                     <button
                                                                         key={stat}
                                                                         onClick={() => setStatusFilter(stat)}
-                                                                        className={`px-2 py-1 text-[9px] font-bold rounded-md uppercase transition-colors ${statusFilter === stat ? 'text-white bg-[#1f9e8e]' : 'text-zinc-600 bg-zinc-100 border border-zinc-200 hover:text-zinc-900 hover:bg-zinc-200'}`}
+                                                                        className={`px-2 py-1 text-[9px] font-bold rounded-md uppercase transition-colors ${statusFilter === stat ? 'text-white bg-[#1f9e8e]' : 'text-zinc-600 bg-zinc-100 border border-zinc-200 hover:text-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
                                                                     >
                                                                         {stat}
                                                                     </button>
@@ -1993,7 +2071,7 @@ export function DailySetClient() {
                                                     onClick={() => handleProblemSelect(p.id)}
                                                     className={`flex flex-col gap-2 p-3 rounded-xl border cursor-pointer transition-all group ${
                                                         p.is_locked
-                                                            ? 'bg-zinc-50/90 border-zinc-200 hover:border-amber-400/60 shadow-2xs'
+                                                            ? 'bg-zinc-50/90 border-zinc-200 hover:border-amber-400/60 shadow-2xs dark:bg-white/5'
                                                             : isActive
                                                             ? 'bg-[#e6f7f5] border-[#1f9e8e] shadow-2xs'
                                                             : 'bg-white border-[#dedee2] hover:border-[#1f9e8e]/40 shadow-2xs'
@@ -2005,13 +2083,13 @@ export function DailySetClient() {
                                                                 {dStyle.label}
                                                             </span>
                                                             {p.is_locked && (
-                                                                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 font-mono">
+                                                                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 font-mono dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30">
                                                                     <Lock size={9} /> PRO
                                                                 </span>
                                                             )}
                                                         </div>
                                                         {p.is_locked ? (
-                                                            <Lock size={13} className="text-amber-600 group-hover:text-amber-700 transition-colors" />
+                                                            <Lock size={13} className="text-amber-600 group-hover:text-amber-700 transition-colors dark:text-amber-300 dark:group-hover:text-amber-200" />
                                                         ) : (
                                                             <CheckCircle2 size={14} className={solvedIds.has(p.id) ? 'text-[#1f9e8e]' : 'text-zinc-300'} />
                                                         )}
@@ -2068,7 +2146,7 @@ export function DailySetClient() {
                                                 onClick={handlePrevProblem}
                                                 disabled={currentNavIndex <= 0}
                                                 title="Previous problem"
-                                                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                                                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60 transition-colors disabled:opacity-25 disabled:cursor-not-allowed dark:hover:bg-zinc-700"
                                             >
                                                 <ChevronLeft size={15} />
                                             </button>
@@ -2076,7 +2154,7 @@ export function DailySetClient() {
                                                 onClick={handleNextProblem}
                                                 disabled={currentNavIndex >= navigationList.length - 1}
                                                 title="Next problem"
-                                                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60 transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                                                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60 transition-colors disabled:opacity-25 disabled:cursor-not-allowed dark:hover:bg-zinc-700"
                                             >
                                                 <ChevronRight size={15} />
                                             </button>
@@ -2275,13 +2353,13 @@ export function DailySetClient() {
                                                             <div className="border border-[#dedee2] rounded-xl overflow-hidden shadow-2xs bg-white">
                                                                 <div className="overflow-x-auto custom-scrollbar">
                                                                     <table className="w-full text-xs text-left border-collapse">
-                                                                        <thead className="bg-[#f0f9f7] text-[#135d54] border-b border-[#dedee2]">
+                                                                        <thead className="bg-[#f0f9f7] text-[#135d54] border-b border-[#dedee2] dark:bg-[#0F1419]">
                                                                             <tr>{output.columns.map(h => <th key={h} className="px-4 py-2 border-r last:border-r-0 border-[#dedee2] font-mono font-bold text-[10px] uppercase tracking-wider">{h}</th>)}</tr>
                                                                         </thead>
                                                                         <tbody className="divide-y divide-[#dedee2]">
                                                                             {output.rows.map((row: any, i: number) => (
-                                                                                <tr key={i} className="hover:bg-emerald-50/50 transition-colors group">
-                                                                                    {row.map((cell: any, j: number) => <td key={j} className="px-4 py-2 text-emerald-700 font-mono border-r last:border-r-0 border-[#dedee2] group-hover:text-emerald-900 transition-colors">{cell?.toString()}</td>)}
+                                                                                <tr key={i} className="hover:bg-emerald-50/50 transition-colors group dark:hover:bg-emerald-500/5">
+                                                                                    {row.map((cell: any, j: number) => <td key={j} className="px-4 py-2 text-emerald-700 font-mono border-r last:border-r-0 border-[#dedee2] group-hover:text-emerald-900 transition-colors dark:text-emerald-300 dark:group-hover:text-emerald-200">{cell?.toString()}</td>)}
                                                                                 </tr>
                                                                             ))}
                                                                         </tbody>
@@ -2306,7 +2384,7 @@ export function DailySetClient() {
                                                 </h3>
                                                 <div className="h-px w-full bg-[#dedee2] mb-3" />
                                                 {showHint && (
-                                                    <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-200 text-amber-900 text-sm leading-relaxed">
+                                                    <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-200 text-amber-900 text-sm leading-relaxed dark:bg-amber-500/5 dark:border-amber-500/30 dark:text-amber-300">
                                                         <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>{hintText}</ReactMarkdown>
                                                     </div>
                                                 )}
@@ -2336,7 +2414,7 @@ export function DailySetClient() {
                                                                 </div>
                                                             </div>
                                                             {comment.is_own && (
-                                                                <button onClick={() => handleDeleteComment(comment.id)} className="text-zinc-400 hover:text-red-600 transition-colors ml-2 shrink-0"><Trash2 size={13} /></button>
+                                                                <button onClick={() => handleDeleteComment(comment.id)} className="text-zinc-400 hover:text-red-600 transition-colors ml-2 shrink-0 dark:hover:text-red-200"><Trash2 size={13} /></button>
                                                             )}
                                                         </div>
                                                         <div className="text-xs text-zinc-700 leading-relaxed prose prose-zinc prose-xs">
@@ -2349,7 +2427,7 @@ export function DailySetClient() {
                                                                         <ThumbsUp size={12} fill={comment.user_vote === 1 ? 'currentColor' : 'none'} />
                                                                         <span>{comment.likes || 0}</span>
                                                                     </button>
-                                                                    <button onClick={() => handleCommentVote(comment.id, -1)} className={`flex items-center gap-1 text-[10px] font-semibold transition-colors ${comment.user_vote === -1 ? 'text-red-600' : 'text-zinc-500 hover:text-red-600'}`}>
+                                                                    <button onClick={() => handleCommentVote(comment.id, -1)} className={`flex items-center gap-1 text-[10px] font-semibold transition-colors ${comment.user_vote === -1 ? 'text-red-600 dark:text-red-300' : 'text-zinc-500 hover:text-red-600 dark:hover:text-red-200'}`}>
                                                                         <ThumbsDown size={12} fill={comment.user_vote === -1 ? 'currentColor' : 'none'} />
                                                                         <span>{comment.dislikes || 0}</span>
                                                                     </button>
@@ -2363,7 +2441,7 @@ export function DailySetClient() {
                                                     {replyingTo && replyingTo.id === comment.id && (
                                                         <div className="ml-5 bg-[#f8fafb] rounded-2xl border border-[#dedee2] overflow-hidden mb-4">
                                                             <div
-                                                                className="h-[44px] px-4 border-b border-[#dedee2] flex items-center justify-between bg-zinc-100/60 cursor-row-resize select-none"
+                                                                className="h-[44px] px-4 border-b border-[#dedee2] flex items-center justify-between bg-zinc-100/60 cursor-row-resize select-none dark:bg-white/5"
                                                                 onMouseDown={handleReplyResizeStart}
                                                             >
                                                                 <div className="flex items-center gap-4">
@@ -2510,7 +2588,7 @@ export function DailySetClient() {
                                 )}
                             </div>
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-zinc-500 gap-4 bg-zinc-50/50">
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-zinc-500 gap-4 bg-zinc-50/50 dark:bg-white/5">
                                 <div className="w-16 h-16 rounded-2xl bg-white border border-[#dedee2] flex items-center justify-center shadow-sm">
                                     <Database size={24} className="text-[#1f9e8e]" />
                                 </div>
@@ -2579,9 +2657,10 @@ export function DailySetClient() {
                         {/* Monaco */}
                         <div id="tour-code-editor" className="flex-1 relative overflow-hidden bg-white">
                             <Editor
+                                key={resolvedTheme === 'dark' ? 'monaco-dark' : 'monaco-light'} /* remount on theme change: Monaco drops syntax tokens on a live setTheme */
                                 height="100%"
                                 language={activeProblem?.challenge_type === 'sql' ? 'sql' : 'python'}
-                                theme="dailySqlTheme"
+                                theme={resolvedTheme === 'dark' ? 'dailySqlDark' : 'dailySqlLight'}
                                 value={code}
                                 onChange={(val) => {
                                     const newCode = val || "";
@@ -2611,7 +2690,7 @@ export function DailySetClient() {
                                     renderLineHighlight: "all",
                                 }}
                             />
-                            <div className="absolute right-16 bottom-3 text-[10px] text-zinc-400 font-mono pointer-events-none px-2 py-1 rounded bg-white/80 border border-[#dedee2]">
+                            <div className="absolute right-16 bottom-3 text-[10px] text-zinc-400 font-mono pointer-events-none px-2 py-1 rounded bg-white/80 border border-[#dedee2] dark:bg-[#0F1419]/80">
                                 Ln {cursorPos.lineNumber}, Col {cursorPos.column}
                             </div>
 
@@ -2667,16 +2746,16 @@ export function DailySetClient() {
                                         <span className={`text-xs font-bold font-mono flex items-center gap-1.5 ${isDsaProblem ? (
                                                 activeOutputTab === 'test' ? (
                                                     executionResult?.test_summary
-                                                        ? (executionResult.test_summary.results.filter(r => !r.is_hidden).every(r => r.passed) ? 'text-emerald-600' : 'text-rose-600')
+                                                        ? (executionResult.test_summary.results.filter(r => !r.is_hidden).every(r => r.passed) ? 'text-emerald-600 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300')
                                                         : 'text-zinc-500'
                                                 ) : (
                                                     executionResult && executionResult.status !== 'run_result'
-                                                        ? (executionResult.status === 'correct' ? 'text-emerald-600' : 'text-rose-600')
+                                                        ? (executionResult.status === 'correct' ? 'text-emerald-600 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300')
                                                         : 'text-zinc-500'
                                                 )
                                             ) : (
-                                                executionResult?.status === 'correct' ? 'text-emerald-600' :
-                                                    executionResult?.status === 'incorrect' ? 'text-rose-600' : 'text-zinc-500'
+                                                executionResult?.status === 'correct' ? 'text-emerald-600 dark:text-emerald-300' :
+                                                    executionResult?.status === 'incorrect' ? 'text-rose-600 dark:text-rose-300' : 'text-zinc-500'
                                             )
                                             }`}>
                                             {isDsaProblem ? (
@@ -2717,8 +2796,8 @@ export function DailySetClient() {
                                             </div>
                                         ) : error === "PROFILE_REQUIRED" ? (
                                             <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
-                                                <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-200 mb-2">
-                                                    <Sparkles size={24} className="text-blue-600" />
+                                                <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-200 mb-2 dark:bg-blue-500/10 dark:border-blue-500/30">
+                                                    <Sparkles size={24} className="text-blue-600 dark:text-blue-300" />
                                                 </div>
                                                 <h3 className="text-lg font-bold text-zinc-900 tracking-tight font-sans">One Last Step!</h3>
                                                 <p className="text-zinc-500 text-sm max-w-xs leading-relaxed font-sans">Complete your profile setup to unlock full access to the daily practice engine.</p>
@@ -2731,8 +2810,8 @@ export function DailySetClient() {
                                             </div>
                                         ) : error === "SUBSCRIPTION_REQUIRED" ? (
                                             <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-4 font-sans">
-                                                <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center border border-amber-200 mb-2 shadow-sm">
-                                                    <Lock size={24} className="text-amber-600" />
+                                                <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center border border-amber-200 mb-2 shadow-sm dark:bg-amber-500/10 dark:border-amber-500/30">
+                                                    <Lock size={24} className="text-amber-600 dark:text-amber-300" />
                                                 </div>
                                                 <h3 className="text-lg font-bold text-zinc-900 tracking-tight font-sans">DailySQL Pro Required</h3>
                                                 <p className="text-zinc-500 text-sm max-w-sm leading-relaxed font-sans">
@@ -2748,11 +2827,11 @@ export function DailySetClient() {
                                                 </div>
                                             </div>
                                         ) : error ? (
-                                            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 font-mono text-sm flex flex-col gap-3">
-                                                <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-widest text-red-700">
+                                            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 font-mono text-sm flex flex-col gap-3 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-300">
+                                                <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-widest text-red-700 dark:text-red-300">
                                                     <AlertCircle size={14} /> Execution Error
                                                 </div>
-                                                <div className="p-4 bg-white border border-red-200 rounded-lg text-red-800 leading-relaxed whitespace-pre-wrap">{error}</div>
+                                                <div className="p-4 bg-white border border-red-200 rounded-lg text-red-800 leading-relaxed whitespace-pre-wrap dark:border-red-500/30 dark:text-red-300">{error}</div>
                                             </div>
                                         ) : isDsaProblem && executionResult?.test_summary ? (
                                             renderDsaPanel()
@@ -2779,7 +2858,7 @@ export function DailySetClient() {
                                                     </table>
                                                 </div>
                                                 {executionResult?.diff_reason && (
-                                                    <div className="bg-red-50 text-red-700 w-full p-3 font-mono text-xs border-t border-red-200">
+                                                    <div className="bg-red-50 text-red-700 w-full p-3 font-mono text-xs border-t border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30">
                                                         Failed against expected output: {executionResult.diff_reason}
                                                     </div>
                                                 )}
@@ -2804,7 +2883,7 @@ export function DailySetClient() {
                                                 onClick={handleSubmit}
                                                 disabled={!activeProblemId || isRunning}
                                                 className={`px-6 py-2 rounded text-xs font-bold transition-all flex items-center gap-1.5 ${!activeProblemId || isRunning
-                                                        ? 'bg-zinc-200 text-zinc-400 cursor-not-allowed border border-[#dedee2]'
+                                                        ? 'bg-zinc-200 text-zinc-400 cursor-not-allowed border border-[#dedee2] dark:bg-zinc-700'
                                                         : 'bg-[#1f9e8e] text-white hover:bg-[#177a6d] shadow-md'
                                                     }`}
                                             >
@@ -2815,7 +2894,7 @@ export function DailySetClient() {
                                             <button
                                                 onClick={handleSubmit}
                                                 disabled={executionResult?.status !== 'correct'}
-                                                className={`px-6 py-2 rounded text-xs font-bold transition-all ${executionResult?.status === 'correct' ? 'bg-[#1f9e8e] text-white hover:bg-[#177a6d] shadow-md' : 'bg-zinc-200 text-zinc-400 cursor-not-allowed border border-[#dedee2]'}`}
+                                                className={`px-6 py-2 rounded text-xs font-bold transition-all ${executionResult?.status === 'correct' ? 'bg-[#1f9e8e] text-white hover:bg-[#177a6d] shadow-md' : 'bg-zinc-200 text-zinc-400 cursor-not-allowed border border-[#dedee2] dark:bg-zinc-700'}`}
                                             >
                                                 SUBMIT
                                             </button>
@@ -2909,12 +2988,12 @@ export function DailySetClient() {
                             <X size={18} />
                         </button>
 
-                        <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mx-auto shadow-sm">
+                        <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mx-auto shadow-sm dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
                             <Lock size={28} />
                         </div>
 
                         <div className="space-y-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full font-mono">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full font-mono dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/30">
                                 Pro Challenge Locked
                             </span>
                             <h3 className="text-lg font-bold text-zinc-900 tracking-tight mt-2">

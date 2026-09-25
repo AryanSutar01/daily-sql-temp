@@ -103,13 +103,13 @@ function PathCardItem({ card, index }: { card: PathCard; index: number }) {
         flexDirection: "column",
         borderRadius: 20,
         overflow: "hidden",
-        border: `1px solid ${hovered ? card.accent + "55" : "#e4e4e8"}`,
+        border: `1px solid ${hovered ? card.accent + "55" : "var(--ls-outline, #e4e4e8)"}`,
         boxShadow: hovered
           ? `0 24px 60px rgba(0,0,0,0.11), 0 2px 0 ${card.accent}22 inset`
-          : "0 4px 18px rgba(0,0,0,0.06)",
+          : "var(--ls-shadow-md, 0 4px 18px rgba(0,0,0,0.06))",
         transform: hovered ? "translateY(-7px)" : "translateY(0)",
         transition: "all 0.28s cubic-bezier(0.22,1,0.36,1)",
-        background: "#fff",
+        background: "var(--ls-surface, #fff)",
         textDecoration: "none",
         cursor: "pointer",
       }}
@@ -117,7 +117,7 @@ function PathCardItem({ card, index }: { card: PathCard; index: number }) {
       {/* ── Coloured top panel with stacked icon illustration ── */}
       <div
         style={{
-          background: card.cardBg,
+          background: card.accent + "1f",
           padding: "40px 28px 28px",
           position: "relative",
           minHeight: 230,
@@ -208,7 +208,7 @@ function PathCardItem({ card, index }: { card: PathCard; index: number }) {
               fontWeight: 700,
               letterSpacing: "0.15em",
               textTransform: "uppercase" as const,
-              color: card.accentDark,
+              color: card.accent,
               marginBottom: 6,
               opacity: 0.65,
             }}
@@ -222,7 +222,7 @@ function PathCardItem({ card, index }: { card: PathCard; index: number }) {
               fontWeight: 800,
               lineHeight: 1.05,
               letterSpacing: "-0.03em",
-              color: "#1a1a1a",
+              color: "var(--ls-heading)",
               whiteSpace: "pre-line" as const,
             }}
           >
@@ -238,14 +238,14 @@ function PathCardItem({ card, index }: { card: PathCard; index: number }) {
           display: "flex",
           flexDirection: "column",
           flex: 1,
-          background: "#fff",
+          background: "var(--ls-surface, #fff)",
         }}
       >
         <p
           style={{
             fontSize: "0.875rem",
             lineHeight: 1.65,
-            color: "#6e6e6e",
+            color: "var(--ls-on-surface-muted)",
             marginBottom: 18,
           }}
         >
@@ -261,7 +261,7 @@ function PathCardItem({ card, index }: { card: PathCard; index: number }) {
                 alignItems: "center",
                 gap: 9,
                 fontSize: "0.8125rem",
-                color: "#4a4a4a",
+                color: "var(--ls-on-surface)",
                 marginBottom: 9,
               }}
             >
@@ -311,7 +311,7 @@ export function PickYourPath() {
   return (
     <section
       style={{
-        background: "#f7f7f8",
+        background: "var(--ls-bg)",
         paddingTop: 80,
         paddingBottom: 96,
       }}
@@ -325,7 +325,7 @@ export function PickYourPath() {
               fontWeight: 700,
               letterSpacing: "0.18em",
               textTransform: "uppercase",
-              color: "#1f9e8e",
+              color: "var(--ls-primary)",
               marginBottom: 12,
             }}
           >
@@ -338,7 +338,7 @@ export function PickYourPath() {
               fontWeight: 800,
               lineHeight: 1.1,
               letterSpacing: "-0.03em",
-              color: "#1a1a1a",
+              color: "var(--ls-heading)",
               marginBottom: 14,
             }}
           >
@@ -348,7 +348,7 @@ export function PickYourPath() {
             style={{
               fontSize: "1rem",
               lineHeight: 1.65,
-              color: "#6e6e6e",
+              color: "var(--ls-on-surface-muted)",
               maxWidth: 460,
             }}
           >

@@ -14,27 +14,27 @@ function CardSQL() {
     <div
       style={{
         width: 236,
-        background: "#fff",
-        border: "1px solid #e8e8ec",
+        background: "var(--ls-surface, #fff)",
+        border: "1px solid var(--ls-outline, #e8e8ec)",
         borderRadius: 16,
         padding: "18px 20px",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.09), 0 1px 0 rgba(255,255,255,0.8) inset",
+        boxShadow: "var(--ls-shadow-lg, 0 8px 32px rgba(0,0,0,0.09))",
       }}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "rgba(31,158,142,0.10)" }}>
-            <Database className="w-3.5 h-3.5" style={{ color: "#1f9e8e" }} />
+            <Database className="w-3.5 h-3.5" style={{ color: "var(--ls-primary)" }} />
           </div>
-          <span className="text-[11px] font-semibold" style={{ color: "#1f9e8e" }}>SQL · Medium</span>
+          <span className="text-[11px] font-semibold" style={{ color: "var(--ls-primary)" }}>SQL · Medium</span>
         </div>
-        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: "#f4f4f5", color: "#6e6e6e" }}>Day 47</span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: "var(--ls-surface-container, #f4f4f5)", color: "var(--ls-on-surface-muted, #6e6e6e)" }}>Day 47</span>
       </div>
-      <p className="text-[13px] font-semibold mb-1.5 leading-snug" style={{ color: "#272727" }}>Monthly Revenue Retention</p>
-      <p className="text-[11px] leading-relaxed mb-3" style={{ color: "#6e6e6e" }}>Find customers who ordered in both current and previous month.</p>
-      <div className="rounded-lg px-3 py-2 font-mono text-[10px] leading-relaxed mb-3" style={{ background: "#f7f8fa", border: "1px solid #e8e8ec", color: "#1a7c6d" }}>
-        <span style={{ color: "#9e9e9e" }}>SELECT</span> month,<br />
-        &nbsp;&nbsp;<span style={{ color: "#1f9e8e" }}>ROUND</span>(retained<br />
+      <p className="text-[13px] font-semibold mb-1.5 leading-snug" style={{ color: "var(--ls-on-surface, #272727)" }}>Monthly Revenue Retention</p>
+      <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--ls-on-surface-muted, #6e6e6e)" }}>Find customers who ordered in both current and previous month.</p>
+      <div className="rounded-lg px-3 py-2 font-mono text-[10px] leading-relaxed mb-3" style={{ background: "var(--ls-surface-container, #f7f8fa)", border: "1px solid var(--ls-outline, #e8e8ec)", color: "var(--ls-primary, #1a7c6d)" }}>
+        <span style={{ color: "var(--ls-on-surface-subtle, #9e9e9e)" }}>SELECT</span> month,<br />
+        &nbsp;&nbsp;<span style={{ color: "var(--ls-primary)" }}>ROUND</span>(retained<br />
         &nbsp;&nbsp;/ total * 100, 2) pct
       </div>
       <div className="flex items-center gap-1.5">
@@ -48,23 +48,23 @@ function CardSQL() {
 function CardLeaderboard() {
   const users = [
     { name: "priya_m", streak: 94, solved: 482, color: "#7c3aed" },
-    { name: "rahul_s", streak: 71, solved: 437, color: "#1f9e8e" },
+    { name: "rahul_s", streak: 71, solved: 437, color: "var(--ls-primary)" },
     { name: "arjun_k", streak: 63, solved: 399, color: "#2563eb" },
   ];
   return (
     <div
       style={{
         width: 220,
-        background: "#fff",
-        border: "1px solid #e8e8ec",
+        background: "var(--ls-surface, #fff)",
+        border: "1px solid var(--ls-outline, #e8e8ec)",
         borderRadius: 16,
         overflow: "hidden",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.09), 0 1px 0 rgba(255,255,255,0.8) inset",
+        boxShadow: "var(--ls-shadow-lg, 0 8px 32px rgba(0,0,0,0.09))",
       }}
     >
-      <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid #f0f0f2", background: "#fafafa" }}>
-        <Trophy className="w-3.5 h-3.5" style={{ color: "#1f9e8e" }} />
-        <span className="text-[11px] font-semibold" style={{ color: "#272727" }}>Top Streaks</span>
+      <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: "1px solid var(--ls-outline, #f0f0f2)", background: "var(--ls-surface-low, #fafafa)" }}>
+        <Trophy className="w-3.5 h-3.5" style={{ color: "var(--ls-primary)" }} />
+        <span className="text-[11px] font-semibold" style={{ color: "var(--ls-on-surface, #272727)" }}>Top Streaks</span>
       </div>
       <div className="px-4 py-2 space-y-2.5">
         {users.map((u, i) => (
@@ -73,17 +73,17 @@ function CardLeaderboard() {
               <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0" style={{ background: u.color }}>
                 {u.name[0].toUpperCase()}
               </div>
-              <span className="text-[11px] font-medium" style={{ color: "#272727" }}>@{u.name}</span>
+              <span className="text-[11px] font-medium" style={{ color: "var(--ls-on-surface, #272727)" }}>@{u.name}</span>
             </div>
             <div className="flex items-center gap-0.5">
-              <span className="text-[11px] font-semibold" style={{ color: "#1f9e8e" }}>{u.solved}</span>
-              <span className="text-[10px]" style={{ color: "#9e9e9e" }}>pts</span>
+              <span className="text-[11px] font-semibold" style={{ color: "var(--ls-primary)" }}>{u.solved}</span>
+              <span className="text-[10px]" style={{ color: "var(--ls-on-surface-subtle, #9e9e9e)" }}>pts</span>
             </div>
           </div>
         ))}
       </div>
-      <div className="px-4 py-2.5" style={{ borderTop: "1px solid #f0f0f2" }}>
-        <span className="text-[10px]" style={{ color: "#9e9e9e" }}>Updated daily</span>
+      <div className="px-4 py-2.5" style={{ borderTop: "1px solid var(--ls-outline, #f0f0f2)" }}>
+        <span className="text-[10px]" style={{ color: "var(--ls-on-surface-subtle, #9e9e9e)" }}>Updated daily</span>
       </div>
     </div>
   );
@@ -94,38 +94,38 @@ function CardStreak() {
     <div
       style={{
         width: 228,
-        background: "#fff",
-        border: "1px solid #e8e8ec",
+        background: "var(--ls-surface, #fff)",
+        border: "1px solid var(--ls-outline, #e8e8ec)",
         borderRadius: 16,
         padding: "18px 20px",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.09), 0 1px 0 rgba(255,255,255,0.8) inset",
+        boxShadow: "var(--ls-shadow-lg, 0 8px 32px rgba(0,0,0,0.09))",
       }}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
           <Flame className="w-4 h-4" style={{ color: "#f97316", fill: "#f97316" }} />
-          <span className="text-[11px] font-semibold" style={{ color: "#6e6e6e" }}>STREAK</span>
+          <span className="text-[11px] font-semibold" style={{ color: "var(--ls-on-surface-muted)" }}>STREAK</span>
         </div>
         <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(249,115,22,0.08)", color: "#ea580c", border: "1px solid rgba(249,115,22,0.15)" }}>
           On fire 🔥
         </span>
       </div>
       <div className="mb-3">
-        <span className="font-bold" style={{ fontSize: 44, lineHeight: 1, letterSpacing: "-0.04em", color: "#272727" }}>47</span>
-        <span className="text-[12px] ml-1.5" style={{ color: "#6e6e6e" }}>day streak</span>
+        <span className="font-bold" style={{ fontSize: 44, lineHeight: 1, letterSpacing: "-0.04em", color: "var(--ls-on-surface, #272727)" }}>47</span>
+        <span className="text-[12px] ml-1.5" style={{ color: "var(--ls-on-surface-muted, #6e6e6e)" }}>day streak</span>
       </div>
       <div className="mb-1.5 flex justify-between">
-        <span className="text-[10px] font-medium" style={{ color: "#6e6e6e" }}>Today's progress</span>
-        <span className="text-[10px] font-semibold" style={{ color: "#1f9e8e" }}>6 / 9</span>
+        <span className="text-[10px] font-medium" style={{ color: "var(--ls-on-surface-muted)" }}>Today's progress</span>
+        <span className="text-[10px] font-semibold" style={{ color: "var(--ls-primary)" }}>6 / 9</span>
       </div>
-      <div className="rounded-full overflow-hidden mb-3" style={{ height: 5, background: "#f0f0f2" }}>
+      <div className="rounded-full overflow-hidden mb-3" style={{ height: 5, background: "var(--ls-surface-high, #f0f0f2)" }}>
         <div className="h-full rounded-full" style={{ width: "67%", background: "linear-gradient(90deg, #1f9e8e, #4DD4C4)" }} />
       </div>
       <div className="space-y-1.5">
         {[{ icon: Database, label: "SQL", done: true }, { icon: Code2, label: "Python", done: true }, { icon: Server, label: "PySpark", done: false }].map(({ icon: Icon, label, done }) => (
           <div key={label} className="flex items-center gap-2">
             <Icon className="w-3 h-3" style={{ color: done ? "#1f9e8e" : "#c9c9cf" }} />
-            <span className="text-[11px]" style={{ color: done ? "#272727" : "#9e9e9e" }}>{label}</span>
+            <span className="text-[11px]" style={{ color: done ? "var(--ls-on-surface, #272727)" : "var(--ls-on-surface-subtle, #9e9e9e)" }}>{label}</span>
             {done && <CheckCircle2 className="w-3 h-3 ml-auto" style={{ color: "#22c55e" }} />}
           </div>
         ))}
@@ -139,18 +139,18 @@ function CardSolved() {
     <div
       style={{
         width: 200,
-        background: "#fff",
-        border: "1px solid #e8e8ec",
+        background: "var(--ls-surface, #fff)",
+        border: "1px solid var(--ls-outline, #e8e8ec)",
         borderRadius: 16,
         padding: "16px 18px",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.09), 0 1px 0 rgba(255,255,255,0.8) inset",
+        boxShadow: "var(--ls-shadow-lg, 0 8px 32px rgba(0,0,0,0.09))",
       }}
     >
-      <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: "#9e9e9e" }}>Solved today · 9 problems</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--ls-on-surface-subtle)" }}>Solved today · 9 problems</p>
       <div className="space-y-2">
         {[
-          { icon: Database, label: "SQL Easy", time: "4 min", color: "#1f9e8e" },
-          { icon: Database, label: "SQL Medium", time: "9 min", color: "#1f9e8e" },
+          { icon: Database, label: "SQL Easy", time: "4 min", color: "var(--ls-primary)" },
+          { icon: Database, label: "SQL Medium", time: "9 min", color: "var(--ls-primary)" },
           { icon: Code2, label: "Python Easy", time: "6 min", color: "#d97706" },
         ].map(({ icon: Icon, label, time, color }) => (
           <div key={label} className="flex items-center justify-between">
@@ -158,14 +158,14 @@ function CardSolved() {
               <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: `${color}12` }}>
                 <Icon className="w-3 h-3" style={{ color }} />
               </div>
-              <span className="text-[11px]" style={{ color: "#272727" }}>{label}</span>
+              <span className="text-[11px]" style={{ color: "var(--ls-on-surface, #272727)" }}>{label}</span>
             </div>
-            <span className="text-[10px] tabular-nums" style={{ color: "#9e9e9e" }}>{time}</span>
+            <span className="text-[10px] tabular-nums" style={{ color: "var(--ls-on-surface-subtle)" }}>{time}</span>
           </div>
         ))}
-        <div className="pt-1.5 flex items-center gap-1.5" style={{ borderTop: "1px solid #f0f0f2" }}>
+        <div className="pt-1.5 flex items-center gap-1.5" style={{ borderTop: "1px solid var(--ls-outline, #f0f0f2)" }}>
           <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#22c55e" }} />
-          <span className="text-[10px]" style={{ color: "#6e6e6e" }}>3 more problems remaining</span>
+          <span className="text-[10px]" style={{ color: "var(--ls-on-surface-muted)" }}>3 more problems remaining</span>
         </div>
       </div>
     </div>
@@ -194,7 +194,7 @@ export function Hero() {
       className="relative overflow-hidden"
       style={{
         /* Teal glow rises from the bottom */
-        background: "#f7f7f8",
+        background: "var(--ls-bg, #f7f7f8)",
         minHeight: "88vh",
         display: "flex",
         alignItems: "center",
@@ -263,7 +263,7 @@ export function Hero() {
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium"
             style={{
               background: "rgba(31,158,142,0.08)",
-              color: "#1f9e8e",
+              color: "var(--ls-primary)",
               border: "1px solid rgba(31,158,142,0.20)",
             }}
           >
@@ -284,7 +284,7 @@ export function Hero() {
             fontWeight: 800,
             lineHeight: 1.06,
             letterSpacing: "-0.035em",
-            color: "#1a1a1a",
+            color: "var(--ls-heading)",
             marginBottom: "1.5rem",
           }}
         >
@@ -317,7 +317,7 @@ export function Hero() {
             maxWidth: 480,
             fontSize: "1.0625rem",
             lineHeight: 1.7,
-            color: "#6e6e6e",
+            color: "var(--ls-on-surface-muted)",
             fontWeight: 400,
             marginBottom: "2.5rem",
           }}
@@ -342,7 +342,7 @@ export function Hero() {
           <Link
             href="#how-it-works"
             className="inline-flex items-center justify-center gap-2 px-4 py-3 text-sm transition-all duration-150"
-            style={{ color: "#6e6e6e" }}
+            style={{ color: "var(--ls-on-surface-muted)" }}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
               <circle cx="8" cy="8" r="7.5" stroke="currentColor" strokeOpacity="0.4" />
@@ -355,7 +355,7 @@ export function Hero() {
         {/* Quick social stats */}
         <div
           className="animate-fade-up animate-fade-up-delay-4 flex flex-wrap gap-5 justify-center mt-10"
-          style={{ fontSize: "0.8125rem", color: "#9e9e9e" }}
+          style={{ fontSize: "0.8125rem", color: "var(--ls-on-surface-subtle)" }}
         >
           {[
             { value: "100+", label: "active users" },
@@ -363,7 +363,7 @@ export function Hero() {
             { value: "9", label: "problems/day" },
           ].map(({ value, label }) => (
             <div key={label} className="flex items-center gap-1.5">
-              <span className="font-semibold" style={{ color: "#272727" }}>{value}</span>
+              <span className="font-semibold" style={{ color: "var(--ls-on-surface, #272727)" }}>{value}</span>
               <span>{label}</span>
             </div>
           ))}
@@ -377,7 +377,7 @@ export function Hero() {
       {/* Bottom fade into next section — tall white dissolve */}
       <div
         className="absolute bottom-0 left-0 right-0 h-40 pointer-events-none"
-        style={{ background: "linear-gradient(to bottom, transparent 0%, #f7f7f8 100%)" }}
+        style={{ background: "linear-gradient(to bottom, transparent 0%, var(--ls-bg, #f7f7f8) 100%)" }}
       />
     </section>
   );

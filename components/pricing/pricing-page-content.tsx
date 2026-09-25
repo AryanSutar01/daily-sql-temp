@@ -249,7 +249,7 @@ export function PricingPageContent() {
                     </div>
                     <Link
                         href="/redeem"
-                        className="inline-flex items-center gap-1.5 font-bold text-[#1f9e8e] hover:text-[#177a6d] underline underline-offset-2 transition-colors"
+                        className="inline-flex items-center gap-1.5 font-bold text-[#1f9e8e] hover:text-[#177a6d] underline underline-offset-2 transition-colors dark:hover:text-[#4DD4C4]"
                     >
                         Redeem Code Now <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
@@ -277,7 +277,7 @@ export function PricingPageContent() {
                                             <span className="text-sm line-through text-zinc-400 font-mono">
                                                 {prices.lifetime.original}
                                             </span>
-                                            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/30">
                                                 Save 34%
                                             </span>
                                         </div>
@@ -355,7 +355,7 @@ export function PricingPageContent() {
                                         <h4 className="text-lg font-bold font-mono text-zinc-900">
                                             Annual plan
                                         </h4>
-                                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/30">
                                             Recommended · Best Value
                                         </span>
                                     </div>
@@ -370,7 +370,7 @@ export function PricingPageContent() {
                                             <span className="text-xs line-through text-zinc-400 font-mono">
                                                 {prices.annual.original}
                                             </span>
-                                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1 rounded">
+                                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1 rounded dark:text-emerald-300 dark:bg-emerald-500/10">
                                                 Save 30%
                                             </span>
                                         </div>
@@ -416,7 +416,7 @@ export function PricingPageContent() {
                                             <span className="text-xs line-through text-zinc-400 font-mono">
                                                 {prices.monthly.original}
                                             </span>
-                                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1 rounded">
+                                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1 rounded dark:text-emerald-300 dark:bg-emerald-500/10">
                                                 Save 30%
                                             </span>
                                         </div>
@@ -445,7 +445,7 @@ export function PricingPageContent() {
                         </div>
 
                         {/* ── CARD 4: FREE TIER ── */}
-                        <div className="bg-zinc-50/70 rounded-xl border border-dashed border-[#dedee2] p-5 sm:p-6 shadow-2xs hover:border-zinc-300 transition-all">
+                        <div className="bg-zinc-50/70 rounded-xl border border-dashed border-[#dedee2] p-5 sm:p-6 shadow-2xs hover:border-zinc-300 transition-all dark:bg-white/5">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div>
                                     <div className="flex items-center gap-2 mb-1">
@@ -590,7 +590,7 @@ export function PricingPageContent() {
                             <Users className="w-4 h-4 text-[#1f9e8e]" />
                             <span className="font-bold">800+ data engineers, analysts, and students practice with DailySQL</span>
                         </div>
-                        <span className="text-[#1f9e8e] font-mono text-[11px] uppercase tracking-wider font-bold bg-white/70 px-2.5 py-0.5 rounded-md border border-[#1f9e8e]/20">
+                        <span className="text-[#1f9e8e] font-mono text-[11px] uppercase tracking-wider font-bold bg-white/70 px-2.5 py-0.5 rounded-md border border-[#1f9e8e]/20 dark:bg-[#0F1419]/70">
                             A GLOBAL LEARNING COMMUNITY
                         </span>
                     </div>
@@ -606,14 +606,14 @@ export function PricingPageContent() {
                                 { name: "Google", font: "font-sans font-bold text-sm text-zinc-800" },
                                 { name: "Microsoft", font: "font-sans font-semibold text-sm text-zinc-700" },
                                 { name: "Amazon", font: "font-sans font-bold text-sm text-zinc-800" },
-                                { name: "Meta", font: "font-sans font-bold text-sm text-blue-600" },
-                                { name: "Snowflake", font: "font-sans font-bold text-sm text-sky-600" },
-                                { name: "Databricks", font: "font-sans font-bold text-sm text-rose-600" },
-                                { name: "Cognizant", font: "font-sans font-bold text-sm text-indigo-700" },
+                                { name: "Meta", font: "font-sans font-bold text-sm text-blue-600 dark:text-blue-300" },
+                                { name: "Snowflake", font: "font-sans font-bold text-sm text-sky-600 dark:text-sky-300" },
+                                { name: "Databricks", font: "font-sans font-bold text-sm text-rose-600 dark:text-rose-300" },
+                                { name: "Cognizant", font: "font-sans font-bold text-sm text-indigo-700 dark:text-indigo-300" },
                                 { name: "CTS", font: "font-mono font-bold text-xs text-zinc-800" },
                                 { name: "TCS", font: "font-sans font-bold text-sm text-zinc-800" },
                                 { name: "Infosys", font: "font-sans font-semibold text-sm text-zinc-700" },
-                                { name: "Accenture", font: "font-sans font-bold text-sm text-purple-700" },
+                                { name: "Accenture", font: "font-sans font-bold text-sm text-purple-700 dark:text-purple-300" },
                                 { name: "Deloitte", font: "font-sans font-bold text-sm text-zinc-900" },
                                 { name: "IVY Institute", font: "font-serif font-bold text-xs text-zinc-800" },
                                 { name: "Covalen", font: "font-mono font-semibold text-xs text-zinc-800" },

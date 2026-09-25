@@ -96,7 +96,7 @@ export function WaitlistForm({ onSubmit, isLoading = false }: WaitlistFormProps)
             onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
           />
         </div>
-        {errors.full_name && <p className="text-[11px] text-rose-600">{errors.full_name}</p>}
+        {errors.full_name && <p className="text-[11px] text-rose-600 dark:text-rose-300">{errors.full_name}</p>}
       </div>
 
       {/* WhatsApp Community Section */}
@@ -138,7 +138,7 @@ export function WaitlistForm({ onSubmit, isLoading = false }: WaitlistFormProps)
                   className={`flex flex-col items-center gap-1 py-2 px-2 rounded-xl text-center transition-all border text-xs font-semibold cursor-pointer ${
                     isSelected
                       ? "bg-white text-[#1f9e8e] border-[#1f9e8e] shadow-2xs font-bold"
-                      : "bg-white/60 text-zinc-600 border-[#dedee2] hover:bg-white hover:text-zinc-900"
+                      : "bg-white/60 text-zinc-600 border-[#dedee2] hover:bg-white hover:text-zinc-900 dark:bg-[#0F1419]/60"
                   }`}
                 >
                   <Icon size={14} />
@@ -177,7 +177,7 @@ export function WaitlistForm({ onSubmit, isLoading = false }: WaitlistFormProps)
                 />
               </div>
             </div>
-            {errors.whatsapp_number && <p className="text-[11px] text-rose-600">{errors.whatsapp_number}</p>}
+            {errors.whatsapp_number && <p className="text-[11px] text-rose-600 dark:text-rose-300">{errors.whatsapp_number}</p>}
           </div>
         )}
 
@@ -196,7 +196,7 @@ export function WaitlistForm({ onSubmit, isLoading = false }: WaitlistFormProps)
                 onChange={(e) => setFormData({ ...formData, whatsapp_number: e.target.value.replace(/\s/g, '') })}
               />
             </div>
-            {errors.whatsapp_number && <p className="text-[11px] text-rose-600">{errors.whatsapp_number}</p>}
+            {errors.whatsapp_number && <p className="text-[11px] text-rose-600 dark:text-rose-300">{errors.whatsapp_number}</p>}
           </div>
         )}
 
@@ -239,7 +239,7 @@ export function WaitlistForm({ onSubmit, isLoading = false }: WaitlistFormProps)
               <SelectItem value="other">Other</SelectItem>
             </SelectContent>
           </Select>
-          {errors.occupation && <p className="text-[11px] text-rose-600">{errors.occupation}</p>}
+          {errors.occupation && <p className="text-[11px] text-rose-600 dark:text-rose-300">{errors.occupation}</p>}
         </div>
 
         <div className="space-y-1.5">
@@ -258,7 +258,7 @@ export function WaitlistForm({ onSubmit, isLoading = false }: WaitlistFormProps)
               <SelectItem value="10">5+ years</SelectItem>
             </SelectContent>
           </Select>
-          {errors.years_of_experience && <p className="text-[11px] text-rose-600">{errors.years_of_experience}</p>}
+          {errors.years_of_experience && <p className="text-[11px] text-rose-600 dark:text-rose-300">{errors.years_of_experience}</p>}
         </div>
       </div>
 
@@ -277,7 +277,7 @@ export function WaitlistForm({ onSubmit, isLoading = false }: WaitlistFormProps)
             onChange={(e) => setFormData({ ...formData, job_role: e.target.value })}
           />
         </div>
-        {errors.job_role && <p className="text-[11px] text-rose-600">{errors.job_role}</p>}
+        {errors.job_role && <p className="text-[11px] text-rose-600 dark:text-rose-300">{errors.job_role}</p>}
       </div>
 
       {/* Source */}
@@ -300,7 +300,7 @@ export function WaitlistForm({ onSubmit, isLoading = false }: WaitlistFormProps)
             <SelectItem value="other">Other</SelectItem>
           </SelectContent>
         </Select>
-        {errors.source && <p className="text-[11px] text-rose-600">{errors.source}</p>}
+        {errors.source && <p className="text-[11px] text-rose-600 dark:text-rose-300">{errors.source}</p>}
       </div>
 
       <Button

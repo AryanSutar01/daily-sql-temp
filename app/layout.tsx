@@ -4,6 +4,7 @@ import "./globals.css";
 import { ConditionalNavbar } from "@/components/layout/conditional-navbar";
 import { ConditionalFooter } from "@/components/layout/conditional-footer";
 import { OnboardingCheck } from "@/components/auth/onboarding-check";
+import { ThemeProvider } from "@/components/theme-provider";
 import Script from "next/script";
 
 const inter = Inter({
@@ -48,7 +49,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Overused Grotesk — not in Next.js font catalog, load via CDN */}
         <link rel="preconnect" href="https://fonts.bunny.net" crossOrigin="anonymous" />
@@ -73,10 +74,17 @@ export default function RootLayout({
       <body
         className={`${inter.variable} font-sans antialiased`}
       >
-        <OnboardingCheck />
-        <ConditionalNavbar />
-        {children}
-        <ConditionalFooter />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange={false}
+        >
+          <OnboardingCheck />
+          <ConditionalNavbar />
+          {children}
+          <ConditionalFooter />
+        </ThemeProvider>
       </body>
     </html>
   );

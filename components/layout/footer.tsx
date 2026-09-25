@@ -84,7 +84,7 @@ export function Footer() {
               <img
                 src="/dailysql-wordmark-bg-removed.png"
                 alt="DailySQL"
-                className="h-7 w-auto object-contain transition-opacity group-hover:opacity-90"
+                className="dark:invert h-7 w-auto object-contain transition-opacity group-hover:opacity-90"
               />
             </Link>
             <p

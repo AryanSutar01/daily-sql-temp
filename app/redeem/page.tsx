@@ -119,8 +119,8 @@ function RedeemContent() {
       <div className="max-w-md w-full relative z-10 space-y-6">
         {/* Header Badge */}
         <div className="text-center space-y-2.5">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold font-mono uppercase tracking-wider shadow-2xs">
-            <Sparkles className="w-3.5 h-3.5 text-amber-600" /> Early Adopter Reward
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold font-mono uppercase tracking-wider shadow-2xs dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
+            <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-300" /> Early Adopter Reward
           </div>
           <h1 className="text-3xl font-bold font-mono tracking-tight text-zinc-900">
             Redeem Invite Code
@@ -137,8 +137,8 @@ function RedeemContent() {
 
           {/* Already Lifetime Notice */}
           {userPlan === "lifetime" && result.status !== "success" && (
-            <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2.5">
-              <Sparkles className="w-4 h-4 shrink-0 text-amber-600" />
+            <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2.5 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
+              <Sparkles className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-300" />
               <div>
                 <p className="font-bold">You already have Lifetime VIP Access!</p>
                 <p className="text-zinc-600 text-[11px]">Your account has full permanent access to all problems.</p>
@@ -161,7 +161,7 @@ function RedeemContent() {
               <div className="p-3.5 bg-zinc-50 rounded-xl border border-zinc-200 text-xs text-left space-y-2">
                 <div className="flex justify-between">
                   <span className="text-zinc-500">Granted Plan:</span>
-                  <span className="text-amber-800 font-bold font-mono">Lifetime VIP</span>
+                  <span className="text-amber-800 font-bold font-mono dark:text-amber-300">Lifetime VIP</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-500">Account:</span>
@@ -221,8 +221,8 @@ function RedeemContent() {
               </div>
 
               {result.status === "error" && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-300" />
                   <div className="space-y-0.5">
                     <p className="font-semibold">{result.message}</p>
                     {result.message?.includes("different email") && (
@@ -254,9 +254,9 @@ function RedeemContent() {
             </form>
           ) : (
             <div className="space-y-3.5">
-              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-zinc-700 space-y-1">
-                <p className="font-bold text-amber-900 flex items-center gap-1">
-                  <KeyRound className="w-3.5 h-3.5 text-amber-600" /> Authentication Required
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-zinc-700 space-y-1 dark:bg-amber-500/10 dark:border-amber-500/30">
+                <p className="font-bold text-amber-900 flex items-center gap-1 dark:text-amber-300">
+                  <KeyRound className="w-3.5 h-3.5 text-amber-600 dark:text-amber-300" /> Authentication Required
                 </p>
                 <p className="text-zinc-600 text-[11px] leading-relaxed">
                   Lifetime coupons are tied to specific early-adopter email accounts. Please sign in or create an account to claim your access.
@@ -280,7 +280,7 @@ function RedeemContent() {
 
                 <Link
                   href={signupRedirectUrl}
-                  className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold rounded-xl h-9 flex items-center justify-center gap-1.5 transition-colors text-xs"
+                  className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold rounded-xl h-9 flex items-center justify-center gap-1.5 transition-colors text-xs dark:hover:bg-zinc-700"
                 >
                   <UserPlus className="w-3.5 h-3.5 text-zinc-600" /> Create New Account
                 </Link>

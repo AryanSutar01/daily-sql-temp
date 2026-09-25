@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Database, Zap, BarChart3, Target, ArrowLeft, CheckCircle2 } from "lucide-react";
 
 interface AuthLayoutProps {
@@ -36,16 +37,19 @@ export function AuthLayout({ children, type }: AuthLayoutProps) {
             <img
               src="/dailysql-wordmark-bg-removed.png"
               alt="DailySQL"
-              className="h-7 w-auto object-contain transition-opacity group-hover:opacity-90"
+              className="dark:invert h-7 w-auto object-contain transition-opacity group-hover:opacity-90"
             />
           </Link>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Back to Home
-          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Back to Home
+            </Link>
+          </div>
         </div>
 
         {/* Center Content: Headline & Value Prop */}
@@ -77,9 +81,9 @@ export function AuthLayout({ children, type }: AuthLayoutProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {[
               { title: "9 Daily Problems", desc: "Easy, Med & Hard sets", icon: Database, bg: "bg-[#e6f7f5]", color: "text-[#1f9e8e]" },
-              { title: "Browser Sandbox", desc: "Instant test feedback", icon: Zap, bg: "bg-amber-50", color: "text-amber-700" },
-              { title: "Daily Streaks", desc: "Build lasting consistency", icon: BarChart3, bg: "bg-sky-50", color: "text-sky-700" },
-              { title: "Real Interview Questions", desc: "Inspired by FAANG & top tech", icon: Target, bg: "bg-purple-50", color: "text-purple-700" },
+              { title: "Browser Sandbox", desc: "Instant test feedback", icon: Zap, bg: "bg-amber-50 dark:bg-amber-500/10", color: "text-amber-700 dark:text-amber-300" },
+              { title: "Daily Streaks", desc: "Build lasting consistency", icon: BarChart3, bg: "bg-sky-50 dark:bg-sky-500/10", color: "text-sky-700 dark:text-sky-300" },
+              { title: "Real Interview Questions", desc: "Inspired by FAANG & top tech", icon: Target, bg: "bg-purple-50 dark:bg-purple-500/10", color: "text-purple-700 dark:text-purple-300" },
             ].map((feat, i) => (
               <div
                 key={i}
@@ -124,15 +128,18 @@ export function AuthLayout({ children, type }: AuthLayoutProps) {
             <img
               src="/dailysql-wordmark-bg-removed.png"
               alt="DailySQL"
-              className="h-6 w-auto object-contain"
+              className="dark:invert h-6 w-auto object-contain"
             />
           </Link>
-          <Link
-            href="/"
-            className="text-xs font-semibold text-zinc-500 hover:text-zinc-900"
-          >
-            ← Home
-          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Link
+              href="/"
+              className="text-xs font-semibold text-zinc-500 hover:text-zinc-900"
+            >
+              ← Home
+            </Link>
+          </div>
         </div>
 
         {/* Card Frame */}

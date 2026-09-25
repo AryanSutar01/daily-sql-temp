@@ -349,7 +349,7 @@ function ProfileContent() {
     if (!profile) {
         return (
             <div className="landing-light min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-[#fafafa] text-zinc-900 p-6 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-rose-50 flex items-center justify-center mb-4 border border-rose-200">
+                <div className="w-16 h-16 rounded-2xl bg-rose-50 flex items-center justify-center mb-4 border border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30">
                     <History className="text-rose-500" size={32} />
                 </div>
                 <h2 className="text-xl font-bold mb-2">Session Expired or Invalid</h2>
@@ -394,11 +394,11 @@ function ProfileContent() {
                         <div
                             className={`mb-6 p-4 rounded-xl border flex items-center gap-3 ${
                                 toast.type === "error"
-                                    ? "bg-rose-50 border-rose-200 text-rose-800"
-                                    : "bg-emerald-50 border-emerald-200 text-emerald-800"
+                                    ? "bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300"
+                                    : "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-300"
                             }`}
                         >
-                            {toast.type === "error" ? <AlertCircle size={18} className="text-rose-600" /> : <CheckCircle2 size={18} className="text-emerald-600" />}
+                            {toast.type === "error" ? <AlertCircle size={18} className="text-rose-600 dark:text-rose-300" /> : <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-300" />}
                             <span className="text-xs font-medium">{toast.message}</span>
                         </div>
                     )}
@@ -735,8 +735,8 @@ function ProfileContent() {
                     {/* Leaderboard Card */}
                     <div className="bg-white border border-[#dedee2] rounded-2xl p-5 shadow-xs flex flex-col text-zinc-900">
                         <div className="flex items-center gap-2.5 mb-4">
-                            <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center border border-amber-200 shrink-0">
-                                <Trophy size={14} className="text-amber-600" />
+                            <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center border border-amber-200 shrink-0 dark:bg-amber-500/10 dark:border-amber-500/30">
+                                <Trophy size={14} className="text-amber-600 dark:text-amber-300" />
                             </div>
                             <h3 className="text-sm font-bold font-mono tracking-tight">Daily Leaderboard</h3>
                         </div>
@@ -751,9 +751,9 @@ function ProfileContent() {
                                 leaderboard.slice(0, 10).map((entry, idx) => {
                                     const isCurrentUser = profile && entry.user_id === profile.user_id;
                                     const rankBadges = [
-                                        "bg-amber-100 text-amber-900 border-amber-300",
-                                        "bg-slate-100 text-slate-800 border-slate-300",
-                                        "bg-orange-100 text-orange-900 border-orange-300"
+                                        "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30",
+                                        "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200",
+                                        "bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-500/20 dark:text-orange-300 dark:border-orange-500/30"
                                     ];
 
                                     return (
@@ -762,7 +762,7 @@ function ProfileContent() {
                                             className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all text-xs ${
                                                 isCurrentUser
                                                     ? "bg-[#e6f7f5] border-[#1f9e8e]/40"
-                                                    : "bg-zinc-50 border-zinc-200/80 hover:bg-zinc-100/70"
+                                                    : "bg-zinc-50 border-zinc-200/80 hover:bg-zinc-100/70 dark:hover:bg-white/5"
                                             }`}
                                         >
                                             <div
@@ -775,7 +775,7 @@ function ProfileContent() {
                                                 {idx + 1}
                                             </div>
 
-                                            <div className="w-6 h-6 rounded-md bg-zinc-200 flex items-center justify-center overflow-hidden shrink-0">
+                                            <div className="w-6 h-6 rounded-md bg-zinc-200 flex items-center justify-center overflow-hidden shrink-0 dark:bg-zinc-700">
                                                 {entry.avatar_url ? (
                                                     <img
                                                         src={entry.avatar_url}
@@ -817,7 +817,7 @@ function ProfileContent() {
 
                                             <div className="flex items-center gap-2 shrink-0">
                                                 {entry.current_streak > 0 && (
-                                                    <div className="flex items-center gap-1 text-[11px] font-bold text-amber-700">
+                                                    <div className="flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300">
                                                         <Flame size={11} className="text-amber-500 fill-amber-500" />
                                                         <span>{entry.current_streak}</span>
                                                     </div>
@@ -896,7 +896,7 @@ function ProfileContent() {
                                                 <span className="text-3xl font-extrabold font-mono text-zinc-900 leading-none">
                                                     {segments.find((s) => s.id === hoveredSegment)?.solved}
                                                 </span>
-                                                <div className="w-6 h-[1px] bg-zinc-200 my-1.5"></div>
+                                                <div className="w-6 h-[1px] bg-zinc-200 my-1.5 dark:bg-zinc-700"></div>
                                                 <span className="text-xs font-medium font-mono text-zinc-400">
                                                     {segments.find((s) => s.id === hoveredSegment)?.total}
                                                 </span>
@@ -906,7 +906,7 @@ function ProfileContent() {
                                                 <span className="text-3xl font-extrabold font-mono text-zinc-900 leading-none">
                                                     {totalSolved}
                                                 </span>
-                                                <div className="w-6 h-[1px] bg-zinc-200 my-1.5"></div>
+                                                <div className="w-6 h-[1px] bg-zinc-200 my-1.5 dark:bg-zinc-700"></div>
                                                 <span className="text-xs font-medium font-mono text-zinc-400">
                                                     {totalQuestions}
                                                 </span>
@@ -922,8 +922,8 @@ function ProfileContent() {
                             <div className="flex flex-col gap-5 w-full">
                                 {[
                                     { id: "EASY", key: "easy", val: stats.easy.solved, max: stats.easy.total, color: "#1f9e8e", bg: "bg-[#e6f7f5]", border: "border-[#1f9e8e]/30", text: "text-[#1f9e8e]" },
-                                    { id: "MEDIUM", key: "medium", val: stats.medium.solved, max: stats.medium.total, color: "#f59e0b", bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-800" },
-                                    { id: "ADVANCED", key: "advanced", val: stats.advanced.solved, max: stats.advanced.total, color: "#ef4444", bg: "bg-rose-50", border: "border-rose-200", text: "text-rose-800" }
+                                    { id: "MEDIUM", key: "medium", val: stats.medium.solved, max: stats.medium.total, color: "#f59e0b", bg: "bg-amber-50 dark:bg-amber-500/10", border: "border-amber-200 dark:border-amber-500/30", text: "text-amber-800 dark:text-amber-300" },
+                                    { id: "ADVANCED", key: "advanced", val: stats.advanced.solved, max: stats.advanced.total, color: "#ef4444", bg: "bg-rose-50 dark:bg-rose-500/10", border: "border-rose-200 dark:border-rose-500/30", text: "text-rose-800 dark:text-rose-300" }
                                 ].map((s) => (
                                     <div
                                         key={s.id}
@@ -1055,8 +1055,8 @@ function ProfileContent() {
                                     {filteredSubmissions.map((p) => {
                                         const diffMeta: Record<string, { badge: string; dot: string }> = {
                                             easy: { badge: "bg-[#e6f7f5] text-[#1f9e8e] border-[#1f9e8e]/30", dot: "bg-[#1f9e8e]" },
-                                            medium: { badge: "bg-amber-50 text-amber-800 border-amber-200", dot: "bg-amber-500" },
-                                            hard: { badge: "bg-rose-50 text-rose-800 border-rose-200", dot: "bg-rose-500" },
+                                            medium: { badge: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30", dot: "bg-amber-500" },
+                                            hard: { badge: "bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30", dot: "bg-rose-500" },
                                         };
                                         const dm = diffMeta[p.difficulty?.toLowerCase()] || { badge: "bg-zinc-100 text-zinc-700 border-zinc-200", dot: "bg-zinc-400" };
 
@@ -1074,7 +1074,7 @@ function ProfileContent() {
                                                         setLoadingCode(false);
                                                     }
                                                 }}
-                                                className="p-4 rounded-xl bg-zinc-50/70 hover:bg-white border border-[#dedee2] hover:border-zinc-300 flex flex-col justify-between gap-3 transition-all duration-150 cursor-pointer shadow-2xs hover:shadow-xs group"
+                                                className="p-4 rounded-xl bg-zinc-50/70 hover:bg-white border border-[#dedee2] hover:border-zinc-300 flex flex-col justify-between gap-3 transition-all duration-150 cursor-pointer shadow-2xs hover:shadow-xs group dark:bg-white/5"
                                             >
                                                 <div className="flex justify-between items-start gap-2">
                                                     <span className="text-xs font-semibold text-zinc-900 group-hover:text-[#1f9e8e] transition-colors line-clamp-2 leading-snug">
@@ -1140,7 +1140,7 @@ function ProfileContent() {
                             <span className="text-[10px] text-zinc-500 font-mono">SQL / PostgreSQL</span>
                             <button
                                 onClick={() => navigator.clipboard.writeText(viewingCode?.query ?? "")}
-                                className="text-xs font-bold text-[#1f9e8e] hover:text-[#177a6d] transition-colors"
+                                className="text-xs font-bold text-[#1f9e8e] hover:text-[#177a6d] transition-colors dark:hover:text-[#4DD4C4]"
                             >
                                 Copy to clipboard
                             </button>
@@ -1154,12 +1154,12 @@ function ProfileContent() {
                 <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1000] animate-in slide-in-from-bottom-5 duration-200">
                     <div
                         className={`bg-white border rounded-xl p-4 flex items-center gap-3 shadow-lg min-w-[320px] ${
-                            toast.type === "error" ? "border-rose-300" : "border-emerald-300"
+                            toast.type === "error" ? "border-rose-300 dark:border-rose-500/30" : "border-emerald-300 dark:border-emerald-500/30"
                         }`}
                     >
                         <div
                             className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                                toast.type === "error" ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
+                                toast.type === "error" ? "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300" : "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
                             }`}
                         >
                             {toast.type === "error" ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}

@@ -267,12 +267,12 @@ export function ProblemsLayout() {
   const getDifficultyBadge = (difficulty: string) => {
     switch (difficulty) {
       case "easy":
-        return <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70">Easy</span>;
+        return <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30">Easy</span>;
       case "medium":
-        return <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/70">Med.</span>;
+        return <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/70 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30">Med.</span>;
       case "advanced":
       case "hard":
-        return <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/70">Hard</span>;
+        return <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/70 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30">Hard</span>;
       default:
         return <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-zinc-100 text-zinc-700 border border-zinc-200">{difficulty}</span>;
     }
@@ -283,20 +283,20 @@ export function ProblemsLayout() {
     switch (discipline) {
       case "sql":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-sky-50 text-sky-700 border border-sky-200">
-            <Database className="w-3 h-3 text-sky-600" /> SQL
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30">
+            <Database className="w-3 h-3 text-sky-600 dark:text-sky-300" /> SQL
           </span>
         );
       case "python":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-            <Code2 className="w-3 h-3 text-amber-600" /> Python
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30">
+            <Code2 className="w-3 h-3 text-amber-600 dark:text-amber-300" /> Python
           </span>
         );
       case "pyspark":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-            <Server className="w-3 h-3 text-purple-600" /> PySpark
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/30">
+            <Server className="w-3 h-3 text-purple-600 dark:text-purple-300" /> PySpark
           </span>
         );
       default:
@@ -351,7 +351,7 @@ export function ProblemsLayout() {
                     <Zap className="w-4 h-4 text-amber-500" />
                     <span style={{ color: "var(--ls-on-surface)" }}>Daily Quest</span>
                   </div>
-                  <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-amber-100 text-amber-800">
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
                     9 Today
                   </span>
                 </Link>
@@ -363,7 +363,7 @@ export function ProblemsLayout() {
                     color: "var(--ls-on-surface)",
                   }}
                 >
-                  <Layers className="w-4 h-4 text-sky-600" />
+                  <Layers className="w-4 h-4 text-sky-600 dark:text-sky-300" />
                   <span>Study Plans</span>
                 </Link>
 
@@ -388,13 +388,13 @@ export function ProblemsLayout() {
                   onClick={() => setSelectedDiscipline("sql")}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                     selectedDiscipline === "sql"
-                      ? "bg-sky-50 text-sky-800 border border-sky-300 font-semibold"
+                      ? "bg-sky-50 text-sky-800 border border-sky-300 font-semibold dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30"
                       : "hover:bg-white"
                   }`}
                   style={{ color: selectedDiscipline === "sql" ? undefined : "var(--ls-on-surface-muted)" }}
                 >
                   <div className="flex items-center gap-2">
-                    <Database className="w-3.5 h-3.5 text-sky-600" />
+                    <Database className="w-3.5 h-3.5 text-sky-600 dark:text-sky-300" />
                     <span>SQL (Postgres/MySQL)</span>
                   </div>
                   <span className="text-[10px] font-mono text-zinc-400">50</span>
@@ -404,13 +404,13 @@ export function ProblemsLayout() {
                   onClick={() => setSelectedDiscipline("python")}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                     selectedDiscipline === "python"
-                      ? "bg-amber-50 text-amber-800 border border-amber-300 font-semibold"
+                      ? "bg-amber-50 text-amber-800 border border-amber-300 font-semibold dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30"
                       : "hover:bg-white"
                   }`}
                   style={{ color: selectedDiscipline === "python" ? undefined : "var(--ls-on-surface-muted)" }}
                 >
                   <div className="flex items-center gap-2">
-                    <Code2 className="w-3.5 h-3.5 text-amber-600" />
+                    <Code2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-300" />
                     <span>Python (Pandas)</span>
                   </div>
                   <span className="text-[10px] font-mono text-zinc-400">30</span>
@@ -420,13 +420,13 @@ export function ProblemsLayout() {
                   onClick={() => setSelectedDiscipline("pyspark")}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                     selectedDiscipline === "pyspark"
-                      ? "bg-purple-50 text-purple-800 border border-purple-300 font-semibold"
+                      ? "bg-purple-50 text-purple-800 border border-purple-300 font-semibold dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/30"
                       : "hover:bg-white"
                   }`}
                   style={{ color: selectedDiscipline === "pyspark" ? undefined : "var(--ls-on-surface-muted)" }}
                 >
                   <div className="flex items-center gap-2">
-                    <Server className="w-3.5 h-3.5 text-purple-600" />
+                    <Server className="w-3.5 h-3.5 text-purple-600 dark:text-purple-300" />
                     <span>PySpark</span>
                   </div>
                   <span className="text-[10px] font-mono text-zinc-400">30</span>
@@ -460,7 +460,7 @@ export function ProblemsLayout() {
                       <p className="text-xs font-semibold truncate" style={{ color: "var(--ls-on-surface)" }}>
                         {user.full_name || user.username || user.email?.split("@")[0]}
                       </p>
-                      <p className="text-[11px] flex items-center gap-1 font-mono text-orange-600">
+                      <p className="text-[11px] flex items-center gap-1 font-mono text-orange-600 dark:text-orange-300">
                         <Flame className="w-3 h-3 fill-orange-500 text-orange-500" />
                         {streakCount} day streak
                       </p>
@@ -497,15 +497,15 @@ export function ProblemsLayout() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Link
                 href="/practice/daily"
-                className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-teal-50 to-emerald-50/50 border border-teal-200/80 hover:border-teal-400 transition-all group shadow-xs"
+                className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-teal-50 to-emerald-50/50 border border-teal-200/80 hover:border-teal-400 transition-all group shadow-xs dark:from-teal-500/10 dark:to-emerald-500/5 dark:border-teal-500/30"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-teal-100 text-teal-800">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-teal-100 text-teal-800 dark:bg-teal-500/20 dark:text-teal-300">
                     Daily 9 Set
                   </span>
-                  <Zap className="w-4 h-4 text-teal-600" />
+                  <Zap className="w-4 h-4 text-teal-600 dark:text-teal-300" />
                 </div>
-                <h4 className="text-sm font-semibold text-zinc-900 group-hover:text-teal-700 transition-colors">
+                <h4 className="text-sm font-semibold text-zinc-900 group-hover:text-teal-700 transition-colors dark:group-hover:text-teal-200">
                   Today's Challenge
                 </h4>
                 <p className="text-xs text-zinc-600 mt-1">3 SQL, 3 Python, 3 Spark</p>
@@ -513,15 +513,15 @@ export function ProblemsLayout() {
 
               <Link
                 href="/pricing"
-                className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-200/80 hover:border-amber-400 transition-all group shadow-xs"
+                className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-200/80 hover:border-amber-400 transition-all group shadow-xs dark:from-amber-500/10 dark:to-orange-500/5 dark:border-amber-500/30"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-100 text-amber-800">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
                     Premium Pass
                   </span>
-                  <Award className="w-4 h-4 text-amber-600" />
+                  <Award className="w-4 h-4 text-amber-600 dark:text-amber-300" />
                 </div>
-                <h4 className="text-sm font-semibold text-zinc-900 group-hover:text-amber-700 transition-colors">
+                <h4 className="text-sm font-semibold text-zinc-900 group-hover:text-amber-700 transition-colors dark:group-hover:text-amber-200">
                   Unlock Full 500+ Archive
                 </h4>
                 <p className="text-xs text-zinc-600 mt-1">From ₹166/month</p>
@@ -529,15 +529,15 @@ export function ProblemsLayout() {
 
               <div
                 onClick={() => setSelectedCompany("Amazon")}
-                className="cursor-pointer relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-indigo-50 to-sky-50/50 border border-indigo-200/80 hover:border-indigo-400 transition-all group shadow-xs"
+                className="cursor-pointer relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-indigo-50 to-sky-50/50 border border-indigo-200/80 hover:border-indigo-400 transition-all group shadow-xs dark:from-indigo-500/10 dark:to-sky-500/5 dark:border-indigo-500/30"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-300">
                     Curated
                   </span>
-                  <Building2 className="w-4 h-4 text-indigo-600" />
+                  <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-300" />
                 </div>
-                <h4 className="text-sm font-semibold text-zinc-900 group-hover:text-indigo-700 transition-colors">
+                <h4 className="text-sm font-semibold text-zinc-900 group-hover:text-indigo-700 transition-colors dark:group-hover:text-indigo-200">
                   Top Tech Interview Sets
                 </h4>
                 <p className="text-xs text-zinc-600 mt-1">Amazon, Meta, Google & Uber</p>
@@ -586,7 +586,7 @@ export function ProblemsLayout() {
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                     selectedDiscipline === "all"
                       ? "bg-[#1f9e8e] text-white font-semibold shadow-xs"
-                      : "bg-[#f4f4f5] text-zinc-700 hover:bg-[#eaeaea]"
+                      : "bg-[#f4f4f5] text-zinc-700 hover:bg-[#eaeaea] dark:hover:bg-[#1A2332]"
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5" />
@@ -601,10 +601,10 @@ export function ProblemsLayout() {
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                     selectedDiscipline === "sql"
                       ? "bg-sky-600 text-white font-semibold shadow-xs"
-                      : "bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200"
+                      : "bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:bg-sky-500/20 dark:border-sky-500/30"
                   }`}
                 >
-                  <div className="w-4 h-4 rounded-full bg-white text-sky-700 flex items-center justify-center shadow-xs">
+                  <div className="w-4 h-4 rounded-full bg-white text-sky-700 flex items-center justify-center shadow-xs dark:text-sky-300">
                     <Database className="w-2.5 h-2.5" />
                   </div>
                   <span>SQL</span>
@@ -618,10 +618,10 @@ export function ProblemsLayout() {
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                     selectedDiscipline === "python"
                       ? "bg-amber-600 text-white font-semibold shadow-xs"
-                      : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200"
+                      : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20 dark:border-amber-500/30"
                   }`}
                 >
-                  <div className="w-4 h-4 rounded-full bg-white text-amber-700 flex items-center justify-center shadow-xs">
+                  <div className="w-4 h-4 rounded-full bg-white text-amber-700 flex items-center justify-center shadow-xs dark:text-amber-300">
                     <Code2 className="w-2.5 h-2.5" />
                   </div>
                   <span>Python</span>
@@ -635,10 +635,10 @@ export function ProblemsLayout() {
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                     selectedDiscipline === "pyspark"
                       ? "bg-purple-600 text-white font-semibold shadow-xs"
-                      : "bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200"
+                      : "bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:hover:bg-purple-500/20 dark:border-purple-500/30"
                   }`}
                 >
-                  <div className="w-4 h-4 rounded-full bg-white text-purple-700 flex items-center justify-center shadow-xs">
+                  <div className="w-4 h-4 rounded-full bg-white text-purple-700 flex items-center justify-center shadow-xs dark:text-purple-300">
                     <Server className="w-2.5 h-2.5" />
                   </div>
                   <span>PySpark</span>
@@ -733,14 +733,14 @@ export function ProblemsLayout() {
 
             {/* Active Company Banner if Selected */}
             {selectedCompany && (
-              <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs shadow-xs">
+              <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs shadow-xs dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
                 <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-amber-600" />
+                  <Building2 className="w-4 h-4 text-amber-600 dark:text-amber-300" />
                   <span>Filtered by company: <strong>{selectedCompany}</strong></span>
                 </div>
                 <button
                   onClick={() => setSelectedCompany(null)}
-                  className="flex items-center gap-1 font-semibold hover:underline text-amber-700"
+                  className="flex items-center gap-1 font-semibold hover:underline text-amber-700 dark:text-amber-300"
                 >
                   <X className="w-3.5 h-3.5" /> Clear filter
                 </button>
@@ -801,15 +801,15 @@ export function ProblemsLayout() {
                     return (
                       <div
                         key={prob.id}
-                        className="grid grid-cols-12 items-center px-5 py-3.5 text-xs transition-colors group cursor-pointer hover:bg-[#f9fafb]"
+                        className="grid grid-cols-12 items-center px-5 py-3.5 text-xs transition-colors group cursor-pointer hover:bg-[#f9fafb] dark:hover:bg-[#0F1419]"
                         onClick={() => router.push(`/practice/daily/${prob.id}`)}
                       >
                         {/* Status */}
                         <div className="col-span-1 flex items-center">
                           {isSolved ? (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-300" />
                           ) : prob.isLocked ? (
-                            <Lock className="w-3.5 h-3.5 text-amber-600" />
+                            <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-300" />
                           ) : (
                             <Circle className="w-3.5 h-3.5 text-zinc-300 group-hover:text-zinc-500" />
                           )}
@@ -923,7 +923,7 @@ export function ProblemsLayout() {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center dark:bg-orange-500/20 dark:text-orange-300">
                     <Flame className="w-4 h-4 fill-orange-500" />
                   </div>
                   <div>
@@ -963,7 +963,7 @@ export function ProblemsLayout() {
                           isToday
                             ? "bg-[#1f9e8e] text-white font-bold shadow-xs scale-105"
                             : isCompleted
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30"
                             : "text-zinc-600 hover:bg-zinc-100"
                         }`}
                       >
@@ -978,7 +978,7 @@ export function ProblemsLayout() {
               <div className="pt-3 border-t space-y-2" style={{ borderColor: "var(--ls-outline)" }}>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-500">Weekly Target</span>
-                  <span className="font-mono text-emerald-700 font-semibold">7 / 7 Days</span>
+                  <span className="font-mono text-emerald-700 font-semibold dark:text-emerald-300">7 / 7 Days</span>
                 </div>
                 <div className="w-full h-1.5 rounded-full bg-zinc-100 overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-emerald-500 to-[#1f9e8e] w-full rounded-full"></div>
@@ -1033,11 +1033,11 @@ export function ProblemsLayout() {
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                         isSelected
                           ? "bg-[#1f9e8e] text-white font-bold shadow-xs scale-105"
-                          : "bg-[#f4f4f5] text-zinc-700 hover:bg-[#e4e4e7] border border-black/5"
+                          : "bg-[#f4f4f5] text-zinc-700 hover:bg-[#e4e4e7] border border-black/5 dark:hover:bg-[#1A2332]"
                       }`}
                     >
                       <span>{c.name}</span>
-                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${isSelected ? "bg-white/25 text-white" : "bg-zinc-200/80 text-zinc-600"}`}>
+                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${isSelected ? "bg-white/25 text-white" : "bg-zinc-200/80 text-zinc-600 dark:bg-zinc-700"}`}>
                         {c.count}
                       </span>
                     </button>
