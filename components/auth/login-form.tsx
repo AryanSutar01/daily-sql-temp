@@ -45,6 +45,18 @@ export function LoginForm() {
                 message: "Authentication failed. Please try again."
             });
             window.history.replaceState({}, '', window.location.pathname);
+        } else if (errorParam === 'email_not_verified') {
+            setToast({
+                type: 'error',
+                message: "Your Google account's email address is not verified. Please verify it with Google, or sign up with your email instead."
+            });
+            window.history.replaceState({}, '', window.location.pathname);
+        } else if (errorParam === 'account_conflict') {
+            setToast({
+                type: 'error',
+                message: "This email is already linked to a different Google account. Please sign in with the original method or contact support."
+            });
+            window.history.replaceState({}, '', window.location.pathname);
         }
     }, [searchParams]);
 
