@@ -23,6 +23,7 @@ import {
   Zap,
   LogIn,
   Target,
+  ChevronDown,
   X
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -80,6 +81,7 @@ export function ProblemsLayout() {
   const [heatmap, setHeatmap] = useState<Record<string, number>>({});
   const [daily, setDaily] = useState<DailyPractice | null>(null);
   const [monthOffset, setMonthOffset] = useState(0);
+  const [studyPlansOpen, setStudyPlansOpen] = useState(false);
 
   // Filters state
   const [searchQuery, setSearchQuery] = useState("");
@@ -212,8 +214,15 @@ export function ProblemsLayout() {
   // Random picker
   const handlePickRandom = () => {
     if (filteredProblems.length === 0) return;
-    const rand = filteredProblems[Math.floor(Math.random() * filteredProblems.length)];
-    router.push(`/practice/daily/${rand.id}`);
+    // Free users only get the first 30 SQL problems + today's free daily set, so a random pick
+    // must come from that same unlocked pool — otherwise it just lands on a paywall.
+    const pickable = filteredProblems.filter((p) => !p.isLocked);
+    const pool = pickable.length > 0 ? pickable : filteredProblems;
+    const rand = pool[Math.floor(Math.random() * pool.length)];
+    // A random pick usually isn't in today's set, so open the daily-set page with its
+    // sidebar on "Problem List" (not "Today's Set") — otherwise the picked problem shows
+    // under a tab it doesn't belong to and prev/next navigation there breaks.
+    router.push(`/practice/daily/${rand.id}?tab=list`);
   };
 
   const solvedCount = useMemo(() => {
@@ -328,7 +337,7 @@ export function ProblemsLayout() {
 
                 <Link
                   href="/practice/daily"
-                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-white"
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-white dark:hover:bg-[#1A2332]"
                   style={{
                     color: "var(--ls-on-surface-muted)",
                   }}
@@ -344,20 +353,54 @@ export function ProblemsLayout() {
                   )}
                 </Link>
 
-                <Link
-                  href="/practice/learn/sql"
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-white"
-                  style={{
-                    color: "var(--ls-on-surface)",
-                  }}
-                >
-                  <Layers className="w-4 h-4 text-sky-600 dark:text-sky-300" />
-                  <span>Study Plans</span>
-                </Link>
+                <div>
+                  <button
+                    onClick={() => setStudyPlansOpen((v) => !v)}
+                    aria-expanded={studyPlansOpen}
+                    className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-white dark:hover:bg-[#1A2332]"
+                    style={{
+                      color: "var(--ls-on-surface)",
+                    }}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Layers className="w-4 h-4 text-sky-600 dark:text-sky-300" />
+                      <span>Study Plans</span>
+                    </span>
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${studyPlansOpen ? "rotate-180" : ""}`} style={{ color: "var(--ls-on-surface-subtle)" }} />
+                  </button>
+                  {studyPlansOpen && (
+                    <div className="mt-1 ml-4 pl-3.5 space-y-0.5 border-l" style={{ borderColor: "var(--ls-outline)" }}>
+                      <Link
+                        href="/practice/learn/sql"
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors hover:bg-white dark:hover:bg-[#1A2332]"
+                        style={{ color: "var(--ls-on-surface-muted)" }}
+                      >
+                        <Database className="w-3.5 h-3.5 text-sky-600 dark:text-sky-300" />
+                        <span>SQL</span>
+                      </Link>
+                      <Link
+                        href="/practice/learn/python"
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors hover:bg-white dark:hover:bg-[#1A2332]"
+                        style={{ color: "var(--ls-on-surface-muted)" }}
+                      >
+                        <Code2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-300" />
+                        <span>Python</span>
+                      </Link>
+                      <Link
+                        href="/practice/learn/pyspark"
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors hover:bg-white dark:hover:bg-[#1A2332]"
+                        style={{ color: "var(--ls-on-surface-muted)" }}
+                      >
+                        <Server className="w-3.5 h-3.5 text-purple-600 dark:text-purple-300" />
+                        <span>PySpark</span>
+                      </Link>
+                    </div>
+                  )}
+                </div>
 
                 <Link
                   href="/profile"
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-white"
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors hover:bg-white dark:hover:bg-[#1A2332]"
                   style={{
                     color: "var(--ls-on-surface)",
                   }}
@@ -377,7 +420,7 @@ export function ProblemsLayout() {
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                     selectedDiscipline === "sql"
                       ? "bg-sky-50 text-sky-800 border border-sky-300 font-semibold dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30"
-                      : "hover:bg-white"
+                      : "hover:bg-white dark:hover:bg-[#1A2332]"
                   }`}
                   style={{ color: selectedDiscipline === "sql" ? undefined : "var(--ls-on-surface-muted)" }}
                 >
@@ -393,7 +436,7 @@ export function ProblemsLayout() {
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                     selectedDiscipline === "python"
                       ? "bg-amber-50 text-amber-800 border border-amber-300 font-semibold dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30"
-                      : "hover:bg-white"
+                      : "hover:bg-white dark:hover:bg-[#1A2332]"
                   }`}
                   style={{ color: selectedDiscipline === "python" ? undefined : "var(--ls-on-surface-muted)" }}
                 >
@@ -409,7 +452,7 @@ export function ProblemsLayout() {
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
                     selectedDiscipline === "pyspark"
                       ? "bg-purple-50 text-purple-800 border border-purple-300 font-semibold dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/30"
-                      : "hover:bg-white"
+                      : "hover:bg-white dark:hover:bg-[#1A2332]"
                   }`}
                   style={{ color: selectedDiscipline === "pyspark" ? undefined : "var(--ls-on-surface-muted)" }}
                 >

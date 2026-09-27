@@ -1386,6 +1386,15 @@ export function DailySetClient() {
         return { label: 'ADVANCED', color: 'text-rose-700 dark:text-rose-300', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/30', hex: '#f43f5e' };
     };
 
+    // Discipline badge — mainly so a randomly-picked problem (which may not be in today's set,
+    // and so isn't obviously "the SQL one" or "the Python one") still shows which track it's from.
+    const getDisciplineStyle = (challengeType: string | null | undefined) => {
+        const t = (challengeType || 'sql').toLowerCase();
+        if (t.includes('spark')) return { label: 'PySpark', Icon: Server, color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/30' };
+        if (t.includes('python')) return { label: 'Python', Icon: Code2, color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/30' };
+        return { label: 'SQL', Icon: Database, color: 'text-sky-700 dark:text-sky-300', bg: 'bg-sky-50 dark:bg-sky-500/10', border: 'border-sky-200 dark:border-sky-500/30' };
+    };
+
     const handleEditorWillMount = (monaco: any) => {
         monaco.editor.defineTheme('dailySqlLight', {
             base: 'vs',
@@ -2252,9 +2261,15 @@ export function DailySetClient() {
                                     <div id="tour-problem-description" className="flex-1 overflow-y-auto p-5 space-y-7 scrollbar-thin scrollbar-thumb-zinc-300">
                                         <div>
                                             {activeProblem && (
-                                                <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border mb-2.5 ${getDiffStyle(activeProblem.difficulty).color} ${getDiffStyle(activeProblem.difficulty).bg} ${getDiffStyle(activeProblem.difficulty).border}`}>
-                                                    {getDiffStyle(activeProblem.difficulty).label}
-                                                </span>
+                                                <div className="flex items-center gap-1.5 mb-2.5">
+                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${getDisciplineStyle(activeProblem.challenge_type).color} ${getDisciplineStyle(activeProblem.challenge_type).bg} ${getDisciplineStyle(activeProblem.challenge_type).border}`}>
+                                                        {(() => { const Icon = getDisciplineStyle(activeProblem.challenge_type).Icon; return <Icon size={11} />; })()}
+                                                        {getDisciplineStyle(activeProblem.challenge_type).label}
+                                                    </span>
+                                                    <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${getDiffStyle(activeProblem.difficulty).color} ${getDiffStyle(activeProblem.difficulty).bg} ${getDiffStyle(activeProblem.difficulty).border}`}>
+                                                        {getDiffStyle(activeProblem.difficulty).label}
+                                                    </span>
+                                                </div>
                                             )}
                                             <h1 className="text-xl font-bold text-zinc-900 mb-1.5 tracking-tight">{activeProblem?.title}</h1>
                                             <div className="flex gap-3 text-xs text-zinc-500 mb-3 font-mono font-medium">
