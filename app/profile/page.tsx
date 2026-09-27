@@ -12,7 +12,6 @@ import {
     Briefcase,
     GraduationCap,
     History,
-    BarChart2,
     Flame,
     X,
     Code,
@@ -21,13 +20,18 @@ import {
     AlertCircle,
     Trophy,
     Share2,
-    Check
+    Check,
+    Target,
+    CalendarDays,
+    Mail,
+    ChevronRight
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useWalkthrough } from "@/hooks/useWalkthrough";
 import SubscriptionStatus from "@/components/subscription/subscription-status";
+import { appToday, addDays, dateKey } from "@/lib/app-day";
 
 function polarToCartesian(centerX: number, centerY: number, radius: number, angleInDegrees: number) {
     const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
@@ -49,6 +53,24 @@ function describeArc(x: number, y: number, r: number, startAngle: number, endAng
     }
     return ["M", start.x, start.y, "A", r, r, 0, largeArcFlag, 1, end.x, end.y].join(" ");
 }
+
+// Shared surface styles (theme tokens, so light and dark both work)
+const CARD = "rounded-2xl border border-[var(--ls-outline)] bg-[var(--ls-surface)] shadow-[var(--ls-shadow-sm)]";
+const HEADING = "text-[var(--ls-heading)]";
+const MUTED = "text-[var(--ls-on-surface-muted)]";
+const SUBTLE = "text-[var(--ls-on-surface-subtle)]";
+
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+type HeatCell = { key: string; count: number; kind: "pad" | "day" | "future" };
+
+const HEAT_LEVELS = [
+    "bg-[var(--ls-surface-container)] border border-[var(--ls-outline)]",
+    "bg-[#99f6e4] border border-[#5eead4] dark:bg-[#115e59] dark:border-[#0f766e]",
+    "bg-[#2dd4bf] border border-[#14b8a6] dark:bg-[#14b8a6] dark:border-[#2dd4bf]",
+    "bg-[#0f766e] border border-[#115e59] dark:bg-[#5eead4] dark:border-[#99f6e4]"
+];
+const heatLevel = (n: number) => (n <= 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : 3);
 
 export default function ProfilePage() {
     return (
@@ -75,11 +97,14 @@ function ProfileContent() {
     const [realStats, setRealStats] = useState<any>(null);
     const [submissions, setSubmissions] = useState<any[]>([]);
     const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
+    const [streakCount, setStreakCount] = useState(0);
+    const [activeToday, setActiveToday] = useState(false);
+    const [tab, setTab] = useState<"overview" | "submissions" | "leaderboard">("overview");
     const [isEditing, setIsEditing] = useState(false);
     const [viewingCode, setViewingCode] = useState<{ title: string; query: string } | null>(null);
     const [loadingCode, setLoadingCode] = useState(false);
-    const currentYear = new Date().getFullYear();
-    const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
+    const currentYear = appToday().getUTCFullYear();
+    const [selectedYear, setSelectedYear] = useState<string>("last_12");
     const [leaderboard, setLeaderboard] = useState<any[]>([]);
     const { navigateAndStart } = useWalkthrough();
 
@@ -100,6 +125,7 @@ function ProfileContent() {
     const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
     const [copied, setCopied] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const heatScrollRef = useRef<HTMLDivElement>(null);
 
     const handleShare = () => {
         const url = `https://dailysql.in/u/${profile?.username}`;
@@ -120,12 +146,15 @@ function ProfileContent() {
     useEffect(() => {
         async function loadProfile() {
             try {
-                const [data, s, sub, h, lb] = await Promise.all([
+                // The profile itself is required; everything else is optional so one failing
+                // widget never turns the whole page into "session expired".
+                const [data, s, sub, h, lb, st] = await Promise.all([
                     api.getProfile(),
-                    api.getStats(),
-                    api.getRecentSubmissions(),
-                    api.getHeatmap(),
-                    api.getLeaderboard().catch(() => [])
+                    api.getStats().catch(() => null),
+                    api.getRecentSubmissions().catch(() => []),
+                    api.getHeatmap().catch(() => ({})),
+                    api.getLeaderboard().catch(() => []),
+                    api.getStreak().catch(() => null)
                 ]);
 
                 setProfile(data);
@@ -133,6 +162,10 @@ function ProfileContent() {
                 setSubmissions(sub || []);
                 setHeatmapData(h || {});
                 setLeaderboard(lb || []);
+                if (st) {
+                    setStreakCount(st.current_streak || 0);
+                    setActiveToday(!!st.active_today);
+                }
 
                 if (data && data.exists) {
                     setFormData({
@@ -240,10 +273,11 @@ function ProfileContent() {
         }
     };
 
+    // ── Progress numbers (real totals; no fake "1" fallbacks) ──
     const stats = {
-        easy: { solved: realStats?.easy?.solved || 0, total: realStats?.easy?.total || 1, color: "#1f9e8e" },
-        medium: { solved: realStats?.medium?.solved || 0, total: realStats?.medium?.total || 1, color: "#f59e0b" },
-        advanced: { solved: realStats?.advanced?.solved || 0, total: realStats?.advanced?.total || 1, color: "#ef4444" }
+        easy: { solved: realStats?.easy?.solved || 0, total: realStats?.easy?.total || 0, color: "#1f9e8e" },
+        medium: { solved: realStats?.medium?.solved || 0, total: realStats?.medium?.total || 0, color: "#f59e0b" },
+        advanced: { solved: realStats?.advanced?.solved || 0, total: realStats?.advanced?.total || 0, color: "#ef4444" }
     };
 
     const totalQuestions = stats.easy.total + stats.medium.total + stats.advanced.total;
@@ -251,10 +285,10 @@ function ProfileContent() {
 
     const gap = 16;
     const availableAngle = 360 - gap * 3;
-
-    const easyAngle = (stats.easy.total / totalQuestions) * availableAngle;
-    const mediumAngle = (stats.medium.total / totalQuestions) * availableAngle;
-    const advancedAngle = (stats.advanced.total / totalQuestions) * availableAngle;
+    const share = (n: number) => (totalQuestions > 0 ? (n / totalQuestions) * availableAngle : 0);
+    const easyAngle = share(stats.easy.total);
+    const mediumAngle = share(stats.medium.total);
+    const advancedAngle = share(stats.advanced.total);
 
     const segments = [
         { id: "easy", start: 0, end: easyAngle, solved: stats.easy.solved, total: stats.easy.total, color: stats.easy.color },
@@ -264,78 +298,87 @@ function ProfileContent() {
 
     const filteredSubmissions = submissions.filter((p) => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const { heatmapWeeks, monthLabels, heatmapRangeLabel } = useMemo(() => {
-        const now = new Date();
-        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const myRank = useMemo(() => {
+        if (!profile) return null;
+        const idx = leaderboard.findIndex((e) => e.user_id === profile.user_id);
+        return idx >= 0 ? idx + 1 : null;
+    }, [leaderboard, profile]);
 
-        let endDate: Date;
-        let startDate: Date;
-        let finalLabel = "";
+    // ── Activity map (app-day / IST clock, UTC date math so the browser timezone never shifts a cell) ──
+    const heat = useMemo(() => {
+        const today = appToday();
+        let start: Date;
+        let end: Date;
+        let rangeLabel: string;
 
         if (selectedYear === "last_12") {
-            endDate = new Date(todayMidnight);
-            const endDayOfWeek = endDate.getDay();
-            startDate = new Date(endDate);
-            startDate.setDate(endDate.getDate() - 52 * 7 - endDayOfWeek);
-
-            const startStr = startDate.toLocaleString("default", { month: "short", year: "numeric" }).toUpperCase();
-            const endStr = endDate.toLocaleString("default", { month: "short", year: "numeric" }).toUpperCase();
-            finalLabel = `${startStr} — ${endStr}`;
+            end = today;
+            start = addDays(today, -52 * 7 - today.getUTCDay());
+            const s = addDays(today, -364);
+            rangeLabel = `${MONTH_SHORT[s.getUTCMonth()]} ${s.getUTCFullYear()} — ${MONTH_SHORT[today.getUTCMonth()]} ${today.getUTCFullYear()}`;
         } else {
             const year = parseInt(selectedYear, 10);
-            startDate = new Date(year, 0, 1);
-            const startDay = startDate.getDay();
-            if (startDay !== 0) {
-                startDate.setDate(startDate.getDate() - startDay);
-            }
-            endDate = new Date(year, 11, 31);
-            finalLabel = selectedYear;
+            const jan1 = new Date(Date.UTC(year, 0, 1));
+            start = addDays(jan1, -jan1.getUTCDay());
+            end = new Date(Date.UTC(year, 11, 31));
+            rangeLabel = selectedYear;
         }
 
-        const weeks = [];
+        const isYearView = selectedYear !== "last_12";
+        const year = parseInt(selectedYear, 10);
+        const todayTime = today.getTime();
+
+        const weeks: HeatCell[][] = [];
         const labels: { name: string; colIndex: number }[] = [];
-        let currentMonth = -1;
+        let lastMonth = -1;
 
-        let currentDate = new Date(startDate);
+        let cursor = start;
         let col = 0;
-
-        while (currentDate <= endDate) {
-            const week = [];
+        while (cursor.getTime() <= end.getTime()) {
+            const week: HeatCell[] = [];
             for (let row = 0; row < 7; row++) {
-                const year = currentDate.getFullYear();
-                const month = currentDate.getMonth();
-                const day = currentDate.getDate();
-
-                if (
-                    (selectedYear === "last_12" || year === parseInt(selectedYear)) &&
-                    ((month !== currentMonth && row === 0) || (month !== currentMonth && day === 1))
-                ) {
-                    labels.push({ name: currentDate.toLocaleString("default", { month: "short" }), colIndex: col });
-                    currentMonth = month;
-                }
-
-                if (selectedYear === "last_12" && currentDate > todayMidnight) {
-                    week.push(-1);
-                } else if (selectedYear !== "last_12" && year !== parseInt(selectedYear, 10)) {
-                    week.push(-1);
+                const key = dateKey(cursor);
+                const outside = isYearView ? cursor.getUTCFullYear() !== year : cursor.getTime() > todayTime;
+                if (outside) {
+                    week.push({ key, count: 0, kind: "pad" });
+                } else if (cursor.getTime() > todayTime) {
+                    week.push({ key, count: 0, kind: "future" });
                 } else {
-                    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                    const activity = heatmapData[dateStr] || 0;
-                    week.push(activity);
+                    week.push({ key, count: heatmapData[key] || 0, kind: "day" });
                 }
-
-                currentDate.setDate(currentDate.getDate() + 1);
+                cursor = addDays(cursor, 1);
+            }
+            const firstReal = week.find((c) => c.kind !== "pad");
+            if (firstReal) {
+                const m = parseInt(firstReal.key.slice(5, 7), 10) - 1;
+                if (m !== lastMonth) {
+                    labels.push({ name: MONTH_SHORT[m], colIndex: col });
+                    lastMonth = m;
+                }
             }
             weeks.push(week);
             col++;
         }
 
-        return {
-            heatmapWeeks: weeks,
-            monthLabels: labels,
-            heatmapRangeLabel: finalLabel
-        };
+        // Summary over the days that have actually happened, in date order
+        const played = weeks.flat().filter((c) => c.kind === "day");
+        const activeDays = played.filter((c) => c.count > 0).length;
+        const totalSolves = played.reduce((sum, c) => sum + c.count, 0);
+        let longest = 0;
+        let run = 0;
+        for (const c of played) {
+            run = c.count > 0 ? run + 1 : 0;
+            if (run > longest) longest = run;
+        }
+
+        return { weeks, labels, rangeLabel, activeDays, totalSolves, longest };
     }, [heatmapData, selectedYear]);
+
+    // On narrow screens keep the most recent weeks in view
+    useEffect(() => {
+        const el = heatScrollRef.current;
+        if (el) el.scrollLeft = selectedYear === "last_12" ? el.scrollWidth : 0;
+    }, [selectedYear, tab, isLoading, isEditing]);
 
     if (isLoading) {
         return (
@@ -354,7 +397,7 @@ function ProfileContent() {
                 </div>
                 <h2 className="text-xl font-bold mb-2">Session Expired or Invalid</h2>
                 <p className="text-zinc-500 max-w-sm mb-6 text-sm">
-                    We couldn't verify your session. Please try logging in again to access your profile.
+                    We couldn&apos;t verify your session. Please try logging in again to access your profile.
                 </p>
                 <div className="flex gap-3">
                     <button
@@ -623,484 +666,576 @@ function ProfileContent() {
         );
     }
 
+    const displayName = profile.full_name || "Member";
+    const roleLabel = profile.job_role || (profile.occupation ? profile.occupation.charAt(0).toUpperCase() + profile.occupation.slice(1) : "Practitioner");
+    const initial = displayName.charAt(0).toUpperCase();
+    const leaderboardTop = leaderboard.slice(0, 10);
+    const youOutsideTop = myRank && myRank > 10 ? leaderboard[myRank - 1] : null;
+
+    const TABS: { id: typeof tab; label: string; count?: number }[] = [
+        { id: "overview", label: "Overview" },
+        { id: "submissions", label: "Submissions", count: submissions.length },
+        { id: "leaderboard", label: "Leaderboard" }
+    ];
+
+    const kpis = [
+        {
+            label: "Solved",
+            value: totalSolved,
+            sub: totalQuestions > 0 ? `of ${totalQuestions} problems` : "problems",
+            icon: <CheckCircle2 size={16} />,
+            tone: "text-[#1f9e8e] bg-[#1f9e8e]/10"
+        },
+        {
+            label: "Current streak",
+            value: streakCount,
+            sub: streakCount === 0 ? "solve one to start" : activeToday ? "done for today ✓" : "solve today to keep it",
+            icon: <Flame size={16} className={streakCount > 0 ? "fill-amber-500" : ""} />,
+            tone: "text-amber-600 bg-amber-500/10 dark:text-amber-300"
+        },
+        {
+            label: "Active days",
+            value: heat.activeDays,
+            sub: selectedYear === "last_12" ? "in the last year" : `in ${selectedYear}`,
+            icon: <CalendarDays size={16} />,
+            tone: "text-sky-600 bg-sky-500/10 dark:text-sky-300"
+        },
+        {
+            label: "Leaderboard",
+            value: myRank ? `#${myRank}` : "—",
+            sub: myRank ? "current rank" : "not ranked yet",
+            icon: <Trophy size={16} />,
+            tone: "text-violet-600 bg-violet-500/10 dark:text-violet-300"
+        }
+    ];
+
     return (
-        <div className="landing-light min-h-[calc(100vh-64px)] bg-[#fafafa] text-zinc-900 font-sans pb-16 relative">
-            <div className="max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8 relative z-10 w-full grid grid-cols-1 lg:grid-cols-12 gap-6 pt-6 lg:pt-10">
-                {/* --- LEFT COLUMN: Profile & Quick Info --- */}
-                <div className="lg:col-span-4 flex flex-col gap-6">
-                    {/* Main Profile Card */}
-                    <div className="bg-white border border-[#dedee2] rounded-2xl p-6 sm:p-7 flex flex-col items-center text-center shadow-xs">
-                        <div className="relative w-24 h-24 rounded-2xl mb-4 p-1 border border-[#1f9e8e]/30 bg-[#e6f7f5] shadow-2xs overflow-hidden">
-                            <div className="w-full h-full rounded-xl overflow-hidden bg-zinc-100 flex justify-center items-center">
-                                {profile.avatar_url ? (
-                                    <img
-                                        src={profile.avatar_url}
-                                        alt={profile.full_name}
-                                        className="w-full h-full object-cover"
-                                    />
+        <div className="landing-light min-h-[calc(100vh-64px)] font-sans pb-16 relative" style={{ background: "var(--ls-bg)", color: "var(--ls-on-surface)" }}>
+            <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 lg:pt-10 flex flex-col gap-6">
+                {/* ═══════════════ HERO ═══════════════ */}
+                <section className={`${CARD} overflow-hidden`}>
+                    <div className="relative h-28 sm:h-36 bg-gradient-to-br from-[#1f9e8e] via-teal-500 to-emerald-600">
+                        <div
+                            className="absolute inset-0 opacity-25"
+                            style={{
+                                backgroundImage: "radial-gradient(rgba(255,255,255,0.55) 1px, transparent 1px)",
+                                backgroundSize: "18px 18px"
+                            }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/15 to-transparent" />
+                    </div>
+
+                    <div className="px-5 sm:px-8 pb-6">
+                        <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 -mt-12 sm:-mt-14">
+                            <div
+                                className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl p-1 shrink-0 shadow-[var(--ls-shadow-md)]"
+                                style={{ background: "var(--ls-surface)", border: "1px solid var(--ls-outline)" }}
+                            >
+                                <div className="w-full h-full rounded-xl overflow-hidden flex items-center justify-center bg-gradient-to-br from-[#1f9e8e] to-emerald-600 text-white text-4xl font-bold font-mono">
+                                    {profile.avatar_url ? (
+                                        <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
+                                    ) : (
+                                        initial
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex-1 min-w-0 sm:pb-1">
+                                <h1 className={`text-2xl sm:text-3xl font-bold font-mono tracking-tight truncate ${HEADING}`}>{displayName}</h1>
+                                <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs font-mono ${MUTED}`}>
+                                    {profile.username && <span>@{profile.username}</span>}
+                                    <span className="inline-flex items-center gap-1">
+                                        <Mail size={12} /> {profile.email}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 sm:pb-1">
+                                <button
+                                    onClick={() => setIsEditing(true)}
+                                    className="bg-[#1f9e8e] hover:bg-[#177a6d] text-white font-bold rounded-xl px-4 py-2.5 text-xs transition-all flex items-center gap-1.5 shadow-2xs"
+                                >
+                                    <Edit2 size={13} /> Edit profile
+                                </button>
+                                {profile.username && (
+                                    <button
+                                        onClick={handleShare}
+                                        className={`border font-semibold rounded-xl px-4 py-2.5 text-xs transition-all flex items-center gap-1.5 ${
+                                            copied
+                                                ? "bg-[#1f9e8e]/10 border-[#1f9e8e]/40 text-[#1f9e8e]"
+                                                : `border-[var(--ls-outline)] bg-[var(--ls-surface)] hover:bg-[var(--ls-surface-container)] ${HEADING}`
+                                        }`}
+                                    >
+                                        {copied ? <><Check size={13} /> Link copied</> : <><Share2 size={13} /> Share</>}
+                                    </button>
+                                )}
+                                <button
+                                    onClick={navigateAndStart}
+                                    className={`border border-[var(--ls-outline)] bg-[var(--ls-surface)] hover:bg-[var(--ls-surface-container)] font-semibold rounded-xl px-4 py-2.5 text-xs transition-all flex items-center gap-1.5 ${HEADING}`}
+                                >
+                                    <Sparkles size={13} className="text-[#1f9e8e]" /> Tour
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="mt-5 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                            <div className="min-w-0 max-w-2xl">
+                                {profile.bio ? (
+                                    <p className={`text-sm leading-relaxed ${MUTED}`}>{profile.bio}</p>
                                 ) : (
-                                    <User size={36} className="text-zinc-400" />
+                                    <button onClick={() => setIsEditing(true)} className={`text-sm italic ${SUBTLE} hover:underline`}>
+                                        Add a short bio so others know what you&apos;re working on
+                                    </button>
+                                )}
+                                <div className="flex flex-wrap items-center gap-2 mt-3">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1f9e8e]/10 border border-[#1f9e8e]/30 text-[#1f9e8e] text-[11px] font-bold font-mono">
+                                        <Briefcase size={11} /> {roleLabel}
+                                    </span>
+                                    {profile.occupation && (
+                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[var(--ls-outline)] text-[11px] font-mono capitalize ${MUTED}`}>
+                                            <GraduationCap size={11} /> {profile.occupation}
+                                        </span>
+                                    )}
+                                    {profile.experience_years > 0 && (
+                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[var(--ls-outline)] text-[11px] font-mono ${MUTED}`}>
+                                            {profile.experience_years} yr{profile.experience_years === 1 ? "" : "s"} experience
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2.5 shrink-0">
+                                {profile.github_url && (
+                                    <a
+                                        href={profile.github_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center border border-[var(--ls-outline)] bg-[var(--ls-surface-low)] hover:bg-[var(--ls-surface-container)] transition-colors"
+                                        title="GitHub"
+                                    >
+                                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className={HEADING}>
+                                            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                                        </svg>
+                                    </a>
+                                )}
+                                {profile.linkedin_url && (
+                                    <a
+                                        href={profile.linkedin_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center border border-[var(--ls-outline)] bg-[var(--ls-surface-low)] hover:bg-[var(--ls-surface-container)] transition-colors"
+                                        title="LinkedIn"
+                                    >
+                                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-[#0a66c2] dark:text-[#5aa9f0]">
+                                            <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+                                            <rect x="2" y="9" width="4" height="12"></rect>
+                                            <circle cx="4" cy="4" r="2"></circle>
+                                        </svg>
+                                    </a>
                                 )}
                             </div>
                         </div>
+                    </div>
+                </section>
 
-                        <h1 className="text-2xl font-bold font-mono text-zinc-900 tracking-tight">
-                            {profile.full_name || "Member"}
-                        </h1>
-                        {profile.username && (
-                            <div className="flex items-center gap-1.5 mt-0.5 text-zinc-500 font-mono text-xs">
-                                <span>@{profile.username}</span>
+                {/* ═══════════════ KPI STRIP ═══════════════ */}
+                <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    {kpis.map((k) => (
+                        <div key={k.label} className={`${CARD} p-4 sm:p-5`}>
+                            <div className="flex items-center justify-between">
+                                <span className={`text-[11px] font-mono font-bold uppercase tracking-wider ${SUBTLE}`}>{k.label}</span>
+                                <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${k.tone}`}>{k.icon}</span>
                             </div>
-                        )}
-
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-2.5 rounded-full bg-[#e6f7f5] border border-[#1f9e8e]/30 text-[#1f9e8e] text-[11px] font-bold font-mono tracking-wide">
-                            <Flame size={12} className="text-amber-500 fill-amber-500" />
-                            {profile.job_role || profile.occupation || "Practitioner"}
+                            <div className={`mt-2 text-3xl font-extrabold font-mono leading-none ${HEADING}`}>{k.value}</div>
+                            <p className={`mt-1.5 text-[11px] ${MUTED}`}>{k.sub}</p>
                         </div>
+                    ))}
+                </section>
 
-                        <p className="text-xs text-zinc-500 mt-2">{profile.email}</p>
-
-                        {profile.bio && (
-                            <p className="text-xs text-zinc-600 mt-3 italic leading-relaxed max-w-xs">
-                                "{profile.bio}"
-                            </p>
-                        )}
-
-                        {/* Social Badges */}
-                        <div className="flex gap-2.5 mt-4">
-                            {profile.github_url && (
-                                <a
-                                    href={profile.github_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="w-8 h-8 rounded-lg bg-zinc-50 flex items-center justify-center hover:bg-zinc-100 transition-colors border border-zinc-200"
-                                    title="GitHub"
-                                >
-                                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-700">
-                                        <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
-                                    </svg>
-                                </a>
-                            )}
-                            {profile.linkedin_url && (
-                                <a
-                                    href={profile.linkedin_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="w-8 h-8 rounded-lg bg-zinc-50 flex items-center justify-center hover:bg-zinc-100 transition-colors border border-zinc-200"
-                                    title="LinkedIn"
-                                >
-                                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-[#0a66c2]">
-                                        <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
-                                        <rect x="2" y="9" width="4" height="12"></rect>
-                                        <circle cx="4" cy="4" r="2"></circle>
-                                    </svg>
-                                </a>
-                            )}
-                        </div>
-
-                        {/* Actions */}
-                        <div className="w-full mt-6 flex flex-col gap-2">
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className="w-full bg-[#1f9e8e] hover:bg-[#177a6d] text-white font-bold rounded-xl py-2.5 text-xs transition-all flex items-center justify-center gap-1.5 shadow-2xs"
-                            >
-                                <Edit2 size={13} /> Edit Profile
-                            </button>
-
-                            {profile.username && (
+                {/* ═══════════════ MAIN GRID ═══════════════ */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    {/* ---------- Main column with tabs ---------- */}
+                    <div className="lg:col-span-8 flex flex-col gap-5 min-w-0">
+                        <div className="flex items-center gap-1 p-1 rounded-xl self-start" style={{ background: "var(--ls-surface-container)" }}>
+                            {TABS.map((t) => (
                                 <button
-                                    onClick={handleShare}
-                                    className={`w-full border font-semibold rounded-xl py-2 text-xs transition-all flex items-center justify-center gap-1.5 ${
-                                        copied
-                                            ? "bg-[#e6f7f5] border-[#1f9e8e]/40 text-[#1f9e8e]"
-                                            : "bg-white border-zinc-200 hover:border-zinc-300 text-zinc-700"
+                                    key={t.id}
+                                    onClick={() => setTab(t.id)}
+                                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                                        tab === t.id
+                                            ? `bg-[var(--ls-surface)] shadow-[var(--ls-shadow-sm)] ${HEADING}`
+                                            : `${MUTED} hover:text-[var(--ls-heading)]`
                                     }`}
                                 >
-                                    {copied ? <><Check size={13} /> Link Copied!</> : <><Share2 size={13} /> Share Profile</>}
+                                    {t.label}
+                                    {t.count !== undefined && t.count > 0 && (
+                                        <span className="px-1.5 rounded-full text-[10px] font-mono bg-[#1f9e8e]/10 text-[#1f9e8e]">{t.count}</span>
+                                    )}
                                 </button>
-                            )}
-
-                            <button
-                                onClick={navigateAndStart}
-                                className="w-full bg-zinc-50 border border-zinc-200 hover:bg-zinc-100 text-zinc-600 font-semibold rounded-xl py-2 text-xs transition-all flex items-center justify-center gap-1.5"
-                            >
-                                <Sparkles size={13} className="text-[#1f9e8e]" /> Take Platform Tour
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Subscription & Membership Card */}
-                    <SubscriptionStatus />
-
-                    {/* Leaderboard Card */}
-                    <div className="bg-white border border-[#dedee2] rounded-2xl p-5 shadow-xs flex flex-col text-zinc-900">
-                        <div className="flex items-center gap-2.5 mb-4">
-                            <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center border border-amber-200 shrink-0 dark:bg-amber-500/10 dark:border-amber-500/30">
-                                <Trophy size={14} className="text-amber-600 dark:text-amber-300" />
-                            </div>
-                            <h3 className="text-sm font-bold font-mono tracking-tight">Daily Leaderboard</h3>
+                            ))}
                         </div>
 
-                        <div className="space-y-1.5 overflow-y-auto max-h-[300px] pr-1">
-                            {leaderboard.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-8 gap-2">
-                                    <Trophy size={24} className="text-zinc-300" />
-                                    <p className="text-xs text-zinc-400 font-mono">No data yet</p>
-                                </div>
-                            ) : (
-                                leaderboard.slice(0, 10).map((entry, idx) => {
-                                    const isCurrentUser = profile && entry.user_id === profile.user_id;
-                                    const rankBadges = [
-                                        "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30",
-                                        "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200",
-                                        "bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-500/20 dark:text-orange-300 dark:border-orange-500/30"
-                                    ];
+                        {/* ===== OVERVIEW ===== */}
+                        {tab === "overview" && (
+                            <>
+                                <div className={`${CARD} p-5 sm:p-6`}>
+                                    <div className="flex items-center justify-between mb-5">
+                                        <h3 className={`text-sm font-bold font-mono tracking-tight ${HEADING}`}>Problem progress</h3>
+                                        <Link href="/problems" className="text-[11px] font-semibold text-[#1f9e8e] hover:underline inline-flex items-center gap-0.5">
+                                            Browse problems <ChevronRight size={12} />
+                                        </Link>
+                                    </div>
 
-                                    return (
-                                        <div
-                                            key={entry.user_id}
-                                            className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all text-xs ${
-                                                isCurrentUser
-                                                    ? "bg-[#e6f7f5] border-[#1f9e8e]/40"
-                                                    : "bg-zinc-50 border-zinc-200/80 hover:bg-zinc-100/70 dark:hover:bg-white/5"
-                                            }`}
-                                        >
-                                            <div
-                                                className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold font-mono border shrink-0 ${
-                                                    idx < 3
-                                                        ? rankBadges[idx]
-                                                        : "bg-white border-zinc-200 text-zinc-500"
-                                                }`}
-                                            >
-                                                {idx + 1}
-                                            </div>
-
-                                            <div className="w-6 h-6 rounded-md bg-zinc-200 flex items-center justify-center overflow-hidden shrink-0 dark:bg-zinc-700">
-                                                {entry.avatar_url ? (
-                                                    <img
-                                                        src={entry.avatar_url}
-                                                        alt={entry.full_name}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <User size={12} className="text-zinc-500" />
+                                    <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-10">
+                                        <div className="relative w-[150px] h-[150px] shrink-0 flex items-center justify-center">
+                                            <svg className="w-full h-full transform -rotate-90 absolute top-0 left-0" viewBox="0 0 100 100">
+                                                {totalQuestions === 0 && (
+                                                    <circle cx="50" cy="50" r="42" fill="none" strokeWidth="5" stroke="currentColor" className={SUBTLE} opacity="0.25" />
                                                 )}
-                                            </div>
-
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-1">
-                                                    {entry.username ? (
-                                                        <Link
-                                                            href={`/u/${entry.username}`}
-                                                            className={`truncate font-semibold hover:underline ${
-                                                                isCurrentUser ? "text-[#1f9e8e]" : "text-zinc-800"
-                                                            }`}
+                                                {segments.map((seg) => {
+                                                    if (seg.end <= seg.start) return null;
+                                                    const solvedAngle = seg.start + (seg.solved / seg.total) * (seg.end - seg.start);
+                                                    return (
+                                                        <g
+                                                            key={seg.id}
+                                                            onMouseEnter={() => setHoveredSegment(seg.id)}
+                                                            onMouseLeave={() => setHoveredSegment(null)}
+                                                            className="cursor-pointer"
                                                         >
-                                                            {entry.full_name}
-                                                        </Link>
-                                                    ) : (
-                                                        <span
-                                                            className={`truncate font-semibold ${
-                                                                isCurrentUser ? "text-[#1f9e8e]" : "text-zinc-800"
-                                                            }`}
-                                                        >
-                                                            {entry.full_name}
-                                                        </span>
-                                                    )}
-                                                    {isCurrentUser && (
-                                                        <span className="text-[9px] font-bold text-[#1f9e8e] bg-[#1f9e8e]/10 px-1 py-0.2 rounded border border-[#1f9e8e]/20 shrink-0">
-                                                            YOU
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                {entry.current_streak > 0 && (
-                                                    <div className="flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300">
-                                                        <Flame size={11} className="text-amber-500 fill-amber-500" />
-                                                        <span>{entry.current_streak}</span>
-                                                    </div>
-                                                )}
-                                                <div className="font-mono text-zinc-900 font-bold">
-                                                    {entry.total_solved}
-                                                    <span className="text-[9px] text-zinc-400 font-normal ml-0.5">sol</span>
-                                                </div>
+                                                            <path
+                                                                d={describeArc(50, 50, 42, seg.start, seg.end)}
+                                                                stroke={seg.color}
+                                                                strokeWidth="5"
+                                                                fill="transparent"
+                                                                strokeLinecap="round"
+                                                                className="transition-all duration-200"
+                                                                opacity={hoveredSegment && hoveredSegment !== seg.id ? 0.08 : 0.2}
+                                                            />
+                                                            {seg.solved > 0 && (
+                                                                <path
+                                                                    d={describeArc(50, 50, 42, seg.start, solvedAngle)}
+                                                                    stroke={seg.color}
+                                                                    strokeWidth="5"
+                                                                    fill="transparent"
+                                                                    strokeLinecap="round"
+                                                                    className="transition-all duration-500 ease-out"
+                                                                    style={{ opacity: hoveredSegment && hoveredSegment !== seg.id ? 0.35 : 1 }}
+                                                                />
+                                                            )}
+                                                            <path d={describeArc(50, 50, 42, seg.start, seg.end)} stroke="transparent" strokeWidth="16" fill="transparent" strokeLinecap="round" />
+                                                        </g>
+                                                    );
+                                                })}
+                                            </svg>
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                                {(() => {
+                                                    const hs = segments.find((s) => s.id === hoveredSegment);
+                                                    return (
+                                                        <>
+                                                            <span className={`text-3xl font-extrabold font-mono leading-none ${HEADING}`}>{hs ? hs.solved : totalSolved}</span>
+                                                            <div className="w-6 h-[1px] my-1.5 bg-[var(--ls-outline-variant)]"></div>
+                                                            <span className={`text-xs font-medium font-mono ${SUBTLE}`}>{hs ? hs.total : totalQuestions}</span>
+                                                        </>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
-                                    );
-                                })
-                            )}
-                        </div>
-                    </div>
-                </div>
 
-                {/* --- RIGHT COLUMN: Main Content --- */}
-                <div className="lg:col-span-8 flex flex-col gap-6">
-                    {/* Top Row: Performance & Difficulty Breakdown */}
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                        {/* Performance Donut */}
-                        <div className="md:col-span-2 bg-white border border-[#dedee2] rounded-2xl p-6 flex flex-col shadow-xs">
-                            <div className="flex items-center gap-2 mb-3">
-                                <div className="w-7 h-7 rounded-lg bg-[#e6f7f5] flex items-center justify-center text-[#1f9e8e] border border-[#1f9e8e]/30">
-                                    <BarChart2 size={15} strokeWidth={2.5} />
-                                </div>
-                                <h3 className="text-sm font-bold font-mono tracking-tight text-zinc-900">Performance</h3>
-                            </div>
-
-                            <div className="flex-1 flex items-center justify-center py-2">
-                                <div className="relative w-[150px] h-[150px] flex items-center justify-center">
-                                    <svg className="w-full h-full transform -rotate-90 absolute top-0 left-0" viewBox="0 0 100 100">
-                                        {segments.map((seg) => {
-                                            if (seg.end <= seg.start) return null;
-                                            const solvedAngle = seg.start + (seg.solved / seg.total) * (seg.end - seg.start);
-
-                                            return (
-                                                <g
-                                                    key={seg.id}
-                                                    onMouseEnter={() => setHoveredSegment(seg.id)}
+                                        <div className="flex flex-col gap-5 w-full">
+                                            {[
+                                                { id: "Easy", key: "easy", val: stats.easy.solved, max: stats.easy.total, color: "#1f9e8e", text: "text-[#1f9e8e]" },
+                                                { id: "Medium", key: "medium", val: stats.medium.solved, max: stats.medium.total, color: "#f59e0b", text: "text-amber-600 dark:text-amber-300" },
+                                                { id: "Hard", key: "advanced", val: stats.advanced.solved, max: stats.advanced.total, color: "#ef4444", text: "text-rose-600 dark:text-rose-300" }
+                                            ].map((s) => (
+                                                <div
+                                                    key={s.key}
+                                                    className="w-full cursor-pointer"
+                                                    onMouseEnter={() => setHoveredSegment(s.key)}
                                                     onMouseLeave={() => setHoveredSegment(null)}
-                                                    className="cursor-pointer"
                                                 >
-                                                    <path
-                                                        d={describeArc(50, 50, 42, seg.start, seg.end)}
-                                                        stroke={seg.color}
-                                                        strokeWidth="5"
-                                                        fill="transparent"
-                                                        strokeLinecap="round"
-                                                        className="transition-all duration-200"
-                                                        opacity={hoveredSegment && hoveredSegment !== seg.id ? 0.08 : 0.18}
-                                                    />
-                                                    {seg.solved > 0 && (
-                                                        <path
-                                                            d={describeArc(50, 50, 42, seg.start, solvedAngle)}
-                                                            stroke={seg.color}
-                                                            strokeWidth="5"
-                                                            fill="transparent"
-                                                            strokeLinecap="round"
-                                                            className="transition-all duration-500 ease-out"
-                                                            style={{
-                                                                opacity: hoveredSegment && hoveredSegment !== seg.id ? 0.35 : 1
-                                                            }}
+                                                    <div className="flex justify-between items-baseline mb-1.5">
+                                                        <span className={`text-xs font-bold font-mono ${s.text}`}>{s.id}</span>
+                                                        <span className="font-mono text-xs">
+                                                            <span className={`font-bold ${HEADING}`}>{s.val}</span>
+                                                            <span className={SUBTLE}> / {s.max}</span>
+                                                        </span>
+                                                    </div>
+                                                    <div className="w-full h-2 rounded-full overflow-hidden bg-[var(--ls-surface-container)]">
+                                                        <div
+                                                            className="h-full rounded-full transition-all duration-700 ease-out"
+                                                            style={{ width: `${s.max ? (s.val / s.max) * 100 : 0}%`, backgroundColor: s.color }}
                                                         />
-                                                    )}
-                                                    <path d={describeArc(50, 50, 42, seg.start, seg.end)} stroke="transparent" strokeWidth="16" fill="transparent" strokeLinecap="round" />
-                                                </g>
-                                            );
-                                        })}
-                                    </svg>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
 
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                        {hoveredSegment ? (
-                                            <>
-                                                <span className="text-3xl font-extrabold font-mono text-zinc-900 leading-none">
-                                                    {segments.find((s) => s.id === hoveredSegment)?.solved}
-                                                </span>
-                                                <div className="w-6 h-[1px] bg-zinc-200 my-1.5 dark:bg-zinc-700"></div>
-                                                <span className="text-xs font-medium font-mono text-zinc-400">
-                                                    {segments.find((s) => s.id === hoveredSegment)?.total}
-                                                </span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="text-3xl font-extrabold font-mono text-zinc-900 leading-none">
-                                                    {totalSolved}
-                                                </span>
-                                                <div className="w-6 h-[1px] bg-zinc-200 my-1.5 dark:bg-zinc-700"></div>
-                                                <span className="text-xs font-medium font-mono text-zinc-400">
-                                                    {totalQuestions}
-                                                </span>
-                                            </>
+                                {/* Activity map */}
+                                <div className={`${CARD} p-5 sm:p-6`}>
+                                    <div className="flex flex-wrap justify-between items-start gap-3 mb-5">
+                                        <div>
+                                            <h3 className={`text-sm font-bold font-mono tracking-tight ${HEADING}`}>Activity</h3>
+                                            <p className={`text-[11px] mt-1 ${MUTED}`}>
+                                                <span className={`font-semibold ${HEADING}`}>{heat.totalSolves}</span> solves ·{" "}
+                                                <span className={`font-semibold ${HEADING}`}>{heat.activeDays}</span> active days · longest run{" "}
+                                                <span className={`font-semibold ${HEADING}`}>{heat.longest}</span> day{heat.longest === 1 ? "" : "s"}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-[11px] font-mono font-semibold uppercase px-2.5 py-1 rounded-md border border-[var(--ls-outline)] bg-[var(--ls-surface-container)] ${MUTED}`}>
+                                                {heat.rangeLabel}
+                                            </span>
+                                            <select
+                                                className={`bg-[var(--ls-surface)] border border-[var(--ls-outline)] text-xs font-semibold rounded-md px-2.5 py-1 outline-none focus:border-[#1f9e8e] cursor-pointer font-mono ${HEADING}`}
+                                                value={selectedYear}
+                                                onChange={(e) => setSelectedYear(e.target.value)}
+                                            >
+                                                <option value="last_12">Last year</option>
+                                                <option value={String(currentYear)}>{currentYear}</option>
+                                                <option value={String(currentYear - 1)}>{currentYear - 1}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div ref={heatScrollRef} className="w-full overflow-x-auto pb-2 flex justify-start sm:justify-center">
+                                        <div className="min-w-fit flex flex-col gap-2">
+                                            <div className="relative h-[14px] w-full">
+                                                {heat.labels.map((lbl, idx) => {
+                                                    if (idx > 0 && lbl.colIndex - heat.labels[idx - 1].colIndex < 3) return null;
+                                                    return (
+                                                        <span
+                                                            key={idx}
+                                                            className={`absolute text-[10px] font-mono font-bold uppercase tracking-wider ${SUBTLE}`}
+                                                            style={{ left: `${lbl.colIndex * 15}px` }}
+                                                        >
+                                                            {lbl.name}
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            <div className="flex gap-[4px]">
+                                                {heat.weeks.map((week, wIdx) => (
+                                                    <div key={wIdx} className="flex flex-col gap-[4px]">
+                                                        {week.map((cell) => {
+                                                            if (cell.kind === "pad") return <div key={cell.key} className="w-[11px] h-[11px]" />;
+                                                            return (
+                                                                <div
+                                                                    key={cell.key}
+                                                                    className={`w-[11px] h-[11px] rounded-[3px] transition-transform duration-150 hover:scale-125 ${HEAT_LEVELS[heatLevel(cell.count)]} ${cell.kind === "future" ? "opacity-40" : ""}`}
+                                                                    title={
+                                                                        cell.kind === "future"
+                                                                            ? cell.key
+                                                                            : `${cell.count} solve${cell.count === 1 ? "" : "s"} on ${cell.key}`
+                                                                    }
+                                                                />
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <div className={`flex items-center justify-end gap-1.5 mt-1 text-[10px] font-mono ${SUBTLE}`}>
+                                                Less
+                                                {HEAT_LEVELS.map((cls, i) => (
+                                                    <span key={i} className={`w-[11px] h-[11px] rounded-[3px] ${cls}`} />
+                                                ))}
+                                                More
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* ===== SUBMISSIONS ===== */}
+                        {tab === "submissions" && (
+                            <div className={`${CARD} p-5 sm:p-6`}>
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
+                                    <h3 className={`text-sm font-bold font-mono tracking-tight ${HEADING}`}>
+                                        Solved problems <span className={`font-normal ${SUBTLE}`}>({filteredSubmissions.length})</span>
+                                    </h3>
+                                    <div className="relative w-full sm:w-64">
+                                        <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${SUBTLE}`} />
+                                        <input
+                                            type="text"
+                                            placeholder="Search solved problems..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className={`w-full bg-[var(--ls-surface-low)] border border-[var(--ls-outline)] text-xs rounded-xl py-2 pl-9 pr-3 outline-none focus:border-[#1f9e8e] transition-all placeholder:text-[var(--ls-on-surface-subtle)] ${HEADING}`}
+                                        />
+                                    </div>
+                                </div>
+
+                                {filteredSubmissions.length === 0 ? (
+                                    <div className="py-14 text-center space-y-3">
+                                        <p className={`text-xs font-mono ${SUBTLE}`}>
+                                            {submissions.length === 0 ? "You haven't solved anything yet." : "No solved problems match your search."}
+                                        </p>
+                                        {submissions.length === 0 && (
+                                            <Link href="/practice/daily" className="inline-flex px-4 py-2 rounded-xl bg-[#1f9e8e] text-white text-xs font-bold hover:bg-[#177a6d] transition-colors">
+                                                Start today&apos;s set
+                                            </Link>
                                         )}
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Difficulty Stats Rows */}
-                        <div className="md:col-span-3 bg-white border border-[#dedee2] rounded-2xl p-6 flex flex-col justify-center shadow-xs">
-                            <div className="flex flex-col gap-5 w-full">
-                                {[
-                                    { id: "EASY", key: "easy", val: stats.easy.solved, max: stats.easy.total, color: "#1f9e8e", bg: "bg-[#e6f7f5]", border: "border-[#1f9e8e]/30", text: "text-[#1f9e8e]" },
-                                    { id: "MEDIUM", key: "medium", val: stats.medium.solved, max: stats.medium.total, color: "#f59e0b", bg: "bg-amber-50 dark:bg-amber-500/10", border: "border-amber-200 dark:border-amber-500/30", text: "text-amber-800 dark:text-amber-300" },
-                                    { id: "ADVANCED", key: "advanced", val: stats.advanced.solved, max: stats.advanced.total, color: "#ef4444", bg: "bg-rose-50 dark:bg-rose-500/10", border: "border-rose-200 dark:border-rose-500/30", text: "text-rose-800 dark:text-rose-300" }
-                                ].map((s) => (
-                                    <div
-                                        key={s.id}
-                                        className="w-full cursor-pointer flex flex-col"
-                                        onMouseEnter={() => setHoveredSegment(s.key)}
-                                        onMouseLeave={() => setHoveredSegment(null)}
-                                    >
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold font-mono uppercase tracking-wider border ${s.bg} ${s.text} ${s.border}`}>
-                                                {s.id}
-                                            </span>
-                                            <div className="flex items-baseline gap-1 font-mono text-xs">
-                                                <span className="font-bold text-zinc-900">{s.val}</span>
-                                                <span className="text-zinc-400">/ {s.max}</span>
-                                            </div>
-                                        </div>
-                                        <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden relative">
-                                            <div
-                                                className="h-full rounded-full transition-all duration-700 ease-out"
-                                                style={{
-                                                    width: `${s.max ? (s.val / s.max) * 100 : 0}%`,
-                                                    backgroundColor: s.color
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Activity Heatmap */}
-                    <div className="bg-white border border-[#dedee2] rounded-2xl p-6 flex flex-col shadow-xs">
-                        <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
-                            <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg bg-[#e6f7f5] flex items-center justify-center text-[#1f9e8e] border border-[#1f9e8e]/30">
-                                    <BarChart2 size={14} />
-                                </div>
-                                <h3 className="text-sm font-bold font-mono tracking-tight text-zinc-900">Activity Map</h3>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-mono text-zinc-500 font-semibold uppercase bg-zinc-100 px-2.5 py-1 rounded-md border border-zinc-200">
-                                    {heatmapRangeLabel}
-                                </span>
-                                <select
-                                    className="bg-white border border-zinc-300 text-zinc-800 text-xs font-semibold rounded-md px-2.5 py-1 outline-none focus:border-[#1f9e8e] cursor-pointer hover:bg-zinc-50 transition-colors font-mono"
-                                    value={selectedYear}
-                                    onChange={(e) => setSelectedYear(e.target.value)}
-                                >
-                                    <option value="last_12">LAST YEAR</option>
-                                    <option value={String(currentYear)}>{currentYear}</option>
-                                    <option value={String(currentYear - 1)}>{currentYear - 1}</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="w-full overflow-x-auto pb-2 flex justify-start sm:justify-center">
-                            <div className="min-w-fit flex flex-col gap-2">
-                                {/* Month Labels */}
-                                <div className="relative h-[14px] w-full">
-                                    {monthLabels.map((lbl, idx) => {
-                                        if (idx > 0 && lbl.colIndex - monthLabels[idx - 1].colIndex < 3) return null;
-                                        return (
-                                            <span
-                                                key={idx}
-                                                className="absolute text-[10px] text-zinc-400 font-mono font-bold uppercase tracking-wider"
-                                                style={{ left: `${lbl.colIndex * 15}px` }}
-                                            >
-                                                {lbl.name}
-                                            </span>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Heatmap Grid */}
-                                <div className="flex gap-[4px]">
-                                    {heatmapWeeks.map((week, wIdx) => (
-                                        <div key={wIdx} className="flex flex-col gap-[4px]">
-                                            {week.map((dayCount, dIdx) => {
-                                                if (dayCount === -1) return <div key={`${wIdx}-${dIdx}`} className="w-[11px] h-[11px]" />;
-                                                let cellColor = "bg-zinc-100 border border-zinc-200/80";
-                                                if (dayCount === 1) cellColor = "bg-[#99f6e4] border border-[#5eead4]";
-                                                else if (dayCount === 2) cellColor = "bg-[#2dd4bf] border border-[#14b8a6]";
-                                                else if (dayCount >= 3) cellColor = "bg-[#0f766e] border border-[#115e59]";
-
-                                                return (
-                                                    <div
-                                                        key={`${wIdx}-${dIdx}`}
-                                                        className={`w-[11px] h-[11px] rounded-[3px] ${cellColor} transition-all duration-150 cursor-pointer hover:scale-125`}
-                                                        title={`${dayCount} submissions`}
-                                                    />
-                                                );
-                                            })}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Recent Submissions */}
-                    <div className="bg-white border border-[#dedee2] rounded-2xl p-6 flex flex-col shadow-xs">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                            <div className="flex items-center gap-2">
-                                <h3 className="text-sm font-bold font-mono tracking-tight text-zinc-900">Recent Submissions</h3>
-                                <span className="px-2 py-0.5 rounded-full bg-zinc-100 border border-zinc-200 text-[10px] font-bold font-mono text-zinc-600">
-                                    {filteredSubmissions.length}
-                                </span>
-                            </div>
-                            <div className="relative w-full sm:w-64">
-                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Search solved problems..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full bg-zinc-50 border border-zinc-200 text-xs text-zinc-900 rounded-xl py-2 pl-9 pr-3 outline-none focus:border-[#1f9e8e] transition-all placeholder:text-zinc-400"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="overflow-y-auto max-h-[460px] pr-1">
-                            {filteredSubmissions.length === 0 ? (
-                                <div className="py-12 text-center text-zinc-400 text-xs font-mono">
-                                    No submissions match your query.
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                                    {filteredSubmissions.map((p) => {
-                                        const diffMeta: Record<string, { badge: string; dot: string }> = {
-                                            easy: { badge: "bg-[#e6f7f5] text-[#1f9e8e] border-[#1f9e8e]/30", dot: "bg-[#1f9e8e]" },
-                                            medium: { badge: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30", dot: "bg-amber-500" },
-                                            hard: { badge: "bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30", dot: "bg-rose-500" },
-                                        };
-                                        const dm = diffMeta[p.difficulty?.toLowerCase()] || { badge: "bg-zinc-100 text-zinc-700 border-zinc-200", dot: "bg-zinc-400" };
-
-                                        return (
-                                            <div
-                                                key={p.id}
-                                                onClick={async () => {
-                                                    setLoadingCode(true);
-                                                    try {
-                                                        const sol = await api.getSavedSolution(p.id);
-                                                        if (sol.submitted_query) setViewingCode({ title: p.title, query: sol.submitted_query });
-                                                    } catch {
-                                                        /* silent */
-                                                    } finally {
-                                                        setLoadingCode(false);
-                                                    }
-                                                }}
-                                                className="p-4 rounded-xl bg-zinc-50/70 hover:bg-white border border-[#dedee2] hover:border-zinc-300 flex flex-col justify-between gap-3 transition-all duration-150 cursor-pointer shadow-2xs hover:shadow-xs group dark:bg-white/5"
-                                            >
-                                                <div className="flex justify-between items-start gap-2">
-                                                    <span className="text-xs font-semibold text-zinc-900 group-hover:text-[#1f9e8e] transition-colors line-clamp-2 leading-snug">
-                                                        {p.title}
-                                                    </span>
-                                                    <span className={`text-[9px] font-bold font-mono uppercase tracking-wider px-2 py-0.5 rounded border ${dm.badge} shrink-0`}>
+                                ) : (
+                                    <div className="divide-y divide-[var(--ls-outline)] max-h-[560px] overflow-y-auto -mx-2 px-2">
+                                        {filteredSubmissions.map((p) => {
+                                            const diff = (p.difficulty || "").toLowerCase();
+                                            const badge =
+                                                diff === "easy"
+                                                    ? "bg-[#1f9e8e]/10 text-[#1f9e8e] border-[#1f9e8e]/30"
+                                                    : diff === "medium"
+                                                    ? "bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-300"
+                                                    : "bg-rose-500/10 text-rose-700 border-rose-500/30 dark:text-rose-300";
+                                            return (
+                                                <button
+                                                    key={p.id}
+                                                    onClick={async () => {
+                                                        setLoadingCode(true);
+                                                        try {
+                                                            const sol = await api.getSavedSolution(p.id);
+                                                            if (sol.submitted_query) setViewingCode({ title: p.title, query: sol.submitted_query });
+                                                        } catch {
+                                                            /* silent */
+                                                        } finally {
+                                                            setLoadingCode(false);
+                                                        }
+                                                    }}
+                                                    className="w-full flex items-center gap-3 py-3 text-left group rounded-lg hover:bg-[var(--ls-surface-low)] px-2 transition-colors"
+                                                >
+                                                    <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`text-xs font-semibold truncate group-hover:text-[#1f9e8e] transition-colors ${HEADING}`}>{p.title}</p>
+                                                        <p className={`text-[11px] mt-0.5 ${SUBTLE}`}>
+                                                            {p.created_at
+                                                                ? new Date(p.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })
+                                                                : "Solved"}
+                                                        </p>
+                                                    </div>
+                                                    <span className={`text-[10px] font-bold font-mono uppercase tracking-wider px-2 py-0.5 rounded border shrink-0 ${badge}`}>
                                                         {p.difficulty}
                                                     </span>
-                                                </div>
+                                                    <span className={`hidden sm:inline-flex items-center gap-1 text-[11px] font-medium shrink-0 ${MUTED} group-hover:text-[#1f9e8e] transition-colors`}>
+                                                        {loadingCode ? <Loader2 size={12} className="animate-spin" /> : <Code size={12} />} View code
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
-                                                <div className="flex justify-between items-center pt-2 border-t border-zinc-200/70 text-[11px] text-zinc-500">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                                        <span>{p.created_at ? new Date(p.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }) : "Solved"}</span>
+                        {/* ===== LEADERBOARD ===== */}
+                        {tab === "leaderboard" && (
+                            <div className={`${CARD} p-5 sm:p-6`}>
+                                <div className="flex items-center gap-2.5 mb-4">
+                                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                                        <Trophy size={16} className="text-amber-600 dark:text-amber-300" />
+                                    </div>
+                                    <div>
+                                        <h3 className={`text-sm font-bold font-mono tracking-tight ${HEADING}`}>Leaderboard</h3>
+                                        <p className={`text-[11px] ${MUTED}`}>Top solvers across DailySQL</p>
+                                    </div>
+                                </div>
+
+                                {leaderboard.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-12 gap-2">
+                                        <Trophy size={24} className={SUBTLE} />
+                                        <p className={`text-xs font-mono ${SUBTLE}`}>No data yet</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-1.5">
+                                        {[...leaderboardTop.map((e, i) => ({ e, rank: i + 1 })), ...(youOutsideTop ? [{ e: youOutsideTop, rank: myRank as number }] : [])].map(({ e: entry, rank }) => {
+                                            const isYou = entry.user_id === profile.user_id;
+                                            const medals = ["bg-amber-400/20 text-amber-700 border-amber-400/50 dark:text-amber-300", "bg-slate-400/20 text-slate-600 border-slate-400/50 dark:text-slate-300", "bg-orange-400/20 text-orange-700 border-orange-400/50 dark:text-orange-300"];
+                                            return (
+                                                <div
+                                                    key={entry.user_id}
+                                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-xs transition-colors ${
+                                                        isYou
+                                                            ? "bg-[#1f9e8e]/10 border-[#1f9e8e]/40"
+                                                            : "border-transparent hover:bg-[var(--ls-surface-low)]"
+                                                    }`}
+                                                >
+                                                    <div
+                                                        className={`w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold font-mono border shrink-0 ${
+                                                            rank <= 3 ? medals[rank - 1] : `border-[var(--ls-outline)] ${MUTED}`
+                                                        }`}
+                                                    >
+                                                        {rank}
                                                     </div>
-                                                    <div className="flex items-center gap-1 font-medium text-zinc-600 group-hover:text-[#1f9e8e] transition-colors">
-                                                        <Code size={12} /> View Code
+                                                    <div className="w-7 h-7 rounded-lg bg-[var(--ls-surface-container)] flex items-center justify-center overflow-hidden shrink-0">
+                                                        {entry.avatar_url ? (
+                                                            <img src={entry.avatar_url} alt={entry.full_name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <User size={13} className={SUBTLE} />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                                                        {entry.username ? (
+                                                            <Link href={`/u/${entry.username}`} className={`truncate font-semibold hover:underline ${isYou ? "text-[#1f9e8e]" : HEADING}`}>
+                                                                {entry.full_name}
+                                                            </Link>
+                                                        ) : (
+                                                            <span className={`truncate font-semibold ${isYou ? "text-[#1f9e8e]" : HEADING}`}>{entry.full_name}</span>
+                                                        )}
+                                                        {isYou && (
+                                                            <span className="text-[9px] font-bold text-[#1f9e8e] bg-[#1f9e8e]/10 px-1.5 py-0.5 rounded border border-[#1f9e8e]/20 shrink-0">YOU</span>
+                                                        )}
+                                                    </div>
+                                                    {entry.current_streak > 0 && (
+                                                        <div className="flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-300 shrink-0">
+                                                            <Flame size={12} className="fill-amber-500 text-amber-500" />
+                                                            {entry.current_streak}
+                                                        </div>
+                                                    )}
+                                                    <div className={`font-mono font-bold shrink-0 ${HEADING}`}>
+                                                        {entry.total_solved}
+                                                        <span className={`text-[9px] font-normal ml-0.5 ${SUBTLE}`}>solved</span>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
+
+                    {/* ---------- Side column ---------- */}
+                    <aside className="lg:col-span-4 flex flex-col gap-5 min-w-0">
+                        <SubscriptionStatus />
+
+                        <div className={`${CARD} p-5`}>
+                            <h3 className={`text-sm font-bold font-mono tracking-tight mb-3 ${HEADING}`}>Keep going</h3>
+                            <div className="flex flex-col gap-2">
+                                <Link
+                                    href="/practice/daily"
+                                    className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl bg-[#1f9e8e]/10 border border-[#1f9e8e]/25 hover:border-[#1f9e8e]/60 transition-colors group"
+                                >
+                                    <span className="flex items-center gap-2.5 min-w-0">
+                                        <Target size={16} className="text-[#1f9e8e] shrink-0" />
+                                        <span className="min-w-0">
+                                            <span className={`block text-xs font-bold ${HEADING}`}>Today&apos;s daily set</span>
+                                            <span className={`block text-[11px] ${MUTED}`}>{activeToday ? "You've solved today — go again" : "Solve one to keep your streak"}</span>
+                                        </span>
+                                    </span>
+                                    <ChevronRight size={14} className="text-[#1f9e8e] group-hover:translate-x-0.5 transition-transform shrink-0" />
+                                </Link>
+                                <Link
+                                    href="/problems"
+                                    className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl border border-[var(--ls-outline)] hover:bg-[var(--ls-surface-low)] transition-colors group"
+                                >
+                                    <span className={`text-xs font-semibold ${HEADING}`}>Browse all problems</span>
+                                    <ChevronRight size={14} className={`${MUTED} group-hover:translate-x-0.5 transition-transform`} />
+                                </Link>
+                            </div>
+                        </div>
+                    </aside>
                 </div>
             </div>
 
@@ -1111,35 +1246,34 @@ function ProfileContent() {
                     onClick={() => setViewingCode(null)}
                 >
                     <div
-                        className="bg-white border border-[#dedee2] rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-xl overflow-hidden"
+                        className="border border-[var(--ls-outline)] bg-[var(--ls-surface)] rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-xl overflow-hidden"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 bg-zinc-50 shrink-0">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded-lg bg-[#e6f7f5] border border-[#1f9e8e]/30 flex items-center justify-center">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ls-outline)] bg-[var(--ls-surface-low)] shrink-0">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-7 h-7 rounded-lg bg-[#1f9e8e]/10 border border-[#1f9e8e]/30 flex items-center justify-center shrink-0">
                                     <Code size={14} className="text-[#1f9e8e]" />
                                 </div>
-                                <div>
-                                    <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider">Submitted Solution</p>
-                                    <h3 className="text-sm font-bold text-zinc-900 leading-tight line-clamp-1">{viewingCode?.title}</h3>
+                                <div className="min-w-0">
+                                    <p className={`text-[10px] font-mono uppercase tracking-wider ${MUTED}`}>Submitted solution</p>
+                                    <h3 className={`text-sm font-bold leading-tight line-clamp-1 ${HEADING}`}>{viewingCode.title}</h3>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setViewingCode(null)}
-                                className="text-zinc-400 hover:text-zinc-700 transition-colors p-1.5 rounded-lg hover:bg-zinc-100"
+                                className={`transition-colors p-1.5 rounded-lg hover:bg-[var(--ls-surface-container)] ${MUTED}`}
+                                aria-label="Close"
                             >
                                 <X size={16} />
                             </button>
                         </div>
                         <div className="flex-1 overflow-auto p-5 bg-[#1c1c1e]">
-                            <pre className="text-xs text-emerald-400 font-mono leading-relaxed whitespace-pre-wrap break-words">
-                                {viewingCode?.query}
-                            </pre>
+                            <pre className="text-xs text-emerald-400 font-mono leading-relaxed whitespace-pre-wrap break-words">{viewingCode.query}</pre>
                         </div>
-                        <div className="px-5 py-3 border-t border-zinc-200 bg-zinc-50 flex justify-between items-center shrink-0">
-                            <span className="text-[10px] text-zinc-500 font-mono">SQL / PostgreSQL</span>
+                        <div className="px-5 py-3 border-t border-[var(--ls-outline)] bg-[var(--ls-surface-low)] flex justify-between items-center shrink-0">
+                            <span className={`text-[10px] font-mono ${MUTED}`}>SQL / PostgreSQL</span>
                             <button
-                                onClick={() => navigator.clipboard.writeText(viewingCode?.query ?? "")}
+                                onClick={() => navigator.clipboard.writeText(viewingCode.query ?? "")}
                                 className="text-xs font-bold text-[#1f9e8e] hover:text-[#177a6d] transition-colors dark:hover:text-[#4DD4C4]"
                             >
                                 Copy to clipboard
@@ -1149,26 +1283,26 @@ function ProfileContent() {
                 </div>
             )}
 
-            {/* Auth Toast */}
+            {/* Toast */}
             {toast && (
                 <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1000] animate-in slide-in-from-bottom-5 duration-200">
                     <div
-                        className={`bg-white border rounded-xl p-4 flex items-center gap-3 shadow-lg min-w-[320px] ${
+                        className={`border bg-[var(--ls-surface)] rounded-xl p-4 flex items-center gap-3 shadow-lg min-w-[320px] ${
                             toast.type === "error" ? "border-rose-300 dark:border-rose-500/30" : "border-emerald-300 dark:border-emerald-500/30"
                         }`}
                     >
                         <div
                             className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                                toast.type === "error" ? "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300" : "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
+                                toast.type === "error" ? "bg-rose-500/10 text-rose-600 dark:text-rose-300" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
                             }`}
                         >
                             {toast.type === "error" ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
                         </div>
                         <div className="flex-1 text-left">
-                            <h4 className="font-bold text-xs text-zinc-900">{toast.type === "error" ? "Action Failed" : "Success"}</h4>
-                            <p className="text-xs text-zinc-600 mt-0.5">{toast.message}</p>
+                            <h4 className={`font-bold text-xs ${HEADING}`}>{toast.type === "error" ? "Action failed" : "Success"}</h4>
+                            <p className={`text-xs mt-0.5 ${MUTED}`}>{toast.message}</p>
                         </div>
-                        <button onClick={() => setToast(null)} className="text-zinc-400 hover:text-zinc-700">
+                        <button onClick={() => setToast(null)} className={MUTED} aria-label="Dismiss">
                             <X size={14} />
                         </button>
                     </div>
