@@ -90,6 +90,10 @@ const PLANS: Plan[] = [
   },
 ];
 
+// Only "production" turns on live payments; anything else (unset, "sandbox", a typo) stays
+// sandboxed — the same fail-safe direction as the Cashfree SDK's own `mode` default below.
+const IS_SANDBOX = process.env.NEXT_PUBLIC_CASHFREE_ENV !== "production";
+
 export function PaymentPlans() {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [cashfreeLoaded, setCashfreeLoaded] = useState(false);
@@ -244,15 +248,18 @@ export function PaymentPlans() {
 
   return (
     <div className="space-y-10 text-zinc-900">
-      {/* Test Sandbox Alert Banner */}
-      <div className="bg-[#e6f7f5] border border-[#1f9e8e]/30 rounded-2xl p-4 max-w-4xl mx-auto flex items-center justify-between text-xs sm:text-sm text-[#135d54] shadow-2xs">
-        <div className="flex items-center gap-3">
-          <CreditCard className="w-5 h-5 shrink-0 text-[#1f9e8e]" />
-          <div>
-            <span className="font-bold">Sandbox Mode:</span> Test payments safely with Cashfree test cards (Card: <code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200 dark:bg-[#0F1419]/80">4706131211212123</code> / OTP: <code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200 dark:bg-[#0F1419]/80">111000</code>) or Test UPI (<code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200 dark:bg-[#0F1419]/80">testsuccess@gocash</code>).
+      {/* Test Sandbox Alert Banner — sandbox/dev only; must never show real customers a "use this
+          fake card" message once NEXT_PUBLIC_CASHFREE_ENV=production is set and deployed. */}
+      {IS_SANDBOX && (
+        <div className="bg-[#e6f7f5] border border-[#1f9e8e]/30 rounded-2xl p-4 max-w-4xl mx-auto flex items-center justify-between text-xs sm:text-sm text-[#135d54] shadow-2xs">
+          <div className="flex items-center gap-3">
+            <CreditCard className="w-5 h-5 shrink-0 text-[#1f9e8e]" />
+            <div>
+              <span className="font-bold">Sandbox Mode:</span> Test payments safely with Cashfree test cards (Card: <code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200 dark:bg-[#0F1419]/80">4706131211212123</code> / OTP: <code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200 dark:bg-[#0F1419]/80">111000</code>) or Test UPI (<code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200 dark:bg-[#0F1419]/80">testsuccess@gocash</code>).
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Terms Acceptance — required before any plan can be paid for */}
       <label className="max-w-4xl mx-auto flex items-start gap-3 bg-white border border-zinc-200 rounded-2xl p-4 shadow-2xs cursor-pointer dark:bg-[#0F1419] dark:border-[#20283C]">
