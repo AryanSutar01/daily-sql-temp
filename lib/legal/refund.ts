@@ -3,7 +3,7 @@ import { LEGAL as L } from "@/lib/legal-config";
 
 export const refundIntro = [
   `This Refund and Cancellation Policy (the **"Policy"**) explains when a payment made on ${L.brand} (${L.domain}) can be refunded, how to ask for a refund, and what happens to your access afterwards. It is part of, and must be read together with, our {{/terms|Terms of Service}} and {{/privacy|Privacy Policy}}.`,
-  `${L.brand} is operated by ${L.operatorName}, ${L.operatorType} (**"we"**, **"us"**, **"our"**). By completing a purchase you confirm that you have read and accepted this Policy. Please read it before you pay.`,
+  `${L.brand} is operated by ${L.operatorName} (**"we"**, **"us"**, **"our"**). By completing a purchase you confirm that you have read and accepted this Policy. Please read it before you pay.`,
 ];
 
 export const refundSections: Section[] = [
@@ -266,9 +266,9 @@ export const refundSections: Section[] = [
     title: "Contact and escalation",
     blocks: [
       { type: "p", text: `**Refunds and billing support:** ${L.supportEmail}` },
-      { type: "p", text: `If you are not satisfied with our reply, you may write to our Grievance Officer: ${L.grievanceName}, ${L.grievanceAddress}, email ${L.grievanceEmail}, available ${L.grievanceHours}. We will acknowledge your complaint within 48 hours and aim to resolve it within one month of receiving it.` },
+      { type: "p", text: `If you are not satisfied with our reply, you may write to our Grievance Officer, ${L.operatorName}, at the same address: ${L.supportEmail}. We will acknowledge your complaint within 48 hours and aim to resolve it within one month of receiving it.` },
       { type: "p", text: "You may also approach the National Consumer Helpline (1915, consumerhelpline.gov.in) or file a complaint before the appropriate Consumer Commission, including through the e-Daakhil portal. These options are always available to you." },
-      { type: "p", text: `Operator: ${L.operatorName}, ${L.operatorAddress}.` },
+      { type: "p", text: `Operator: ${L.operatorName}.` },
     ],
   },
 ];

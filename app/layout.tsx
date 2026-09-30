@@ -5,7 +5,8 @@ import { ConditionalNavbar } from "@/components/layout/conditional-navbar";
 import { ConditionalFooter } from "@/components/layout/conditional-footer";
 import { OnboardingCheck } from "@/components/auth/onboarding-check";
 import { ThemeProvider } from "@/components/theme-provider";
-import Script from "next/script";
+import { GoogleAnalytics } from "@/components/legal/google-analytics";
+import { CookieConsentBanner } from "@/components/legal/cookie-consent-banner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -57,19 +58,6 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://fonts.bunny.net/css?family=overused-grotesk:300,400,500,600,700&display=swap"
         />
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-93XK08X7L0"
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-
-            gtag('config', 'G-93XK08X7L0');
-          `}
-        </Script>
       </head>
       <body
         className={`${inter.variable} font-sans antialiased`}
@@ -84,7 +72,9 @@ export default function RootLayout({
           <ConditionalNavbar />
           {children}
           <ConditionalFooter />
+          <CookieConsentBanner />
         </ThemeProvider>
+        <GoogleAnalytics />
       </body>
     </html>
   );

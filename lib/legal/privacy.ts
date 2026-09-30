@@ -2,7 +2,7 @@ import type { Section } from "@/components/legal/legal-page";
 import { LEGAL as L } from "@/lib/legal-config";
 
 export const privacyIntro = [
-  `This Privacy Policy explains how ${L.operatorName}, ${L.operatorType} (**"we"**, **"us"**, **"our"**), collects, uses, shares, stores and protects your personal data when you use ${L.brand} at ${L.domain} (the **"Platform"**), and the choices and rights you have.`,
+  `This Privacy Policy explains how ${L.operatorName} (**"we"**, **"us"**, **"our"**) collects, uses, shares, stores and protects your personal data when you use ${L.brand} at ${L.domain} (the **"Platform"**), and the choices and rights you have.`,
   `It is written to meet the requirements of the Digital Personal Data Protection Act, 2023 (**"DPDP Act"**), the Information Technology Act, 2000 and the rules made under it (including the Reasonable Security Practices and Sensitive Personal Data or Information Rules, 2011 and the Intermediary Guidelines and Digital Media Ethics Code Rules, 2021), and the Consumer Protection (E-Commerce) Rules, 2020. Where you are in another country, we also try to respect the local rights described in section 18.`,
   "Please read this Policy together with our {{/terms|Terms of Service}} and {{/refund|Refund Policy}}. If you do not agree with it, please do not use the parts of the Platform that need an account.",
 ];
@@ -17,10 +17,9 @@ export const privacySections: Section[] = [
       {
         type: "ul",
         items: [
-          `**Operator:** ${L.operatorName}, ${L.operatorType}`,
-          `**Address:** ${L.operatorAddress}`,
+          `**Operator:** ${L.operatorName}`,
           `**Support email:** ${L.supportEmail}`,
-          `**Grievance Officer:** ${L.grievanceName}, ${L.grievanceEmail} (see section 24)`,
+          `**Grievance Officer:** ${L.operatorName}, ${L.supportEmail} (see section 24)`,
         ],
       },
     ],
@@ -335,14 +334,12 @@ export const privacySections: Section[] = [
     id: "grievance",
     title: "Grievance Officer",
     blocks: [
-      { type: "p", text: "In accordance with the Information Technology Act, 2000, the rules made under it, the DPDP Act, 2023 and the Consumer Protection (E-Commerce) Rules, 2020, the name and contact details of our Grievance Officer are:" },
+      { type: "p", text: `In accordance with the Information Technology Act, 2000, the rules made under it, the DPDP Act, 2023 and the Consumer Protection (E-Commerce) Rules, 2020, ${L.operatorName} (the sole proprietor operating the Platform) is also our Grievance Officer, and can be reached at:` },
       {
         type: "ul",
         items: [
-          `**Name:** ${L.grievanceName}`,
-          `**Address:** ${L.grievanceAddress}`,
-          `**Email:** ${L.grievanceEmail}`,
-          `**Availability:** ${L.grievanceHours}`,
+          `**Name:** ${L.operatorName}`,
+          `**Email:** ${L.supportEmail}`,
         ],
       },
       { type: "p", text: "We will acknowledge your complaint within 48 hours and aim to resolve it within one month. If you are not satisfied, you may approach the Data Protection Board of India (once constituted and operational), or the Consumer Commission for consumer complaints." },
@@ -352,7 +349,7 @@ export const privacySections: Section[] = [
     id: "contact",
     title: "Contact us",
     blocks: [
-      { type: "p", text: `For privacy questions, write to ${L.supportEmail}. Operator: ${L.operatorName}, ${L.operatorAddress}.` },
+      { type: "p", text: `For privacy questions, write to ${L.supportEmail}. Operator: ${L.operatorName}.` },
     ],
   },
 ];

@@ -142,7 +142,7 @@ export function Footer() {
             </h3>
             <ul className="space-y-2.5 text-xs sm:text-sm">
               {[
-                { label: "SQL (PostgreSQL)", href: "/problems?discipline=sql" },
+                { label: "SQL", href: "/problems?discipline=sql" },
                 { label: "Python & Pandas", href: "/problems?discipline=python" },
                 { label: "PySpark Engine", href: "/problems?discipline=pyspark" },
                 { label: "SQL Tutorials", href: "/practice/learn/sql" },

@@ -10,20 +10,15 @@ export const LEGAL = {
   effectiveDate: "26 September 2026",
 
   // ── Operator (the contracting party / "we") ────────────────────────────
-  operatorName: "[Operator full legal name]",
-  operatorType: "a sole proprietorship",
-  operatorAddress: "[Postal address of the operator: street, city, state, PIN code]",
-  operatorPhone: "[Customer-care phone number]",
+  // A sole proprietorship with no separate registered office or grievance officer:
+  // the operator itself (contactable at supportEmail) is the sole point of contact
+  // and also the Grievance Officer required by the IT Rules / DPDP Act / CPA E-Commerce Rules.
+  operatorName: "DailySQL",
+  operatorType: "",
   supportEmail: "support@dailysql.in",
 
-  // ── Grievance Officer (IT Rules 2011 / 2021, DPDP Act 2023, Consumer Protection (E-Commerce) Rules 2020) ──
-  grievanceName: "[Grievance Officer full name]",
-  grievanceAddress: "[Grievance Officer postal address]",
-  grievanceEmail: "[Grievance Officer email address]",
-  grievanceHours: "[Working days and hours, e.g. Monday to Friday, 10:00 to 18:00 IST]",
-
   // ── Infrastructure ─────────────────────────────────────────────────────
-  backendHost: "[Name of the VPS / cloud provider hosting the backend and database, and its data-centre country]",
+  backendHost: "Hostinger VPS, Mumbai Server",
 
   // ── Dispute resolution ─────────────────────────────────────────────────
   arbitrationSeat: "Pune, Maharashtra, India",

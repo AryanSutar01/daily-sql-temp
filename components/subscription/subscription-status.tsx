@@ -12,6 +12,8 @@ interface Subscription {
   expires_at: string | null;
   is_lifetime: boolean;
   amount_paid?: number;
+  /** "active", or "cancelled" (will not renew, access continues until expires_at) */
+  status?: string;
 }
 
 interface SubscriptionData {
@@ -358,7 +360,17 @@ export default function SubscriptionStatus() {
           </div>
         )}
 
-        {isPaid && !sub?.is_lifetime && (
+        {isPaid && !sub?.is_lifetime && sub?.status === "cancelled" && (
+          <p className="w-full text-center text-xs text-zinc-500 py-2">
+            Cancelled. Your plan will not renew, and you keep full access until{" "}
+            {sub?.expires_at
+              ? new Date(sub.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+              : "the end of your paid period"}
+            .
+          </p>
+        )}
+
+        {isPaid && !sub?.is_lifetime && sub?.status !== "cancelled" && (
           <button
             onClick={handleCancel}
             disabled={cancelling}

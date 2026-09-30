@@ -181,6 +181,8 @@ export default function AdminDashboard() {
     // Create Wizard State
     const [createStep, setCreateStep] = useState<CreateStep>('problem');
     const [createdProblemId, setCreatedProblemId] = useState<string | null>(null);
+    const [createdPublished, setCreatedPublished] = useState(false);
+    const [publishingCreated, setPublishingCreated] = useState(false);
 
     // Form States
     const [problemForm, setProblemForm] = useState({
@@ -718,6 +720,34 @@ export default function AdminDashboard() {
                 showToast('error', 'Failed to update status');
             }
         } catch (e) { console.error(e); }
+    };
+
+    // Final wizard step. Problems are created as drafts (is_active=false) and drafts are invisible on the
+    // public site, so "publish" must actually flip the flag; "draft" leaves it for the schedule to publish.
+    const handleFinishCreate = async (publish: boolean) => {
+        if (!createdProblemId) return;
+        if (publish) {
+            setPublishingCreated(true);
+            try {
+                const res = await fetchWithAuth(`${API_URL}/admin/problems/${createdProblemId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ is_active: true })
+                });
+                if (!res.ok) {
+                    showToast('error', 'Failed to publish the problem. It is still saved as a draft.');
+                    return;
+                }
+                loadProblems();
+            } catch (e) {
+                console.error(e);
+                showToast('error', 'Failed to publish the problem. It is still saved as a draft.');
+                return;
+            } finally {
+                setPublishingCreated(false);
+            }
+        }
+        setCreatedPublished(publish);
+        setCreateStep('done');
     };
 
     const handleUpdateSolution = async () => {
@@ -1832,7 +1862,7 @@ export default function AdminDashboard() {
                             {createStep === 'test-cases' && 'Step 2: Add test cases'}
                             {createStep === 'solution' && 'Step 3: Set reference query/code'}
                             {createStep === 'preview' && 'Step 4: Preview & Verify'}
-                            {createStep === 'done' && '✓ Problem published!'}
+                            {createStep === 'done' && (createdPublished ? '✓ Problem published!' : '✓ Saved as draft')}
                         </div>
 
                         {/* Step 1: Problem */}
@@ -2329,8 +2359,11 @@ export default function AdminDashboard() {
                                         {solutionForm.order_sensitive && <div className="text-[10px] text-zinc-500 flex items-center gap-1"><CheckCircle2 size={10} /> Results must match order exactly</div>}
                                     </div>
 
-                                    <Button onClick={() => setCreateStep('done')} className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-extrabold py-6 text-lg shadow-[0_0_20px_rgba(77,212,196,0.2)]">
-                                        Confirm & Publish Problem
+                                    <Button onClick={() => handleFinishCreate(true)} disabled={publishingCreated} className="w-full bg-[#4DD4C4] hover:bg-[#3dbdb0] text-black font-extrabold py-6 text-lg shadow-[0_0_20px_rgba(77,212,196,0.2)]">
+                                        {publishingCreated ? 'Publishing…' : 'Confirm & Publish Problem'}
+                                    </Button>
+                                    <Button onClick={() => handleFinishCreate(false)} disabled={publishingCreated} variant="outline" className="w-full border-[#202736] text-zinc-400 hover:text-white bg-white/5">
+                                        Keep as Draft (goes live when its daily set is scheduled)
                                     </Button>
                                 </div>
                             </div>
@@ -2344,8 +2377,12 @@ export default function AdminDashboard() {
                                     <CheckCircle2 size={40} className="text-green-500" />
                                 </div>
                                 <div className="space-y-2">
-                                    <h2 className="text-3xl font-bold text-white tracking-tight">Problem Published</h2>
-                                    <p className="text-zinc-500 text-sm max-w-sm mx-auto">Your problem has been successfully added to the database and is ready to be scheduled.</p>
+                                    <h2 className="text-3xl font-bold text-white tracking-tight">{createdPublished ? 'Problem Published' : 'Problem Saved as Draft'}</h2>
+                                    <p className="text-zinc-500 text-sm max-w-sm mx-auto">
+                                        {createdPublished
+                                            ? 'Your problem is now live on the Problems page and can also be scheduled for a daily set.'
+                                            : 'Your problem is saved but hidden from the website. It goes live automatically on the date you schedule it for, or you can publish it from the Problems list.'}
+                                    </p>
                                 </div>
 
                                 <div className="bg-[#0b101c] p-3 rounded-lg border border-[#202736] inline-block mx-auto">
@@ -4150,5 +4187,5 @@ export default function AdminDashboard() {
         </div>
     );
 }
-// redep
+// redeploy
 

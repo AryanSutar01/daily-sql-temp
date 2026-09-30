@@ -96,6 +96,7 @@ export function PaymentPlans() {
   const [cashfreeInstance, setCashfreeInstance] = useState<any>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<PlanId | null>(null);
   const [userSubscription, setUserSubscription] = useState<any>(null);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [paymentResult, setPaymentResult] = useState<{
     status: "PAID" | "PENDING" | "FAILED" | "EXPIRED" | "TEST_MODE_WARNING";
     orderId?: string;
@@ -155,6 +156,14 @@ export function PaymentPlans() {
   }, [selectedPlanId]);
 
   const handlePayment = async (plan: Plan) => {
+    if (!agreedToTerms) {
+      setPaymentResult({
+        status: "FAILED",
+        message: "Please agree to the Terms of Service, Privacy Policy and Refund Policy before paying.",
+      });
+      return;
+    }
+
     setLoadingPlan(plan.id);
     setPaymentResult(null);
 
@@ -245,6 +254,31 @@ export function PaymentPlans() {
         </div>
       </div>
 
+      {/* Terms Acceptance — required before any plan can be paid for */}
+      <label className="max-w-4xl mx-auto flex items-start gap-3 bg-white border border-zinc-200 rounded-2xl p-4 shadow-2xs cursor-pointer dark:bg-[#0F1419] dark:border-[#20283C]">
+        <input
+          type="checkbox"
+          checked={agreedToTerms}
+          onChange={(e) => setAgreedToTerms(e.target.checked)}
+          className="mt-0.5 w-4 h-4 rounded border-zinc-300 text-[#1f9e8e] focus:ring-[#1f9e8e] shrink-0 accent-[#1f9e8e]"
+        />
+        <span className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+          I agree to the{" "}
+          <Link href="/terms" target="_blank" className="underline text-[#1f9e8e] font-semibold">
+            Terms of Service
+          </Link>
+          ,{" "}
+          <Link href="/privacy" target="_blank" className="underline text-[#1f9e8e] font-semibold">
+            Privacy Policy
+          </Link>{" "}
+          and{" "}
+          <Link href="/refund" target="_blank" className="underline text-[#1f9e8e] font-semibold">
+            Refund Policy
+          </Link>
+          , including that Monthly and Yearly plans are non-refundable once activated.
+        </span>
+      </label>
+
       {/* Pricing Cards Grid */}
       <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto items-stretch">
         {PLANS.map((plan) => {
@@ -314,7 +348,8 @@ export function PaymentPlans() {
               <div className="mt-6 pt-5 border-t border-zinc-100 space-y-2.5">
                 <Button
                   onClick={() => handlePayment(plan)}
-                  disabled={isLoading || !cashfreeLoaded || isOwned}
+                  disabled={isLoading || !cashfreeLoaded || isOwned || !agreedToTerms}
+                  title={!agreedToTerms && !isOwned ? "Please agree to the Terms of Service, Privacy Policy and Refund Policy first" : undefined}
                   className={`w-full h-11 text-xs font-bold rounded-xl transition-all ${
                     isOwned
                       ? "bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-default dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30"
