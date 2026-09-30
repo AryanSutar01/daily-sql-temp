@@ -48,6 +48,8 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Panel, Group, Separator } from "react-resizable-panels";
 import Editor from "@monaco-editor/react";
+import { useTheme } from "next-themes";
+import { ThemeToggle } from "@/components/theme-toggle";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -57,6 +59,7 @@ import { api } from "@/lib/api";
 import { Problem, DailyPractice, Dataset, ExecutionResponse } from "@/types/api";
 import { WalkthroughTour, PRACTICE_TOUR_STEPS } from "@/components/walkthrough/WalkthroughTour";
 import { useWalkthrough } from "@/hooks/useWalkthrough";
+import { PracticeTrialBanner } from "@/components/subscription/trial-experience";
 
 SyntaxHighlighter.registerLanguage('sql', sql);
 
@@ -65,16 +68,19 @@ const sqlHighlightStyle = {
     ...vscDarkPlus,
     'pre[class*="language-"]': {
         ...vscDarkPlus['pre[class*="language-"]'],
-        background: '#0b101c',
+        background: '#f8fafc',
+        color: '#18181b',
         margin: 0,
         padding: '10px 12px',
         fontSize: '11px',
         lineHeight: '1.6',
-        borderRadius: '6px',
+        borderRadius: '8px',
+        border: '1px solid #e2e8f0',
     },
     'code[class*="language-"]': {
         ...vscDarkPlus['code[class*="language-"]'],
         background: 'none',
+        color: '#18181b',
         fontSize: '11px',
         lineHeight: '1.6',
         fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
@@ -85,78 +91,78 @@ type Difficulty = 'easy' | 'medium' | 'hard' | 'advanced';
 
 export function DailySetSkeleton() {
     return (
-        <div className="h-screen bg-[#080c16] flex flex-col overflow-hidden">
+        <div className="landing-light h-screen bg-[#f7f7f8] flex flex-col overflow-hidden">
             {/* Top Bar Skeleton */}
-            <div className="h-14 bg-[#0d121c] border-b border-[#202736] flex items-center px-6 shrink-0 justify-between">
+            <div className="h-14 bg-white border-b border-[#dedee2] flex items-center px-6 shrink-0 justify-between">
                 <div className="flex items-center gap-4">
-                    <div className="w-20 h-5 bg-[#202736] rounded animate-pulse" />
-                    <div className="w-px h-5 bg-[#202736]" />
-                    <div className="w-32 h-8 bg-[#202736] rounded animate-pulse" />
+                    <div className="w-20 h-5 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                    <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700" />
+                    <div className="w-32 h-8 bg-zinc-100 border border-zinc-200 rounded-lg animate-pulse" />
                 </div>
                 <div className="flex gap-3">
-                    <div className="w-24 h-8 bg-[#202736] rounded animate-pulse" />
-                    <div className="w-8 h-8 bg-[#202736] rounded-full animate-pulse" />
+                    <div className="w-24 h-8 bg-[#1f9e8e]/20 rounded-lg animate-pulse" />
+                    <div className="w-8 h-8 bg-zinc-200 rounded-full animate-pulse dark:bg-zinc-700" />
                 </div>
             </div>
 
             {/* Main Workspace Skeleton */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Sidebar */}
-                <div className="w-[280px] bg-[#080c16] border-r border-[#202736] flex flex-col shrink-0">
-                    <div className="h-[52px] border-b border-[#202736] bg-[#0d121c] flex items-center px-4 justify-between">
-                        <div className="w-24 h-4 bg-[#202736] rounded animate-pulse" />
-                        <div className="w-6 h-6 bg-[#202736] rounded animate-pulse" />
+                <div className="w-[280px] bg-[#fafafa] border-r border-[#dedee2] flex flex-col shrink-0">
+                    <div className="h-[52px] border-b border-[#dedee2] bg-white flex items-center px-4 justify-between">
+                        <div className="w-24 h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                        <div className="w-6 h-6 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                     </div>
                     <div className="p-3 space-y-3">
                         {[1, 2, 3, 4, 5].map(i => (
-                            <div key={i} className="h-16 bg-[#131924] border border-[#202736] rounded-lg animate-pulse" />
+                            <div key={i} className="h-16 bg-white border border-[#dedee2] rounded-xl animate-pulse" />
                         ))}
                     </div>
                 </div>
 
                 {/* Question Details */}
-                <div className="flex-1 border-r border-[#202736] bg-[#080c16] flex flex-col">
-                    <div className="h-[52px] border-b border-[#202736] bg-[#0d121c] px-4 flex items-center gap-4">
-                        <div className="w-20 h-6 bg-[#202736] rounded animate-pulse" />
-                        <div className="w-20 h-6 bg-[#202736] rounded animate-pulse" />
+                <div className="flex-1 border-r border-[#dedee2] bg-white flex flex-col">
+                    <div className="h-[52px] border-b border-[#dedee2] bg-[#fafafa] px-4 flex items-center gap-4">
+                        <div className="w-20 h-6 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                        <div className="w-20 h-6 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                     </div>
                     <div className="p-6 space-y-6">
                         <div className="space-y-3">
-                            <div className="w-3/4 h-8 bg-[#202736] rounded animate-pulse" />
-                            <div className="w-1/4 h-5 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-3/4 h-8 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                            <div className="w-1/4 h-5 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                         </div>
                         <div className="space-y-3 mt-8">
-                            <div className="w-full h-4 bg-[#202736] rounded animate-pulse" />
-                            <div className="w-full h-4 bg-[#202736] rounded animate-pulse" />
-                            <div className="w-5/6 h-4 bg-[#202736] rounded animate-pulse" />
-                            <div className="w-4/6 h-4 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-full h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                            <div className="w-full h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                            <div className="w-5/6 h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                            <div className="w-4/6 h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                         </div>
-                        <div className="h-48 mt-8 bg-[#131924] border border-[#202736] rounded-xl animate-pulse" />
+                        <div className="h-48 mt-8 bg-[#fafafa] border border-[#dedee2] rounded-xl animate-pulse" />
                     </div>
                 </div>
 
                 {/* Code Editor */}
-                <div className="flex-1 flex flex-col bg-[#080c16]">
-                    <div className="h-[52px] border-b border-[#202736] bg-[#0d121c] flex items-center justify-between px-4">
+                <div className="flex-1 flex flex-col bg-white">
+                    <div className="h-[52px] border-b border-[#dedee2] bg-[#fafafa] flex items-center justify-between px-4">
                         <div className="flex gap-2">
-                            <div className="w-20 h-8 bg-[#202736] rounded animate-pulse" />
-                            <div className="w-20 h-8 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-20 h-8 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
+                            <div className="w-20 h-8 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                         </div>
-                        <div className="w-24 h-8 bg-[#202736] rounded animate-pulse" />
+                        <div className="w-24 h-8 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                     </div>
                     <div className="flex-1 p-4">
-                        <div className="w-1/2 h-4 bg-[#202736] rounded animate-pulse mb-3" />
-                        <div className="w-1/3 h-4 bg-[#202736] rounded animate-pulse mb-3" />
-                        <div className="w-2/3 h-4 bg-[#202736] rounded animate-pulse mb-3" />
-                        <div className="w-1/4 h-4 bg-[#202736] rounded animate-pulse" />
+                        <div className="w-1/2 h-4 bg-zinc-200 rounded animate-pulse mb-3 dark:bg-zinc-700" />
+                        <div className="w-1/3 h-4 bg-zinc-200 rounded animate-pulse mb-3 dark:bg-zinc-700" />
+                        <div className="w-2/3 h-4 bg-zinc-200 rounded animate-pulse mb-3 dark:bg-zinc-700" />
+                        <div className="w-1/4 h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                     </div>
-                    <div className="h-[280px] border-t border-[#202736] bg-[#0b101c] flex flex-col">
-                        <div className="h-[42px] border-b border-[#202736] flex items-center px-4">
-                            <div className="w-32 h-5 bg-[#202736] rounded animate-pulse" />
+                    <div className="h-[280px] border-t border-[#dedee2] bg-[#fafafa] flex flex-col">
+                        <div className="h-[42px] border-b border-[#dedee2] flex items-center px-4">
+                            <div className="w-32 h-5 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                         </div>
                         <div className="flex-1 p-4">
-                            <div className="w-1/3 h-4 bg-[#202736] rounded animate-pulse mb-3" />
-                            <div className="w-1/4 h-4 bg-[#202736] rounded animate-pulse" />
+                            <div className="w-1/3 h-4 bg-zinc-200 rounded animate-pulse mb-3 dark:bg-zinc-700" />
+                            <div className="w-1/4 h-4 bg-zinc-200 rounded animate-pulse dark:bg-zinc-700" />
                         </div>
                     </div>
                 </div>
@@ -167,6 +173,7 @@ export function DailySetSkeleton() {
 
 export function DailySetClient() {
     const router = useRouter();
+    const { resolvedTheme } = useTheme();
     const { isActive: tourActive, tryAutoStart, startTour, completeTour, skipTour } = useWalkthrough();
     const params = useParams();
     const searchParams = useSearchParams();
@@ -248,6 +255,8 @@ export function DailySetClient() {
     const [feedbackMessage, setFeedbackMessage] = useState('');
     const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
     const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+    const [lockedModalProblem, setLockedModalProblem] = useState<Problem | null>(null);
+    const [userSubscription, setUserSubscription] = useState<any>(null);
 
     // ── Refs ─────────────────────────────────────────────
     const containerRef = useRef<HTMLDivElement>(null);
@@ -329,6 +338,11 @@ export function DailySetClient() {
 
     // ── Handlers ─────────────────────────────────────────
     const handleProblemSelect = async (id: string) => {
+        const targetProb = problems.find(p => p.id === id);
+        if (targetProb?.is_locked) {
+            setLockedModalProblem(targetProb);
+            return;
+        }
         if (sidebarScrollRef.current) {
             sessionStorage.setItem('sidebar_scroll_top', String(sidebarScrollRef.current.scrollTop));
         }
@@ -363,7 +377,12 @@ export function DailySetClient() {
                         }
                         return prev;
                     });
-                } catch (err) {
+                } catch (err: any) {
+                    if (err?.message === 'subscription_required' || err?.message?.includes('subscription_required')) {
+                        setError("SUBSCRIPTION_REQUIRED");
+                        setShowResult(true);
+                        return;
+                    }
                     console.error("Failed to load problem metadata from API", err);
                 }
             }
@@ -381,10 +400,16 @@ export function DailySetClient() {
 
             const [datasets, savedSol] = await Promise.all([
                 // DSA problems have no datasets table — skip the call to avoid a 404
-                isDsa ? Promise.resolve([]) : api.getDatasets(id),
+                isDsa ? Promise.resolve([]) : api.getDatasets(id).catch((err: any) => {
+                    if (err?.message === 'subscription_required' || err?.message?.includes('subscription_required')) {
+                        setError("SUBSCRIPTION_REQUIRED");
+                        setShowResult(true);
+                    }
+                    return [];
+                }),
                 api.getSavedSolution(id).catch(() => ({ submitted_query: null }))
             ]);
-            const normalizedDatasets = datasets.map(ds => ({
+            const normalizedDatasets = (datasets || []).map(ds => ({
                 ...ds,
                 sample_rows: typeof ds.sample_rows === 'string'
                     ? JSON.parse(ds.sample_rows)
@@ -397,11 +422,16 @@ export function DailySetClient() {
             } else if (savedSol?.submitted_query) {
                 setCode(savedSol.submitted_query);
             } else {
-                const firstDsName = datasets[0]?.table_name || 'table_name';
+                const firstDsName = datasets?.[0]?.table_name || 'table_name';
                 if (isDsa) {
-                    if (p?.starter_code) {
-                        // Admin defined a full stub with params — use it directly
-                        setCode(`from typing import List, Optional\n\n${p.starter_code}\n    # Write your solution here\n    pass\n`);
+                    if (p?.starter_code?.trim()) {
+                        const trimmedStarter = p.starter_code.trim();
+                        const hasPassOrBody = trimmedStarter.includes('pass') || /\n\s+[^\s#]/.test(trimmedStarter);
+                        const body = hasPassOrBody ? trimmedStarter : `${trimmedStarter}\n    # Write your solution here\n    pass`;
+                        const typingImport = (body.includes('List') || body.includes('Optional') || body.includes('Dict')) && !body.includes('from typing')
+                            ? 'from typing import List, Optional, Dict\n\n'
+                            : '';
+                        setCode(`${typingImport}${body}\n`);
                     } else {
                         // Fall back: build a minimal stub from function_name or description regex
                         const fnName = p?.function_name
@@ -410,15 +440,15 @@ export function DailySetClient() {
                         setCode(`from typing import List, Optional\n\ndef ${fnName}():\n    # Write your solution here\n    pass\n`);
                     }
                 } else if (p?.challenge_type === 'python') {
-                    const dfList = datasets.map(d => `'${d.table_name}_df'`).join(', ');
-                    const dfLabel = datasets.length > 1
+                    const dfList = (datasets || []).map(d => `'${d.table_name}_df'`).join(', ');
+                    const dfLabel = (datasets || []).length > 1
                         ? `DataFrames are available as: ${dfList}`
                         : `DataFrame is available as '${firstDsName}_df'`;
                     setCode(`# Write your Python (Pandas) code for: ${p?.title}\n# The input ${dfLabel}.\n# Assign your final DataFrame to the 'result' variable.\n\nresult = ${firstDsName}_df\n`);
                 } else if (p?.challenge_type === 'pyspark') {
-                    const dfList = datasets.map(d => `'${d.table_name}_df'`).join(', ');
-                    const viewList = datasets.map(d => `'${d.table_name}'`).join(', ');
-                    const dfLabel = datasets.length > 1
+                    const dfList = (datasets || []).map(d => `'${d.table_name}_df'`).join(', ');
+                    const viewList = (datasets || []).map(d => `'${d.table_name}'`).join(', ');
+                    const dfLabel = (datasets || []).length > 1
                         ? `DataFrames are available as: ${dfList} (or as temp views: ${viewList})`
                         : `DataFrame is available as '${firstDsName}_df' or as a temp view '${firstDsName}'`;
                     setCode(`# Write your PySpark code for: ${p?.title}\n# The input ${dfLabel}.\n# Assign your final DataFrame to the 'result' variable.\n\nresult = ${firstDsName}_df\n`);
@@ -439,9 +469,13 @@ export function DailySetClient() {
             api.getProblemVotes(id).then(v => setProblemVotes(v)).catch(() => setProblemVotes({ likes: 0, user_has_voted: false }));
             api.getCommentCount(id).then(({ count }) => setCommentCount(count)).catch(() => setCommentCount(0));
 
-
-        } catch (err) {
-            console.error("Failed to load datasets", err);
+        } catch (err: any) {
+            if (err?.message === 'subscription_required' || err?.message?.includes('subscription_required')) {
+                setError("SUBSCRIPTION_REQUIRED");
+                setShowResult(true);
+            } else {
+                console.error("Failed to load problem data", err);
+            }
         }
     }, [problems, dailySet]);
 
@@ -504,6 +538,8 @@ export function DailySetClient() {
                         setTimeout(() => tryAutoStart(), 500);
                     }
                 }
+                // Fetch subscription state for trial banner and access
+                api.getMySubscription().then(sub => setUserSubscription(sub)).catch(() => {});
             } catch (err) {
                 console.error("Failed to load initial data", err);
             } finally {
@@ -768,32 +804,32 @@ export function DailySetClient() {
     };
 
     const markdownComponents = {
-        h1: ({ node, ...props }: any) => <h1 className="text-lg font-bold text-white mt-4 mb-2.5" {...props} />,
-        h2: ({ node, ...props }: any) => <h2 className="text-md font-bold text-white mt-4 mb-2" {...props} />,
-        h3: ({ node, ...props }: any) => <h3 className="text-sm font-bold text-zinc-300 mt-3 mb-1.5" {...props} />,
-        p: ({ node, ...props }: any) => <p className="mb-2.5 leading-relaxed" {...props} />,
-        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-2.5" {...props} />,
-        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-2.5" {...props} />,
-        li: ({ node, ...props }: any) => <li className="mb-1 last:mb-0" {...props} />,
+        h1: ({ node, ...props }: any) => <h1 className="text-lg font-bold text-zinc-900 mt-4 mb-2.5 font-mono" {...props} />,
+        h2: ({ node, ...props }: any) => <h2 className="text-base font-bold text-zinc-900 mt-4 mb-2 font-mono" {...props} />,
+        h3: ({ node, ...props }: any) => <h3 className="text-sm font-bold text-zinc-800 mt-3 mb-1.5 font-mono" {...props} />,
+        p: ({ node, ...props }: any) => <p className="mb-2.5 text-zinc-700 leading-relaxed text-sm" {...props} />,
+        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-2.5 text-zinc-700 text-sm space-y-1" {...props} />,
+        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-2.5 text-zinc-700 text-sm space-y-1" {...props} />,
+        li: ({ node, ...props }: any) => <li className="mb-1 last:mb-0 text-zinc-700 text-sm" {...props} />,
         table: ({ node, ...props }: any) => (
-            <div className="overflow-x-auto my-6 rounded-xl border border-[#202736] bg-[#0d121c] shadow-xl">
-                <table className="w-full border-collapse text-sm text-left" {...props} />
+            <div className="overflow-x-auto my-5 rounded-xl border border-[#dedee2] bg-white shadow-2xs">
+                <table className="w-full border-collapse text-xs text-left" {...props} />
             </div>
         ),
-        thead: ({ node, ...props }: any) => <thead className="bg-[#131924] border-b border-[#202736]" {...props} />,
-        tbody: ({ node, ...props }: any) => <tbody className="divide-y divide-[#202736]/30" {...props} />,
-        tr: ({ node, ...props }: any) => <tr className="hover:bg-[#4DD4C4]/5 transition-colors group" {...props} />,
-        th: ({ node, ...props }: any) => <th className="px-4 py-3 text-[10px] font-bold text-[#4DD4C4] uppercase tracking-widest font-mono" {...props} />,
-        td: ({ node, ...props }: any) => <td className="px-4 py-3 text-xs text-zinc-300 font-mono group-hover:text-white transition-colors" {...props} />,
-        strong: ({ node, ...props }: any) => <strong className="font-bold text-white shadow-[#4DD4C4]/20 text-shadow-sm" {...props} />,
+        thead: ({ node, ...props }: any) => <thead className="bg-[#f8f9fa] border-b border-[#dedee2]" {...props} />,
+        tbody: ({ node, ...props }: any) => <tbody className="divide-y divide-[#dedee2] bg-white" {...props} />,
+        tr: ({ node, ...props }: any) => <tr className="hover:bg-zinc-50 transition-colors group" {...props} />,
+        th: ({ node, ...props }: any) => <th className="px-4 py-2.5 text-[10px] font-bold text-zinc-700 uppercase tracking-widest font-mono" {...props} />,
+        td: ({ node, ...props }: any) => <td className="px-4 py-2 text-xs text-zinc-800 font-mono" {...props} />,
+        strong: ({ node, ...props }: any) => <strong className="font-bold text-zinc-900" {...props} />,
         code: ({ node, className, children, ...props }: any) => {
             const match = /language-(\w+)/.exec(className || '');
             const isInline = !match && !className;
             return isInline ? (
-                <code className="bg-[#202736] px-1.5 py-0.5 rounded text-[11px] text-[#4DD4C4] font-mono" {...props}>{children}</code>
+                <code className="bg-[#e6f7f5] text-[#135d54] border border-[#1f9e8e]/30 px-1.5 py-0.5 rounded-md text-[11.5px] font-mono font-semibold shadow-2xs inline-block align-baseline mx-0.5" {...props}>{children}</code>
             ) : (
-                <div className="bg-[#131924] p-3 rounded border border-[#202736] overflow-x-auto text-[11px] my-3 font-mono">
-                    <code className="text-[#4DD4C4]" {...props}>{children}</code>
+                <div className="bg-[#f8fafc] p-3.5 rounded-xl border border-[#dedee2] overflow-x-auto text-[11px] my-3 font-mono shadow-2xs">
+                    <code className="text-zinc-800 font-mono" {...props}>{children}</code>
                 </div>
             );
         },
@@ -801,16 +837,16 @@ export function DailySetClient() {
 
     // Compact markdown components for discussion drawer (smaller fonts/spacing)
     const discussionMarkdownComponents = {
-        p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0" {...props} />,
-        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-1.5 space-y-1 text-xs" {...props} />,
-        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-1.5 space-y-1 text-xs" {...props} />,
-        li: ({ node, ...props }: any) => <li className="text-xs mb-0.5 last:mb-0" {...props} />,
-        pre: ({ node, children, ...props }: any) => <div className="my-2 first:mt-0 last:mb-0 rounded-md border border-[#202736] overflow-hidden" {...props}>{children}</div>,
+        p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0 text-zinc-700" {...props} />,
+        ul: ({ node, ...props }: any) => <ul className="list-disc list-inside mb-1.5 space-y-1 text-xs text-zinc-700" {...props} />,
+        ol: ({ node, ...props }: any) => <ol className="list-decimal list-inside mb-1.5 space-y-1 text-xs text-zinc-700" {...props} />,
+        li: ({ node, ...props }: any) => <li className="text-xs mb-0.5 last:mb-0 text-zinc-700" {...props} />,
+        pre: ({ node, children, ...props }: any) => <div className="my-2 first:mt-0 last:mb-0 rounded-lg border border-[#dedee2] overflow-hidden shadow-2xs" {...props}>{children}</div>,
         code: ({ node, className, children, ...props }: any) => {
             const match = /language-(\w+)/.exec(className || '');
             const isInline = !match && !className;
             if (isInline) {
-                return <code className="bg-[#202736] px-1 py-0.5 rounded text-[11px] text-[#4DD4C4] font-mono" {...props}>{children}</code>;
+                return <code className="bg-[#e6f7f5] text-[#135d54] border border-[#1f9e8e]/30 px-1.5 py-0.5 rounded-md text-[11px] font-mono font-semibold" {...props}>{children}</code>;
             }
             const lang = match?.[1] || 'sql';
             const codeString = String(children).replace(/\n$/, '');
@@ -824,8 +860,8 @@ export function DailySetClient() {
                 </SyntaxHighlighter>
             );
         },
-        strong: ({ node, ...props }: any) => <strong className="font-semibold text-zinc-200" {...props} />,
-        em: ({ node, ...props }: any) => <em className="italic text-zinc-400" {...props} />,
+        strong: ({ node, ...props }: any) => <strong className="font-semibold text-zinc-900" {...props} />,
+        em: ({ node, ...props }: any) => <em className="italic text-zinc-500" {...props} />,
     };
 
 
@@ -882,31 +918,31 @@ export function DailySetClient() {
         };
 
         const TestDataRow = ({ label, value, color }: { label: string; value: any; color: string }) => (
-            <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold">{label}</span>
-                <pre className={`text-[11px] font-mono ${color} bg-[#080c16] border border-[#202736] rounded-md px-3 py-2 whitespace-pre-wrap break-all leading-relaxed`}>{typeof value === 'string' ? value : formatValue(value)}</pre>
+            <div className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold font-mono">{label}</span>
+                <pre className={`text-[12px] font-mono ${color} bg-[#f8fafc] border border-[#dedee2] rounded-lg px-3 py-2 whitespace-pre-wrap break-all leading-relaxed`}>{typeof value === 'string' ? value : formatValue(value)}</pre>
             </div>
         );
 
         if (activeOutputTab === 'test') {
             return (
-                <div className="space-y-4">
+                <div className="space-y-4 font-mono">
                     {/* ── Sample Pass / Fail count badge ── */}
                     <div className="flex items-center gap-3">
-                        <div className={`text-xs font-bold px-2.5 py-1 rounded-full ${sampleTests.every(r => r.passed) ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                                'bg-red-500/10 text-red-400 border border-red-500/20'
+                        <div className={`text-xs font-bold px-3 py-1 rounded-full font-mono ${sampleTests.every(r => r.passed) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' :
+                                'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30'
                             }`}>
                             {sampleTests.filter(r => r.passed).length} / {sampleTests.length} sample cases passed
                         </div>
                         {executionResult.status === 'run_result' && (
-                            <span className="text-[10px] text-zinc-500 italic">Sample tests only · Press Submit to run all tests</span>
+                            <span className="text-[11px] text-zinc-500 italic font-mono">Sample tests only · Press Submit to run all tests</span>
                         )}
                     </div>
 
                     {/* ── Sample Test Cases (Tabbed) ── */}
                     {sampleTests.length > 0 && (
                         <div className="space-y-3">
-                            <div className="flex flex-wrap gap-1.5 border-b border-[#202736]/40 pb-2">
+                            <div className="flex flex-wrap gap-1.5 border-b border-[#dedee2] pb-2">
                                 {sampleTests.map((tc, idx) => {
                                     const isActive = activeSampleTab === idx;
                                     return (
@@ -914,14 +950,14 @@ export function DailySetClient() {
                                             key={idx}
                                             onClick={() => setActiveSampleTab(idx)}
                                             className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 border ${isActive
-                                                    ? 'bg-[#182235] text-[#4DD4C4] border-[#4DD4C4]/30 shadow-md shadow-[#4DD4C4]/5'
-                                                    : 'bg-[#0d121c] text-zinc-400 hover:text-zinc-200 border-[#202736]/50 hover:bg-[#131924]'
+                                                    ? 'bg-[#e6f7f5] text-[#1f9e8e] border-[#1f9e8e]/40 shadow-sm'
+                                                    : 'bg-[#f8fafc] text-zinc-600 hover:text-zinc-900 border-[#dedee2] hover:bg-white'
                                                 }`}
                                         >
                                             {tc.passed ? (
-                                                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                                             ) : (
-                                                <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                                                <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
                                             )}
                                             {tc.label ? tc.label : `Case ${idx + 1}`}
                                         </button>
@@ -934,19 +970,19 @@ export function DailySetClient() {
                                 if (!tc) return null;
                                 return (
                                     <div
-                                        className={`rounded-xl border p-3.5 flex flex-col gap-3 ${tc.passed
-                                                ? 'bg-green-500/5 border-green-500/20'
-                                                : 'bg-red-500/5 border-red-500/20'
+                                        className={`rounded-xl border p-4 flex flex-col gap-3 font-mono ${tc.passed
+                                                ? 'bg-emerald-50/30 border-emerald-200 dark:bg-emerald-500/5 dark:border-emerald-500/30'
+                                                : 'bg-rose-50/30 border-rose-200 dark:bg-rose-500/5 dark:border-rose-500/30'
                                             }`}
                                     >
                                         {/* Input */}
                                         {tc.input_data !== undefined && tc.input_data !== null && (
-                                            <TestDataRow label="Input" value={formatInput(tc.input_data)} color="text-zinc-300" />
+                                            <TestDataRow label="Input" value={formatInput(tc.input_data)} color="text-zinc-800" />
                                         )}
 
                                         {/* Expected */}
                                         {tc.expected !== undefined && tc.expected !== 'hidden' && (
-                                            <TestDataRow label="Expected Output" value={tc.expected} color="text-green-300" />
+                                            <TestDataRow label="Expected Output" value={tc.expected} color="text-emerald-700 dark:text-emerald-300" />
                                         )}
 
                                         {/* Actual (got) */}
@@ -954,13 +990,13 @@ export function DailySetClient() {
                                             <TestDataRow
                                                 label="Actual Output"
                                                 value={tc.got}
-                                                color={tc.passed ? 'text-green-300' : 'text-red-300'}
+                                                color={tc.passed ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}
                                             />
                                         )}
 
                                         {/* Error */}
                                         {tc.error && (
-                                            <TestDataRow label="Error" value={tc.error} color="text-red-400" />
+                                            <TestDataRow label="Error" value={tc.error} color="text-rose-600 dark:text-rose-300" />
                                         )}
                                     </div>
                                 );
@@ -974,66 +1010,66 @@ export function DailySetClient() {
         // ── Submission Results Tab ──
         if (executionResult.status === 'run_result') {
             return (
-                <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-3">
-                    <div className="w-12 h-12 rounded-xl bg-zinc-800/20 flex items-center justify-center border border-[#202736] text-zinc-500 mb-2">
-                        <Sparkles size={22} className="opacity-80" />
+                <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-3 font-mono">
+                    <div className="w-12 h-12 rounded-xl bg-zinc-100 flex items-center justify-center border border-[#dedee2] text-zinc-500 mb-2">
+                        <Sparkles size={22} className="opacity-80 text-[#1f9e8e]" />
                     </div>
-                    <h3 className="text-sm font-bold text-zinc-300">No Submission Result</h3>
-                    <p className="text-zinc-500 text-xs max-w-xs leading-relaxed">You only executed Sample tests. Click the Submit button to run your solution against the complete validation suite.</p>
+                    <h3 className="text-sm font-bold text-zinc-800 font-sans">No Submission Result</h3>
+                    <p className="text-zinc-500 text-xs max-w-xs leading-relaxed font-sans">You only executed Sample tests. Click the Submit button to run your solution against the complete validation suite.</p>
                 </div>
             );
         }
 
         return (
-            <div className="space-y-4">
+            <div className="space-y-4 font-mono">
                 {/* ── Summary Badge ── */}
                 <div className="flex items-center gap-3">
-                    <div className={`text-xs font-bold px-2.5 py-1 rounded-full ${executionResult.status === 'correct' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                            'bg-red-500/10 text-red-400 border border-red-500/20'
+                    <div className={`text-xs font-bold px-3 py-1 rounded-full font-mono ${executionResult.status === 'correct' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' :
+                            'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30'
                         }`}>
                         {summary.passed} / {summary.total} test cases passed
                     </div>
                 </div>
 
                 {firstFailing ? (
-                    <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3.5 flex flex-col gap-3">
+                    <div className="rounded-xl border border-rose-200 bg-rose-50/40 p-4 flex flex-col gap-3 font-mono dark:border-rose-500/30 dark:bg-rose-500/5">
                         <div className="flex items-center gap-2">
-                            <XCircle size={13} className="text-red-400 shrink-0" />
-                            <span className="text-xs font-bold text-red-400">
+                            <XCircle size={15} className="text-rose-600 shrink-0 dark:text-rose-300" />
+                            <span className="text-xs font-bold text-rose-700 font-mono dark:text-rose-300">
                                 {firstFailing.is_hidden ? "Hidden Test Failed" : "Sample Test Failed"}
                             </span>
                             {firstFailing.is_hidden ? (
-                                <span className="ml-auto text-[9px] text-zinc-600 uppercase tracking-wider border border-[#202736] rounded px-1.5 py-0.5">Hidden</span>
+                                <span className="ml-auto text-[9px] text-zinc-500 uppercase tracking-wider border border-[#dedee2] bg-white rounded px-1.5 py-0.5 font-mono">Hidden</span>
                             ) : (
-                                <span className="ml-auto text-[9px] text-[#4DD4C4] uppercase tracking-wider border border-[#4DD4C4]/20 rounded px-1.5 py-0.5">{firstFailing.label || "Sample"}</span>
+                                <span className="ml-auto text-[9px] text-[#1f9e8e] uppercase tracking-wider border border-[#1f9e8e]/30 bg-white rounded px-1.5 py-0.5 font-mono">{firstFailing.label || "Sample"}</span>
                             )}
                         </div>
 
                         {/* Input (only if not hidden) */}
                         {!firstFailing.is_hidden && firstFailing.input_data !== undefined && firstFailing.input_data !== null && (
-                            <TestDataRow label="Input" value={formatInput(firstFailing.input_data)} color="text-zinc-300" />
+                            <TestDataRow label="Input" value={formatInput(firstFailing.input_data)} color="text-zinc-800" />
                         )}
 
                         {/* Expected */}
                         {firstFailing.expected !== undefined && firstFailing.expected !== 'hidden' && (
-                            <TestDataRow label="Expected Output" value={firstFailing.expected} color="text-green-300" />
+                            <TestDataRow label="Expected Output" value={firstFailing.expected} color="text-emerald-700 dark:text-emerald-300" />
                         )}
 
                         {/* Actual */}
                         {firstFailing.got !== undefined && (
-                            <TestDataRow label="Actual Output" value={firstFailing.got} color="text-red-300" />
+                            <TestDataRow label="Actual Output" value={firstFailing.got} color="text-rose-700 dark:text-rose-300" />
                         )}
 
                         {/* Error */}
                         {firstFailing.error && (
-                            <TestDataRow label="Error" value={firstFailing.error} color="text-red-400" />
+                            <TestDataRow label="Error" value={firstFailing.error} color="text-rose-600 dark:text-rose-300" />
                         )}
                     </div>
                 ) : (
-                    <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-5 flex flex-col items-center justify-center text-center space-y-2">
-                        <CheckCircle2 size={24} className="text-green-400" />
-                        <h4 className="text-sm font-bold text-green-400">Submission Accepted!</h4>
-                        <p className="text-zinc-500 text-xs max-w-xs leading-relaxed">Your code successfully passes all standard validation checks and hidden edge-case testing constraints.</p>
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-6 flex flex-col items-center justify-center text-center space-y-2 font-sans dark:border-emerald-500/30 dark:bg-emerald-500/5">
+                        <CheckCircle2 size={28} className="text-emerald-600 dark:text-emerald-300" />
+                        <h4 className="text-sm font-bold text-emerald-800 font-sans dark:text-emerald-300">Submission Accepted!</h4>
+                        <p className="text-zinc-600 text-xs max-w-xs leading-relaxed font-sans">Your code successfully passes all standard validation checks and hidden edge-case testing constraints.</p>
                     </div>
                 )}
             </div>
@@ -1057,9 +1093,14 @@ export function DailySetClient() {
                 setActiveOutputTab('test');
             }
             if (res.status === 'error' && res.error === 'PROFILE_REQUIRED') { setError("PROFILE_REQUIRED"); return; }
+            if (res.status === 'error' && (res.error === 'subscription_required' || res.error?.includes('subscription_required'))) { setError("SUBSCRIPTION_REQUIRED"); return; }
             if (res.status === 'error' && res.error) setError(res.error);
         } catch (err: any) {
-            setError(err.message || "Execution failed");
+            if (err?.message === 'subscription_required' || err?.message?.includes('subscription_required')) {
+                setError("SUBSCRIPTION_REQUIRED");
+            } else {
+                setError(err.message || "Execution failed");
+            }
             setExecutionResult(null);
         } finally {
             setIsRunning(false);
@@ -1084,6 +1125,7 @@ export function DailySetClient() {
                     setActiveOutputTab('submit');
                 }
                 if (res.status === 'error' && res.error === 'PROFILE_REQUIRED') { setError("PROFILE_REQUIRED"); return; }
+                if (res.status === 'error' && (res.error === 'subscription_required' || res.error?.includes('subscription_required'))) { setError("SUBSCRIPTION_REQUIRED"); return; }
                 if (res.status === 'error' && res.error) { setError(res.error); return; }
                 if (res.status === 'correct') {
                     setSolvedIds(prev => new Set(prev).add(activeProblemId));
@@ -1101,7 +1143,11 @@ export function DailySetClient() {
                     setTimeout(() => setToast(null), 5000);
                 }
             } catch (err: any) {
-                setError(err.message || "Execution failed");
+                if (err?.message === 'subscription_required' || err?.message?.includes('subscription_required')) {
+                    setError("SUBSCRIPTION_REQUIRED");
+                } else {
+                    setError(err.message || "Execution failed");
+                }
                 setExecutionResult(null);
             } finally {
                 setIsRunning(false);
@@ -1340,19 +1386,173 @@ export function DailySetClient() {
 
     const getDiffStyle = (diff: string) => {
         const d = diff?.toLowerCase();
-        if (d === 'easy') return { label: 'BASIC', color: 'text-[#4DD4C4]', bg: 'bg-[#4DD4C4]/10', border: 'border-[#4DD4C4]/30', hex: '#4DD4C4' };
-        if (d === 'medium') return { label: 'INTERMEDIATE', color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', hex: '#eab308' };
-        return { label: 'ADVANCED', color: 'text-red-400', bg: 'bg-red-400/10', border: 'border-red-400/30', hex: '#f87171' };
+        if (d === 'easy') return { label: 'BASIC', color: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/30', hex: '#10b981' };
+        if (d === 'medium') return { label: 'INTERMEDIATE', color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/30', hex: '#f59e0b' };
+        return { label: 'ADVANCED', color: 'text-rose-700 dark:text-rose-300', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/30', hex: '#f43f5e' };
+    };
+
+    // Discipline badge — mainly so a randomly-picked problem (which may not be in today's set,
+    // and so isn't obviously "the SQL one" or "the Python one") still shows which track it's from.
+    const getDisciplineStyle = (challengeType: string | null | undefined) => {
+        const t = (challengeType || 'sql').toLowerCase();
+        if (t.includes('spark')) return { label: 'PySpark', Icon: Server, color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/30' };
+        if (t.includes('python')) return { label: 'Python', Icon: Code2, color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/30' };
+        return { label: 'SQL', Icon: Database, color: 'text-sky-700 dark:text-sky-300', bg: 'bg-sky-50 dark:bg-sky-500/10', border: 'border-sky-200 dark:border-sky-500/30' };
     };
 
     const handleEditorWillMount = (monaco: any) => {
-        monaco.editor.defineTheme('dailySqlTheme', {
-            base: 'vs-dark', inherit: true, rules: [],
+        monaco.editor.defineTheme('dailySqlLight', {
+            base: 'vs',
+            inherit: true,
+            rules: [
+                // Comments (VS Code Light green italic)
+                { token: 'comment', foreground: '008000', fontStyle: 'italic' },
+                { token: 'comment.sql', foreground: '008000', fontStyle: 'italic' },
+                { token: 'comment.python', foreground: '008000', fontStyle: 'italic' },
+                { token: 'comment.doc', foreground: '008000', fontStyle: 'italic' },
+
+                // Keywords (VS Code Blue #0000ff / Purple for Python flow control)
+                { token: 'keyword', foreground: '0000ff', fontStyle: 'bold' },
+                { token: 'keyword.sql', foreground: '0000ff', fontStyle: 'bold' },
+                { token: 'keyword.python', foreground: 'af00db', fontStyle: 'bold' },
+                { token: 'keyword.control', foreground: 'af00db', fontStyle: 'bold' },
+                { token: 'keyword.operator', foreground: '0000ff' },
+
+                // Functions & Methods (VS Code signature golden brown #795e26)
+                { token: 'entity.name.function', foreground: '795e26', fontStyle: 'bold' },
+                { token: 'support.function', foreground: '795e26', fontStyle: 'bold' },
+                { token: 'function', foreground: '795e26', fontStyle: 'bold' },
+                { token: 'predefined', foreground: '795e26', fontStyle: 'bold' },
+                { token: 'predefined.sql', foreground: '795e26', fontStyle: 'bold' },
+
+                // Strings (VS Code burgundy #a31515)
+                { token: 'string', foreground: 'a31515' },
+                { token: 'string.sql', foreground: 'a31515' },
+                { token: 'string.python', foreground: 'a31515' },
+                { token: 'string.quote', foreground: 'a31515' },
+
+                // Numbers (VS Code emerald #098658)
+                { token: 'number', foreground: '098658' },
+                { token: 'number.float', foreground: '098658' },
+                { token: 'number.hex', foreground: '098658' },
+                { token: 'constant.numeric', foreground: '098658' },
+
+                // Types & Classes (VS Code Teal #267f99)
+                { token: 'type', foreground: '267f99' },
+                { token: 'type.identifier', foreground: '267f99' },
+                { token: 'entity.name.type', foreground: '267f99' },
+                { token: 'class', foreground: '267f99', fontStyle: 'bold' },
+                { token: 'storage.type', foreground: '0000ff' },
+
+                // Variables & Parameters (VS Code Navy #001080)
+                { token: 'variable', foreground: '001080' },
+                { token: 'variable.parameter', foreground: '001080' },
+                { token: 'variable.other', foreground: '001080' },
+                { token: 'identifier', foreground: '1e293b' },
+
+                // Constants (VS Code blue)
+                { token: 'constant', foreground: '0000ff' },
+                { token: 'constant.language', foreground: '0000ff' },
+
+                // Operators & Delimiters
+                { token: 'operator', foreground: '000000' },
+                { token: 'operator.sql', foreground: '000000' },
+                { token: 'delimiter', foreground: '000000' },
+                { token: 'delimiter.parenthesis', foreground: '000000' },
+                { token: 'delimiter.bracket', foreground: '000000' },
+
+                // Decorators (Python @decorator)
+                { token: 'tag', foreground: 'af00db' },
+                { token: 'meta.decorator', foreground: 'af00db' },
+            ],
             colors: {
-                'editor.background': '#0b101c',
-                'editor.lineHighlightBackground': '#ffffff0a',
-                'editorLineNumber.foreground': '#4f5b72',
-                'editorGutter.background': '#0b101c'
+                'editor.background': '#ffffff',
+                'editor.foreground': '#1e293b',
+                'editor.lineHighlightBackground': '#f8fafc',
+                'editor.lineHighlightBorder': '#e2e8f0',
+                'editorLineNumber.foreground': '#94a3b8',
+                'editorLineNumber.activeForeground': '#0f172a',
+                'editorGutter.background': '#ffffff',
+                'editorCursor.foreground': '#1f9e8e',
+                'editor.selectionBackground': '#b3d7ff',
+                'editor.inactiveSelectionBackground': '#e2e8f0',
+                'editorIndentGuide.background': '#e2e8f0',
+                'editorIndentGuide.activeBackground': '#cbd5e1',
+                'editorBracketMatch.background': '#dbeafe',
+                'editorBracketMatch.border': '#93c5fd',
+            }
+        });
+
+        // Dark counterpart — VS Code Dark+ token colors on the app's dark surface (#0F1419)
+        monaco.editor.defineTheme('dailySqlDark', {
+            base: 'vs-dark',
+            inherit: true,
+            rules: [
+                { token: 'comment', foreground: '6a9955', fontStyle: 'italic' },
+                { token: 'comment.sql', foreground: '6a9955', fontStyle: 'italic' },
+                { token: 'comment.python', foreground: '6a9955', fontStyle: 'italic' },
+                { token: 'comment.doc', foreground: '6a9955', fontStyle: 'italic' },
+
+                { token: 'keyword', foreground: '569cd6', fontStyle: 'bold' },
+                { token: 'keyword.sql', foreground: '569cd6', fontStyle: 'bold' },
+                { token: 'keyword.python', foreground: 'c586c0', fontStyle: 'bold' },
+                { token: 'keyword.control', foreground: 'c586c0', fontStyle: 'bold' },
+                { token: 'keyword.operator', foreground: '569cd6' },
+
+                { token: 'entity.name.function', foreground: 'dcdcaa', fontStyle: 'bold' },
+                { token: 'support.function', foreground: 'dcdcaa', fontStyle: 'bold' },
+                { token: 'function', foreground: 'dcdcaa', fontStyle: 'bold' },
+                { token: 'predefined', foreground: 'dcdcaa', fontStyle: 'bold' },
+                { token: 'predefined.sql', foreground: 'dcdcaa', fontStyle: 'bold' },
+
+                { token: 'string', foreground: 'ce9178' },
+                { token: 'string.sql', foreground: 'ce9178' },
+                { token: 'string.python', foreground: 'ce9178' },
+                { token: 'string.quote', foreground: 'ce9178' },
+
+                { token: 'number', foreground: 'b5cea8' },
+                { token: 'number.float', foreground: 'b5cea8' },
+                { token: 'number.hex', foreground: 'b5cea8' },
+                { token: 'constant.numeric', foreground: 'b5cea8' },
+
+                { token: 'type', foreground: '4ec9b0' },
+                { token: 'type.identifier', foreground: '4ec9b0' },
+                { token: 'entity.name.type', foreground: '4ec9b0' },
+                { token: 'class', foreground: '4ec9b0', fontStyle: 'bold' },
+                { token: 'storage.type', foreground: '569cd6' },
+
+                { token: 'variable', foreground: '9cdcfe' },
+                { token: 'variable.parameter', foreground: '9cdcfe' },
+                { token: 'variable.other', foreground: '9cdcfe' },
+                { token: 'identifier', foreground: 'e2e8f0' },
+
+                { token: 'constant', foreground: '569cd6' },
+                { token: 'constant.language', foreground: '569cd6' },
+
+                { token: 'operator', foreground: 'd4d4d4' },
+                { token: 'operator.sql', foreground: 'd4d4d4' },
+                { token: 'delimiter', foreground: 'd4d4d4' },
+                { token: 'delimiter.parenthesis', foreground: 'd4d4d4' },
+                { token: 'delimiter.bracket', foreground: 'd4d4d4' },
+
+                { token: 'tag', foreground: 'c586c0' },
+                { token: 'meta.decorator', foreground: 'c586c0' },
+            ],
+            colors: {
+                'editor.background': '#0f1419',
+                'editor.foreground': '#e2e8f0',
+                'editor.lineHighlightBackground': '#1a2332',
+                'editor.lineHighlightBorder': '#20283c',
+                'editorLineNumber.foreground': '#5a6b80',
+                'editorLineNumber.activeForeground': '#e2e8f0',
+                'editorGutter.background': '#0f1419',
+                'editorCursor.foreground': '#4dd4c4',
+                'editor.selectionBackground': '#264f78',
+                'editor.inactiveSelectionBackground': '#20283c',
+                'editorIndentGuide.background': '#20283c',
+                'editorIndentGuide.activeBackground': '#354258',
+                'editorBracketMatch.background': '#1f4a5c',
+                'editorBracketMatch.border': '#4dd4c4',
             }
         });
     };
@@ -1380,36 +1580,40 @@ export function DailySetClient() {
     return (
         <div
             ref={containerRef}
-            className="h-screen bg-[#080c16] text-white flex flex-col font-sans overflow-hidden [&_*::-webkit-scrollbar]:w-1.5 [&_*::-webkit-scrollbar-track]:bg-transparent [&_*::-webkit-scrollbar-thumb]:bg-[#202736] [&_*::-webkit-scrollbar-thumb]:rounded-full hover:[&_*::-webkit-scrollbar-thumb]:bg-zinc-600"
+            className="landing-light h-screen bg-[#f7f7f8] text-zinc-900 flex flex-col font-sans overflow-hidden [&_*::-webkit-scrollbar]:w-1.5 [&_*::-webkit-scrollbar-track]:bg-transparent [&_*::-webkit-scrollbar-thumb]:bg-zinc-300 [&_*::-webkit-scrollbar-thumb]:rounded-full hover:[&_*::-webkit-scrollbar-thumb]:bg-zinc-400"
         >
             {/* ════════════════════════════════════════════
                 INTEGRATED TOP BAR
             ════════════════════════════════════════════ */}
-            <div className="h-14 bg-[#0d121c] border-b border-[#202736] flex items-center px-6 shrink-0 relative z-[100] gap-3">
+            <div className="h-14 bg-[#f8f9fa] border-b border-[#dedee2] flex items-center px-6 shrink-0 relative z-[100] gap-3">
 
                 {/* ── LEFT: Logo + Set selector ── */}
                 <div className="flex items-center gap-3 shrink-0">
-                    <Link href="/" className="text-base font-bold text-white hover:opacity-80 transition-opacity">
-                        DailySQL
+                    <Link href="/" className="flex items-center group shrink-0">
+                        <img
+                            src="/dailysql-wordmark-bg-removed.png"
+                            alt="DailySQL"
+                            className="dark:invert h-6 w-auto object-contain transition-transform group-hover:scale-105"
+                        />
                     </Link>
-                    <div className="w-px h-5 bg-[#202736]" />
+                    <div className="w-px h-5 bg-[#dedee2]" />
                     <div className="relative" ref={sidebarDropdownRef}>
                         <button
                             onClick={() => setSidebarDropdownOpen(!sidebarDropdownOpen)}
-                            className="flex items-center gap-2 text-sm font-medium text-zinc-300 hover:text-white bg-[#131924] border border-[#202736] rounded px-3 py-1.5 transition-colors"
+                            className="flex items-center gap-2 text-xs font-semibold text-zinc-800 bg-white border border-[#dedee2] hover:border-[#1f9e8e] rounded-lg px-3 py-1.5 transition-colors shadow-2xs"
                         >
                             {activeSidebarTab === 'today' ? "Today's Set" : "Problem List"}
-                            <ChevronDown size={13} className={`transition-transform duration-200 ${sidebarDropdownOpen ? 'rotate-180' : ''}`} />
+                            <ChevronDown size={13} className={`transition-transform duration-200 text-zinc-500 ${sidebarDropdownOpen ? 'rotate-180' : ''}`} />
                         </button>
                         {sidebarDropdownOpen && (
-                            <div className="absolute top-full left-0 mt-1.5 w-40 bg-[#131924] border border-[#202736] rounded-lg overflow-hidden py-1 z-[300] shadow-xl">
+                            <div className="absolute top-full left-0 mt-1.5 w-44 bg-white border border-[#dedee2] rounded-xl overflow-hidden py-1 z-[300] shadow-xl">
                                 <button
                                     onClick={() => { setActiveSidebarTab('today'); setSidebarDropdownOpen(false); }}
-                                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${activeSidebarTab === 'today' ? 'text-[#4DD4C4] bg-[#4DD4C4]/5' : 'text-zinc-300 hover:text-white hover:bg-[#202736]'}`}
+                                    className={`w-full text-left px-3.5 py-2 text-xs font-medium transition-colors ${activeSidebarTab === 'today' ? 'text-[#1f9e8e] bg-[#e6f7f5] font-semibold' : 'text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50'}`}
                                 >Today&apos;s Set</button>
                                 <button
                                     onClick={() => { setActiveSidebarTab('list'); setSidebarDropdownOpen(false); }}
-                                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${activeSidebarTab === 'list' ? 'text-[#4DD4C4] bg-[#4DD4C4]/5' : 'text-zinc-300 hover:text-white hover:bg-[#202736]'}`}
+                                    className={`w-full text-left px-3.5 py-2 text-xs font-medium transition-colors ${activeSidebarTab === 'list' ? 'text-[#1f9e8e] bg-[#e6f7f5] font-semibold' : 'text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50'}`}
                                 >Problem List</button>
                             </div>
                         )}
@@ -1423,7 +1627,7 @@ export function DailySetClient() {
                         <button
                             onClick={handleRun}
                             disabled={!activeProblemId}
-                            className={`flex items-center gap-2 px-5 py-2 text-[#080C16] text-sm font-bold rounded transition-colors shadow-[0_0_10px_rgba(77,212,196,0.2)] ${activeProblemId ? 'bg-[#4DD4C4] hover:bg-[#3dbdb0]' : 'bg-zinc-700 cursor-not-allowed shadow-none text-zinc-500'}`}
+                            className={`flex items-center gap-2 px-5 py-2 text-white text-sm font-bold rounded-lg transition-colors shadow-sm ${activeProblemId ? 'bg-[#1f9e8e] hover:bg-[#177a6d]' : 'bg-zinc-300 cursor-not-allowed shadow-none text-zinc-500'}`}
                         >
                             {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} fill="currentColor" />}
                             Run
@@ -1437,13 +1641,13 @@ export function DailySetClient() {
                             onClick={handleSubmit}
                             disabled={isDsaProblem ? (!activeProblemId || isRunning) : executionResult?.status !== 'correct'}
                             title={isDsaProblem ? 'Submit against all test cases' : 'Submit solution'}
-                            className={`flex items-center gap-1.5 px-4 py-2 rounded text-sm font-bold transition-colors ${isDsaProblem
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${isDsaProblem
                                     ? (!activeProblemId || isRunning)
-                                        ? 'bg-zinc-700 cursor-not-allowed text-zinc-500'
-                                        : 'bg-[#4DD4C4]/15 border border-[#4DD4C4]/40 text-[#4DD4C4] hover:bg-[#4DD4C4]/25 shadow-[0_0_8px_rgba(77,212,196,0.15)]'
+                                        ? 'bg-zinc-100 border border-[#dedee2] cursor-not-allowed text-zinc-400'
+                                        : 'bg-[#e6f7f5] border border-[#1f9e8e]/40 text-[#1f9e8e] hover:bg-[#1f9e8e]/20 shadow-2xs'
                                     : executionResult?.status === 'correct'
-                                        ? 'bg-[#4DD4C4]/15 border border-[#4DD4C4]/40 text-[#4DD4C4] hover:bg-[#4DD4C4]/25 shadow-[0_0_8px_rgba(77,212,196,0.15)]'
-                                        : 'text-zinc-600 border border-[#202736] cursor-not-allowed'
+                                        ? 'bg-[#e6f7f5] border border-[#1f9e8e]/40 text-[#1f9e8e] hover:bg-[#1f9e8e]/20 shadow-2xs'
+                                        : 'text-zinc-400 bg-zinc-100 border border-[#dedee2] cursor-not-allowed'
                                 }`}
                         >
                             <UploadCloud size={14} />
@@ -1456,11 +1660,13 @@ export function DailySetClient() {
                 {/* ── RIGHT: Streak + Timer + Fullscreen + Profile ── */}
                 <div className="ml-auto flex items-center gap-4">
 
+                    <ThemeToggle />
+
                     {/* Tour Help Button */}
                     <button
                         onClick={startTour}
                         title="Take the Tour"
-                        className="flex items-center gap-1.5 text-zinc-500 hover:text-[#4DD4C4] transition-colors text-[11px] font-semibold"
+                        className="flex items-center gap-1.5 text-zinc-600 hover:text-[#1f9e8e] transition-colors text-[11px] font-semibold"
                     >
                         <Info size={14} />
                         <span className="hidden sm:inline">Tour</span>
@@ -1471,7 +1677,7 @@ export function DailySetClient() {
                         <button
                             onClick={() => setTimerExpanded(!timerExpanded)}
                             title={timerExpanded ? 'Collapse timer' : 'Expand timer'}
-                            className={`flex items-center gap-2 transition-colors ${timerRunning ? 'text-[#4DD4C4]' : 'text-zinc-400 hover:text-white'}`}
+                            className={`flex items-center gap-2 transition-colors ${timerRunning ? 'text-[#1f9e8e] font-bold' : 'text-zinc-600 hover:text-zinc-900'}`}
                         >
                             <Timer size={16} />
                             {timerExpanded && (
@@ -1481,11 +1687,11 @@ export function DailySetClient() {
                             )}
                         </button>
                         {timerExpanded && (
-                            <div className="flex items-center gap-1.5 pl-2 border-l border-[#202736]">
+                            <div className="flex items-center gap-1.5 pl-2 border-l border-[#dedee2]">
                                 <button
                                     onClick={() => setTimerRunning(!timerRunning)}
                                     title={timerRunning ? 'Pause' : 'Start'}
-                                    className="text-zinc-400 hover:text-white transition-colors"
+                                    className="text-zinc-600 hover:text-zinc-900 transition-colors"
                                 >
                                     {timerRunning ? <Pause size={14} /> : <Play size={14} />}
                                 </button>
@@ -1495,7 +1701,7 @@ export function DailySetClient() {
                                         setTimerSeconds(timerMode === 'timer' ? ((activeProblem?.estimated_time_minutes || 15) * 60) : 0);
                                     }}
                                     title="Reset"
-                                    className="text-zinc-400 hover:text-white transition-colors"
+                                    className="text-zinc-600 hover:text-zinc-900 transition-colors"
                                 >
                                     <RotateCcw size={14} />
                                 </button>
@@ -1507,23 +1713,23 @@ export function DailySetClient() {
                                         setTimerSeconds(newMode === 'timer' ? ((activeProblem?.estimated_time_minutes || 15) * 60) : 0);
                                     }}
                                     title={timerMode === 'stopwatch' ? 'Switch to Countdown Timer' : 'Switch to Stopwatch'}
-                                    className="text-xs font-mono font-bold text-zinc-500 hover:text-zinc-200 bg-[#0b101c] border border-[#202736] rounded px-1.5 py-0.5 transition-colors"
+                                    className="text-xs font-mono font-bold text-zinc-700 hover:text-zinc-900 bg-white border border-[#dedee2] rounded px-1.5 py-0.5 transition-colors shadow-2xs"
                                 >
                                     {timerMode === 'stopwatch' ? 'SW' : 'TM'}
                                 </button>
                                 {timerMode === 'timer' && !timerRunning && (
-                                    <div className="h-[52px] flex items-center justify-between px-2 border-b border-[#202736] bg-[#0d121c]/50">
+                                    <div className="h-[52px] flex items-center justify-between px-2 border-b border-[#dedee2] bg-zinc-50">
                                         <button
                                             onClick={() => setTimerSeconds(s => Math.max(60, s - 60))}
                                             title="-1 minute"
-                                            className="text-zinc-500 hover:text-white bg-[#0b101c] border border-[#202736] rounded w-5 h-5 flex items-center justify-center font-mono text-xs leading-none transition-colors"
+                                            className="text-zinc-600 hover:text-zinc-900 bg-white border border-[#dedee2] rounded w-5 h-5 flex items-center justify-center font-mono text-xs leading-none transition-colors"
                                         >
                                             -
                                         </button>
                                         <button
                                             onClick={() => setTimerSeconds(s => s + 60)}
                                             title="+1 minute"
-                                            className="text-zinc-500 hover:text-white bg-[#0b101c] border border-[#202736] rounded w-5 h-5 flex items-center justify-center font-mono text-xs leading-none transition-colors"
+                                            className="text-zinc-600 hover:text-zinc-900 bg-white border border-[#dedee2] rounded w-5 h-5 flex items-center justify-center font-mono text-xs leading-none transition-colors"
                                         >
                                             +
                                         </button>
@@ -1537,7 +1743,7 @@ export function DailySetClient() {
                     <button
                         onClick={handleFullscreen}
                         title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-                        className="text-zinc-400 hover:text-white transition-colors"
+                        className="text-zinc-600 hover:text-zinc-900 transition-colors"
                     >
                         {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                     </button>
@@ -1549,31 +1755,31 @@ export function DailySetClient() {
                         <div className="relative" ref={profileDropdownRef}>
                             <button
                                 onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                                className="w-9 h-9 rounded-full bg-[#131924] border-2 border-[#202736] hover:border-[#4DD4C4] transition-colors flex items-center justify-center overflow-hidden focus:outline-none"
+                                className="w-9 h-9 rounded-full bg-white border-2 border-[#dedee2] hover:border-[#1f9e8e] transition-colors flex items-center justify-center overflow-hidden focus:outline-none shadow-2xs"
                             >
                                 {userProfile?.avatar_url ? (
                                     <img src={userProfile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
                                 ) : (
-                                    <svg className="w-6 h-6 text-[#4DD4C4] mt-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-6 h-6 text-[#1f9e8e] mt-0.5" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                                     </svg>
                                 )}
                             </button>
                             {profileDropdownOpen && (
-                                <div className="absolute top-10 right-0 w-48 bg-[#131924] border border-[#202736] rounded-xl shadow-2xl overflow-hidden py-1 z-[300]">
-                                    <div className="px-4 py-3 border-b border-[#202736] bg-[#0b101c]">
-                                        <p className="text-xs font-semibold text-white truncate">
+                                <div className="absolute top-10 right-0 w-48 bg-white border border-[#dedee2] rounded-xl shadow-2xl overflow-hidden py-1 z-[300]">
+                                    <div className="px-4 py-3 border-b border-[#dedee2] bg-zinc-50">
+                                        <p className="text-xs font-semibold text-zinc-900 truncate">
                                             {userProfile?.full_name || userProfile?.email?.split('@')[0]}
                                         </p>
-                                        <p className="text-xs text-zinc-400 truncate">{userProfile?.email}</p>
+                                        <p className="text-xs text-zinc-500 truncate">{userProfile?.email}</p>
                                     </div>
                                     <Link href="/profile" onClick={() => setProfileDropdownOpen(false)}>
-                                        <div className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-[#202736] transition-colors cursor-pointer">
-                                            <User size={14} /> My Profile
+                                        <div className="flex items-center gap-2 px-4 py-2 text-xs text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50 transition-colors cursor-pointer font-medium">
+                                            <User size={14} className="text-zinc-500" /> My Profile
                                         </div>
                                     </Link>
                                     <button onClick={() => { handleLogout(); setProfileDropdownOpen(false); }} className="w-full text-left">
-                                        <div className="flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors cursor-pointer">
+                                        <div className="flex items-center gap-2 px-4 py-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer font-medium dark:text-red-300 dark:hover:text-red-200 dark:hover:bg-red-500/10">
                                             <LogOut size={14} /> Log Out
                                         </div>
                                     </button>
@@ -1583,13 +1789,16 @@ export function DailySetClient() {
                     ) : (
                         <Link
                             href="/login"
-                            className="text-xs font-semibold text-[#4DD4C4] hover:text-white border border-[#4DD4C4]/30 hover:border-[#4DD4C4] rounded px-2.5 py-1 transition-colors"
+                            className="text-xs font-semibold text-[#1f9e8e] hover:text-[#177a6d] bg-[#e6f7f5] border border-[#1f9e8e]/30 rounded-lg px-3 py-1.5 transition-colors shadow-2xs dark:hover:text-[#4DD4C4]"
                         >
                             Log In
                         </Link>
                     )}
                 </div>
             </div>
+
+            {/* ── Contextual Trial Status / Expiry Banner ── */}
+            <PracticeTrialBanner subscription={userSubscription} />
 
             {/* ════════════════════════════════════════════
                 MAIN WORKSPACE
@@ -1603,24 +1812,24 @@ export function DailySetClient() {
                         minWidth: sidebarCollapsed ? '52px' : '220px',
                         transition: 'width 250ms ease, min-width 250ms ease'
                     }}
-                    className="flex flex-col bg-[#080c16] border-r border-[#202736] overflow-visible shrink-0"
+                    className="flex flex-col bg-[#f4f6f8] border-r border-[#dedee2] overflow-visible shrink-0"
                 >
                     <div className={`flex-1 flex flex-col h-full ${sidebarCollapsed ? 'overflow-visible' : 'overflow-hidden'}`}>
                         {/* Header / Tabs */}
-                        <div className={`h-[52px] border-b border-[#202736] bg-[#0d121c] flex ${sidebarCollapsed ? 'flex-col justify-center' : 'flex-row'} items-center px-3 shrink-0 transition-all gap-1.5`}>
+                        <div className={`h-[52px] border-b border-[#dedee2] bg-[#eaedf1] flex ${sidebarCollapsed ? 'flex-col justify-center' : 'flex-row'} items-center px-3 shrink-0 transition-all gap-1.5`}>
                             {!sidebarCollapsed ? (
                                 <>
                                     {/* Discipline tabs inline in header */}
                                     {activeSidebarTab === 'today' ? (
-                                        <div className="flex gap-0.5 flex-1 overflow-hidden">
-                                            {([{ id: 'sql', label: 'SQL', Icon: Database, color: 'text-sky-400', bg: 'bg-sky-400/10', border: 'border-sky-400/40' }, { id: 'python', label: 'Python', Icon: Code2, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/40' }, { id: 'pyspark', label: 'PySpark', Icon: Server, color: 'text-violet-400', bg: 'bg-violet-400/10', border: 'border-violet-400/40' }] as const).map(({ id, label, Icon, color, bg, border }) => (
+                                        <div className="flex gap-1 flex-1 overflow-hidden">
+                                            {([{ id: 'sql', label: 'SQL', Icon: Database, color: 'text-sky-700 dark:text-sky-300', bg: 'bg-sky-50 dark:bg-sky-500/10', border: 'border-sky-200 dark:border-sky-500/30' }, { id: 'python', label: 'Python', Icon: Code2, color: 'text-amber-800 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/30' }, { id: 'pyspark', label: 'PySpark', Icon: Server, color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/30' }] as const).map(({ id, label, Icon, color, bg, border }) => (
                                                 <button
                                                     key={id}
                                                     onClick={() => setActiveDisciplineTab(id)}
-                                                    className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-[10px] font-bold border transition-all ${
+                                                    className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
                                                         activeDisciplineTab === id
-                                                            ? `${bg} ${color} ${border}`
-                                                            : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.03] border-transparent'
+                                                            ? `${bg} ${color} ${border} shadow-2xs`
+                                                            : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 border-transparent'
                                                     }`}
                                                 >
                                                     <Icon size={11} />
@@ -1629,15 +1838,15 @@ export function DailySetClient() {
                                             ))}
                                         </div>
                                     ) : (
-                                        <div className="flex gap-0.5 flex-1 overflow-hidden">
+                                        <div className="flex gap-1 flex-1 overflow-hidden">
                                             {([{ id: 'all', label: 'All' }, { id: 'sql', label: 'SQL' }, { id: 'python', label: 'Python' }, { id: 'pyspark', label: 'PySpark' }] as const).map(({ id, label }) => (
                                                 <button
                                                     key={id}
                                                     onClick={() => setTypeFilter(id)}
-                                                    className={`flex-1 flex items-center justify-center py-1.5 rounded text-[10px] font-bold border transition-all ${
+                                                    className={`flex-1 flex items-center justify-center py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
                                                         typeFilter === id
-                                                            ? 'bg-[#4DD4C4]/10 text-[#4DD4C4] border-[#4DD4C4]/40'
-                                                            : 'text-zinc-600 hover:text-zinc-400 hover:bg-white/[0.03] border-transparent'
+                                                            ? 'bg-[#1f9e8e] text-white border-[#1f9e8e] shadow-2xs'
+                                                            : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 border-transparent'
                                                     }`}
                                                 >
                                                     {label}
@@ -1648,16 +1857,16 @@ export function DailySetClient() {
                                     {/* Collapse button */}
                                     <button
                                         onClick={() => setSidebarCollapsed(true)}
-                                        className="p-1.5 hover:bg-[#202736] rounded text-zinc-500 hover:text-white transition-colors shrink-0"
+                                        className="p-1.5 hover:bg-zinc-100 rounded-lg text-zinc-500 hover:text-zinc-900 transition-colors shrink-0"
                                         title="Collapse Sidebar"
                                     >
-                                        <ChevronLeft size={13} />
+                                        <ChevronLeft size={14} />
                                     </button>
                                 </>
                             ) : (
                                 <button
                                     onClick={() => setSidebarCollapsed(false)}
-                                    className="p-2 hover:bg-[#202736] rounded text-zinc-500 hover:text-white transition-colors"
+                                    className="p-2 hover:bg-zinc-100 rounded-lg text-zinc-500 hover:text-zinc-900 transition-colors"
                                     title="Expand Sidebar"
                                 >
                                     <ChevronRight size={16} />
@@ -1700,20 +1909,20 @@ export function DailySetClient() {
                                                     onClick={() => handleProblemSelect(pId)}
                                                     className={`relative group cursor-pointer`}
                                                 >
-                                                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${isActive ? 'ring-4 ring-offset-2 ring-offset-[#080c16] scale-125' : 'hover:scale-150'}`}
+                                                    <div className={`w-3 h-3 rounded-full transition-all duration-300 ${isActive ? 'ring-4 ring-offset-2 ring-offset-white scale-125' : 'hover:scale-150'}`}
                                                         style={{
                                                             backgroundColor: dStyle.hex,
-                                                            boxShadow: isActive ? `0 0 12px ${dStyle.hex}` : 'none',
+                                                            boxShadow: isActive ? `0 0 10px ${dStyle.hex}` : 'none',
                                                         }}
                                                     />
                                                     {isSolved && (
-                                                        <div className="absolute -top-1.5 -right-1.5 bg-[#080c16] rounded-full p-0.5">
-                                                            <CheckCircle2 size={10} className="text-[#4DD4C4]" />
+                                                        <div className="absolute -top-1.5 -right-1.5 bg-white rounded-full p-0.5 shadow-2xs">
+                                                            <CheckCircle2 size={10} className="text-[#1f9e8e]" />
                                                         </div>
                                                     )}
-                                                    {/* Tooltip — rendered at fixed z-index to escape overflow clipping */}
-                                                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 bg-[#131924] border border-[#4DD4C4]/20 rounded-lg text-[10px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 shadow-2xl z-[9999]">
-                                                        <div className="absolute right-full top-1/2 -translate-y-1/2 mr-0 border-4 border-transparent border-r-[#131924]" />
+                                                    {/* Tooltip */}
+                                                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-[10px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 shadow-xl z-[9999]">
+                                                        <div className="absolute right-full top-1/2 -translate-y-1/2 mr-0 border-4 border-transparent border-r-zinc-900" />
                                                         <span className="font-medium">{pInfo.title}</span>
                                                     </div>
                                                 </div>
@@ -1722,12 +1931,12 @@ export function DailySetClient() {
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        {/* ── Discipline Tab content (tabs are now in header) ── */}
+                                        {/* ── Discipline Tab content ── */}
                                         {(() => {
                                             const DISC_TABS = [
-                                                { id: 'sql' as const, label: 'SQL', Icon: Database, color: 'text-sky-400', bg: 'bg-sky-400/10', border: 'border-sky-400/30' },
-                                                { id: 'python' as const, label: 'Python', Icon: Code2, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/30' },
-                                                { id: 'pyspark' as const, label: 'PySpark', Icon: Server, color: 'text-violet-400', bg: 'bg-violet-400/10', border: 'border-violet-400/30' },
+                                                { id: 'sql' as const, label: 'SQL', Icon: Database, color: 'text-sky-700 dark:text-sky-300', bg: 'bg-sky-50 dark:bg-sky-500/10', border: 'border-sky-200 dark:border-sky-500/30' },
+                                                { id: 'python' as const, label: 'Python', Icon: Code2, color: 'text-amber-800 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'border-amber-200 dark:border-amber-500/30' },
+                                                { id: 'pyspark' as const, label: 'PySpark', Icon: Server, color: 'text-purple-700 dark:text-purple-300', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/30' },
                                             ];
                                             const DISC_KEYS: Record<string, Array<keyof DailyPractice>> = {
                                                 sql: ['easy', 'medium', 'advanced'],
@@ -1745,9 +1954,6 @@ export function DailySetClient() {
 
                                             return (
                                                 <>
-
-
-
                                                     {/* Problem cards for the active discipline */}
                                                     {catProblems.length > 0 ? (
                                                         <div className="space-y-2">
@@ -1762,18 +1968,18 @@ export function DailySetClient() {
                                                                         id={cardIdx === 0 ? 'tour-problem-card' : undefined}
                                                                         key={`card-${id ?? cardIdx}`}
                                                                         onClick={() => handleProblemSelect(id!)}
-                                                                        className={`p-3 rounded-lg cursor-pointer border transition-all flex flex-col gap-2 group ${isActive
-                                                                                ? `${activeTabMeta.bg} ${activeTabMeta.border}`
-                                                                                : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'
+                                                                        className={`p-3 rounded-xl cursor-pointer border transition-all flex flex-col gap-2 group ${isActive
+                                                                                ? `bg-[#e6f7f5] border-[#1f9e8e] shadow-2xs`
+                                                                                : 'bg-white border-[#dedee2] hover:border-[#1f9e8e]/40 shadow-2xs'
                                                                             }`}
                                                                     >
                                                                         <div className="flex justify-between items-center">
-                                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
+                                                                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
                                                                                 {dStyle.label}
                                                                             </span>
-                                                                            <CheckCircle2 size={14} className={isSolved ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
+                                                                            <CheckCircle2 size={14} className={isSolved ? 'text-[#1f9e8e]' : 'text-zinc-300'} />
                                                                         </div>
-                                                                        <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'
+                                                                        <div className={`text-xs font-semibold transition-colors line-clamp-2 ${isActive ? 'text-[#135d54]' : 'text-zinc-800 group-hover:text-zinc-950'
                                                                             }`}>
                                                                             {pInfo.title}
                                                                         </div>
@@ -1782,7 +1988,7 @@ export function DailySetClient() {
                                                             })}
                                                         </div>
                                                     ) : (
-                                                        <div className="text-xs text-zinc-500 italic p-4 text-center border border-[#202736] rounded bg-[#131924]">
+                                                        <div className="text-xs text-zinc-500 italic p-4 text-center border border-[#dedee2] rounded-xl bg-white shadow-2xs">
                                                             {dailySet ? `No ${activeDisciplineTab.toUpperCase()} problems today.` : 'No daily set found.'}
                                                         </div>
                                                     )}
@@ -1797,61 +2003,61 @@ export function DailySetClient() {
                                     {!sidebarCollapsed && (
                                         <div className="flex gap-2 mb-2 shrink-0">
                                             <div className="flex-1 relative">
-                                                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+                                                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
                                                 <input
                                                     type="text"
-                                                    placeholder="Search..."
+                                                    placeholder="Search questions..."
                                                     value={searchQuery}
                                                     onChange={e => setSearchQuery(e.target.value)}
-                                                    className="w-full bg-[#131924] border border-[#202736] rounded text-[11px] py-1.5 pl-8 pr-2 text-zinc-300 outline-none focus:border-[#4DD4C4]/50 transition-colors"
+                                                    className="w-full bg-white border border-[#dedee2] rounded-lg text-xs py-1.5 pl-8 pr-2 text-zinc-800 placeholder:text-zinc-400 outline-none focus:border-[#1f9e8e] transition-colors shadow-2xs"
                                                 />
                                             </div>
                                             <div className="relative" ref={filterDropdownRef}>
                                                 <button
                                                     onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                                                    className={`p-1.5 border rounded transition-colors ${(difficultyFilter !== 'all' || typeFilter !== 'all' || statusFilter !== 'all') ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/30 text-[#4DD4C4]' : 'bg-[#131924] border-[#202736] text-[#4DD4C4] hover:bg-[#1a2230]'}`}
+                                                    className={`p-1.5 border rounded-lg transition-colors ${(difficultyFilter !== 'all' || typeFilter !== 'all' || statusFilter !== 'all') ? 'bg-[#e6f7f5] border-[#1f9e8e]/40 text-[#1f9e8e]' : 'bg-white border-[#dedee2] text-zinc-600 hover:bg-zinc-50'}`}
                                                     title="Filters"
                                                 >
-                                                    <Filter size={12} />
+                                                    <Filter size={13} />
                                                 </button>
                                                 {showFilterDropdown && (
-                                                    <div className="absolute top-full right-0 mt-1.5 w-48 bg-[#131924] border border-[#202736] rounded-lg overflow-hidden p-3 z-[300] shadow-xl space-y-3">
+                                                    <div className="absolute top-full right-0 mt-1.5 w-48 bg-white border border-[#dedee2] rounded-xl overflow-hidden p-3 z-[300] shadow-xl space-y-3">
                                                         <div>
-                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Difficulty</div>
+                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1 font-mono">Difficulty</div>
                                                             <div className="flex flex-wrap gap-1">
                                                                 {['all', 'easy', 'medium', 'advanced'].map((lvl) => (
                                                                     <button
                                                                         key={lvl}
                                                                         onClick={() => setDifficultyFilter(lvl)}
-                                                                        className={`px-2 py-1 text-[9px] font-bold rounded uppercase transition-colors ${difficultyFilter === lvl ? 'text-[#080c16] bg-[#4DD4C4]' : 'text-zinc-400 bg-[#080c16] border border-[#202736] hover:text-white hover:bg-[#202736]'}`}
+                                                                        className={`px-2 py-1 text-[9px] font-bold rounded-md uppercase transition-colors ${difficultyFilter === lvl ? 'text-white bg-[#1f9e8e]' : 'text-zinc-600 bg-zinc-100 border border-zinc-200 hover:text-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
                                                                     >
                                                                         {lvl === 'advanced' ? 'hard' : lvl}
                                                                     </button>
                                                                 ))}
                                                             </div>
                                                         </div>
-                                                        <div className="border-t border-[#202736]/50 pt-2">
-                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Category</div>
+                                                        <div className="border-t border-zinc-100 pt-2">
+                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1 font-mono">Category</div>
                                                             <div className="flex flex-wrap gap-1">
                                                                 {[{ val: 'all', label: 'All' }, { val: 'sql', label: 'SQL' }, { val: 'python', label: 'Python' }, { val: 'pyspark', label: 'PySpark' }, { val: 'python_dsa', label: 'DSA' }].map((cat) => (
                                                                     <button
                                                                         key={cat.val}
                                                                         onClick={() => setTypeFilter(cat.val)}
-                                                                        className={`px-2 py-1 text-[9px] font-bold rounded uppercase transition-colors ${typeFilter === cat.val ? 'text-[#080c16] bg-[#4DD4C4]' : 'text-zinc-400 bg-[#080c16] border border-[#202736] hover:text-white hover:bg-[#202736]'}`}
+                                                                        className={`px-2 py-1 text-[9px] font-bold rounded-md uppercase transition-colors ${typeFilter === cat.val ? 'text-white bg-[#1f9e8e]' : 'text-zinc-600 bg-zinc-100 border border-zinc-200 hover:text-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
                                                                     >
                                                                         {cat.label}
                                                                     </button>
                                                                 ))}
                                                             </div>
                                                         </div>
-                                                        <div className="border-t border-[#202736]/50 pt-2">
-                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Status</div>
+                                                        <div className="border-t border-zinc-100 pt-2">
+                                                            <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1 font-mono">Status</div>
                                                             <div className="flex flex-wrap gap-1">
                                                                 {['all', 'solved', 'unsolved'].map((stat) => (
                                                                     <button
                                                                         key={stat}
                                                                         onClick={() => setStatusFilter(stat)}
-                                                                        className={`px-2 py-1 text-[9px] font-bold rounded uppercase transition-colors ${statusFilter === stat ? 'text-[#080c16] bg-[#4DD4C4]' : 'text-zinc-400 bg-[#080c16] border border-[#202736] hover:text-white hover:bg-[#202736]'}`}
+                                                                        className={`px-2 py-1 text-[9px] font-bold rounded-md uppercase transition-colors ${statusFilter === stat ? 'text-white bg-[#1f9e8e]' : 'text-zinc-600 bg-zinc-100 border border-zinc-200 hover:text-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
                                                                     >
                                                                         {stat}
                                                                     </button>
@@ -1877,13 +2083,36 @@ export function DailySetClient() {
                                                 <div
                                                     key={p.id}
                                                     onClick={() => handleProblemSelect(p.id)}
-                                                    className={`flex flex-col gap-2 p-3 rounded border cursor-pointer transition-all group ${isActive ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40' : 'bg-[#131924] border-[#202736] hover:border-[#4DD4C4]/30'}`}
+                                                    className={`flex flex-col gap-2 p-3 rounded-xl border cursor-pointer transition-all group ${
+                                                        p.is_locked
+                                                            ? 'bg-zinc-50/90 border-zinc-200 hover:border-amber-400/60 shadow-2xs dark:bg-white/5'
+                                                            : isActive
+                                                            ? 'bg-[#e6f7f5] border-[#1f9e8e] shadow-2xs'
+                                                            : 'bg-white border-[#dedee2] hover:border-[#1f9e8e]/40 shadow-2xs'
+                                                    }`}
                                                 >
                                                     <div className="flex justify-between items-center">
-                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>{dStyle.label}</span>
-                                                        <CheckCircle2 size={14} className={solvedIds.has(p.id) ? 'text-[#4DD4C4]' : 'text-zinc-600'} />
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${dStyle.color} ${dStyle.bg} ${dStyle.border}`}>
+                                                                {dStyle.label}
+                                                            </span>
+                                                            {p.is_locked && (
+                                                                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 font-mono dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30">
+                                                                    <Lock size={9} /> PRO
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {p.is_locked ? (
+                                                            <Lock size={13} className="text-amber-600 group-hover:text-amber-700 transition-colors dark:text-amber-300 dark:group-hover:text-amber-200" />
+                                                        ) : (
+                                                            <CheckCircle2 size={14} className={solvedIds.has(p.id) ? 'text-[#1f9e8e]' : 'text-zinc-300'} />
+                                                        )}
                                                     </div>
-                                                    <div className={`text-sm font-medium transition-colors line-clamp-2 ${isActive ? 'text-white' : 'text-zinc-300 group-hover:text-white'}`}>{p.title}</div>
+                                                    <div className={`text-xs font-semibold transition-colors line-clamp-2 ${
+                                                        p.is_locked ? 'text-zinc-600 group-hover:text-zinc-900' : isActive ? 'text-[#135d54]' : 'text-zinc-800 group-hover:text-zinc-950'
+                                                    }`}>
+                                                        {p.title}
+                                                    </div>
                                                 </div>
                                             );
                                         })}
@@ -1895,16 +2124,16 @@ export function DailySetClient() {
 
                         {/* Streak Footer */}
                         {!sidebarCollapsed && (
-                            <div id="tour-streak" className="p-4 border-t border-[#202736] bg-[#0d121c] shrink-0">
+                            <div id="tour-streak" className="p-4 border-t border-[#dedee2] bg-white shrink-0">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Daily Streak</span>
-                                    <span className="text-sm font-bold text-white flex items-center gap-1">
-                                        {streak} <Flame size={14} className="text-[#4DD4C4] fill-[#4DD4C4]" />
+                                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest font-mono">Daily Streak</span>
+                                    <span className="text-sm font-bold text-zinc-900 flex items-center gap-1">
+                                        {streak} <Flame size={14} className="text-amber-500 fill-amber-500" />
                                     </span>
                                 </div>
-                                <div className="h-1.5 w-full bg-[#080c16] rounded-full overflow-hidden border border-[#202736]">
+                                <div className="h-1.5 w-full bg-zinc-100 rounded-full overflow-hidden border border-zinc-200">
                                     <div
-                                        className="h-full bg-[#4DD4C4] shadow-[0_0_10px_rgba(77,212,196,0.5)] transition-all duration-1000"
+                                        className="h-full bg-[#1f9e8e] transition-all duration-1000"
                                         style={{ width: `${Math.min(100, (streak / 30) * 100)}%` }}
                                     ></div>
                                 </div>
@@ -1919,11 +2148,11 @@ export function DailySetClient() {
                 <Group orientation="horizontal" className="flex-1 h-full overflow-hidden">
 
                     {/* ── COLUMN 2: PROBLEM DETAILS ── */}
-                    <Panel defaultSize="35" minSize="25" maxSize="50" className="flex flex-col bg-[#0d121c] border-r border-[#202736]">
+                    <Panel defaultSize="35" minSize="25" maxSize="50" className="flex flex-col bg-white border-r border-[#dedee2]">
                         {activeProblemId ? (
                             <div className="flex-1 flex flex-col h-full overflow-hidden">
                                 {/* Tab Bar */}
-                                <div className="h-[52px] border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0 relative">
+                                <div className="h-[52px] border-b border-[#dedee2] bg-[#f8f9fa] px-4 flex items-center justify-between shrink-0 relative">
                                     <div className="flex items-center gap-2">
                                         {/* Prev / Next navigation */}
                                         <div className="flex items-center gap-0.5">
@@ -1931,7 +2160,7 @@ export function DailySetClient() {
                                                 onClick={handlePrevProblem}
                                                 disabled={currentNavIndex <= 0}
                                                 title="Previous problem"
-                                                className="p-1 rounded text-zinc-500 hover:text-white hover:bg-[#202736] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                                                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60 transition-colors disabled:opacity-25 disabled:cursor-not-allowed dark:hover:bg-zinc-700"
                                             >
                                                 <ChevronLeft size={15} />
                                             </button>
@@ -1939,7 +2168,7 @@ export function DailySetClient() {
                                                 onClick={handleNextProblem}
                                                 disabled={currentNavIndex >= navigationList.length - 1}
                                                 title="Next problem"
-                                                className="p-1 rounded text-zinc-500 hover:text-white hover:bg-[#202736] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+                                                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200/60 transition-colors disabled:opacity-25 disabled:cursor-not-allowed dark:hover:bg-zinc-700"
                                             >
                                                 <ChevronRight size={15} />
                                             </button>
@@ -1950,43 +2179,43 @@ export function DailySetClient() {
                                     <div className="flex items-center h-full">
                                         <button
                                             onClick={() => setActiveDetailTab('question')}
-                                            className={`flex items-center gap-1.5 h-full px-4 text-xs font-medium border-b-2 transition-colors ${activeDetailTab === 'question' ? 'text-white border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
+                                            className={`flex items-center gap-1.5 h-full px-4 text-xs font-semibold border-b-2 transition-colors ${activeDetailTab === 'question' ? 'text-[#1f9e8e] border-[#1f9e8e]' : 'text-zinc-500 border-transparent hover:text-zinc-800'}`}
                                         >
                                             Question
                                         </button>
                                         <button
                                             onClick={handleOpenDiscussion}
-                                            className={`flex items-center gap-1.5 h-full px-4 text-xs font-medium border-b-2 transition-colors ${activeDetailTab === 'discussion' ? 'text-white border-[#4DD4C4]' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}
+                                            className={`flex items-center gap-1.5 h-full px-4 text-xs font-semibold border-b-2 transition-colors ${activeDetailTab === 'discussion' ? 'text-[#1f9e8e] border-[#1f9e8e]' : 'text-zinc-500 border-transparent hover:text-zinc-800'}`}
                                         >
                                             Discussion
-                                            {commentCount > 0 && <span className="ml-1 text-[10px] bg-[#4DD4C4]/15 text-[#4DD4C4] rounded-full px-1.5 font-mono leading-tight">{commentCount}</span>}
+                                            {commentCount > 0 && <span className="ml-1 text-[10px] bg-[#e6f7f5] text-[#1f9e8e] rounded-full px-1.5 font-mono leading-tight">{commentCount}</span>}
                                         </button>
                                     </div>
 
                                     {/* Action buttons (Share/Vote) */}
                                     <div className="flex items-center gap-2 shrink-0">
-                                        <div className="flex items-center bg-[#0d121c] border border-[#202736] rounded-md px-1.5 py-1 gap-3">
+                                        <div className="flex items-center bg-white border border-[#dedee2] rounded-lg px-2 py-1 gap-3 shadow-2xs">
                                             <div className="relative group">
                                                 <button
                                                     onClick={handleVote}
                                                     disabled={isVoting}
-                                                    className={`flex items-center gap-1.5 text-xs transition-colors ${problemVotes?.user_has_voted ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-[#4DD4C4]'}`}
+                                                    className={`flex items-center gap-1.5 text-xs transition-colors ${problemVotes?.user_has_voted ? 'text-[#1f9e8e] font-bold' : 'text-zinc-500 hover:text-[#1f9e8e]'}`}
                                                 >
-                                                    <ThumbsUp size={14} fill={problemVotes?.user_has_voted ? 'currentColor' : 'none'} />
+                                                    <ThumbsUp size={13} fill={problemVotes?.user_has_voted ? 'currentColor' : 'none'} />
                                                     {problemVotes !== null && <span className="font-mono text-[11px] font-bold">{problemVotes.likes}</span>}
                                                 </button>
                                                 {authStatus === 'unauthenticated' && <LoginTooltip text="Sign in to like" />}
                                             </div>
 
-                                            <div className="w-[1px] h-3 bg-[#202736]" />
+                                            <div className="w-[1px] h-3 bg-[#dedee2]" />
 
                                             <div className="relative group">
                                                 <button
                                                     onClick={handleDislike}
-                                                    className="text-zinc-500 hover:text-red-400 transition-colors"
+                                                    className="text-zinc-400 hover:text-red-500 transition-colors"
                                                     title="Dislike / Report Issue"
                                                 >
-                                                    <ThumbsDown size={14} />
+                                                    <ThumbsDown size={13} />
                                                 </button>
                                                 {authStatus === 'unauthenticated' && <LoginTooltip text="Sign in to report" />}
                                             </div>
@@ -1995,33 +2224,33 @@ export function DailySetClient() {
                                         <div className="relative" ref={shareDropdownRef}>
                                             <button
                                                 onClick={() => setShareDropdownOpen(!shareDropdownOpen)}
-                                                className="flex items-center gap-2 px-3 py-1.5 bg-[#4DD4C4]/5 border border-[#4DD4C4]/20 rounded-md text-[#4DD4C4] text-[11px] font-bold hover:bg-[#4DD4C4]/10 transition-all shadow-[0_0_15px_rgba(77,212,196,0.05)]"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#e6f7f5] border border-[#1f9e8e]/30 rounded-lg text-[#1f9e8e] text-xs font-semibold hover:bg-[#1f9e8e]/15 transition-all shadow-2xs"
                                             >
-                                                <Share2 size={14} />
+                                                <Share2 size={13} />
                                                 <span>Share</span>
                                             </button>
 
                                             {shareDropdownOpen && (
-                                                <div className="absolute top-full right-0 mt-2 w-48 bg-[#131924] border border-[#202736] rounded-xl shadow-2xl overflow-hidden py-1 z-[300]">
-                                                    <div className="px-4 py-2 border-b border-[#202736] bg-[#0b101c]">
-                                                        <p className="text-[10px] font-bold text-[#4DD4C4] uppercase tracking-wider">Share Question</p>
+                                                <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-[#dedee2] rounded-xl shadow-2xl overflow-hidden py-1 z-[300]">
+                                                    <div className="px-4 py-2 border-b border-[#dedee2] bg-zinc-50">
+                                                        <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider font-mono">Share Question</p>
                                                     </div>
                                                     <div className="p-1">
-                                                        <button onClick={() => handleShare('twitter')} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#202736] rounded-lg transition-colors">
+                                                        <button onClick={() => handleShare('twitter')} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50 rounded-lg transition-colors font-medium">
                                                             <div className="w-6 h-6 rounded bg-[#1DA1F2]/10 flex items-center justify-center">
                                                                 <Twitter size={13} className="text-[#1DA1F2]" />
                                                             </div>
                                                             Twitter
                                                         </button>
-                                                        <button onClick={() => handleShare('linkedin')} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#202736] rounded-lg transition-colors">
+                                                        <button onClick={() => handleShare('linkedin')} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50 rounded-lg transition-colors font-medium">
                                                             <div className="w-6 h-6 rounded bg-[#0A66C2]/10 flex items-center justify-center">
                                                                 <Linkedin size={13} className="text-[#0A66C2]" />
                                                             </div>
                                                             LinkedIn
                                                         </button>
-                                                        <button onClick={() => handleShare('copy')} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-300 hover:text-white hover:bg-[#202736] rounded-lg transition-colors">
-                                                            <div className="w-6 h-6 rounded bg-zinc-700/30 flex items-center justify-center">
-                                                                <Copy size={13} className="text-zinc-400" />
+                                                        <button onClick={() => handleShare('copy')} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-700 hover:text-zinc-950 hover:bg-zinc-50 rounded-lg transition-colors font-medium">
+                                                            <div className="w-6 h-6 rounded bg-zinc-100 flex items-center justify-center">
+                                                                <Copy size={13} className="text-zinc-500" />
                                                             </div>
                                                             Copy Link
                                                         </button>
@@ -2034,54 +2263,60 @@ export function DailySetClient() {
 
                                 {/* Content */}
                                 {activeDetailTab === 'question' ? (
-                                    <div id="tour-problem-description" className="flex-1 overflow-y-auto p-5 space-y-8 scrollbar-thin scrollbar-thumb-zinc-700">
+                                    <div id="tour-problem-description" className="flex-1 overflow-y-auto p-5 space-y-7 scrollbar-thin scrollbar-thumb-zinc-300">
                                         <div>
                                             {activeProblem && (
-                                                <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border mb-2 ${getDiffStyle(activeProblem.difficulty).color} ${getDiffStyle(activeProblem.difficulty).bg} ${getDiffStyle(activeProblem.difficulty).border}`}>
-                                                    {getDiffStyle(activeProblem.difficulty).label}
-                                                </span>
+                                                <div className="flex items-center gap-1.5 mb-2.5">
+                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${getDisciplineStyle(activeProblem.challenge_type).color} ${getDisciplineStyle(activeProblem.challenge_type).bg} ${getDisciplineStyle(activeProblem.challenge_type).border}`}>
+                                                        {(() => { const Icon = getDisciplineStyle(activeProblem.challenge_type).Icon; return <Icon size={11} />; })()}
+                                                        {getDisciplineStyle(activeProblem.challenge_type).label}
+                                                    </span>
+                                                    <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${getDiffStyle(activeProblem.difficulty).color} ${getDiffStyle(activeProblem.difficulty).bg} ${getDiffStyle(activeProblem.difficulty).border}`}>
+                                                        {getDiffStyle(activeProblem.difficulty).label}
+                                                    </span>
+                                                </div>
                                             )}
-                                            <h1 className="text-xl font-bold text-white mb-1 tracking-tight">{activeProblem?.title}</h1>
+                                            <h1 className="text-xl font-bold text-zinc-900 mb-1.5 tracking-tight">{activeProblem?.title}</h1>
                                             <div className="flex gap-3 text-xs text-zinc-500 mb-3 font-mono font-medium">
-                                                <span className="flex items-center gap-1.5"><Timer size={11} /> {activeProblem?.estimated_time_minutes}m Avg</span>
+                                                <span className="flex items-center gap-1.5"><Timer size={12} className="text-zinc-400" /> {activeProblem?.estimated_time_minutes}m Avg</span>
                                             </div>
-                                            <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Task</h3>
-                                            <div className="h-px w-full bg-[#202736] mb-3" />
-                                            <div className="text-zinc-400 text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
+                                            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 font-mono">Task</h3>
+                                            <div className="h-px w-full bg-[#dedee2] mb-3" />
+                                            <div className="text-zinc-700 text-sm leading-relaxed prose prose-zinc prose-sm max-w-none">
                                                 <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>{mainDesc}</ReactMarkdown>
                                             </div>
                                         </div>
 
                                         {!isDsaProblem && (
                                             <div>
-                                                <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                                                    <Database size={11} /> Datasets
+                                                <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5 font-mono">
+                                                    <Database size={12} className="text-[#1f9e8e]" /> Datasets
                                                 </h3>
-                                                <div className="h-px w-full bg-[#202736] mb-3" />
+                                                <div className="h-px w-full bg-[#dedee2] mb-3" />
                                                 {activeDatasets.map((ds, idx) => {
                                                     const colOrder = getColumnOrder(ds.schema_sql, ds.sample_rows[0], ds.seed_data_json);
                                                     return (
                                                         <div key={idx} className="mb-6 last:mb-0 space-y-3">
                                                             <div className="flex items-center gap-2">
-                                                                <div className="h-4 w-1 bg-[#4DD4C4] rounded-full" />
-                                                                <span className="text-xs font-bold text-zinc-300 font-mono uppercase tracking-wider">{ds.table_name}</span>
+                                                                <div className="h-4 w-1 bg-[#1f9e8e] rounded-full" />
+                                                                <span className="text-xs font-bold text-zinc-800 font-mono uppercase tracking-wider">{ds.table_name}</span>
                                                             </div>
 
-                                                            {/* Schema */}
-                                                            <div className="border border-[#202736] rounded-xl overflow-hidden max-w-sm bg-[#080c16] shadow-lg">
-                                                                <table className="w-full text-[10px] text-left border-collapse">
-                                                                    <thead className="bg-[#131924] text-zinc-400">
+                                                            {/* Schema Table */}
+                                                            <div className="border border-[#dedee2] rounded-xl overflow-hidden max-w-sm bg-white shadow-2xs">
+                                                                <table className="w-full text-xs text-left border-collapse">
+                                                                    <thead className="bg-[#f4f6f8] text-zinc-700 font-semibold border-b border-[#dedee2]">
                                                                         <tr>
-                                                                            <th className="px-4 py-2.5 border-b border-[#202736] font-bold uppercase tracking-wider text-[9px]">Column</th>
-                                                                            <th className="px-4 py-2.5 border-b border-[#202736] font-bold uppercase tracking-wider text-[9px]">Type</th>
+                                                                            <th className="px-4 py-2 font-mono font-bold uppercase tracking-wider text-[10px]">Column</th>
+                                                                            <th className="px-4 py-2 font-mono font-bold uppercase tracking-wider text-[10px]">Type</th>
                                                                         </tr>
                                                                     </thead>
-                                                                    <tbody className="divide-y divide-[#202736]/30">
+                                                                    <tbody className="divide-y divide-[#dedee2]">
                                                                         {colOrder.map(col => (
-                                                                            <tr key={col} className="hover:bg-white/[0.02] transition-colors group">
-                                                                                <td className="px-4 py-2 font-mono font-medium text-zinc-300 group-hover:text-[#4DD4C4] transition-colors">{col}</td>
+                                                                            <tr key={col} className="hover:bg-zinc-50 transition-colors group">
+                                                                                <td className="px-4 py-2 font-mono font-medium text-zinc-800 group-hover:text-[#1f9e8e] transition-colors">{col}</td>
                                                                                 <td className="px-4 py-2">
-                                                                                    <span className="bg-[#4DD4C4]/5 text-[#4DD4C4]/80 px-1.5 py-0.5 rounded border border-[#4DD4C4]/20 text-[8px] font-bold font-mono uppercase">
+                                                                                    <span className="bg-[#e6f7f5] text-[#135d54] border border-[#1f9e8e]/20 px-1.5 py-0.5 rounded text-[9px] font-bold font-mono uppercase">
                                                                                         {ds.column_types?.[col] || 'string'}
                                                                                     </span>
                                                                                 </td>
@@ -2092,28 +2327,28 @@ export function DailySetClient() {
                                                             </div>
 
                                                             {/* Sample Data */}
-                                                            <div className="border border-[#202736] rounded-xl overflow-hidden shadow-2xl bg-[#080c16]">
-                                                                <div className="bg-[#131924] px-4 py-2 text-[9px] font-bold text-[#4DD4C4] uppercase tracking-widest border-b border-[#202736] flex items-center justify-between">
+                                                            <div className="border border-[#dedee2] rounded-xl overflow-hidden shadow-2xs bg-[#f8fafb]">
+                                                                <div className="bg-[#edf2f6] px-4 py-2 text-[10px] font-bold text-[#135d54] uppercase tracking-widest border-b border-[#dedee2] flex items-center justify-between font-mono">
                                                                     <span className="flex items-center gap-2">
-                                                                        <div className="w-1 h-1 rounded-full bg-[#4DD4C4]" />
+                                                                        <div className="w-1.5 h-1.5 rounded-full bg-[#1f9e8e]" />
                                                                         Sample Rows
                                                                     </span>
-                                                                    <span className="text-[8px] text-zinc-500 font-normal">Showing first {ds.sample_rows.length} rows</span>
+                                                                    <span className="text-[9px] text-zinc-500 font-normal">Showing first {ds.sample_rows.length} rows</span>
                                                                 </div>
                                                                 <div className="overflow-x-auto custom-scrollbar">
-                                                                    <table className="w-full text-[10px] text-left border-collapse">
-                                                                        <thead className="bg-[#0b101c] text-zinc-500">
+                                                                    <table className="w-full text-xs text-left border-collapse">
+                                                                        <thead className="bg-[#f4f6f8] text-zinc-700 border-b border-[#dedee2]">
                                                                             <tr>
                                                                                 {colOrder.map(h => (
-                                                                                    <th key={h} className="px-4 py-2.5 border-b border-[#202736] font-mono font-bold text-[9px] uppercase tracking-wider">{h}</th>
+                                                                                    <th key={h} className="px-4 py-2 border-r last:border-r-0 border-[#dedee2] font-mono font-bold text-[10px] uppercase tracking-wider">{h}</th>
                                                                                 ))}
                                                                             </tr>
                                                                         </thead>
-                                                                        <tbody className="divide-y divide-[#202736]/20">
+                                                                        <tbody className="divide-y divide-[#dedee2]/60">
                                                                             {ds.sample_rows.map((row: any, i: number) => (
-                                                                                <tr key={i} className="hover:bg-[#4DD4C4]/5 transition-colors group">
+                                                                                <tr key={i} className="hover:bg-[#e6f7f5]/30 transition-colors group">
                                                                                     {colOrder.map((col: string) => (
-                                                                                        <td key={col} className="px-4 py-2.5 text-zinc-400 font-mono group-hover:text-zinc-200 transition-colors">{row[col]?.toString() ?? ''}</td>
+                                                                                        <td key={col} className="px-4 py-2 text-zinc-700 font-mono border-r last:border-r-0 border-[#dedee2]/60 group-hover:text-zinc-950 transition-colors">{row[col]?.toString() ?? ''}</td>
                                                                                     ))}
                                                                                 </tr>
                                                                             ))}
@@ -2129,22 +2364,22 @@ export function DailySetClient() {
 
                                         {!isDsaProblem && (
                                             <div>
-                                                <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Expected Output</h3>
-                                                <div className="h-px w-full bg-[#202736] mb-3" />
+                                                <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 font-mono">Expected Output</h3>
+                                                <div className="h-px w-full bg-[#dedee2] mb-3" />
                                                 {(() => {
                                                     const output = executionResult?.expected || expectedOutput;
                                                     if (output && output.columns.length > 0) {
                                                         return (
-                                                            <div className="border border-[#202736] rounded-xl overflow-hidden shadow-lg bg-[#080c16]">
+                                                            <div className="border border-[#dedee2] rounded-xl overflow-hidden shadow-2xs bg-white">
                                                                 <div className="overflow-x-auto custom-scrollbar">
-                                                                    <table className="w-full text-[10px] text-left border-collapse">
-                                                                        <thead className="bg-[#131924] text-zinc-400">
-                                                                            <tr>{output.columns.map(h => <th key={h} className="px-4 py-2.5 border-b border-[#202736] font-mono font-bold text-[9px] uppercase tracking-wider">{h}</th>)}</tr>
+                                                                    <table className="w-full text-xs text-left border-collapse">
+                                                                        <thead className="bg-[#f0f9f7] text-[#135d54] border-b border-[#dedee2] dark:bg-[#0F1419]">
+                                                                            <tr>{output.columns.map(h => <th key={h} className="px-4 py-2 border-r last:border-r-0 border-[#dedee2] font-mono font-bold text-[10px] uppercase tracking-wider">{h}</th>)}</tr>
                                                                         </thead>
-                                                                        <tbody className="divide-y divide-[#202736]/20">
+                                                                        <tbody className="divide-y divide-[#dedee2]">
                                                                             {output.rows.map((row: any, i: number) => (
-                                                                                <tr key={i} className="hover:bg-green-400/[0.03] transition-colors group">
-                                                                                    {row.map((cell: any, j: number) => <td key={j} className="px-4 py-2.5 text-green-400/80 font-mono group-hover:text-green-400 transition-colors">{cell?.toString()}</td>)}
+                                                                                <tr key={i} className="hover:bg-emerald-50/50 transition-colors group dark:hover:bg-emerald-500/5">
+                                                                                    {row.map((cell: any, j: number) => <td key={j} className="px-4 py-2 text-emerald-700 font-mono border-r last:border-r-0 border-[#dedee2] group-hover:text-emerald-900 transition-colors dark:text-emerald-300 dark:group-hover:text-emerald-200">{cell?.toString()}</td>)}
                                                                                 </tr>
                                                                             ))}
                                                                         </tbody>
@@ -2153,7 +2388,7 @@ export function DailySetClient() {
                                                             </div>
                                                         );
                                                     }
-                                                    return <div className="p-3 bg-[#131924] rounded-lg border border-[#202736] text-xs text-zinc-500 font-mono italic">Loading...</div>;
+                                                    return <div className="p-3 bg-zinc-50 rounded-xl border border-[#dedee2] text-xs text-zinc-500 font-mono italic">Loading expected output...</div>;
                                                 })()}
                                             </div>
                                         )}
@@ -2161,15 +2396,15 @@ export function DailySetClient() {
                                         {hintText && (
                                             <div>
                                                 <h3
-                                                    className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5 cursor-pointer hover:text-white transition-colors flex justify-between items-center"
+                                                    className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 cursor-pointer hover:text-zinc-900 transition-colors flex justify-between items-center font-mono"
                                                     onClick={() => setShowHint(!showHint)}
                                                 >
                                                     <span>Hints</span>
                                                     <span className={`text-[10px] transform transition-transform ${showHint ? 'rotate-180' : ''}`}>&darr;</span>
                                                 </h3>
-                                                <div className="h-px w-full bg-[#202736] mb-3" />
+                                                <div className="h-px w-full bg-[#dedee2] mb-3" />
                                                 {showHint && (
-                                                    <div className="p-3 bg-[#131924] rounded-lg border border-[#202736] text-zinc-400 text-sm leading-relaxed">
+                                                    <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-200 text-amber-900 text-sm leading-relaxed dark:bg-amber-500/5 dark:border-amber-500/30 dark:text-amber-300">
                                                         <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>{hintText}</ReactMarkdown>
                                                     </div>
                                                 )}
@@ -2178,100 +2413,100 @@ export function DailySetClient() {
                                     </div>
                                 ) : (
                                     /* Discussion View */
-                                    <div className="flex-1 flex flex-col overflow-hidden">
-                                        <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-zinc-700">
-                                            {isLoadingComments && <div className="flex justify-center pt-8"><Loader2 size={20} className="animate-spin text-[#4DD4C4]" /></div>}
+                                    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                                        <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-zinc-300">
+                                            {isLoadingComments && <div className="flex justify-center pt-8"><Loader2 size={20} className="animate-spin text-[#1f9e8e]" /></div>}
                                             {!isLoadingComments && comments.length === 0 && (
                                                 <div className="text-center text-xs text-zinc-500 pt-10 space-y-2">
-                                                    <MessageCircle size={28} className="mx-auto text-zinc-700" />
+                                                    <MessageCircle size={28} className="mx-auto text-zinc-400" />
                                                     <p>No comments yet.</p>
                                                 </div>
                                             )}
                                             {comments.map(comment => (
                                                 <div key={comment.id} className="space-y-2">
-                                                    <div className="bg-[#131924] rounded-lg p-3 border border-[#202736]">
+                                                    <div className="bg-[#f8fafb] rounded-xl p-4 border border-[#dedee2]">
                                                         <div className="flex items-start justify-between mb-1.5">
                                                             <div className="flex items-center gap-2">
-                                                                <div className="w-6 h-6 rounded-full bg-[#4DD4C4]/20 flex items-center justify-center text-[10px] font-bold text-[#4DD4C4] shrink-0">{comment.user.initials}</div>
+                                                                <div className="w-6 h-6 rounded-full bg-[#e6f7f5] flex items-center justify-center text-[10px] font-bold text-[#1f9e8e] shrink-0">{comment.user.initials}</div>
                                                                 <div>
-                                                                    <span className="text-xs font-semibold text-zinc-300">{comment.user.full_name}</span>
-                                                                    <span className="text-[10px] text-zinc-600 ml-2">{new Date(comment.created_at).toLocaleDateString()}</span>
+                                                                    <span className="text-xs font-semibold text-zinc-900">{comment.user.full_name}</span>
+                                                                    <span className="text-[10px] text-zinc-500 ml-2">{new Date(comment.created_at).toLocaleDateString()}</span>
                                                                 </div>
                                                             </div>
                                                             {comment.is_own && (
-                                                                <button onClick={() => handleDeleteComment(comment.id)} className="text-zinc-600 hover:text-red-400 transition-colors ml-2 shrink-0"><Trash2 size={12} /></button>
+                                                                <button onClick={() => handleDeleteComment(comment.id)} className="text-zinc-400 hover:text-red-600 transition-colors ml-2 shrink-0 dark:hover:text-red-200"><Trash2 size={13} /></button>
                                                             )}
                                                         </div>
-                                                        <div className="text-xs text-zinc-300 leading-relaxed prose prose-invert prose-xs">
+                                                        <div className="text-xs text-zinc-700 leading-relaxed prose prose-zinc prose-xs">
                                                             <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{comment.body}</ReactMarkdown>
                                                         </div>
                                                         {authStatus === 'authenticated' && (
                                                             <div className="mt-3 flex items-center gap-4">
                                                                 <div className="flex items-center gap-2">
-                                                                    <button onClick={() => handleCommentVote(comment.id, 1)} className={`flex items-center gap-1 text-[10px] transition-colors ${comment.user_vote === 1 ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-[#4DD4C4]'}`}>
+                                                                    <button onClick={() => handleCommentVote(comment.id, 1)} className={`flex items-center gap-1 text-[10px] font-semibold transition-colors ${comment.user_vote === 1 ? 'text-[#1f9e8e]' : 'text-zinc-500 hover:text-[#1f9e8e]'}`}>
                                                                         <ThumbsUp size={12} fill={comment.user_vote === 1 ? 'currentColor' : 'none'} />
                                                                         <span>{comment.likes || 0}</span>
                                                                     </button>
-                                                                    <button onClick={() => handleCommentVote(comment.id, -1)} className={`flex items-center gap-1 text-[10px] transition-colors ${comment.user_vote === -1 ? 'text-red-400' : 'text-zinc-500 hover:text-red-400'}`}>
+                                                                    <button onClick={() => handleCommentVote(comment.id, -1)} className={`flex items-center gap-1 text-[10px] font-semibold transition-colors ${comment.user_vote === -1 ? 'text-red-600 dark:text-red-300' : 'text-zinc-500 hover:text-red-600 dark:hover:text-red-200'}`}>
                                                                         <ThumbsDown size={12} fill={comment.user_vote === -1 ? 'currentColor' : 'none'} />
                                                                         <span>{comment.dislikes || 0}</span>
                                                                     </button>
                                                                 </div>
-                                                                <button onClick={() => setReplyingTo(replyingTo?.id === comment.id ? null : { id: comment.id, userName: comment.user.full_name })} className="text-[10px] text-zinc-500 hover:text-[#4DD4C4] transition-colors flex items-center gap-1"><Reply size={10} /> Reply</button>
+                                                                <button onClick={() => setReplyingTo(replyingTo?.id === comment.id ? null : { id: comment.id, userName: comment.user.full_name })} className="text-[10px] text-zinc-500 hover:text-[#1f9e8e] transition-colors flex items-center gap-1"><Reply size={10} /> Reply</button>
                                                             </div>
                                                         )}
                                                     </div>
 
                                                     {/* Reply Input */}
                                                     {replyingTo && replyingTo.id === comment.id && (
-                                                        <div className="ml-5 bg-[#080c16] rounded-2xl border border-[#4DD4C4]/20 overflow-hidden mb-4">
+                                                        <div className="ml-5 bg-[#f8fafb] rounded-2xl border border-[#dedee2] overflow-hidden mb-4">
                                                             <div
-                                                                className="h-[52px] px-4 border-b border-[#202736] flex items-center justify-between bg-[#0d121c]/50 cursor-row-resize select-none"
+                                                                className="h-[44px] px-4 border-b border-[#dedee2] flex items-center justify-between bg-zinc-100/60 cursor-row-resize select-none dark:bg-white/5"
                                                                 onMouseDown={handleReplyResizeStart}
                                                             >
                                                                 <div className="flex items-center gap-4">
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); setIsReplyPreview(false); }}
-                                                                        className={`text-[9px] font-bold uppercase tracking-widest transition-colors relative py-1 ${!isReplyPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                                        className={`text-[9px] font-bold uppercase tracking-widest transition-colors relative py-1 ${!isReplyPreview ? 'text-[#1f9e8e]' : 'text-zinc-500 hover:text-zinc-800'}`}
                                                                     >
                                                                         Write
-                                                                        {!isReplyPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
+                                                                        {!isReplyPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1f9e8e]" />}
                                                                     </button>
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); setIsReplyPreview(true); }}
-                                                                        className={`text-[9px] font-bold uppercase tracking-widest transition-colors relative py-1 ${isReplyPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                                        className={`text-[9px] font-bold uppercase tracking-widest transition-colors relative py-1 ${isReplyPreview ? 'text-[#1f9e8e]' : 'text-zinc-500 hover:text-zinc-800'}`}
                                                                     >
                                                                         Preview
-                                                                        {isReplyPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
+                                                                        {isReplyPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1f9e8e]" />}
                                                                     </button>
                                                                 </div>
                                                                 <span className="text-[9px] font-bold text-zinc-500 uppercase">Reply to {replyingTo?.userName}</span>
-                                                                <button onClick={(e) => { e.stopPropagation(); setReplyingTo(null); }} className="text-zinc-500 hover:text-white"><X size={12} /></button>
+                                                                <button onClick={(e) => { e.stopPropagation(); setReplyingTo(null); }} className="text-zinc-400 hover:text-zinc-800"><X size={12} /></button>
                                                             </div>
                                                             <div className="flex items-end gap-2 p-2">
-                                                                <div className="flex-1 relative bg-[#080c16] rounded-2xl border border-[#4DD4C4]/20 overflow-hidden">
+                                                                <div className="flex-1 relative bg-white rounded-xl border border-[#dedee2] overflow-hidden">
                                                                     {!isReplyPreview ? (
                                                                         <textarea
                                                                             value={replyText}
                                                                             onChange={e => setReplyText(e.target.value)}
                                                                             placeholder="Write a reply..."
-                                                                            className="w-full bg-transparent p-4 text-[11px] text-zinc-300 outline-none resize-none font-sans"
+                                                                            className="w-full bg-transparent p-4 text-xs text-zinc-800 outline-none resize-none font-sans"
                                                                             style={{ height: replyEditorHeight }}
                                                                             onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handlePostReply(comment.id); }}
                                                                         />
                                                                     ) : (
-                                                                        <div className="p-4 text-[11px] text-zinc-300 overflow-y-auto scrollbar-thin" style={{ height: replyEditorHeight }}>
+                                                                        <div className="p-4 text-xs text-zinc-800 overflow-y-auto scrollbar-thin" style={{ height: replyEditorHeight }}>
                                                                             {replyText ? (
                                                                                 <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{replyText}</ReactMarkdown>
                                                                             ) : (
-                                                                                <span className="text-zinc-600 italic">Nothing to preview</span>
+                                                                                <span className="text-zinc-400 italic">Nothing to preview</span>
                                                                             )}
                                                                         </div>
                                                                     )}
                                                                 </div>
                                                                 <button
                                                                     onClick={() => handlePostReply(comment.id)}
-                                                                    className="text-zinc-600 hover:text-[#4DD4C4] transition-colors p-1.5 shrink-0 mb-1"
+                                                                    className="text-zinc-500 hover:text-[#1f9e8e] transition-colors p-1.5 shrink-0 mb-1"
                                                                 >
                                                                     <Send size={15} />
                                                                 </button>
@@ -2280,14 +2515,14 @@ export function DailySetClient() {
                                                     )}
 
                                                     {comment.replies?.map((reply: any) => (
-                                                        <div key={reply.id} className="ml-5 bg-[#0b101c] rounded-lg p-3 border border-[#202736]/60">
+                                                        <div key={reply.id} className="ml-5 bg-[#f8fafb] rounded-xl p-3 border border-[#dedee2]">
                                                             <div className="flex items-start justify-between mb-1">
                                                                 <div className="flex items-center gap-2">
-                                                                    <div className="w-5 h-5 rounded-full bg-[#4DD4C4]/10 flex items-center justify-center text-[9px] font-bold text-[#4DD4C4] shrink-0">{reply.user.initials}</div>
-                                                                    <span className="text-[11px] font-semibold text-zinc-400">{reply.user.full_name}</span>
+                                                                    <div className="w-5 h-5 rounded-full bg-[#e6f7f5] flex items-center justify-center text-[9px] font-bold text-[#1f9e8e] shrink-0">{reply.user.initials}</div>
+                                                                    <span className="text-xs font-semibold text-zinc-800">{reply.user.full_name}</span>
                                                                 </div>
                                                             </div>
-                                                            <div className="text-[11px] text-zinc-400 leading-relaxed">
+                                                            <div className="text-xs text-zinc-700 leading-relaxed">
                                                                 <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{reply.body}</ReactMarkdown>
                                                             </div>
                                                         </div>
@@ -2297,61 +2532,59 @@ export function DailySetClient() {
                                         </div>
                                         {/* Resize Handle Separator */}
                                         <div
-                                            className="h-[1px] w-full bg-[#202736] hover:bg-[#4DD4C4]/50 cursor-row-resize transition-colors relative shrink-0"
+                                            className="h-[1px] w-full bg-[#dedee2] hover:bg-[#1f9e8e]/50 cursor-row-resize transition-colors relative shrink-0"
                                             onMouseDown={handleCommentResizeStart}
                                         >
                                             <div className="absolute -top-2 -bottom-2 left-0 right-0 z-10" />
                                         </div>
-                                        <div className="p-4 bg-[#0d121c] shrink-0">
+                                        <div className="p-4 bg-[#f8f9fa] border-t border-[#dedee2] shrink-0">
                                             {authStatus === 'authenticated' ? (
                                                 <div className="flex flex-col">
-
-
                                                     {/* Tabs Bar */}
                                                     <div className="flex items-center gap-6 mb-3 px-1 select-none">
                                                         <button
                                                             onClick={() => setIsCommentPreview(false)}
-                                                            className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${!isCommentPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                            className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${!isCommentPreview ? 'text-[#1f9e8e]' : 'text-zinc-500 hover:text-zinc-800'}`}
                                                         >
                                                             Write
-                                                            {!isCommentPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
+                                                            {!isCommentPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1f9e8e]" />}
                                                         </button>
                                                         <button
                                                             onClick={() => setIsCommentPreview(true)}
-                                                            className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${isCommentPreview ? 'text-[#4DD4C4]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                                            className={`text-[10px] font-bold uppercase tracking-widest transition-colors relative py-1 ${isCommentPreview ? 'text-[#1f9e8e]' : 'text-zinc-500 hover:text-zinc-800'}`}
                                                         >
                                                             Preview
-                                                            {isCommentPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4DD4C4]" />}
+                                                            {isCommentPreview && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1f9e8e]" />}
                                                         </button>
                                                     </div>
 
                                                     <div className="flex items-end gap-2">
-                                                        <div className="flex-1 relative bg-[#080c16] rounded-2xl border border-[#202736] overflow-hidden group focus-within:border-[#4DD4C4]/30 transition-all">
+                                                        <div className="flex-1 relative bg-white rounded-2xl border border-[#dedee2] overflow-hidden group focus-within:border-[#1f9e8e]/50 transition-all shadow-2xs">
                                                             {!isCommentPreview ? (
                                                                 <textarea
                                                                     value={newComment}
                                                                     onChange={e => setNewComment(e.target.value)}
                                                                     placeholder="Add to discussion..."
-                                                                    className="w-full bg-transparent p-5 text-[12px] text-zinc-300 outline-none resize-none font-sans"
+                                                                    className="w-full bg-transparent p-4 text-xs text-zinc-800 outline-none resize-none font-sans placeholder:text-zinc-400"
                                                                     style={{ height: commentEditorHeight }}
                                                                     onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handlePostComment(); }}
                                                                 />
                                                             ) : (
-                                                                <div className="p-5 text-[12px] text-zinc-300 overflow-y-auto scrollbar-thin" style={{ height: commentEditorHeight }}>
+                                                                <div className="p-4 text-xs text-zinc-800 overflow-y-auto scrollbar-thin" style={{ height: commentEditorHeight }}>
                                                                     {newComment ? (
                                                                         <ReactMarkdown components={discussionMarkdownComponents} remarkPlugins={[remarkGfm]}>{newComment}</ReactMarkdown>
                                                                     ) : (
-                                                                        <span className="text-zinc-600 italic">Nothing to preview</span>
+                                                                        <span className="text-zinc-400 italic">Nothing to preview</span>
                                                                     )}
                                                                 </div>
                                                             )}
                                                         </div>
                                                         <button
                                                             onClick={handlePostComment}
-                                                            className="text-zinc-600 hover:text-[#4DD4C4] transition-colors p-1.5 shrink-0 mb-2"
+                                                            className="text-zinc-500 hover:text-[#1f9e8e] transition-colors p-2 shrink-0 mb-1"
                                                             title="Ctrl + Enter to send"
                                                         >
-                                                            <Send size={18} />
+                                                            <Send size={16} />
                                                         </button>
                                                     </div>
 
@@ -2362,11 +2595,11 @@ export function DailySetClient() {
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="text-center space-y-2 flex flex-col justify-center h-full">
+                                                <div className="text-center space-y-2 flex flex-col justify-center h-full py-4">
                                                     <p className="text-xs text-zinc-500">Sign in to join the discussion</p>
                                                     <div className="flex gap-2 justify-center">
-                                                        <Link href="/login" className="px-4 py-1.5 bg-[#4DD4C4] text-[#080c16] rounded text-xs font-bold hover:bg-[#3dbdb0] transition-colors">Log In</Link>
-                                                        <Link href="/signup" className="px-4 py-1.5 bg-[#131924] border border-[#202736] text-white rounded text-xs font-bold hover:bg-[#202736] transition-colors">Sign Up</Link>
+                                                        <Link href="/login" className="px-4 py-1.5 bg-[#1f9e8e] text-white rounded-lg text-xs font-bold hover:bg-[#177a6d] transition-colors shadow-2xs">Log In</Link>
+                                                        <Link href="/signup" className="px-4 py-1.5 bg-white border border-[#dedee2] text-zinc-800 rounded-lg text-xs font-bold hover:bg-zinc-50 transition-colors shadow-2xs">Sign Up</Link>
                                                     </div>
                                                 </div>
                                             )}
@@ -2375,39 +2608,39 @@ export function DailySetClient() {
                                 )}
                             </div>
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-zinc-500 gap-4">
-                                <div className="w-16 h-16 rounded-2xl bg-[#131924] border border-[#202736] flex items-center justify-center">
-                                    <Database size={24} className="text-[#4DD4C4]/50" />
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-zinc-500 gap-4 bg-zinc-50/50 dark:bg-white/5">
+                                <div className="w-16 h-16 rounded-2xl bg-white border border-[#dedee2] flex items-center justify-center shadow-sm">
+                                    <Database size={24} className="text-[#1f9e8e]" />
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-sm font-bold text-white">No Problem Selected</p>
-                                    <p className="text-xs leading-relaxed max-w-[200px]">Choose a question from the sidebar to view details and start practice.</p>
+                                    <p className="text-sm font-bold text-zinc-900">No Problem Selected</p>
+                                    <p className="text-xs leading-relaxed max-w-[200px] text-zinc-500">Choose a question from the sidebar to view details and start practice.</p>
                                 </div>
                             </div>
                         )}
                     </Panel>
 
                     {/* Resize Handle */}
-                    <Separator className="w-1.5 bg-[#080c16] hover:bg-[#4DD4C4]/20 transition-colors cursor-col-resize flex flex-col items-center justify-center relative">
-                        <div className="h-8 w-0.5 bg-[#202736] rounded-full" />
+                    <Separator className="w-2 bg-[#f0f2f5] hover:bg-[#1f9e8e]/30 border-x border-[#dedee2] transition-colors cursor-col-resize flex flex-col items-center justify-center relative">
+                        <div className="h-8 w-0.5 bg-zinc-300 rounded-full" />
                     </Separator>
 
                     {/* ── RIGHT PANE: Editor + Output ── */}
-                    <Panel minSize="30" className="flex flex-col bg-[#0b101c]">
+                    <Panel minSize="30" className="flex flex-col bg-white">
                         {/* Editor toolbar */}
-                        <div className="h-[52px] border-b border-[#202736] bg-[#131924] flex items-center justify-between px-4 shrink-0">
+                        <div className="h-[52px] border-b border-[#dedee2] bg-[#fafafa] flex items-center justify-between px-4 shrink-0">
                             <div className="flex items-center gap-3">
                                 {/* Language / dialect label */}
                                 {!isDualDialect && (
-                                    <span className="text-xs font-mono font-medium text-[#4DD4C4] flex items-center gap-2">
-                                        <span className="text-zinc-500">&gt;_</span>
+                                    <span className="text-xs font-mono font-medium text-[#1f9e8e] flex items-center gap-2">
+                                        <span className="text-zinc-400">&gt;_</span>
                                         {activeProblem?.challenge_type === 'python' ? 'Python (Pandas)' : activeProblem?.challenge_type === 'pyspark' ? 'PySpark' : activeProblem?.challenge_type === 'python_dsa' ? 'Python' : activeProblem?.challenge_type === 'sql' ? 'PostgreSQL' : 'SQL'}
                                     </span>
                                 )}
 
                                 {/* Dialect toggle — only shown for dual-dialect SQL problems */}
                                 {isDualDialect && (
-                                    <div className="flex items-center gap-1 bg-[#0b101c] border border-[#202736] rounded-lg p-0.5">
+                                    <div className="flex items-center gap-1 bg-white border border-[#dedee2] rounded-lg p-0.5 shadow-sm">
                                         {(['postgresql', 'mysql'] as const).map(d => (
                                             <button
                                                 key={d}
@@ -2415,8 +2648,8 @@ export function DailySetClient() {
                                                 title={d === 'postgresql' ? 'Run with PostgreSQL' : 'Run with MySQL'}
                                                 className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold transition-all duration-150 ${
                                                     sqlDialect === d
-                                                        ? 'bg-[#4DD4C4]/15 text-[#4DD4C4] border border-[#4DD4C4]/30'
-                                                        : 'text-zinc-500 hover:text-zinc-300'
+                                                        ? 'bg-[#1f9e8e]/15 text-[#1f9e8e] border border-[#1f9e8e]/30 shadow-xs'
+                                                        : 'text-zinc-500 hover:text-zinc-800'
                                                 }`}
                                             >
                                                 {d === 'postgresql' ? 'PostgreSQL' : 'MySQL'}
@@ -2425,7 +2658,7 @@ export function DailySetClient() {
                                     </div>
                                 )}
                             </div>
-                            <div className="flex items-center gap-3 text-zinc-400">
+                            <div className="flex items-center gap-3 text-zinc-500">
                                 <button
                                     onClick={() => {
                                         setCode('');
@@ -2433,7 +2666,7 @@ export function DailySetClient() {
                                             localStorage.removeItem(`draft_query_${activeProblemId}`);
                                         }
                                     }}
-                                    className="hover:text-zinc-200 transition-colors"
+                                    className="hover:text-zinc-900 transition-colors"
                                     title="Clear Code"
                                 >
                                     <Undo size={14} />
@@ -2442,11 +2675,12 @@ export function DailySetClient() {
                         </div>
 
                         {/* Monaco */}
-                        <div id="tour-code-editor" className="flex-1 relative overflow-hidden bg-[#0b101c]">
+                        <div id="tour-code-editor" className="flex-1 relative overflow-hidden bg-white">
                             <Editor
+                                key={resolvedTheme === 'dark' ? 'monaco-dark' : 'monaco-light'} /* remount on theme change: Monaco drops syntax tokens on a live setTheme */
                                 height="100%"
                                 language={activeProblem?.challenge_type === 'sql' ? 'sql' : 'python'}
-                                theme="dailySqlTheme"
+                                theme={resolvedTheme === 'dark' ? 'dailySqlDark' : 'dailySqlLight'}
                                 value={code}
                                 onChange={(val) => {
                                     const newCode = val || "";
@@ -2464,17 +2698,19 @@ export function DailySetClient() {
                                     overviewRulerBorder: false,
                                     scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
                                     fontSize: 14,
-                                    fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+                                    fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Consolas, monospace",
+                                    fontLigatures: true,
                                     lineHeight: 24,
-                                    padding: { top: 4 },
+                                    padding: { top: 8, bottom: 8 },
                                     scrollBeyondLastLine: false,
                                     smoothScrolling: true,
                                     cursorBlinking: "smooth",
                                     cursorSmoothCaretAnimation: "on",
                                     formatOnPaste: true,
+                                    renderLineHighlight: "all",
                                 }}
                             />
-                            <div className="absolute right-16 bottom-3 text-[10px] text-zinc-500 font-mono pointer-events-none px-2 py-1 rounded">
+                            <div className="absolute right-16 bottom-3 text-[10px] text-zinc-400 font-mono pointer-events-none px-2 py-1 rounded bg-white/80 border border-[#dedee2] dark:bg-[#0F1419]/80">
                                 Ln {cursorPos.lineNumber}, Col {cursorPos.column}
                             </div>
 
@@ -2482,7 +2718,7 @@ export function DailySetClient() {
                             <button
                                 onClick={() => openFeedbackModal('fab')}
                                 title="Send Feedback"
-                                className="absolute bottom-3 right-6 z-[30] w-8 h-8 rounded-full bg-[#131924] border border-[#202736] text-zinc-400 hover:text-[#4DD4C4] hover:border-[#4DD4C4]/50 transition-all shadow-lg flex items-center justify-center group"
+                                className="absolute bottom-3 right-6 z-[30] w-8 h-8 rounded-full bg-white border border-[#dedee2] text-zinc-500 hover:text-[#1f9e8e] hover:border-[#1f9e8e]/50 transition-all shadow-md flex items-center justify-center group"
                             >
                                 <MessageCircle size={14} className="group-hover:scale-110 transition-transform" />
                             </button>
@@ -2493,21 +2729,21 @@ export function DailySetClient() {
                             <>
                                 {/* Drag handle for resizing output */}
                                 <div
-                                    className="h-1.5 bg-[#080c16] hover:bg-[#4DD4C4]/20 transition-colors cursor-row-resize flex items-center justify-center shrink-0 border-t border-[#202736]"
+                                    className="h-1.5 bg-[#f4f4f5] hover:bg-[#1f9e8e]/20 transition-colors cursor-row-resize flex items-center justify-center shrink-0 border-t border-[#dedee2]"
                                     onMouseDown={handleOutputResizeStart}
                                 >
-                                    <div className="w-8 h-0.5 bg-[#202736] rounded-full" />
+                                    <div className="w-8 h-0.5 bg-[#cbd5e1] rounded-full" />
                                 </div>
 
-                                <div className="flex flex-col bg-[#0d121c] shrink-0 overflow-hidden" style={{ height: outputHeight }}>
-                                    <div className="h-10 border-b border-[#202736] bg-[#131924] px-4 flex items-center justify-between shrink-0">
+                                <div className="flex flex-col bg-white shrink-0 overflow-hidden" style={{ height: outputHeight }}>
+                                    <div className="h-10 border-b border-[#dedee2] bg-[#f8fafc] px-4 flex items-center justify-between shrink-0">
                                         {isDsaProblem ? (
                                             <div className="flex items-center h-full">
                                                 <button
                                                     onClick={() => setActiveOutputTab('test')}
                                                     className={`h-full px-4 text-xs font-mono font-bold border-b-2 flex items-center gap-1.5 transition-all ${activeOutputTab === 'test'
-                                                            ? 'border-[#4DD4C4] text-[#4DD4C4] bg-[#4DD4C4]/5'
-                                                            : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                                                            ? 'border-[#1f9e8e] text-[#1f9e8e] bg-[#1f9e8e]/5'
+                                                            : 'border-transparent text-zinc-500 hover:text-zinc-800'
                                                         }`}
                                                 >
                                                     <TerminalSquare size={13} /> Test Results
@@ -2515,31 +2751,31 @@ export function DailySetClient() {
                                                 <button
                                                     onClick={() => setActiveOutputTab('submit')}
                                                     className={`h-full px-4 text-xs font-mono font-bold border-b-2 flex items-center gap-1.5 transition-all ${activeOutputTab === 'submit'
-                                                            ? 'border-[#4DD4C4] text-[#4DD4C4] bg-[#4DD4C4]/5'
-                                                            : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                                                            ? 'border-[#1f9e8e] text-[#1f9e8e] bg-[#1f9e8e]/5'
+                                                            : 'border-transparent text-zinc-500 hover:text-zinc-800'
                                                         }`}
                                                 >
                                                     <Sparkles size={13} /> Submission
                                                 </button>
                                             </div>
                                         ) : (
-                                            <span className="text-xs font-bold uppercase tracking-widest text-white font-mono flex items-center gap-2">
-                                                <TerminalSquare size={14} /> Query Output
+                                            <span className="text-xs font-bold uppercase tracking-wider text-zinc-800 font-mono flex items-center gap-2">
+                                                <TerminalSquare size={14} className="text-[#1f9e8e]" /> Query Output
                                             </span>
                                         )}
                                         <span className={`text-xs font-bold font-mono flex items-center gap-1.5 ${isDsaProblem ? (
                                                 activeOutputTab === 'test' ? (
                                                     executionResult?.test_summary
-                                                        ? (executionResult.test_summary.results.filter(r => !r.is_hidden).every(r => r.passed) ? 'text-green-400' : 'text-red-400')
-                                                        : 'text-zinc-400'
+                                                        ? (executionResult.test_summary.results.filter(r => !r.is_hidden).every(r => r.passed) ? 'text-emerald-600 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300')
+                                                        : 'text-zinc-500'
                                                 ) : (
                                                     executionResult && executionResult.status !== 'run_result'
-                                                        ? (executionResult.status === 'correct' ? 'text-green-400' : 'text-red-400')
-                                                        : 'text-zinc-400'
+                                                        ? (executionResult.status === 'correct' ? 'text-emerald-600 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300')
+                                                        : 'text-zinc-500'
                                                 )
                                             ) : (
-                                                executionResult?.status === 'correct' ? 'text-green-400' :
-                                                    executionResult?.status === 'incorrect' ? 'text-red-400' : 'text-zinc-400'
+                                                executionResult?.status === 'correct' ? 'text-emerald-600 dark:text-emerald-300' :
+                                                    executionResult?.status === 'incorrect' ? 'text-rose-600 dark:text-rose-300' : 'text-zinc-500'
                                             )
                                             }`}>
                                             {isDsaProblem ? (
@@ -2565,58 +2801,76 @@ export function DailySetClient() {
                                         </span>
                                     </div>
 
-                                    <div className="flex-1 overflow-auto p-4 bg-[#0d121c]">
+                                    <div className="flex-1 overflow-auto p-4 bg-white font-mono">
                                         {error === "LOGIN_REQUIRED" ? (
                                             <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
-                                                <div className="w-12 h-12 rounded-xl bg-[#4DD4C4]/10 flex items-center justify-center border border-[#4DD4C4]/20 mb-2 shadow-inner">
-                                                    <Lock size={24} className="text-[#4DD4C4]" />
+                                                <div className="w-12 h-12 rounded-xl bg-[#1f9e8e]/10 flex items-center justify-center border border-[#1f9e8e]/20 mb-2 shadow-inner">
+                                                    <Lock size={24} className="text-[#1f9e8e]" />
                                                 </div>
-                                                <h3 className="text-lg font-bold text-white tracking-tight">Practice is Locked</h3>
-                                                <p className="text-zinc-500 text-sm max-w-xs leading-relaxed">Join our community of data pros to run queries, track streaks, and save your progress.</p>
+                                                <h3 className="text-lg font-bold text-zinc-900 tracking-tight font-sans">Practice is Locked</h3>
+                                                <p className="text-zinc-500 text-sm max-w-xs leading-relaxed font-sans">Join our community of data pros to run queries, track streaks, and save your progress.</p>
                                                 <div className="flex gap-4 pt-2">
-                                                    <Link href="/login" className="px-6 py-2 bg-[#4DD4C4] text-[#080c16] rounded-xl font-bold text-sm hover:bg-[#3dbdb0] transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-[#4DD4C4]/20">Log In</Link>
-                                                    <Link href="/signup" className="px-6 py-2 bg-[#131924] border border-[#202736] text-white rounded-xl font-bold text-sm hover:bg-[#202736] transition-all">Sign Up</Link>
+                                                    <Link href="/login" className="px-6 py-2 bg-[#1f9e8e] text-white rounded-xl font-bold text-sm hover:bg-[#177a6d] transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-[#1f9e8e]/20 font-sans">Log In</Link>
+                                                    <Link href="/signup" className="px-6 py-2 bg-white border border-[#dedee2] text-zinc-800 rounded-xl font-bold text-sm hover:bg-zinc-50 transition-all font-sans">Sign Up</Link>
                                                 </div>
                                             </div>
                                         ) : error === "PROFILE_REQUIRED" ? (
                                             <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
-                                                <div className="w-12 h-12 rounded-xl bg-[#60a5fa]/10 flex items-center justify-center border border-[#60a5fa]/20 mb-2">
-                                                    <Sparkles size={24} className="text-[#60a5fa]" />
+                                                <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-200 mb-2 dark:bg-blue-500/10 dark:border-blue-500/30">
+                                                    <Sparkles size={24} className="text-blue-600 dark:text-blue-300" />
                                                 </div>
-                                                <h3 className="text-lg font-bold text-white tracking-tight">One Last Step!</h3>
-                                                <p className="text-zinc-500 text-sm max-w-xs leading-relaxed">Complete your profile setup to unlock full access to the daily practice engine.</p>
+                                                <h3 className="text-lg font-bold text-zinc-900 tracking-tight font-sans">One Last Step!</h3>
+                                                <p className="text-zinc-500 text-sm max-w-xs leading-relaxed font-sans">Complete your profile setup to unlock full access to the daily practice engine.</p>
                                                 <button
                                                     onClick={() => router.push('/profile')}
-                                                    className="px-8 py-2.5 bg-[#60a5fa] text-white rounded-xl font-bold text-sm hover:bg-[#4f83cc] transition-all flex items-center gap-2 group shadow-lg shadow-[#60a5fa]/20"
+                                                    className="px-8 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all flex items-center gap-2 group shadow-lg shadow-blue-500/20 font-sans"
                                                 >
                                                     Complete Setup <ArrowRightIcon size={16} className="group-hover:translate-x-1 transition-transform" />
                                                 </button>
                                             </div>
+                                        ) : error === "SUBSCRIPTION_REQUIRED" ? (
+                                            <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-4 font-sans">
+                                                <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center border border-amber-200 mb-2 shadow-sm dark:bg-amber-500/10 dark:border-amber-500/30">
+                                                    <Lock size={24} className="text-amber-600 dark:text-amber-300" />
+                                                </div>
+                                                <h3 className="text-lg font-bold text-zinc-900 tracking-tight font-sans">DailySQL Pro Required</h3>
+                                                <p className="text-zinc-500 text-sm max-w-sm leading-relaxed font-sans">
+                                                    This problem is part of the Pro Practice Library (SQL #31+, Python & PySpark full archive). Upgrade to Pro for unlimited access across all problems and sandboxes.
+                                                </p>
+                                                <div className="flex gap-3 pt-2">
+                                                    <Link href="/pricing" className="px-6 py-2.5 bg-[#1f9e8e] text-white rounded-xl font-bold text-sm hover:bg-[#177a6d] transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-[#1f9e8e]/20 font-sans">
+                                                        View Pro Plans
+                                                    </Link>
+                                                    <Link href="/practice/daily" className="px-5 py-2.5 bg-white border border-[#dedee2] text-zinc-800 rounded-xl font-bold text-sm hover:bg-zinc-50 transition-all font-sans">
+                                                        Today&apos;s Free Set
+                                                    </Link>
+                                                </div>
+                                            </div>
                                         ) : error ? (
-                                            <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-xl text-red-400 font-mono text-sm flex flex-col gap-3">
-                                                <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-widest opacity-80">
+                                            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 font-mono text-sm flex flex-col gap-3 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-300">
+                                                <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-widest text-red-700 dark:text-red-300">
                                                     <AlertCircle size={14} /> Execution Error
                                                 </div>
-                                                <div className="p-4 bg-[#080c16] border border-red-500/20 rounded-lg text-red-200/90 leading-relaxed whitespace-pre-wrap">{error}</div>
+                                                <div className="p-4 bg-white border border-red-200 rounded-lg text-red-800 leading-relaxed whitespace-pre-wrap dark:border-red-500/30 dark:text-red-300">{error}</div>
                                             </div>
                                         ) : isDsaProblem && executionResult?.test_summary ? (
                                             renderDsaPanel()
                                         ) : executionResult?.user ? (
-                                            <div className="rounded-xl border border-[#202736] overflow-hidden bg-[#080c16] shadow-2xl">
+                                            <div className="rounded-xl border border-[#dedee2] overflow-hidden bg-white shadow-sm font-mono">
                                                 <div className="overflow-x-auto custom-scrollbar">
-                                                    <table className="w-full text-left text-[10px] border-collapse">
-                                                        <thead className="bg-[#131924] text-zinc-400">
+                                                    <table className="w-full text-left text-[11px] border-collapse font-mono">
+                                                        <thead className="bg-[#f8fafc] text-zinc-700 border-b border-[#dedee2]">
                                                             <tr>
                                                                 {executionResult.user.columns.map((k: string) => (
-                                                                    <th key={k} className="px-4 py-2.5 border-b border-[#202736] font-mono font-bold text-[9px] uppercase tracking-wider whitespace-nowrap">{k}</th>
+                                                                    <th key={k} className="px-4 py-2.5 font-mono font-bold text-[10px] uppercase tracking-wider whitespace-nowrap border-r last:border-r-0 border-[#dedee2]">{k}</th>
                                                                 ))}
                                                             </tr>
                                                         </thead>
-                                                        <tbody className="divide-y divide-[#202736]/20">
+                                                        <tbody className="divide-y divide-[#dedee2]">
                                                             {executionResult.user.rows.map((row: any[], i: number) => (
-                                                                <tr key={i} className="hover:bg-[#4DD4C4]/5 transition-colors group">
+                                                                <tr key={i} className="hover:bg-[#f8fafc] transition-colors group">
                                                                     {row.map((cell: any, j: number) => (
-                                                                        <td key={j} className="px-4 py-2.5 text-zinc-300 font-mono group-hover:text-white transition-colors whitespace-nowrap">{cell?.toString()}</td>
+                                                                        <td key={j} className="px-4 py-2.5 text-zinc-800 font-mono group-hover:text-black transition-colors whitespace-nowrap border-r last:border-r-0 border-[#dedee2]">{cell?.toString()}</td>
                                                                     ))}
                                                                 </tr>
                                                             ))}
@@ -2624,7 +2878,7 @@ export function DailySetClient() {
                                                     </table>
                                                 </div>
                                                 {executionResult?.diff_reason && (
-                                                    <div className="bg-red-500/10 text-red-400 w-full p-3 font-mono mt-4 rounded-b-lg border-t border-red-500/20">
+                                                    <div className="bg-red-50 text-red-700 w-full p-3 font-mono text-xs border-t border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30">
                                                         Failed against expected output: {executionResult.diff_reason}
                                                     </div>
                                                 )}
@@ -2633,12 +2887,12 @@ export function DailySetClient() {
                                     </div>
 
 
-                                    <div className="p-4 border-t border-[#202736] bg-[#0b101c] flex justify-between items-center shrink-0">
+                                    <div className="p-3.5 border-t border-[#dedee2] bg-[#fafafa] flex justify-between items-center shrink-0">
                                         <div className="flex text-xs text-zinc-500 gap-4 font-mono">
                                             {!isDsaProblem && (
                                                 <button
                                                     onClick={() => setShowHint(!showHint)}
-                                                    className="cursor-pointer hover:text-zinc-300 transition-colors"
+                                                    className="cursor-pointer hover:text-zinc-800 transition-colors"
                                                 >
                                                     Hint
                                                 </button>
@@ -2649,8 +2903,8 @@ export function DailySetClient() {
                                                 onClick={handleSubmit}
                                                 disabled={!activeProblemId || isRunning}
                                                 className={`px-6 py-2 rounded text-xs font-bold transition-all flex items-center gap-1.5 ${!activeProblemId || isRunning
-                                                        ? 'bg-[#18212f] text-zinc-500 cursor-not-allowed border border-[#202736]'
-                                                        : 'bg-[#4DD4C4] text-[#080C16] hover:bg-[#3dbdb0] shadow-[0_0_10px_rgba(77,212,196,0.2)]'
+                                                        ? 'bg-zinc-200 text-zinc-400 cursor-not-allowed border border-[#dedee2] dark:bg-zinc-700'
+                                                        : 'bg-[#1f9e8e] text-white hover:bg-[#177a6d] shadow-md'
                                                     }`}
                                             >
                                                 {isRunning ? <Loader2 size={12} className="animate-spin" /> : <UploadCloud size={12} />}
@@ -2660,7 +2914,7 @@ export function DailySetClient() {
                                             <button
                                                 onClick={handleSubmit}
                                                 disabled={executionResult?.status !== 'correct'}
-                                                className={`px-6 py-2 rounded text-xs font-bold transition-all ${executionResult?.status === 'correct' ? 'bg-[#4DD4C4] text-[#080C16] hover:bg-[#3dbdb0] shadow-[0_0_10px_rgba(77,212,196,0.2)]' : 'bg-[#18212f] text-zinc-500 cursor-not-allowed border border-[#202736]'}`}
+                                                className={`px-6 py-2 rounded text-xs font-bold transition-all ${executionResult?.status === 'correct' ? 'bg-[#1f9e8e] text-white hover:bg-[#177a6d] shadow-md' : 'bg-zinc-200 text-zinc-400 cursor-not-allowed border border-[#dedee2] dark:bg-zinc-700'}`}
                                             >
                                                 SUBMIT
                                             </button>
@@ -2738,6 +2992,54 @@ export function DailySetClient() {
                         <button onClick={() => setToast(null)} className="text-zinc-500 hover:text-white transition-colors">
                             <X size={16} />
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ══ Pro / Locked Challenge Modal ══ */}
+            {lockedModalProblem && (
+                <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+                    <div className="bg-white border border-[#dedee2] rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 relative overflow-hidden text-center">
+                        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400" />
+                        <button
+                            onClick={() => setLockedModalProblem(null)}
+                            className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-800 transition-colors p-1 rounded-lg hover:bg-zinc-100"
+                        >
+                            <X size={18} />
+                        </button>
+
+                        <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mx-auto shadow-sm dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
+                            <Lock size={28} />
+                        </div>
+
+                        <div className="space-y-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full font-mono dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/30">
+                                Pro Challenge Locked
+                            </span>
+                            <h3 className="text-lg font-bold text-zinc-900 tracking-tight mt-2">
+                                {lockedModalProblem.title}
+                            </h3>
+                            <p className="text-xs text-zinc-600 leading-relaxed max-w-xs mx-auto">
+                                Free tier includes the first 30 SQL questions and today&apos;s 3 SQL daily questions. Upgrade to unlock all questions across SQL, Python, PySpark &amp; DSA.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2.5 pt-2">
+                            <Link
+                                href="/payment"
+                                onClick={() => setLockedModalProblem(null)}
+                                className="w-full bg-[#1f9e8e] hover:bg-[#177a6d] text-white font-bold rounded-xl py-3 text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                            >
+                                Upgrade to Pro Plan →
+                            </Link>
+                            <Link
+                                href="/redeem"
+                                onClick={() => setLockedModalProblem(null)}
+                                className="w-full bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-700 hover:text-zinc-900 font-semibold rounded-xl py-2.5 text-xs transition-colors flex items-center justify-center gap-1.5"
+                            >
+                                <Sparkles size={13} className="text-amber-500" /> Have an invite code or coupon? Redeem here
+                            </Link>
+                        </div>
                     </div>
                 </div>
             )}

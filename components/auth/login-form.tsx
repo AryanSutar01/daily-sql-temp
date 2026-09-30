@@ -1,22 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { saveToken } from "@/lib/auth";
+import { isPlanId, setPendingPlan } from "@/lib/pending-plan";
 import { api } from "@/lib/api";
-import { useSearchParams } from "next/navigation";
-import { useEffect } from "react";
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { Mail, Lock, AlertCircle, X, ArrowRight, Loader2 } from "lucide-react";
 
-import { Mail, Lock, AlertCircle, X, CheckCircle2 } from "lucide-react";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
+
+    // Remember a plan picked on /pricing so checkout can resume after auth (incl. Google OAuth)
+    useEffect(() => {
+        const plan = searchParams.get("plan");
+        if (isPlanId(plan)) setPendingPlan(plan);
+    }, [searchParams]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
@@ -38,6 +43,18 @@ export function LoginForm() {
             setToast({
                 type: 'error',
                 message: "Authentication failed. Please try again."
+            });
+            window.history.replaceState({}, '', window.location.pathname);
+        } else if (errorParam === 'email_not_verified') {
+            setToast({
+                type: 'error',
+                message: "Your Google account's email address is not verified. Please verify it with Google, or sign up with your email instead."
+            });
+            window.history.replaceState({}, '', window.location.pathname);
+        } else if (errorParam === 'account_conflict') {
+            setToast({
+                type: 'error',
+                message: "This email is already linked to a different Google account. Please sign in with the original method or contact support."
             });
             window.history.replaceState({}, '', window.location.pathname);
         }
@@ -63,14 +80,20 @@ export function LoginForm() {
             const { access_token } = await res.json();
             saveToken(access_token);
 
-            const profile = await api.getProfile().catch(() => ({ onboarding_completed: false }));
-            router.push(profile.onboarding_completed ? "/practice/daily" : "/profile");
+            const redirectUrl = searchParams.get("redirect");
+            if (redirectUrl && redirectUrl.startsWith("/")) {
+                router.push(redirectUrl);
+            } else {
+                const profile = await api.getProfile().catch(() => ({ onboarding_completed: false }));
+                router.push(profile.onboarding_completed ? "/practice/daily" : "/profile");
+            }
             router.refresh();
         } catch (err: any) {
             setError(err.message || "Login failed. Please try again.");
         } finally {
             setIsLoading(false);
         }
+
     };
 
     const handleGoogleLogin = () => {
@@ -78,93 +101,96 @@ export function LoginForm() {
     };
 
     return (
-        <div className="w-full space-y-8">
-            <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tight text-white">Sign in to your account</h2>
-                <p className="text-zinc-400 text-sm">Enter your credentials to access the engine</p>
+        <div className="w-full space-y-6">
+            
+            {/* Header */}
+            <div className="space-y-1.5 text-left">
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 font-sans">
+                    Welcome back
+                </h2>
+                <p className="text-zinc-500 text-sm">
+                    Sign in to continue your daily data practice
+                </p>
             </div>
 
+            {/* Error Alert */}
             {error && (
-                <div className="animate-in fade-in zoom-in-95 duration-300 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex flex-col gap-3">
-                    <div className="flex items-start gap-3">
-                        <AlertCircle className="text-red-500 shrink-0 mt-0.5" size={18} />
-                        <div className="flex-1">
-                            <p className="text-red-400 text-sm font-medium leading-relaxed">{error}</p>
-                            {(error.toLowerCase().includes("authorized") || error.toLowerCase().includes("whitelist")) && (
-                                <div className="mt-3">
-                                    <Link href="/waitlist" className="block w-full">
-                                        <Button type="button" className="w-full bg-[#4DD4C4]/10 hover:bg-[#4DD4C4]/20 text-[#4DD4C4] border border-[#4DD4C4]/30 font-bold h-10 rounded-xl transition-all text-sm">
-                                            Join the Waitlist
-                                        </Button>
-                                    </Link>
-                                </div>
-                            )}
-                        </div>
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-rose-800 text-xs dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5 dark:text-rose-300" />
+                    <div className="flex-1">
+                        <p className="font-medium">{error}</p>
+                        {(error.toLowerCase().includes("authorized") || error.toLowerCase().includes("whitelist")) && (
+                            <Link href="/waitlist" className="inline-block mt-2 font-bold text-rose-900 underline dark:text-rose-300">
+                                Join the Waitlist →
+                            </Link>
+                        )}
                     </div>
                 </div>
             )}
 
+            {/* Primary Google Login Button */}
             <Button
                 type="button"
-                variant="outline"
                 onClick={handleGoogleLogin}
                 disabled={isLoading}
-                className="w-full bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10 hover:text-white h-14 rounded-xl font-bold transition-all"
+                className="w-full bg-white hover:bg-zinc-50 text-zinc-800 font-bold border border-[#dedee2] h-12 rounded-xl transition-all shadow-2xs hover:border-zinc-300 flex items-center justify-center gap-3 text-sm cursor-pointer"
             >
-                <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
-                Sign in with Google
+                Continue with Google
             </Button>
 
+            {/* Legacy Email Section */}
             {!showLegacy ? (
-                <div className="text-center pt-2">
+                <div className="text-center pt-1">
                     <button 
                         type="button" 
                         onClick={() => setShowLegacy(true)} 
-                        className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                        className="text-xs text-zinc-500 hover:text-zinc-800 transition-colors"
                     >
-                        Using an old account? Sign in with Email
+                        Sign in with Email & Password
                     </button>
                 </div>
             ) : (
-                <div className="space-y-6 pt-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="space-y-4 pt-2">
                     <div className="relative">
                         <div className="absolute inset-0 flex items-center">
-                            <span className="w-full border-t border-white/5" />
+                            <span className="w-full border-t border-[#dedee2]" />
                         </div>
-                        <div className="relative flex justify-center text-[10px] font-bold uppercase tracking-[0.2em]">
-                            <span className="bg-[#0a0f1c] px-4 text-zinc-500">or</span>
+                        <div className="relative flex justify-center text-[10px] font-bold uppercase tracking-[0.16em]">
+                            <span className="bg-white px-3 text-zinc-400 font-mono">or email</span>
                         </div>
                     </div>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="space-y-3">
-                            <Label htmlFor="email" className="text-[10px] uppercase tracking-[0.1em] font-bold text-zinc-500 ml-1">
-                                Email Address (Legacy)
+
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="email" className="text-xs font-bold text-zinc-700">
+                                Email Address
                             </Label>
-                            <div className="relative group">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={18} />
+                            <div className="relative">
+                                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
                                 <Input
                                     id="email"
                                     type="email"
                                     required
-                                    placeholder="master@sql-engine.com"
+                                    placeholder="you@example.com"
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    className="bg-[#0b101c]/50 border-white/5 text-zinc-200 focus:border-[#4DD4C4]/50 h-14 pl-12 rounded-xl transition-all"
+                                    className="bg-white border-[#dedee2] text-zinc-900 focus:border-[#1f9e8e] focus:ring-[#1f9e8e]/20 h-11 pl-10 rounded-xl"
                                 />
                             </div>
                         </div>
 
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <Label className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase">PASSWORD</Label>
-                            </div>
-                            <div className="relative group">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" size={18} />
+                        <div className="space-y-1.5">
+                            <Label htmlFor="password" className="text-xs font-bold text-zinc-700">
+                                Password
+                            </Label>
+                            <div className="relative">
+                                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
                                 <Input
                                     id="password"
                                     type="password"
@@ -172,7 +198,7 @@ export function LoginForm() {
                                     placeholder="••••••••"
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    className="bg-[#0b101c]/50 border-white/5 text-zinc-200 focus:border-[#4DD4C4]/50 h-14 pl-12 rounded-xl transition-all"
+                                    className="bg-white border-[#dedee2] text-zinc-900 focus:border-[#1f9e8e] focus:ring-[#1f9e8e]/20 h-11 pl-10 rounded-xl"
                                 />
                             </div>
                         </div>
@@ -180,50 +206,44 @@ export function LoginForm() {
                         <Button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-14 rounded-xl transition-all transform active:scale-[0.98] mt-2 text-base border border-white/10"
+                            className="w-full bg-[#1f9e8e] hover:bg-[#177a6d] text-white font-bold h-11 rounded-xl shadow-xs transition-all text-sm mt-1"
                         >
-                            {isLoading ? "Validating..." : "Log In via Email"}
+                            {isLoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                            ) : (
+                                "Sign In"
+                            )}
                         </Button>
                     </form>
                 </div>
             )}
 
-            <div className="text-center pt-4">
-                <p className="text-sm font-medium text-zinc-500">
-                    New to DailySQL? <Link href="/signup" className="text-[#4DD4C4] hover:text-[#3dbdb0] font-bold transition-colors">Sign Up</Link>
+            {/* Bottom link to Sign up */}
+            <div className="text-center pt-2 border-t border-[#dedee2]">
+                <p className="text-xs text-zinc-500">
+                    New to DailySQL?{" "}
+                    <Link href="/signup" className="text-[#1f9e8e] hover:text-[#177a6d] font-bold transition-colors dark:hover:text-[#4DD4C4]">
+                        Create an account
+                    </Link>
                 </p>
             </div>
 
-            {/* ══ Auth Toast ══ */}
+            {/* Toast Notification */}
             {toast && (
-                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[1000] animate-in slide-in-from-bottom-5 duration-300">
-                    <div className="bg-[#0d121c] border-2 border-red-500/50 rounded-2xl p-4 shadow-[0_0_40px_rgba(239,68,68,0.2)] flex flex-col gap-3 min-w-[380px] backdrop-blur-md">
-                        <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
-                                <Lock className="text-red-500 animate-pulse" size={24} />
-                            </div>
-                            <div className="flex-1 pt-1">
-                                <h3 className="text-white font-bold text-sm text-left">Access Restricted</h3>
-                                <p className="text-red-400 text-xs mt-1 text-left leading-relaxed">{toast.message}</p>
-                            </div>
-                            <button onClick={() => setToast(null)} className="text-zinc-500 hover:text-white transition-colors pt-1">
-                                <X size={16} />
-                            </button>
+                <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-3 duration-200">
+                    <div className="bg-white border border-[#dedee2] rounded-2xl p-4 shadow-lg flex items-start gap-3 max-w-sm">
+                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 dark:text-amber-300" />
+                        <div className="flex-1">
+                            <h4 className="text-xs font-bold text-zinc-900">Notice</h4>
+                            <p className="text-xs text-zinc-600 mt-0.5">{toast.message}</p>
                         </div>
-                        {toast.type === 'error' && toast.message.toLowerCase().includes("waitlist") && (
-                            <div className="pt-2 border-t border-red-500/20 mt-1">
-                                <Link href="/waitlist" className="block w-full">
-                                    <Button type="button" className="w-full bg-[#4DD4C4]/10 hover:bg-[#4DD4C4]/20 text-[#4DD4C4] border border-[#4DD4C4]/30 font-bold h-10 rounded-xl transition-all text-sm">
-                                        Join the Waitlist
-                                    </Button>
-                                </Link>
-                            </div>
-                        )}
+                        <button onClick={() => setToast(null)} className="text-zinc-400 hover:text-zinc-600">
+                            <X size={14} />
+                        </button>
                     </div>
                 </div>
             )}
+
         </div>
     );
 }
-
-

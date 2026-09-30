@@ -1,72 +1,447 @@
 "use client";
 
+import { Check, Sparkles, Shield, Zap, ArrowRight, Star, Crown } from "lucide-react";
+import Link from "next/link";
 import { PracticeLink } from "@/components/landing/practice-link";
-import { Check, Zap } from "lucide-react";
 
 export function CTASection() {
-  const features = [
-    "9 new problems every day — SQL, Python & PySpark",
-    "Easy, Medium, and Advanced difficulties",
-    "Live code execution in isolated sandboxes",
-    "Streak tracking and public profile",
-    "Leaderboard & community discussion per problem",
-    "Structured tutorials for all three disciplines",
-  ];
-
   return (
-    <section id="pricing">
-      <section className="py-16 md:py-24 bg-[#080c16]">
-        <div className="container mx-auto px-4">
-          <div className="max-w-2xl mx-auto text-center space-y-8">
-
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#4DD4C4]/30 bg-[#4DD4C4]/10 text-sm text-[#4DD4C4] font-medium">
-              <Zap className="w-3.5 h-3.5" />
-              Free to start
+    <section
+      id="pricing"
+      style={{
+        padding: "100px 0 100px",
+        background: "var(--ls-bg)",
+        borderBottom: "1px solid var(--ls-outline)",
+      }}
+    >
+      <div className="mx-auto px-4 sm:px-6 lg:px-8" style={{ maxWidth: 1400 }}>
+        {/* Section Header */}
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <div
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-[0.16em] mb-4"
+            style={{
+              background: "var(--ls-primary-container)",
+              color: "var(--ls-primary)",
+              border: "1px solid rgba(31,158,142,0.2)",
+            }}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Pricing & Plans
+          </div>
+          <h2
+            style={{
+              fontFamily: "'Overused Grotesk', system-ui, sans-serif",
+              fontSize: "clamp(2.1rem, 3.8vw, 3rem)",
+              fontWeight: 400,
+              lineHeight: 1.15,
+              letterSpacing: "-0.025em",
+              color: "var(--ls-on-surface)",
+            }}
+          >
+            Invest in your data career.
+            <br />
+            <span style={{ color: "var(--ls-on-surface-muted)", fontWeight: 400 }}>
+              Stay sharp, confident, and interview-ready.
             </span>
+          </h2>
+          <p
+            className="mt-4 text-base leading-relaxed max-w-xl mx-auto"
+            style={{ color: "var(--ls-on-surface-muted)" }}
+          >
+            Start with 3 free SQL questions every day, or upgrade to unlock every question across all disciplines, plus step-by-step editorial solutions.
+          </p>
+        </div>
 
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">
-              Start your daily practice today
-            </h2>
+        {/* Pricing Cards Grid (4 Columns) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-stretch max-w-7xl mx-auto mb-16">
 
-            <p className="text-lg text-[#7b8ca3] mb-12">
-              Join hundreds of data professionals who already practice for 15 minutes every day. No credit card required.
-            </p>
-
-            <div className="p-8 rounded-2xl bg-[#121826] border border-[#202736] shadow-xl relative overflow-hidden">
-              {/* Glow */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-px bg-gradient-to-r from-transparent via-[#4DD4C4]/50 to-transparent" />
-
-              {/* Card Content */}
-              <div className="mb-6 text-center flex items-baseline justify-center gap-2">
-                <span className="text-5xl font-bold text-white">Free</span>
-                <span className="text-[#7b8ca3]">to get started</span>
+          {/* ────── 1. FREE PLAN ────── */}
+          <div
+            className="rounded-2xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 hover:translate-y-[-4px]"
+            style={{
+              background: "var(--ls-surface)",
+              border: "1px solid var(--ls-outline)",
+              boxShadow: "var(--ls-shadow-sm)",
+            }}
+          >
+            <div>
+              <div className="mb-6">
+                <span
+                  className="px-2.5 py-1 rounded-md text-xs font-mono font-bold uppercase tracking-wider"
+                  style={{
+                    background: "var(--ls-surface-container)",
+                    color: "var(--ls-on-surface-muted)",
+                    border: "1px solid var(--ls-outline)",
+                  }}
+                >
+                  Free Forever
+                </span>
+                <h3 className="text-xl font-semibold mt-3" style={{ color: "var(--ls-on-surface)" }}>
+                  Free
+                </h3>
+                <p className="text-xs mt-1.5 min-h-[32px]" style={{ color: "var(--ls-on-surface-muted)" }}>
+                  Perfect for establishing a daily coding habit.
+                </p>
               </div>
 
-              <ul className="text-left space-y-3 mb-8">
-                {features.map((item, i) => (
-                  <li key={i} className="flex items-center gap-3 text-zinc-300">
-                    <div className="w-5 h-5 rounded-full bg-[#4DD4C4]/10 border border-[#4DD4C4]/30 flex items-center justify-center shrink-0">
-                      <Check className="w-3 h-3 text-[#4DD4C4]" />
+              <div className="mb-6 pb-6 border-b" style={{ borderColor: "var(--ls-outline)" }}>
+                <div className="flex items-baseline gap-1">
+                  <span
+                    className="text-3xl sm:text-4xl font-bold font-mono tracking-tight"
+                    style={{ color: "var(--ls-on-surface)" }}
+                  >
+                    ₹0
+                  </span>
+                  <span className="text-xs font-medium" style={{ color: "var(--ls-on-surface-subtle)" }}>
+                    / forever
+                  </span>
+                </div>
+              </div>
+
+              {/* Features */}
+              <ul className="space-y-3 mb-8">
+                {[
+                  "3 SQL questions every day — today's daily set",
+                  "First 30 SQL questions of the archive, free",
+                  "In-browser code execution with instant test results",
+                  "Daily streak & solve history tracking",
+                  "Global weekly leaderboard rank",
+                ].map((feat, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-xs leading-relaxed" style={{ color: "var(--ls-on-surface)" }}>
+                    <div
+                      className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                      style={{ background: "var(--ls-surface-container)" }}
+                    >
+                      <Check className="w-2.5 h-2.5" style={{ color: "var(--ls-on-surface-muted)" }} />
                     </div>
-                    {item}
+                    <span className={i < 2 ? "font-semibold" : ""}>{feat}</span>
                   </li>
                 ))}
               </ul>
-
-              <PracticeLink
-                label="Start practicing — it's free"
-                showArrow
-                className="inline-flex items-center justify-center gap-2 whitespace-nowrap bg-[#4DD4C4] text-[#080c16] font-bold hover:bg-[#3dbdb0] shadow-[0_0_60px_rgba(77,212,196,0.15)] hover:shadow-[0_0_80px_rgba(77,212,196,0.25)] transition-all duration-300 h-14 rounded-lg px-10 text-base w-full"
-              />
-
-              <p className="text-xs text-zinc-600 mt-4">
-                No credit card required · Sign up with Google or email
+              <p className="text-[11px] leading-relaxed -mt-4 mb-6" style={{ color: "var(--ls-on-surface-subtle)" }}>
+                Python, PySpark and DSA tracks and the full archive are part of paid plans.
               </p>
             </div>
 
+            <div>
+              <PracticeLink
+                label="Start practicing free"
+                showArrow
+                className="w-full inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl text-xs font-semibold transition-all duration-150"
+                style={{
+                  background: "var(--ls-surface-container)",
+                  color: "var(--ls-on-surface)",
+                  border: "1px solid var(--ls-outline)",
+                }}
+              />
+              <p className="text-[11px] text-center mt-3" style={{ color: "var(--ls-on-surface-subtle)" }}>
+                No credit card needed · Instant setup
+              </p>
+            </div>
+          </div>
+
+          {/* ────── 2. MONTHLY PLAN ────── */}
+          <div
+            className="rounded-2xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 hover:translate-y-[-4px]"
+            style={{
+              background: "var(--ls-surface)",
+              border: "1px solid var(--ls-outline)",
+              boxShadow: "var(--ls-shadow-sm)",
+            }}
+          >
+            <div>
+              <div className="mb-6">
+                <span
+                  className="px-2.5 py-1 rounded-md text-xs font-mono font-bold uppercase tracking-wider text-sky-700 bg-sky-50 border border-sky-200 dark:text-sky-300 dark:bg-sky-500/10 dark:border-sky-500/30"
+                >
+                  Prep Sprint
+                </span>
+                <h3 className="text-xl font-semibold mt-3" style={{ color: "var(--ls-on-surface)" }}>
+                  Monthly
+                </h3>
+                <p className="text-xs mt-1.5 min-h-[32px]" style={{ color: "var(--ls-on-surface-muted)" }}>
+                  Ideal for targeted 30-day technical interview prep.
+                </p>
+              </div>
+
+              <div className="mb-6 pb-6 border-b" style={{ borderColor: "var(--ls-outline)" }}>
+                <div className="flex items-baseline gap-1">
+                  <span
+                    className="text-3xl sm:text-4xl font-bold font-mono tracking-tight"
+                    style={{ color: "var(--ls-on-surface)" }}
+                  >
+                    ₹899
+                  </span>
+                  <span className="text-xs font-medium" style={{ color: "var(--ls-on-surface-subtle)" }}>
+                    / month
+                  </span>
+                </div>
+              </div>
+
+              {/* Features */}
+              <ul className="space-y-3 mb-8">
+                {[
+                  "Full access to every question, across all disciplines",
+                  "SQL, Python (Pandas), PySpark & DSA — nothing locked",
+                  "Step-by-step editorial solutions & query breakdowns",
+                  "Unlimited sandbox runs & retries",
+                  "Company-wise SQL & data sets",
+                ].map((feat, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-xs leading-relaxed" style={{ color: "var(--ls-on-surface)" }}>
+                    <div
+                      className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-sky-50 dark:bg-sky-500/10"
+                    >
+                      <Check className="w-2.5 h-2.5 text-sky-600 dark:text-sky-300" />
+                    </div>
+                    <span className={i === 0 ? "font-semibold" : ""}>{feat}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <Link
+                href="/payment?plan=monthly"
+                className="w-full inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl text-xs font-semibold transition-all duration-150 bg-[#1f9e8e] text-white hover:bg-[#177a6d]"
+              >
+                Get Monthly Access
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <p className="text-[11px] text-center mt-3" style={{ color: "var(--ls-on-surface-subtle)" }}>
+                One-time payment · 30 days of access
+              </p>
+            </div>
+          </div>
+
+          {/* ────── 3. YEARLY PLAN (RECOMMENDED) ────── */}
+          <div
+            className="rounded-2xl p-6 sm:p-7 flex flex-col justify-between relative transition-all duration-300 hover:translate-y-[-4px]"
+            style={{
+              background: "var(--ls-surface)",
+              border: "2px solid var(--ls-primary)",
+              boxShadow: "0 12px 36px rgba(31,158,142,0.16)",
+            }}
+          >
+            {/* Top Badge */}
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap">
+              <span
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-white shadow-xs"
+                style={{ background: "var(--ls-primary)" }}
+              >
+                <Star className="w-3 h-3 fill-white" />
+                Best Value • Save 86%
+              </span>
+            </div>
+
+            <div>
+              <div className="mb-6">
+                <span
+                  className="px-2.5 py-1 rounded-md text-xs font-mono font-bold uppercase tracking-wider"
+                  style={{
+                    background: "var(--ls-primary-container)",
+                    color: "var(--ls-primary)",
+                    border: "1px solid rgba(31,158,142,0.25)",
+                  }}
+                >
+                  Full Mastery
+                </span>
+                <h3 className="text-xl font-semibold mt-3" style={{ color: "var(--ls-on-surface)" }}>
+                  Yearly
+                </h3>
+                <p className="text-xs mt-1.5 min-h-[32px]" style={{ color: "var(--ls-on-surface-muted)" }}>
+                  Year-round consistency for data career growth.
+                </p>
+              </div>
+
+              <div className="mb-6 pb-6 border-b" style={{ borderColor: "var(--ls-outline)" }}>
+                <div className="flex items-baseline gap-1.5">
+                  <span
+                    className="text-3xl sm:text-4xl font-bold font-mono tracking-tight"
+                    style={{ color: "var(--ls-primary)" }}
+                  >
+                    ₹1,499
+                  </span>
+                  <span className="text-xs font-medium" style={{ color: "var(--ls-on-surface-subtle)" }}>
+                    / yr (₹125/mo)
+                  </span>
+                </div>
+              </div>
+
+              {/* Features */}
+              <ul className="space-y-3 mb-8">
+                {[
+                  "Full access to every question, across all disciplines",
+                  "Everything in Monthly, for a full year",
+                  "New problems added every day",
+                  "Save 86% compared to buying Monthly for 12 months",
+                ].map((feat, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-xs leading-relaxed" style={{ color: "var(--ls-on-surface)" }}>
+                    <div
+                      className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                      style={{
+                        background: "var(--ls-primary-container)",
+                      }}
+                    >
+                      <Check className="w-2.5 h-2.5" style={{ color: "var(--ls-primary)" }} />
+                    </div>
+                    <span className={i === 0 ? "font-semibold" : ""}>{feat}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <Link
+                href="/payment?plan=yearly"
+                className="w-full inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl text-xs font-semibold transition-all duration-150 hover:opacity-95 shadow-sm"
+                style={{
+                  background: "var(--ls-primary)",
+                  color: "var(--ls-on-primary)",
+                  boxShadow: "0 3px 12px rgba(31,158,142,0.28)",
+                }}
+              >
+                Get Yearly Access
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <p className="text-[11px] text-center mt-3 font-medium text-emerald-700 dark:text-emerald-300">
+                One-time payment · 12 months of access
+              </p>
+            </div>
+          </div>
+
+          {/* ────── 4. LIFETIME VIP PLAN ────── */}
+          <div
+            className="rounded-2xl p-6 sm:p-7 flex flex-col justify-between relative transition-all duration-300 hover:translate-y-[-4px]"
+            style={{
+              background: "var(--ls-surface)",
+              border: "1px solid rgba(245, 158, 11, 0.4)",
+              boxShadow: "0 8px 24px rgba(245, 158, 11, 0.08)",
+            }}
+          >
+            {/* Top Badge */}
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap">
+              <span
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-amber-950 bg-amber-400 shadow-xs"
+              >
+                <Crown className="w-3 h-3 fill-amber-950" />
+                VIP Deal • Permanent
+              </span>
+            </div>
+
+            <div>
+              <div className="mb-6">
+                <span
+                  className="px-2.5 py-1 rounded-md text-xs font-mono font-bold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200 dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-500/30"
+                >
+                  Lifetime VIP
+                </span>
+                <h3 className="text-xl font-semibold mt-3" style={{ color: "var(--ls-on-surface)" }}>
+                  Lifetime
+                </h3>
+                <p className="text-xs mt-1.5 min-h-[32px]" style={{ color: "var(--ls-on-surface-muted)" }}>
+                  One single payment. Unlimited access forever.
+                </p>
+              </div>
+
+              <div className="mb-6 pb-6 border-b" style={{ borderColor: "var(--ls-outline)" }}>
+                <div className="flex items-baseline gap-1.5">
+                  <span
+                    className="text-3xl sm:text-4xl font-bold font-mono tracking-tight text-amber-600 dark:text-amber-400"
+                  >
+                    ₹4,999
+                  </span>
+                  <span className="text-xs font-medium" style={{ color: "var(--ls-on-surface-subtle)" }}>
+                    / paid once
+                  </span>
+                </div>
+              </div>
+
+              {/* Features */}
+              <ul className="space-y-3 mb-8">
+                {[
+                  "Full access to every question, across all disciplines — for life",
+                  "Everything in Yearly included",
+                  "One payment, permanent access. No renewals",
+                  "New problems and tracks added to the Platform",
+                  "Exclusive VIP community role",
+                ].map((feat, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-xs leading-relaxed" style={{ color: "var(--ls-on-surface)" }}>
+                    <div
+                      className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-amber-50 dark:bg-amber-500/10"
+                    >
+                      <Check className="w-2.5 h-2.5 text-amber-600 dark:text-amber-300" />
+                    </div>
+                    <span className={i === 0 || i === 1 ? "font-semibold" : ""}>{feat}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <Link
+                href="/payment?plan=lifetime"
+                className="w-full inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl text-xs font-semibold transition-all duration-150 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold shadow-xs"
+              >
+                Get Lifetime Access
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <p className="text-[11px] text-center mt-3 font-medium text-amber-800 dark:text-amber-300">
+                Pay once · 7-day refund window ·{" "}
+                <Link href="/refund" className="underline underline-offset-2 hover:opacity-80">
+                  See policy
+                </Link>
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Voucher / Coupon Promotion Bar */}
+        <div className="max-w-4xl mx-auto mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 py-3 px-6 bg-[#e6f7f5] rounded-2xl border border-[#1f9e8e]/25 text-xs text-[#135d54]">
+            <div className="flex items-center gap-2 font-medium">
+              <span className="text-sm">🎟️</span>
+              <span>Have an invite voucher code or early access gift pass?</span>
+            </div>
+            <Link
+              href="/redeem"
+              className="inline-flex items-center gap-1.5 font-bold text-[#1f9e8e] hover:text-[#177a6d] underline underline-offset-2 transition-colors dark:hover:text-[#4DD4C4]"
+            >
+              Redeem Code Here <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </div>
-      </section>
+
+        {/* Value / ROI Callout */}
+        <div
+          className="rounded-2xl p-8 max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6"
+          style={{
+            background: "var(--ls-surface)",
+            border: "1px solid var(--ls-outline)",
+            boxShadow: "var(--ls-shadow-sm)",
+          }}
+        >
+          <div className="space-y-1.5 text-left">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
+              <h4 className="text-sm font-semibold" style={{ color: "var(--ls-on-surface)" }}>
+                Why daily practice is worth it
+              </h4>
+            </div>
+            <p className="text-xs leading-relaxed max-w-xl" style={{ color: "var(--ls-on-surface-muted)" }}>
+              Senior Data Engineer and Analyst roles in India often pay <strong>₹15 LPA to ₹30+ LPA</strong>. Daily practice helps you stay sharp for live SQL and data pipeline interview rounds, though we can&apos;t guarantee interview outcomes.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs shrink-0 font-medium" style={{ color: "var(--ls-on-surface-subtle)" }}>
+            <span className="flex items-center gap-1"><Shield className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" /> Secure checkout</span>
+            <span>•</span>
+            <span>UPI & Cards</span>
+          </div>
+        </div>
+
+      </div>
     </section>
   );
 }
+

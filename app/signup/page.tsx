@@ -8,7 +8,7 @@ export default function SignupPage() {
         <AuthLayout type="signup">
             <Suspense fallback={
                 <div className="h-96 flex items-center justify-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-[#4DD4C4]" />
+                    <Loader2 className="w-8 h-8 animate-spin text-[#1f9e8e]" />
                 </div>
             }>
                 <SignupForm />

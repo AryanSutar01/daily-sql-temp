@@ -11,52 +11,60 @@ export function FAQ() {
   const faqs = [
     {
       question: "Is this for SQL beginners?",
-      answer: "No. Daily SQL is designed for professionals who already know SQL and want to maintain their skills. You should be comfortable with basic SELECT, JOIN, WHERE, and GROUP BY statements. We focus on advanced concepts like window functions, CTEs, and complex aggregations—the SQL you actually use at work.",
+      answer: "No. Daily SQL is designed for professionals and learners who know the basics and want to build real muscle memory. You should understand basic SELECT, JOIN, WHERE, and GROUP BY statements. We focus on advanced concepts like window functions, CTEs, and complex aggregations—the SQL you actually use at work.",
     },
     {
       question: "How much time do I need each day?",
-      answer: "Exactly 15 minutes. We've designed the platform so that three questions (Easy, Medium, Advanced) can be completed in about 15 minutes. It fits into your schedule without overwhelming your day.",
+      answer: "Around 15 minutes. We've designed the daily practice routine so that three questions (Easy, Medium, Advanced) can be completed in a single focused session without overwhelming your day.",
     },
     {
       question: "Is this interview-focused or job-focused?",
-      answer: "Both. The problems are real business-style scenarios you'd encounter at work, which also happen to be what interviewers ask about. Real work prepares you for real interviews.",
+      answer: "Both. The problems simulate real production schemas and business metrics (churn, retention, funnel conversions, anomaly detection) that you encounter at work and in FAANG/top tech technical rounds.",
     },
     {
-      question: "What SQL dialects are supported?",
-      answer: "We primarily support PostgreSQL, the industry standard for modern data stacks. However, the concepts we practice—CTEs, window functions, and complex joins—are applicable to almost all dialects including Snowflake, BigQuery, and Redshift.",
+      question: "What SQL dialects and languages are supported?",
+      answer: "We support PostgreSQL, Python (Pandas/Polars data manipulation), and Apache PySpark. The concepts you practice transfer directly across Snowflake, BigQuery, Redshift, and Databricks.",
     },
     {
-      question: "Can I practice more than 3 questions per day?",
-      answer: "By design, no. The philosophy of Daily SQL is 'consistency over intensity'. We deliberately limit it to 3 questions to prevent burnout and ensure you can maintain the habit long-term.",
+      question: "Can I practice past sets?",
+      answer: "Yes! Pro and Lifetime members have complete access to the full problem archive, custom topic filters, and self-paced interview paths across SQL, Python, and PySpark.",
+    },
+    {
+      question: "What pricing plans and options do you have?",
+      answer: "We have four clear plans: Free Tier (₹0 forever, with 3 SQL questions a day plus the first 30 SQL questions), Monthly Pro (₹899/month for 30-day interview prep), Yearly Pro (₹1,499/year — just ₹125/month for annual mastery), and Lifetime VIP (₹4,999 one-time payment for permanent unlimited access with zero recurring fees).",
     },
     {
       question: "What happens if I miss a day?",
-      answer: "Your streak resets, but you can always catch up. The platform is designed to be forgiving—you can review past questions in the archive whenever you're ready. Consistency is the goal, but perfection isn't required.",
+      answer: "Your streak resets, but you can always catch up using the archive. Consistency is the goal, and the platform makes it effortless to jump right back in.",
     },
   ];
 
   return (
-    <section className="py-16 px-4 sm:px-6 lg:px-8 border-b border-border/50">
+    <section className="landing-light py-20 px-4 sm:px-6 lg:px-8 bg-[#fafafa] text-zinc-900">
       <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-16 space-y-4">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">
-            Frequently asked questions
+        <div className="text-center mb-14 space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#e6f7f5] border border-[#1f9e8e]/20 text-[#1f9e8e] text-xs font-mono font-bold">
+            Frequently Asked Questions
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-bold font-mono tracking-tight text-zinc-900">
+            Got Questions? We&apos;ve Got Answers
           </h2>
-          <p className="text-lg text-muted-foreground">
-            Everything you need to know about Daily SQL
+          <p className="text-sm sm:text-base text-zinc-600">
+            Everything you need to know about practicing, subscriptions, and supported technologies.
           </p>
         </div>
-        <Accordion type="single" collapsible className="w-full space-y-4">
+
+        <Accordion type="single" collapsible className="w-full space-y-3.5">
           {faqs.map((faq, index) => (
             <AccordionItem
               key={index}
               value={`item-${index}`}
-              className="rounded-xl border border-border/40 bg-card/30 px-6 data-[state=open]:border-[#30B5A6]/30 data-[state=open]:bg-[#30B5A6]/5 transition-all duration-300"
+              className="rounded-2xl border border-[#dedee2] bg-white px-6 data-[state=open]:border-[#1f9e8e]/50 data-[state=open]:bg-[#f7fdfc] shadow-xs transition-all duration-200"
             >
-              <AccordionTrigger className="text-left font-semibold hover:no-underline text-lg py-6">
+              <AccordionTrigger className="text-left font-bold font-mono hover:no-underline text-base py-5 text-zinc-900 hover:text-[#1f9e8e]">
                 {faq.question}
               </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground leading-relaxed text-base pb-6">
+              <AccordionContent className="text-zinc-600 leading-relaxed text-sm pb-5">
                 {faq.answer}
               </AccordionContent>
             </AccordionItem>
@@ -66,4 +74,3 @@ export function FAQ() {
     </section>
   );
 }
-

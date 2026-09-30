@@ -1,19 +1,43 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Edit2, Search, Loader2, Sparkles, User, Briefcase, GraduationCap, History, BarChart2, Flame, X, Code, Camera, CheckCircle2, AlertCircle, Trophy, Share2, Check } from "lucide-react";
-import { useRef } from "react";
+import {
+    ArrowLeft,
+    Edit2,
+    Search,
+    Loader2,
+    Sparkles,
+    User,
+    Briefcase,
+    GraduationCap,
+    History,
+    Flame,
+    X,
+    Code,
+    Camera,
+    CheckCircle2,
+    AlertCircle,
+    Trophy,
+    Share2,
+    Check,
+    Target,
+    CalendarDays,
+    Mail,
+    ChevronRight
+} from "lucide-react";
 import { api } from "@/lib/api";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useWalkthrough } from "@/hooks/useWalkthrough";
+import SubscriptionStatus from "@/components/subscription/subscription-status";
+import { appToday, addDays, dateKey } from "@/lib/app-day";
 
 function polarToCartesian(centerX: number, centerY: number, radius: number, angleInDegrees: number) {
-    const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
+    const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
     return {
-        x: centerX + (radius * Math.cos(angleInRadians)),
-        y: centerY + (radius * Math.sin(angleInRadians))
+        x: centerX + radius * Math.cos(angleInRadians),
+        y: centerY + radius * Math.sin(angleInRadians)
     };
 }
 
@@ -25,17 +49,38 @@ function describeArc(x: number, y: number, r: number, startAngle: number, endAng
     if (endAngle >= startAngle) {
         largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
     } else {
-        largeArcFlag = (endAngle + 360.0) - startAngle <= 180 ? "0" : "1";
+        largeArcFlag = endAngle + 360.0 - startAngle <= 180 ? "0" : "1";
     }
-    return [
-        "M", start.x, start.y,
-        "A", r, r, 0, largeArcFlag, 1, end.x, end.y
-    ].join(" ");
+    return ["M", start.x, start.y, "A", r, r, 0, largeArcFlag, 1, end.x, end.y].join(" ");
 }
+
+// Shared surface styles (theme tokens, so light and dark both work)
+const CARD = "rounded-2xl border border-[var(--ls-outline)] bg-[var(--ls-surface)] shadow-[var(--ls-shadow-sm)]";
+const HEADING = "text-[var(--ls-heading)]";
+const MUTED = "text-[var(--ls-on-surface-muted)]";
+const SUBTLE = "text-[var(--ls-on-surface-subtle)]";
+
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+type HeatCell = { key: string; count: number; kind: "pad" | "day" | "future" };
+
+const HEAT_LEVELS = [
+    "bg-[var(--ls-surface-container)] border border-[var(--ls-outline)]",
+    "bg-[#99f6e4] border border-[#5eead4] dark:bg-[#115e59] dark:border-[#0f766e]",
+    "bg-[#2dd4bf] border border-[#14b8a6] dark:bg-[#14b8a6] dark:border-[#2dd4bf]",
+    "bg-[#0f766e] border border-[#115e59] dark:bg-[#5eead4] dark:border-[#99f6e4]"
+];
+const heatLevel = (n: number) => (n <= 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : 3);
 
 export default function ProfilePage() {
     return (
-        <Suspense fallback={<div className="min-h-screen bg-[#080c16] flex items-center justify-center"><Loader2 className="animate-spin text-[#4DD4C4]" /></div>}>
+        <Suspense
+            fallback={
+                <div className="landing-light min-h-screen bg-[#fafafa] flex items-center justify-center">
+                    <Loader2 className="animate-spin text-[#1f9e8e]" size={32} />
+                </div>
+            }
+        >
             <ProfileContent />
         </Suspense>
     );
@@ -52,11 +97,14 @@ function ProfileContent() {
     const [realStats, setRealStats] = useState<any>(null);
     const [submissions, setSubmissions] = useState<any[]>([]);
     const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
+    const [streakCount, setStreakCount] = useState(0);
+    const [activeToday, setActiveToday] = useState(false);
+    const [tab, setTab] = useState<"overview" | "submissions" | "leaderboard">("overview");
     const [isEditing, setIsEditing] = useState(false);
     const [viewingCode, setViewingCode] = useState<{ title: string; query: string } | null>(null);
     const [loadingCode, setLoadingCode] = useState(false);
-    const currentYear = new Date().getFullYear();
-    const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
+    const currentYear = appToday().getUTCFullYear();
+    const [selectedYear, setSelectedYear] = useState<string>("last_12");
     const [leaderboard, setLeaderboard] = useState<any[]>([]);
     const { navigateAndStart } = useWalkthrough();
 
@@ -74,9 +122,10 @@ function ProfileContent() {
     });
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
-    const [toast, setToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
     const [copied, setCopied] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const heatScrollRef = useRef<HTMLDivElement>(null);
 
     const handleShare = () => {
         const url = `https://dailysql.in/u/${profile?.username}`;
@@ -96,66 +145,16 @@ function ProfileContent() {
 
     useEffect(() => {
         async function loadProfile() {
-            // SET USE_MOCK to false to fetch real data
-            const USE_MOCK = false;
-
-            if (USE_MOCK) {
-                const mockProfile = {
-                    exists: true,
-                    full_name: "John Doe",
-                    email: "john.doe@example.com",
-                    occupation: "Professional",
-                    job_role: "Senior Data Analyst",
-                    avatar_url: null,
-                    experience_years: 5
-                };
-                const mockStats = {
-                    easy: { solved: 55, total: 100 },
-                    medium: { solved: 32, total: 80 },
-                    advanced: { solved: 12, total: 40 }
-                };
-                const mockSubmissions = [
-                    { id: 1, title: "Find Top 3 Sales by Department", difficulty: "Medium", status: "Success" },
-                    { id: 2, title: "Calculate Monthly Growth Rate", difficulty: "Hard", status: "Success" },
-                    { id: 3, title: "Basic Select and Filter", difficulty: "Easy", status: "Success" },
-                    { id: 4, title: "Group by and Having Clause", difficulty: "Medium", status: "Success" },
-                ];
-                const mockHeatmap = {
-                    "2025-03-25": 3,
-                    "2025-03-24": 2,
-                    "2025-03-23": 5,
-                    "2025-03-22": 1,
-                    "2025-03-21": 0,
-                    "2025-03-20": 4
-                };
-
-                setProfile(mockProfile);
-                setRealStats(mockStats);
-                setSubmissions(mockSubmissions);
-                setHeatmapData(mockHeatmap);
-                setFormData({
-                    full_name: mockProfile.full_name,
-                    occupation: mockProfile.occupation,
-                    job_role: mockProfile.job_role,
-                    experience_years: mockProfile.experience_years,
-                    avatar_url: mockProfile.avatar_url || "",
-                    username: "johndoe",
-                    is_public_profile: true,
-                    bio: "Mock bio",
-                    linkedin_url: "",
-                    github_url: ""
-                });
-                setIsLoading(false);
-                return;
-            }
-
             try {
-                const [data, s, sub, h, lb] = await Promise.all([
+                // The profile itself is required; everything else is optional so one failing
+                // widget never turns the whole page into "session expired".
+                const [data, s, sub, h, lb, st] = await Promise.all([
                     api.getProfile(),
-                    api.getStats(),
-                    api.getRecentSubmissions(),
-                    api.getHeatmap(),
-                    api.getLeaderboard().catch(() => [])
+                    api.getStats().catch(() => null),
+                    api.getRecentSubmissions().catch(() => []),
+                    api.getHeatmap().catch(() => ({})),
+                    api.getLeaderboard().catch(() => []),
+                    api.getStreak().catch(() => null)
                 ]);
 
                 setProfile(data);
@@ -163,6 +162,10 @@ function ProfileContent() {
                 setSubmissions(sub || []);
                 setHeatmapData(h || {});
                 setLeaderboard(lb || []);
+                if (st) {
+                    setStreakCount(st.current_streak || 0);
+                    setActiveToday(!!st.active_today);
+                }
 
                 if (data && data.exists) {
                     setFormData({
@@ -202,8 +205,7 @@ function ProfileContent() {
             const updated = await api.getProfile();
             setProfile(updated);
             setIsEditing(false);
-            
-            // If in setup mode or just finished onboarding, redirect to practice
+
             if (isSetupMode || !profile.onboarding_completed) {
                 router.push("/practice/daily?welcome=true");
             } else {
@@ -211,7 +213,7 @@ function ProfileContent() {
             }
         } catch (err: any) {
             console.error("Failed to save profile", err);
-            setToast({ type: 'error', message: err.message || "Failed to update profile." });
+            setToast({ type: "error", message: err.message || "Failed to update profile." });
         } finally {
             setIsSaving(false);
         }
@@ -225,23 +227,20 @@ function ProfileContent() {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Basic validation
-        if (!file.type.startsWith('image/')) {
-            setToast({ type: 'error', message: "Please select a valid image file (PNG, JPG, etc)." });
+        if (!file.type.startsWith("image/")) {
+            setToast({ type: "error", message: "Please select a valid image file (PNG, JPG, etc)." });
             return;
         }
         if (file.size > 2 * 1024 * 1024) {
-            setToast({ type: 'error', message: "Image is too large. Please select a photo under 2MB." });
+            setToast({ type: "error", message: "Image is too large. Please select a photo under 2MB." });
             return;
         }
 
         setIsUploading(true);
         setToast(null);
         try {
-            // 1. Get signature from backend
             const sigData = await api.getCloudinarySignature();
 
-            // 2. Upload to Cloudinary
             const fd = new FormData();
             fd.append("file", file);
             fd.append("api_key", sigData.api_key);
@@ -260,27 +259,25 @@ function ProfileContent() {
             const result = await uploadRes.json();
             const newAvatarUrl = result.secure_url;
 
-            // 3. Update local state and backend
             const updatedFormData = { ...formData, avatar_url: newAvatarUrl };
             setFormData(updatedFormData);
             await api.updateProfile(updatedFormData);
-            
-            // Update profile state to reflect change immediately
+
             setProfile((prev: any) => ({ ...prev, avatar_url: newAvatarUrl }));
-            setToast({ type: 'success', message: "Profile photo updated successfully!" });
-            
+            setToast({ type: "success", message: "Profile photo updated successfully!" });
         } catch (err) {
             console.error("Upload failed", err);
-            setToast({ type: 'error', message: "Failed to upload photo. Please try again." });
+            setToast({ type: "error", message: "Failed to upload photo. Please try again." });
         } finally {
             setIsUploading(false);
         }
     };
 
+    // ── Progress numbers (real totals; no fake "1" fallbacks) ──
     const stats = {
-        easy: { solved: realStats?.easy?.solved || 0, total: realStats?.easy?.total || 1, color: "#00b8a3" },
-        medium: { solved: realStats?.medium?.solved || 0, total: realStats?.medium?.total || 1, color: "#ffc01e" },
-        advanced: { solved: realStats?.advanced?.solved || 0, total: realStats?.advanced?.total || 1, color: "#ff375f" },
+        easy: { solved: realStats?.easy?.solved || 0, total: realStats?.easy?.total || 0, color: "#1f9e8e" },
+        medium: { solved: realStats?.medium?.solved || 0, total: realStats?.medium?.total || 0, color: "#f59e0b" },
+        advanced: { solved: realStats?.advanced?.solved || 0, total: realStats?.advanced?.total || 0, color: "#ef4444" }
     };
 
     const totalQuestions = stats.easy.total + stats.medium.total + stats.advanced.total;
@@ -288,126 +285,132 @@ function ProfileContent() {
 
     const gap = 16;
     const availableAngle = 360 - gap * 3;
-
-    const easyAngle = (stats.easy.total / totalQuestions) * availableAngle;
-    const mediumAngle = (stats.medium.total / totalQuestions) * availableAngle;
-    const advancedAngle = (stats.advanced.total / totalQuestions) * availableAngle;
+    const share = (n: number) => (totalQuestions > 0 ? (n / totalQuestions) * availableAngle : 0);
+    const easyAngle = share(stats.easy.total);
+    const mediumAngle = share(stats.medium.total);
+    const advancedAngle = share(stats.advanced.total);
 
     const segments = [
-        { id: 'easy', start: 0, end: easyAngle, solved: stats.easy.solved, total: stats.easy.total, color: stats.easy.color },
-        { id: 'medium', start: easyAngle + gap, end: easyAngle + gap + mediumAngle, solved: stats.medium.solved, total: stats.medium.total, color: stats.medium.color },
-        { id: 'advanced', start: easyAngle + mediumAngle + gap * 2, end: easyAngle + mediumAngle + advancedAngle + gap * 2, solved: stats.advanced.solved, total: stats.advanced.total, color: stats.advanced.color }
+        { id: "easy", start: 0, end: easyAngle, solved: stats.easy.solved, total: stats.easy.total, color: stats.easy.color },
+        { id: "medium", start: easyAngle + gap, end: easyAngle + gap + mediumAngle, solved: stats.medium.solved, total: stats.medium.total, color: stats.medium.color },
+        { id: "advanced", start: easyAngle + mediumAngle + gap * 2, end: easyAngle + mediumAngle + advancedAngle + gap * 2, solved: stats.advanced.solved, total: stats.advanced.total, color: stats.advanced.color }
     ];
 
-    const getDiffStyle = (level: string) => {
-        const l = level.toLowerCase();
-        switch (l) {
-            case "easy":
-            case "basic": return { color: "text-[#4DD4C4]", bg: "bg-[#4DD4C4]/10", border: "border-[#4DD4C4]/20", label: "BASIC" };
-            case "medium":
-            case "intermediate": return { color: "text-[#eab308]", bg: "bg-[#eab308]/10", border: "border-[#eab308]/20", label: "INTERMEDIATE" };
-            case "advanced":
-            case "hard": return { color: "text-[#f87171]", bg: "bg-[#f87171]/10", border: "border-[#f87171]/20", label: "ADVANCED" };
-            default: return { color: "text-zinc-400", bg: "bg-zinc-500/10", border: "border-zinc-500/20", label: "UNKNOWN" };
-        }
-    };
+    const filteredSubmissions = submissions.filter((p) => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const filteredSubmissions = submissions.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    const myRank = useMemo(() => {
+        if (!profile) return null;
+        const idx = leaderboard.findIndex((e) => e.user_id === profile.user_id);
+        return idx >= 0 ? idx + 1 : null;
+    }, [leaderboard, profile]);
 
-    const { heatmapWeeks, monthLabels, heatmapRangeLabel } = useMemo(() => {
-        const now = new Date();
-        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        
-        let endDate: Date;
-        let startDate: Date;
-        let finalLabel = "";
+    // ── Activity map (app-day / IST clock, UTC date math so the browser timezone never shifts a cell) ──
+    const heat = useMemo(() => {
+        const today = appToday();
+        let start: Date;
+        let end: Date;
+        let rangeLabel: string;
 
-        if (selectedYear === 'last_12') {
-            endDate = new Date(todayMidnight);
-            const endDayOfWeek = endDate.getDay();
-            startDate = new Date(endDate);
-            startDate.setDate(endDate.getDate() - (52 * 7) - endDayOfWeek);
-            
-            const startStr = startDate.toLocaleString('default', { month: 'short', year: 'numeric' }).toUpperCase();
-            const endStr = endDate.toLocaleString('default', { month: 'short', year: 'numeric' }).toUpperCase();
-            finalLabel = `${startStr} — ${endStr}`;
+        if (selectedYear === "last_12") {
+            end = today;
+            start = addDays(today, -52 * 7 - today.getUTCDay());
+            const s = addDays(today, -364);
+            rangeLabel = `${MONTH_SHORT[s.getUTCMonth()]} ${s.getUTCFullYear()} — ${MONTH_SHORT[today.getUTCMonth()]} ${today.getUTCFullYear()}`;
         } else {
             const year = parseInt(selectedYear, 10);
-            startDate = new Date(year, 0, 1); // Jan 1st
-            const startDay = startDate.getDay();
-            if (startDay !== 0) {
-                startDate.setDate(startDate.getDate() - startDay);
-            }
-            // Always generate full year grid to maintain layout width
-            endDate = new Date(year, 11, 31); 
-            finalLabel = selectedYear;
+            const jan1 = new Date(Date.UTC(year, 0, 1));
+            start = addDays(jan1, -jan1.getUTCDay());
+            end = new Date(Date.UTC(year, 11, 31));
+            rangeLabel = selectedYear;
         }
 
-        const weeks = [];
-        const labels: { name: string, colIndex: number }[] = [];
-        let currentMonth = -1;
+        const isYearView = selectedYear !== "last_12";
+        const year = parseInt(selectedYear, 10);
+        const todayTime = today.getTime();
 
-        let currentDate = new Date(startDate);
+        const weeks: HeatCell[][] = [];
+        const labels: { name: string; colIndex: number }[] = [];
+        let lastMonth = -1;
+
+        let cursor = start;
         let col = 0;
-        
-        while (currentDate <= endDate) {
-            const week = [];
+        while (cursor.getTime() <= end.getTime()) {
+            const week: HeatCell[] = [];
             for (let row = 0; row < 7; row++) {
-                const year = currentDate.getFullYear();
-                const month = currentDate.getMonth();
-                const day = currentDate.getDate();
-                
-                // Labels processing (only push if it belongs to the target year view)
-                if ((selectedYear === 'last_12' || year === parseInt(selectedYear)) && 
-                   ((month !== currentMonth && row === 0) || (month !== currentMonth && day === 1))) {
-                    labels.push({ name: currentDate.toLocaleString('default', { month: 'short' }), colIndex: col });
-                    currentMonth = month;
-                }
-
-                // Push -1 for future days if "last_12" mode, OR padding days of other years in specific year mode
-                if (selectedYear === 'last_12' && currentDate > todayMidnight) {
-                    week.push(-1); 
-                } else if (selectedYear !== 'last_12' && year !== parseInt(selectedYear, 10)) {
-                    week.push(-1); 
+                const key = dateKey(cursor);
+                const outside = isYearView ? cursor.getUTCFullYear() !== year : cursor.getTime() > todayTime;
+                if (outside) {
+                    week.push({ key, count: 0, kind: "pad" });
+                } else if (cursor.getTime() > todayTime) {
+                    week.push({ key, count: 0, kind: "future" });
                 } else {
-                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const activity = heatmapData[dateStr] || 0;
-                    week.push(activity);
+                    week.push({ key, count: heatmapData[key] || 0, kind: "day" });
                 }
-                
-                currentDate.setDate(currentDate.getDate() + 1);
+                cursor = addDays(cursor, 1);
+            }
+            const firstReal = week.find((c) => c.kind !== "pad");
+            if (firstReal) {
+                const m = parseInt(firstReal.key.slice(5, 7), 10) - 1;
+                if (m !== lastMonth) {
+                    labels.push({ name: MONTH_SHORT[m], colIndex: col });
+                    lastMonth = m;
+                }
             }
             weeks.push(week);
             col++;
         }
 
-        return { 
-            heatmapWeeks: weeks, 
-            monthLabels: labels,
-            heatmapRangeLabel: finalLabel 
-        };
+        // Summary over the days that have actually happened, in date order
+        const played = weeks.flat().filter((c) => c.kind === "day");
+        const activeDays = played.filter((c) => c.count > 0).length;
+        const totalSolves = played.reduce((sum, c) => sum + c.count, 0);
+        let longest = 0;
+        let run = 0;
+        for (const c of played) {
+            run = c.count > 0 ? run + 1 : 0;
+            if (run > longest) longest = run;
+        }
+
+        return { weeks, labels, rangeLabel, activeDays, totalSolves, longest };
     }, [heatmapData, selectedYear]);
+
+    // On narrow screens keep the most recent weeks in view
+    useEffect(() => {
+        const el = heatScrollRef.current;
+        if (el) el.scrollLeft = selectedYear === "last_12" ? el.scrollWidth : 0;
+    }, [selectedYear, tab, isLoading, isEditing]);
 
     if (isLoading) {
         return (
-            <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-[#080c16] text-white">
-                <Loader2 size={32} className="animate-spin text-[#4DD4C4] mb-4" />
-                <p className="text-zinc-500 font-mono text-sm">Authenticating Profile...</p>
+            <div className="landing-light min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-[#fafafa] text-zinc-900">
+                <Loader2 size={32} className="animate-spin text-[#1f9e8e] mb-4" />
+                <p className="text-zinc-500 font-mono text-xs">Authenticating Profile...</p>
             </div>
         );
     }
 
     if (!profile) {
         return (
-            <div className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-[#080c16] text-white p-6 text-center">
-                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4 border border-red-500/20">
-                    <History className="text-red-400" size={32} />
+            <div className="landing-light min-h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-[#fafafa] text-zinc-900 p-6 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-rose-50 flex items-center justify-center mb-4 border border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30">
+                    <History className="text-rose-500" size={32} />
                 </div>
                 <h2 className="text-xl font-bold mb-2">Session Expired or Invalid</h2>
-                <p className="text-zinc-400 max-w-sm mb-6">We couldn't verify your session. Please try logging in again to access your profile.</p>
-                <div className="flex gap-4">
-                    <button onClick={() => window.location.reload()} className="px-6 py-2 bg-[#131924] border border-[#202736] rounded-xl text-sm font-bold">Retry</button>
-                    <Link href="/"><button className="px-6 py-2 bg-[#4DD4C4] text-[#080c16] rounded-xl text-sm font-bold">Go Home</button></Link>
+                <p className="text-zinc-500 max-w-sm mb-6 text-sm">
+                    We couldn&apos;t verify your session. Please try logging in again to access your profile.
+                </p>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="px-5 py-2.5 bg-white border border-zinc-300 rounded-xl text-xs font-bold text-zinc-700 shadow-2xs hover:bg-zinc-50 transition-colors"
+                    >
+                        Retry
+                    </button>
+                    <Link href="/">
+                        <button className="px-5 py-2.5 bg-[#1f9e8e] text-white rounded-xl text-xs font-bold shadow-2xs hover:bg-[#177a6d] transition-colors">
+                            Go Home
+                        </button>
+                    </Link>
                 </div>
             </div>
         );
@@ -415,127 +418,134 @@ function ProfileContent() {
 
     if (profile && (!profile.onboarding_completed || isEditing)) {
         return (
-            <div className="min-h-[calc(100vh-64px)] bg-[#080c16] flex flex-col items-center justify-center p-6">
-                <div className="max-w-2xl w-full p-8 rounded-3xl border border-[#202736] bg-[#131924] shadow-2xl relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#4DD4C4] to-transparent opacity-50"></div>
-                    
+            <div className="landing-light min-h-[calc(100vh-64px)] bg-[#fafafa] flex flex-col items-center justify-center p-6 text-zinc-900">
+                <div className="max-w-2xl w-full p-8 rounded-2xl border border-[#dedee2] bg-white shadow-xs relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#1f9e8e] to-transparent"></div>
+
                     {/* Close Button */}
                     {!isSetupMode && (
-                        <button 
+                        <button
                             onClick={() => setIsEditing(false)}
-                            className="absolute top-5 right-5 p-2 rounded-xl bg-[#0b101c] border border-[#202736] text-zinc-400 hover:text-white hover:border-zinc-500 transition-all z-20"
+                            className="absolute top-5 right-5 p-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:border-zinc-400 transition-all z-20"
                             title="Cancel editing"
                         >
-                            <X size={18} />
+                            <X size={16} />
                         </button>
                     )}
 
                     {toast && (
-                        <div className={`mb-6 p-4 rounded-xl border flex items-center gap-3 ${toast.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-[#4DD4C4]/10 border-[#4DD4C4]/30 text-[#4DD4C4]'}`}>
-                            {toast.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
-                            <span className="text-sm font-medium">{toast.message}</span>
+                        <div
+                            className={`mb-6 p-4 rounded-xl border flex items-center gap-3 ${
+                                toast.type === "error"
+                                    ? "bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300"
+                                    : "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-300"
+                            }`}
+                        >
+                            {toast.type === "error" ? <AlertCircle size={18} className="text-rose-600 dark:text-rose-300" /> : <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-300" />}
+                            <span className="text-xs font-medium">{toast.message}</span>
                         </div>
                     )}
 
                     <div className="flex flex-col items-center mb-8 text-center">
-                        {isSetupMode && (
-                            <div className="flex items-center justify-center gap-4 mb-8">
-                                <div className="flex flex-col items-center gap-2">
-                                    <div className="w-8 h-8 rounded-full bg-green-500/20 text-green-500 border border-green-500/30 flex items-center justify-center font-black text-xs">
-                                        <CheckCircle2 size={14} />
-                                    </div>
-                                    <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">Basics</span>
-                                </div>
-                                <div className="w-12 h-px bg-green-500/30"></div>
-                                <div className="flex flex-col items-center gap-2">
-                                    <div className="w-8 h-8 rounded-full bg-[#4DD4C4] text-[#080c16] flex items-center justify-center font-black text-xs shadow-[0_0_15px_rgba(77,212,196,0.3)]">2</div>
-                                    <span className="text-[10px] font-bold text-[#4DD4C4] uppercase tracking-widest">Profile</span>
-                                </div>
-                            </div>
-                        )}
-                        <div 
+                        <div
                             onClick={handlePhotoClick}
-                            className="relative w-24 h-24 rounded-3xl mb-4 p-1 border border-[#4DD4C4]/30 bg-[#4DD4C4]/5 hover:border-[#4DD4C4]/60 hover:bg-[#4DD4C4]/10 transition-all duration-300 shadow-lg shadow-[#4DD4C4]/10 cursor-pointer overflow-hidden group/avatar"
+                            className="relative w-24 h-24 rounded-2xl mb-4 p-1 border border-[#1f9e8e]/30 bg-[#e6f7f5] hover:border-[#1f9e8e] transition-all cursor-pointer overflow-hidden group/avatar shadow-2xs"
                         >
-                            <input 
-                                type="file" 
-                                ref={fileInputRef} 
-                                onChange={handleFileChange} 
-                                className="hidden" 
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                className="hidden"
                                 accept="image/*"
                             />
-                            <div className="w-full h-full rounded-[20px] overflow-hidden bg-[#080c16] flex justify-center items-center border border-[#202736]/50 relative">
+                            <div className="w-full h-full rounded-xl overflow-hidden bg-zinc-100 flex justify-center items-center relative">
                                 {formData.avatar_url || profile.avatar_url ? (
-                                    <img src={formData.avatar_url || profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                                    <img
+                                        src={formData.avatar_url || profile.avatar_url}
+                                        alt="Profile"
+                                        className="w-full h-full object-cover"
+                                    />
                                 ) : (
-                                    <User size={32} className="text-zinc-600" />
+                                    <User size={32} className="text-zinc-400" />
                                 )}
-                                
-                                {/* Hover Overlay */}
-                                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-300">
+
+                                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-200">
                                     {isUploading ? (
-                                        <Loader2 size={20} className="text-[#4DD4C4] animate-spin" />
+                                        <Loader2 size={18} className="text-white animate-spin" />
                                     ) : (
                                         <>
-                                            <Camera size={20} className="text-white mb-1" />
+                                            <Camera size={18} className="text-white mb-0.5" />
                                             <span className="text-[10px] font-bold text-white">Change</span>
                                         </>
                                     )}
                                 </div>
                             </div>
                         </div>
-                        <h2 className="text-2xl font-bold text-white mb-2">{profile.onboarding_completed || isSetupMode ? "Complete Your Public Profile" : "Update Your Profile"}</h2>
-                        <p className="text-zinc-400 text-sm">
+
+                        <h2 className="text-2xl font-bold font-mono text-zinc-900 tracking-tight mb-1">
+                            {profile.onboarding_completed || isSetupMode ? "Public Profile" : "Update Profile"}
+                        </h2>
+                        <p className="text-zinc-500 text-xs max-w-sm">
                             {isSetupMode
-                                ? "Last step! Customize your public profile and assign your username."
-                                : "Update your details below to keep your profile accurate and professional."}
+                                ? "Customize your public profile, bio, and social links."
+                                : "Update your details below to keep your stats and profile professional."}
                         </p>
                     </div>
 
-                    <form onSubmit={handleOnboard} className="space-y-5">
+                    <form onSubmit={handleOnboard} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Full Name</label>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500">
+                                    Full Name
+                                </label>
                                 <div className="relative">
-                                    <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                                    <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                                     <input
                                         required
                                         type="text"
                                         placeholder="Vedant Sharma"
-                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                        className="w-full bg-white border border-zinc-300 rounded-xl text-xs py-2.5 pl-9 pr-3 text-zinc-900 outline-none focus:border-[#1f9e8e] transition-all"
                                         value={formData.full_name}
-                                        onChange={e => setFormData({ ...formData, full_name: e.target.value })}
+                                        onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                                     />
                                 </div>
                             </div>
 
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Username (URL slug)</label>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500">
+                                    Username (URL slug)
+                                </label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 text-sm">@</span>
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-xs font-mono">@</span>
                                     <input
                                         required
                                         type="text"
                                         placeholder="vedant-sharma"
-                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-8 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                        className="w-full bg-white border border-zinc-300 rounded-xl text-xs py-2.5 pl-8 pr-3 text-zinc-900 outline-none focus:border-[#1f9e8e] transition-all font-mono"
                                         value={formData.username}
-                                        onChange={e => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                username: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")
+                                            })
+                                        }
                                     />
                                 </div>
-                                {isEditing && <p className="text-[10px] text-zinc-500 px-1 mt-1">Warning: Changing this breaks links to your old profile.</p>}
                             </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Occupation</label>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500">
+                                    Occupation
+                                </label>
                                 <div className="relative">
-                                    <GraduationCap size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+                                    <GraduationCap size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                                     <select
                                         required
-                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all appearance-none inline-block align-middle cursor-pointer"
+                                        className="w-full bg-white border border-zinc-300 rounded-xl text-xs py-2.5 pl-9 pr-3 text-zinc-900 outline-none focus:border-[#1f9e8e] transition-all appearance-none cursor-pointer"
                                         value={formData.occupation}
-                                        onChange={e => setFormData({ ...formData, occupation: e.target.value })}
+                                        onChange={(e) => setFormData({ ...formData, occupation: e.target.value })}
                                     >
                                         <option value="">Select...</option>
                                         <option value="student">Student</option>
@@ -544,79 +554,87 @@ function ProfileContent() {
                                     </select>
                                 </div>
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Exp (Years)</label>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500">
+                                    Exp (Years)
+                                </label>
                                 <input
                                     required
                                     type="number"
                                     min="0"
                                     max="50"
-                                    className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 px-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                    className="w-full bg-white border border-zinc-300 rounded-xl text-xs py-2.5 px-3 text-zinc-900 outline-none focus:border-[#1f9e8e] transition-all font-mono"
                                     value={formData.experience_years}
-                                    onChange={e => setFormData({ ...formData, experience_years: parseInt(e.target.value) || 0 })}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, experience_years: parseInt(e.target.value) || 0 })
+                                    }
                                 />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Job Role / Interest</label>
-                                <div className="relative">
-                                    <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-                                    <input
-                                        required
-                                        type="text"
-                                        placeholder="Data Analyst, Student, etc."
-                                        className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 pl-10 pr-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
-                                        value={formData.job_role}
-                                        onChange={e => setFormData({ ...formData, job_role: e.target.value })}
-                                    />
-                                </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500">
+                                Job Role / Target Role
+                            </label>
+                            <div className="relative">
+                                <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                                <input
+                                    required
+                                    type="text"
+                                    placeholder="Data Analyst, Analytics Engineer, etc."
+                                    className="w-full bg-white border border-zinc-300 rounded-xl text-xs py-2.5 pl-9 pr-3 text-zinc-900 outline-none focus:border-[#1f9e8e] transition-all"
+                                    value={formData.job_role}
+                                    onChange={(e) => setFormData({ ...formData, job_role: e.target.value })}
+                                />
                             </div>
                         </div>
 
-                        <div className="space-y-1.5 pt-2">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">Short Bio</label>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500">
+                                Bio
+                            </label>
                             <textarea
-                                placeholder="I love solving SQL puzzles and drinking coffee..."
+                                placeholder="Practicing SQL, Python & PySpark every day..."
                                 rows={2}
-                                className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 px-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all resize-none"
+                                className="w-full bg-white border border-zinc-300 rounded-xl text-xs py-2.5 px-3 text-zinc-900 outline-none focus:border-[#1f9e8e] transition-all resize-none"
                                 value={formData.bio}
-                                onChange={e => setFormData({ ...formData, bio: e.target.value })}
+                                onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">LinkedIn URL</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500">
+                                    LinkedIn URL
+                                </label>
                                 <input
                                     type="url"
-                                    placeholder="https://www.linkedin.com/in/username"
-                                    className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 px-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                    placeholder="https://linkedin.com/in/username"
+                                    className="w-full bg-white border border-zinc-300 rounded-xl text-xs py-2.5 px-3 text-zinc-900 outline-none focus:border-[#1f9e8e] transition-all"
                                     value={formData.linkedin_url}
-                                    onChange={e => setFormData({ ...formData, linkedin_url: e.target.value })}
+                                    onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
                                 />
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 ml-1">GitHub URL</label>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500">
+                                    GitHub URL
+                                </label>
                                 <input
                                     type="url"
                                     placeholder="https://github.com/username"
-                                    className="w-full bg-[#0b101c] border border-[#202736] rounded-xl text-sm py-2.5 px-4 text-white outline-none focus:border-[#4DD4C4]/50 transition-all"
+                                    className="w-full bg-white border border-zinc-300 rounded-xl text-xs py-2.5 px-3 text-zinc-900 outline-none focus:border-[#1f9e8e] transition-all"
                                     value={formData.github_url}
-                                    onChange={e => setFormData({ ...formData, github_url: e.target.value })}
+                                    onChange={(e) => setFormData({ ...formData, github_url: e.target.value })}
                                 />
                             </div>
                         </div>
 
-
-
-                        <div className="flex gap-3 mt-6">
+                        <div className="flex gap-3 pt-3">
                             {!isSetupMode && (
                                 <button
                                     type="button"
                                     onClick={() => setIsEditing(false)}
-                                    className="flex-1 bg-[#131924] border border-[#202736] text-zinc-400 font-bold py-3 rounded-xl hover:text-white hover:border-zinc-500 transition-all"
+                                    className="flex-1 bg-white border border-zinc-300 text-zinc-700 font-bold py-2.5 rounded-xl hover:bg-zinc-50 transition-all text-xs"
                                 >
                                     Cancel
                                 </button>
@@ -624,544 +642,672 @@ function ProfileContent() {
                             <button
                                 disabled={isSaving}
                                 type="submit"
-                                className={`${isSetupMode ? 'w-full' : 'flex-[2]'} bg-[#4DD4C4] text-[#080c16] font-bold py-3 rounded-xl hover:bg-[#3dbdb0] transition-colors flex items-center justify-center gap-2 group shadow-xl shadow-[#4DD4C4]/20`}
+                                className={`${
+                                    isSetupMode ? "w-full" : "flex-[2]"
+                                } bg-[#1f9e8e] hover:bg-[#177a6d] text-white font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 text-xs shadow-2xs`}
                             >
-                                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <>{profile.exists && isEditing ? "Save Changes" : "Start Journey"} {profile.exists && isEditing ? <Edit2 size={18} /> : <ArrowLeft size={18} className="rotate-180 group-hover:translate-x-1 transition-transform" />}</>}
+                                {isSaving ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                    <>
+                                        {profile.exists && isEditing ? "Save Changes" : "Start Journey"}
+                                        {profile.exists && isEditing ? (
+                                            <Edit2 size={14} />
+                                        ) : (
+                                            <ArrowLeft size={14} className="rotate-180" />
+                                        )}
+                                    </>
+                                )}
                             </button>
                         </div>
-
-                        {!isEditing && !profile.exists && (
-                            <div className="text-center mt-4">
-                                <Link
-                                    href="/practice/daily"
-                                    className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors inline-flex items-center gap-1 group"
-                                >
-                                    Skip for now
-                                    <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-                                </Link>
-                            </div>
-                        )}
                     </form>
                 </div>
             </div>
         );
     }
 
+    const displayName = profile.full_name || "Member";
+    const roleLabel = profile.job_role || (profile.occupation ? profile.occupation.charAt(0).toUpperCase() + profile.occupation.slice(1) : "Practitioner");
+    const initial = displayName.charAt(0).toUpperCase();
+    const leaderboardTop = leaderboard.slice(0, 10);
+    const youOutsideTop = myRank && myRank > 10 ? leaderboard[myRank - 1] : null;
+
+    const TABS: { id: typeof tab; label: string; count?: number }[] = [
+        { id: "overview", label: "Overview" },
+        { id: "submissions", label: "Submissions", count: submissions.length },
+        { id: "leaderboard", label: "Leaderboard" }
+    ];
+
+    const kpis = [
+        {
+            label: "Solved",
+            value: totalSolved,
+            sub: totalQuestions > 0 ? `of ${totalQuestions} problems` : "problems",
+            icon: <CheckCircle2 size={16} />,
+            tone: "text-[#1f9e8e] bg-[#1f9e8e]/10"
+        },
+        {
+            label: "Current streak",
+            value: streakCount,
+            sub: streakCount === 0 ? "solve one to start" : activeToday ? "done for today ✓" : "solve today to keep it",
+            icon: <Flame size={16} className={streakCount > 0 ? "fill-amber-500" : ""} />,
+            tone: "text-amber-600 bg-amber-500/10 dark:text-amber-300"
+        },
+        {
+            label: "Active days",
+            value: heat.activeDays,
+            sub: selectedYear === "last_12" ? "in the last year" : `in ${selectedYear}`,
+            icon: <CalendarDays size={16} />,
+            tone: "text-sky-600 bg-sky-500/10 dark:text-sky-300"
+        },
+        {
+            label: "Leaderboard",
+            value: myRank ? `#${myRank}` : "—",
+            sub: myRank ? "current rank" : "not ranked yet",
+            icon: <Trophy size={16} />,
+            tone: "text-violet-600 bg-violet-500/10 dark:text-violet-300"
+        }
+    ];
+
     return (
-        <>
-        <div className="min-h-[calc(100vh-64px)] bg-[#080c16] text-zinc-300 font-sans pb-16 relative overflow-hidden">
-            
-            {/* Ambient Background Glows */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#4DD4C4]/10 rounded-full blur-[120px] pointer-events-none mix-blend-screen"></div>
-            <div className="absolute bottom-[20%] right-[-10%] w-[30%] h-[50%] bg-[#3b82f6]/10 rounded-full blur-[120px] pointer-events-none mix-blend-screen"></div>
-            <div className="absolute top-[30%] left-[40%] w-[20%] h-[20%] bg-[#8b5cf6]/10 rounded-full blur-[100px] pointer-events-none mix-blend-screen"></div>
-
-            <div className="w-full bg-gradient-to-b from-[#131924]/80 to-transparent h-48 absolute top-0 left-0 pointer-events-none opacity-50 backdrop-blur-sm z-0"></div>
-
-            <div className="max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8 relative z-10 w-full grid grid-cols-1 lg:grid-cols-12 gap-6 pt-8 lg:pt-12">
-                
-                {/* --- LEFT COLUMN: Profile & Quick Info --- */}
-                <div className="lg:col-span-4 flex flex-col gap-6">
-                    
-                    {/* Main Profile Card */}
-                    <div className="group relative bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-8 flex flex-col items-center text-center shadow-xl hover:border-[#4DD4C4]/30 transition-all duration-500 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-[#4DD4C4]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                        
-                        <div className="relative w-[110px] h-[110px] rounded-[32px] mb-6 p-1 border border-[#4DD4C4]/20 bg-[#4DD4C4]/5 shadow-[0_0_15px_rgba(77,212,196,0.05)] overflow-hidden">
-                            <div className="w-full h-full rounded-[28px] overflow-hidden bg-[#080c16] flex justify-center items-center border border-[#202736]/50">
-                                {profile.avatar_url ? (
-                                    <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" />
-                                ) : (
-                                    <User size={40} className="text-zinc-600" />
-                                )}
-                            </div>
-                        </div>
-                        
-                        <h1 className="text-[28px] font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400 tracking-tight">{profile.full_name || 'Member'}</h1>
-                        {profile.username && (
-                            <div className="flex items-center gap-1.5 mt-1 text-zinc-400 font-medium">
-                                <span className="text-sm">@{profile.username}</span>
-                            </div>
-                        )}
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-2 rounded-full bg-[#4DD4C4]/10 border border-[#4DD4C4]/20 text-[#4DD4C4] text-[12px] font-bold tracking-wide">
-                            <Flame size={12} /> {profile.job_role || profile.occupation || 'Learner'}
-                        </div>
-                        <p className="text-[13px] text-zinc-400 mt-3 font-medium">{profile.email}</p>
-
-                        <div className="flex gap-3 mt-4">
-                            {profile.github_url && (
-                                <a href={profile.github_url} target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-xl bg-[#202736]/50 flex items-center justify-center hover:bg-[#202736] transition-colors border border-[#202736]">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-300"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
-                                </a>
-                            )}
-                            {profile.linkedin_url && (
-                                <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-xl bg-[#202736]/50 flex items-center justify-center hover:bg-[#202736] transition-colors border border-[#202736]">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-[#0a66c2]"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
-                                </a>
-                            )}
-                        </div>
-
-                        <div className="w-full mt-6 relative z-10 px-2 lg:px-4 flex flex-col gap-2">
-                            <button onClick={() => setIsEditing(true)} className="w-full bg-gradient-to-r from-[#4DD4C4] to-[#34b6a5] hover:opacity-90 text-[#080c16] font-bold rounded-xl py-2.5 text-[13px] transition-all duration-300 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(77,212,196,0.2)] hover:shadow-[0_0_20px_rgba(77,212,196,0.3)] transform hover:-translate-y-0.5">
-                                <Edit2 size={14} /> Edit Profile
-                            </button>
-                            {profile.username && (
-                                <button
-                                    onClick={handleShare}
-                                    className={`w-full border font-semibold rounded-xl py-2 text-[12px] transition-all duration-200 flex items-center justify-center gap-1.5 ${
-                                        copied
-                                            ? 'bg-[#4DD4C4]/10 border-[#4DD4C4]/40 text-[#4DD4C4]'
-                                            : 'bg-[#0b101c] border-[#202736] hover:border-[#4DD4C4]/40 text-zinc-400 hover:text-[#4DD4C4]'
-                                    }`}
-                                >
-                                    {copied ? <><Check size={12} /> Link Copied!</> : <><Share2 size={12} /> Share Profile</>}
-                                </button>
-                            )}
-                            <button
-                                onClick={navigateAndStart}
-                                className="w-full bg-[#0b101c] border border-[#202736] hover:border-[#4DD4C4]/40 text-zinc-400 hover:text-[#4DD4C4] font-semibold rounded-xl py-2 text-[12px] transition-all duration-200 flex items-center justify-center gap-1.5"
-                            >
-                                <Sparkles size={12} /> Take the Tour
-                            </button>
-                        </div>
+        <div className="landing-light min-h-[calc(100vh-64px)] font-sans pb-16 relative" style={{ background: "var(--ls-bg)", color: "var(--ls-on-surface)" }}>
+            <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 lg:pt-10 flex flex-col gap-6">
+                {/* ═══════════════ HERO ═══════════════ */}
+                <section className={`${CARD} overflow-hidden`}>
+                    <div className="relative h-28 sm:h-36 bg-gradient-to-br from-[#1f9e8e] via-teal-500 to-emerald-600">
+                        <div
+                            className="absolute inset-0 opacity-25"
+                            style={{
+                                backgroundImage: "radial-gradient(rgba(255,255,255,0.55) 1px, transparent 1px)",
+                                backgroundSize: "18px 18px"
+                            }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/15 to-transparent" />
                     </div>
 
-                    {/* Leaderboard Card */}
-                    <div className="relative flex-1 bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-6 flex flex-col shadow-xl overflow-hidden group hover:border-[#4DD4C4]/20 transition-all duration-500">
-                        <div className="absolute -bottom-20 -right-20 w-48 h-48 bg-[#f59e0b]/5 rounded-full blur-[60px] pointer-events-none group-hover:bg-[#f59e0b]/10 transition-colors duration-700"></div>
-                        
-                        {/* Header */}
-                        <div className="flex items-center gap-3 mb-5 relative z-10">
-                            <div className="w-8 h-8 rounded-xl bg-[#f59e0b]/10 flex items-center justify-center border border-[#f59e0b]/20 shrink-0">
-                                <Trophy size={14} className="text-[#f59e0b]" />
-                            </div>
-                            <h3 className="text-[14px] font-bold text-white tracking-wide">Leaderboard</h3>
-                        </div>
-
-                        {/* List */}
-                        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar relative z-10">
-                            {leaderboard.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-full gap-3 py-8">
-                                    <Trophy size={28} className="text-zinc-700" />
-                                    <p className="text-xs text-zinc-500">No data yet</p>
+                    <div className="px-5 sm:px-8 pb-6">
+                        <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 -mt-12 sm:-mt-14">
+                            <div
+                                className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl p-1 shrink-0 shadow-[var(--ls-shadow-md)]"
+                                style={{ background: "var(--ls-surface)", border: "1px solid var(--ls-outline)" }}
+                            >
+                                <div className="w-full h-full rounded-xl overflow-hidden flex items-center justify-center bg-gradient-to-br from-[#1f9e8e] to-emerald-600 text-white text-4xl font-bold font-mono">
+                                    {profile.avatar_url ? (
+                                        <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
+                                    ) : (
+                                        initial
+                                    )}
                                 </div>
-                            ) : leaderboard.map((entry, idx) => {
-                                const isCurrentUser = profile && entry.user_id === profile.user_id;
-                                const rankColors = [
-                                    'text-[#f59e0b]',   // Gold - 1st
-                                    'text-[#94a3b8]',   // Silver - 2nd
-                                    'text-[#b45309]',   // Bronze - 3rd
-                                ];
-                                const rankBg = [
-                                    'bg-[#f59e0b]/10 border-[#f59e0b]/30',
-                                    'bg-[#94a3b8]/10 border-[#94a3b8]/30',
-                                    'bg-[#b45309]/10 border-[#b45309]/30',
-                                ];
-                                return (
-                                    <div
-                                        key={entry.user_id}
-                                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all duration-200 ${
-                                            isCurrentUser
-                                                ? 'bg-[#4DD4C4]/8 border-[#4DD4C4]/30 shadow-[0_0_10px_rgba(77,212,196,0.08)]'
-                                                : 'bg-[#0b101c]/40 border-[#202736] hover:border-[#202736]/80 hover:bg-[#131924]/60'
+                            </div>
+
+                            <div className="flex-1 min-w-0 sm:pb-1">
+                                <h1 className={`text-2xl sm:text-3xl font-bold font-mono tracking-tight truncate ${HEADING}`}>{displayName}</h1>
+                                <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs font-mono ${MUTED}`}>
+                                    {profile.username && <span>@{profile.username}</span>}
+                                    <span className="inline-flex items-center gap-1">
+                                        <Mail size={12} /> {profile.email}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 sm:pb-1">
+                                <button
+                                    onClick={() => setIsEditing(true)}
+                                    className="bg-[#1f9e8e] hover:bg-[#177a6d] text-white font-bold rounded-xl px-4 py-2.5 text-xs transition-all flex items-center gap-1.5 shadow-2xs"
+                                >
+                                    <Edit2 size={13} /> Edit profile
+                                </button>
+                                {profile.username && (
+                                    <button
+                                        onClick={handleShare}
+                                        className={`border font-semibold rounded-xl px-4 py-2.5 text-xs transition-all flex items-center gap-1.5 ${
+                                            copied
+                                                ? "bg-[#1f9e8e]/10 border-[#1f9e8e]/40 text-[#1f9e8e]"
+                                                : `border-[var(--ls-outline)] bg-[var(--ls-surface)] hover:bg-[var(--ls-surface-container)] ${HEADING}`
                                         }`}
                                     >
-                                        {/* Rank */}
-                                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black border shrink-0 ${
-                                            idx < 3 ? rankBg[idx] + ' ' + rankColors[idx] : 'bg-[#202736]/60 border-[#202736] text-zinc-500'
-                                        }`}>
-                                            {idx + 1}
-                                        </div>
-
-                                        {/* Avatar */}
-                                        <div className="w-7 h-7 rounded-lg bg-[#0b101c] border border-[#202736] flex items-center justify-center overflow-hidden shrink-0">
-                                            {entry.avatar_url ? (
-                                                <img src={entry.avatar_url} alt={entry.full_name} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <User size={14} className="text-zinc-600" />
-                                            )}
-                                        </div>
-
-                                        {/* Name + Role */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-1.5">
-                                                {entry.username ? (
-                                                    <Link href={`/u/${entry.username}`} className={`text-[12px] font-semibold truncate hover:underline ${
-                                                        isCurrentUser ? 'text-[#4DD4C4]' : 'text-zinc-200 hover:text-white'
-                                                    }`}>
-                                                        {entry.full_name}
-                                                    </Link>
-                                                ) : (
-                                                    <span className={`text-[12px] font-semibold truncate ${
-                                                        isCurrentUser ? 'text-[#4DD4C4]' : 'text-zinc-200'
-                                                    }`}>
-                                                        {entry.full_name}
-                                                    </span>
-                                                )}
-                                                {isCurrentUser && (
-                                                    <span className="text-[9px] font-bold text-[#4DD4C4]/70 bg-[#4DD4C4]/10 px-1.5 py-0.5 rounded-full border border-[#4DD4C4]/20 shrink-0">YOU</span>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Stats */}
-                                        <div className="flex items-center gap-0 shrink-0">
-                                            {entry.current_streak > 0 && (
-                                                <>
-                                                    <div className="flex items-center gap-1 px-2">
-                                                        <Flame size={10} className="text-[#4DD4C4] fill-[#4DD4C4]" />
-                                                        <span className="text-[11px] font-bold text-zinc-300 tabular-nums">{entry.current_streak}</span>
-                                                    </div>
-                                                    <div className="w-px h-3 bg-[#202736]" />
-                                                </>
-                                            )}
-                                            <div className="flex items-baseline gap-0.5 pl-2">
-                                                <span className="text-[13px] font-extrabold text-white tabular-nums">{entry.total_solved}</span>
-                                                <span className="text-[9px] text-zinc-600 font-medium">sol</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                {/* --- RIGHT COLUMN: Main Content --- */}
-                <div className="lg:col-span-8 flex flex-col gap-6">
-                    {/* Top Row: Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                    {/* Performance Donut */}
-                    <div className="md:col-span-2 bg-[#131924]/60 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-6 flex flex-col shadow-lg relative min-h-[250px]">
-                        <div className="w-full flex justify-start items-center mb-4 z-20">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#202736]/50 text-[#00b8a3] border border-[#202736] shadow-sm">
-                                    <BarChart2 size={16} strokeWidth={2.5} />
-                                </div>
-                                <h3 className="text-[15px] font-bold text-white tracking-wide">Performance</h3>
+                                        {copied ? <><Check size={13} /> Link copied</> : <><Share2 size={13} /> Share</>}
+                                    </button>
+                                )}
+                                <button
+                                    onClick={navigateAndStart}
+                                    className={`border border-[var(--ls-outline)] bg-[var(--ls-surface)] hover:bg-[var(--ls-surface-container)] font-semibold rounded-xl px-4 py-2.5 text-xs transition-all flex items-center gap-1.5 ${HEADING}`}
+                                >
+                                    <Sparkles size={13} className="text-[#1f9e8e]" /> Tour
+                                </button>
                             </div>
                         </div>
-                        <div className="flex-1 flex items-center justify-center">
-                            <div className="relative w-[160px] h-[160px] flex items-center justify-center group">
-                                <svg className="w-full h-full transform -rotate-90 absolute top-0 left-0" viewBox="0 0 100 100">
-                                {segments.map(seg => {
-                                    // Make sure segment isn't negative
-                                    if (seg.end <= seg.start) return null;
 
-                                    const solvedAngle = seg.start + (seg.solved / seg.total) * (seg.end - seg.start);
-                                    
-                                    return (
-                                        <g key={seg.id} 
-                                           onMouseEnter={() => setHoveredSegment(seg.id)}
-                                           onMouseLeave={() => setHoveredSegment(null)}
-                                           className="cursor-pointer"
-                                        >
-                                            {/* Faint Colored Background Track matching the reference image */}
-                                            <path 
-                                                d={describeArc(50, 50, 42, seg.start, seg.end)} 
-                                                stroke={seg.color} 
-                                                strokeWidth="5" 
-                                                fill="transparent" 
-                                                strokeLinecap="round" 
-                                                className="transition-all duration-300"
-                                                opacity={hoveredSegment && hoveredSegment !== seg.id ? 0.05 : 0.15}
-                                            />
-                                            
-                                            {/* Bright Progress Track */}
-                                            {seg.solved > 0 && (
-                                                <path 
-                                                    d={describeArc(50, 50, 42, seg.start, solvedAngle)} 
-                                                    stroke={seg.color} 
-                                                    strokeWidth="5" 
-                                                    fill="transparent" 
-                                                    strokeLinecap="round" 
-                                                    className="transition-all duration-700 ease-out"
-                                                    style={{
-                                                        opacity: hoveredSegment && hoveredSegment !== seg.id ? 0.3 : 1
-                                                    }}
-                                                />
-                                            )}
-                                            {/* Invisible wider path for easier hovering */}
-                                            <path d={describeArc(50, 50, 42, seg.start, seg.end)} stroke="transparent" strokeWidth="20" fill="transparent" strokeLinecap="round" />
-                                        </g>
-                                    );
-                                })}
-                            </svg>
-                            
-                            {/* Center Numbers with visual dividers mimicking the target image */}
-                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none transition-all duration-300">
-                                {hoveredSegment ? (
-                                    <>
-                                        <span className="text-[32px] font-bold text-white leading-none tracking-tight group-hover:scale-105 transition-transform">
-                                            {segments.find(s=>s.id === hoveredSegment)?.solved}
-                                        </span>
-                                        <div className="w-8 h-[1px] bg-[#202736] my-2"></div>
-                                        <span className="text-[14px] font-medium text-zinc-500">
-                                            {segments.find(s=>s.id === hoveredSegment)?.total}
-                                        </span>
-                                    </>
+                        <div className="mt-5 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                            <div className="min-w-0 max-w-2xl">
+                                {profile.bio ? (
+                                    <p className={`text-sm leading-relaxed ${MUTED}`}>{profile.bio}</p>
                                 ) : (
-                                    <>
-                                        <span className="text-[32px] font-bold text-white leading-none tracking-tight group-hover:scale-105 transition-transform">
-                                            {totalSolved}
+                                    <button onClick={() => setIsEditing(true)} className={`text-sm italic ${SUBTLE} hover:underline`}>
+                                        Add a short bio so others know what you&apos;re working on
+                                    </button>
+                                )}
+                                <div className="flex flex-wrap items-center gap-2 mt-3">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1f9e8e]/10 border border-[#1f9e8e]/30 text-[#1f9e8e] text-[11px] font-bold font-mono">
+                                        <Briefcase size={11} /> {roleLabel}
+                                    </span>
+                                    {profile.occupation && (
+                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[var(--ls-outline)] text-[11px] font-mono capitalize ${MUTED}`}>
+                                            <GraduationCap size={11} /> {profile.occupation}
                                         </span>
-                                        <div className="w-8 h-[1px] bg-[#202736] my-2"></div>
-                                        <span className="text-[14px] font-medium text-zinc-500">
-                                            {totalQuestions}
+                                    )}
+                                    {profile.experience_years > 0 && (
+                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[var(--ls-outline)] text-[11px] font-mono ${MUTED}`}>
+                                            {profile.experience_years} yr{profile.experience_years === 1 ? "" : "s"} experience
                                         </span>
-                                    </>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2.5 shrink-0">
+                                {profile.github_url && (
+                                    <a
+                                        href={profile.github_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center border border-[var(--ls-outline)] bg-[var(--ls-surface-low)] hover:bg-[var(--ls-surface-container)] transition-colors"
+                                        title="GitHub"
+                                    >
+                                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className={HEADING}>
+                                            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                                        </svg>
+                                    </a>
+                                )}
+                                {profile.linkedin_url && (
+                                    <a
+                                        href={profile.linkedin_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center border border-[var(--ls-outline)] bg-[var(--ls-surface-low)] hover:bg-[var(--ls-surface-container)] transition-colors"
+                                        title="LinkedIn"
+                                    >
+                                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-[#0a66c2] dark:text-[#5aa9f0]">
+                                            <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+                                            <rect x="2" y="9" width="4" height="12"></rect>
+                                            <circle cx="4" cy="4" r="2"></circle>
+                                        </svg>
+                                    </a>
                                 )}
                             </div>
                         </div>
-                        </div>
                     </div>
+                </section>
 
-                    {/* Difficulty Stats List (LeetCode Wide Rows style) */}
-                    <div className="md:col-span-3 bg-[#131924]/60 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-8 flex flex-col justify-center shadow-lg relative group overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-b from-[#202736]/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                        <div className="relative z-10 flex flex-col gap-8 w-full px-2 max-w-[320px] mx-auto">
-                            {[
-                                { id: 'EASY', key: 'easy', val: stats.easy.solved, max: stats.easy.total, color: stats.easy.color },
-                                { id: 'MEDIUM', key: 'medium', val: stats.medium.solved, max: stats.medium.total, color: stats.medium.color },
-                                { id: 'ADVANCED', key: 'advanced', val: stats.advanced.solved, max: stats.advanced.total, color: stats.advanced.color }
-                            ].map(s => (
-                                <div key={s.id} 
-                                     className="relative w-full cursor-pointer flex flex-col"
-                                     onMouseEnter={() => setHoveredSegment(s.key)}
-                                     onMouseLeave={() => setHoveredSegment(null)}
+                {/* ═══════════════ KPI STRIP ═══════════════ */}
+                <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    {kpis.map((k) => (
+                        <div key={k.label} className={`${CARD} p-4 sm:p-5`}>
+                            <div className="flex items-center justify-between">
+                                <span className={`text-[11px] font-mono font-bold uppercase tracking-wider ${SUBTLE}`}>{k.label}</span>
+                                <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${k.tone}`}>{k.icon}</span>
+                            </div>
+                            <div className={`mt-2 text-3xl font-extrabold font-mono leading-none ${HEADING}`}>{k.value}</div>
+                            <p className={`mt-1.5 text-[11px] ${MUTED}`}>{k.sub}</p>
+                        </div>
+                    ))}
+                </section>
+
+                {/* ═══════════════ MAIN GRID ═══════════════ */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    {/* ---------- Main column with tabs ---------- */}
+                    <div className="lg:col-span-8 flex flex-col gap-5 min-w-0">
+                        <div className="flex items-center gap-1 p-1 rounded-xl self-start" style={{ background: "var(--ls-surface-container)" }}>
+                            {TABS.map((t) => (
+                                <button
+                                    key={t.id}
+                                    onClick={() => setTab(t.id)}
+                                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                                        tab === t.id
+                                            ? `bg-[var(--ls-surface)] shadow-[var(--ls-shadow-sm)] ${HEADING}`
+                                            : `${MUTED} hover:text-[var(--ls-heading)]`
+                                    }`}
                                 >
-                                    <div className="flex justify-between items-center mb-3">
-                                        <div className="px-4 py-1.5 rounded-[20px] border shadow-sm" 
-                                             style={{ 
-                                                 borderColor: `${s.color}30`, 
-                                                 backgroundColor: `${s.color}10`, 
-                                                 color: s.color 
-                                             }}>
-                                            <span className="text-[11px] font-black tracking-widest uppercase">{s.id}</span>
-                                        </div>
-                                        <div className="flex items-baseline gap-1.5 pr-1">
-                                            <span className="text-[18px] font-bold text-white leading-none tracking-tight">{s.val}</span>
-                                            <span className="text-[13px] font-bold text-zinc-500">/ {s.max}</span>
-                                        </div>
-                                    </div>
-                                    <div className="w-full h-1.5 bg-[#171e2e] rounded-full overflow-hidden relative" style={{ opacity: 0.8 }}>
-                                        {/* Very faint inner track, matching image */}
-                                        <div className="absolute top-0 left-0 h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${s.max ? (s.val / s.max) * 100 : 0}%`, backgroundColor: `${s.color}30` }}></div>
-                                    </div>
-                                </div>
+                                    {t.label}
+                                    {t.count !== undefined && t.count > 0 && (
+                                        <span className="px-1.5 rounded-full text-[10px] font-mono bg-[#1f9e8e]/10 text-[#1f9e8e]">{t.count}</span>
+                                    )}
+                                </button>
                             ))}
                         </div>
-                    </div>
-                </div>
-                    
-                {/* Middle Row: Heatmap */}
-                <div className="bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-8 flex flex-col shadow-lg relative overflow-hidden group">
-                        <div className="absolute -top-24 -right-24 w-64 h-64 bg-[#4DD4C4]/5 rounded-full blur-[60px] pointer-events-none group-hover:bg-[#4DD4C4]/10 transition-colors duration-700"></div>
-                        
-                        <div className="flex justify-between items-center mb-8 relative z-10">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-[#4DD4C4]/10 flex items-center justify-center border border-[#4DD4C4]/20"><BarChart2 size={14} className="text-[#4DD4C4]"/></div>
-                                <h3 className="text-[15px] font-bold text-white tracking-wide">Activity Map</h3>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="hidden sm:flex gap-2 text-[11px] font-semibold tracking-wider uppercase text-zinc-500 bg-[#0b101c] px-3 py-1.5 rounded-lg border border-[#202736]">
-                                    {heatmapRangeLabel}
-                                </div>
-                                <select 
-                                    className="bg-[#0b101c] border border-[#202736] text-zinc-300 text-[12px] font-semibold tracking-wider rounded-lg px-3 py-1.5 outline-none focus:border-[#4DD4C4]/50 cursor-pointer hover:bg-[#131924] transition-colors"
-                                    value={selectedYear}
-                                    onChange={(e) => setSelectedYear(e.target.value)}
-                                >
-                                    <option value="last_12">LAST YEAR</option>
-                                    <option value={String(currentYear)}>{currentYear}</option>
-                                    <option value={String(currentYear - 1)}>{currentYear - 1}</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div className="w-full overflow-x-auto pb-4 custom-scrollbar lg:pr-4 relative z-10 flex justify-center">
-                            <div className="min-w-fit flex flex-col gap-2">
-                                {/* Month Labels */}
-                                <div className="relative h-[14px] w-full mt-1">
-                                    {monthLabels.map((lbl, idx) => {
-                                        // 15px is the width of one column (11px + 4px gap)
-                                        if (idx > 0 && lbl.colIndex - monthLabels[idx - 1].colIndex < 3) return null;
-                                        return (
-                                            <span 
-                                                key={idx} 
-                                                className="absolute text-[10px] text-zinc-500 font-bold uppercase tracking-wider" 
-                                                style={{ left: `${lbl.colIndex * 15}px`, transform: 'translateX(-2px)' }}
-                                            >
-                                                {lbl.name}
-                                            </span>
-                                        );
-                                    })}
-                                </div>
-                                
-                                {/* Grid */}
-                                <div className="flex gap-[4px]">
-                                    {heatmapWeeks.map((week, wIdx) => (
-                                        <div key={wIdx} className="flex flex-col gap-[4px]">
-                                            {week.map((dayCount, dIdx) => {
-                                                if (dayCount === -1) return <div key={`${wIdx}-${dIdx}`} className="w-[11px] h-[11px]" />;
-                                                let bgColor = "bg-[#202736]/60 border border-[#202736]/30";
-                                                if (dayCount === 1) { bgColor = "bg-[#4DD4C4]/30 border border-[#4DD4C4]/40"; }
-                                                else if (dayCount === 2) { bgColor = "bg-[#4DD4C4]/60 border border-[#4DD4C4]/70"; }
-                                                else if (dayCount >= 3) { bgColor = "bg-[#4DD4C4] border border-[#34b6a5] shadow-[0_0_8px_rgba(77,212,196,0.5)]"; }
-                                                
-                                                return (
-                                                    <div 
-                                                        key={`${wIdx}-${dIdx}`} 
-                                                        className={`w-[11px] h-[11px] rounded-[3px] ${bgColor} transition-all duration-300 cursor-pointer hover:scale-125 hover:z-10`} 
-                                                        title={`${dayCount} submissions`} 
-                                                    />
-                                                );
-                                            })}
+
+                        {/* ===== OVERVIEW ===== */}
+                        {tab === "overview" && (
+                            <>
+                                <div className={`${CARD} p-5 sm:p-6`}>
+                                    <div className="flex items-center justify-between mb-5">
+                                        <h3 className={`text-sm font-bold font-mono tracking-tight ${HEADING}`}>Problem progress</h3>
+                                        <Link href="/problems" className="text-[11px] font-semibold text-[#1f9e8e] hover:underline inline-flex items-center gap-0.5">
+                                            Browse problems <ChevronRight size={12} />
+                                        </Link>
+                                    </div>
+
+                                    <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-10">
+                                        <div className="relative w-[150px] h-[150px] shrink-0 flex items-center justify-center">
+                                            <svg className="w-full h-full transform -rotate-90 absolute top-0 left-0" viewBox="0 0 100 100">
+                                                {totalQuestions === 0 && (
+                                                    <circle cx="50" cy="50" r="42" fill="none" strokeWidth="5" stroke="currentColor" className={SUBTLE} opacity="0.25" />
+                                                )}
+                                                {segments.map((seg) => {
+                                                    if (seg.end <= seg.start) return null;
+                                                    const solvedAngle = seg.start + (seg.solved / seg.total) * (seg.end - seg.start);
+                                                    return (
+                                                        <g
+                                                            key={seg.id}
+                                                            onMouseEnter={() => setHoveredSegment(seg.id)}
+                                                            onMouseLeave={() => setHoveredSegment(null)}
+                                                            className="cursor-pointer"
+                                                        >
+                                                            <path
+                                                                d={describeArc(50, 50, 42, seg.start, seg.end)}
+                                                                stroke={seg.color}
+                                                                strokeWidth="5"
+                                                                fill="transparent"
+                                                                strokeLinecap="round"
+                                                                className="transition-all duration-200"
+                                                                opacity={hoveredSegment && hoveredSegment !== seg.id ? 0.08 : 0.2}
+                                                            />
+                                                            {seg.solved > 0 && (
+                                                                <path
+                                                                    d={describeArc(50, 50, 42, seg.start, solvedAngle)}
+                                                                    stroke={seg.color}
+                                                                    strokeWidth="5"
+                                                                    fill="transparent"
+                                                                    strokeLinecap="round"
+                                                                    className="transition-all duration-500 ease-out"
+                                                                    style={{ opacity: hoveredSegment && hoveredSegment !== seg.id ? 0.35 : 1 }}
+                                                                />
+                                                            )}
+                                                            <path d={describeArc(50, 50, 42, seg.start, seg.end)} stroke="transparent" strokeWidth="16" fill="transparent" strokeLinecap="round" />
+                                                        </g>
+                                                    );
+                                                })}
+                                            </svg>
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                                {(() => {
+                                                    const hs = segments.find((s) => s.id === hoveredSegment);
+                                                    return (
+                                                        <>
+                                                            <span className={`text-3xl font-extrabold font-mono leading-none ${HEADING}`}>{hs ? hs.solved : totalSolved}</span>
+                                                            <div className="w-6 h-[1px] my-1.5 bg-[var(--ls-outline-variant)]"></div>
+                                                            <span className={`text-xs font-medium font-mono ${SUBTLE}`}>{hs ? hs.total : totalQuestions}</span>
+                                                        </>
+                                                    );
+                                                })()}
+                                            </div>
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
-                    {/* Bottom Row: Submissions (Same Width) */}
-                    <div className="bg-[#131924]/80 backdrop-blur-xl border border-[#202736]/80 rounded-[32px] p-6 lg:p-8 flex flex-col shadow-lg relative overflow-hidden">
-                        <div className="absolute bottom-[-20%] left-[10%] w-[50%] h-[50%] bg-[#0ea5e9]/5 rounded-full blur-[80px] pointer-events-none"></div>
-
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8 relative z-10">
-                            <div className="flex items-center gap-3 pl-2">
-                                <h3 className="text-[17px] font-bold text-white tracking-wide">Recent Submissions</h3>
-                                <div className="px-2 py-0.5 rounded-full bg-[#202736] text-[10px] font-bold text-zinc-400">{filteredSubmissions.length}</div>
-                            </div>
-                            <div className="flex gap-2 w-full sm:w-auto">
-                                <div className="relative w-full sm:w-72 group">
-                                    <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#4DD4C4] transition-colors" />
-                                    <input type="text" placeholder="Search history..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-[#0b101c]/80 border border-[#202736] text-sm text-zinc-300 rounded-2xl py-3 pl-11 pr-4 outline-none focus:border-[#4DD4C4]/50 focus:shadow-[0_0_15px_rgba(77,212,196,0.1)] transition-all placeholder:text-zinc-600" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="relative z-10 overflow-y-auto max-h-[500px] custom-scrollbar pr-2 pb-2">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                                {filteredSubmissions.map(p => {
-                                    const diffLabels: Record<string, { t: string, b: string, bg: string, icon: string, shadow: string }> = {
-                                        easy: { t: 'text-[#4DD4C4]', b: 'border-[#4DD4C4]/30', bg: 'bg-[#4DD4C4]/10', icon: 'bg-[#4DD4C4]', shadow: 'group-hover:shadow-[0_4px_20px_rgba(77,212,196,0.08)]' },
-                                        medium: { t: 'text-[#eab308]', b: 'border-[#eab308]/30', bg: 'bg-[#eab308]/10', icon: 'bg-[#eab308]', shadow: 'group-hover:shadow-[0_4px_20px_rgba(234,179,8,0.08)]' },
-                                        hard: { t: 'text-[#f87171]', b: 'border-[#f87171]/30', bg: 'bg-[#f87171]/10', icon: 'bg-[#f87171]', shadow: 'group-hover:shadow-[0_4px_20px_rgba(248,113,113,0.08)]' },
-                                    };
-                                    const st = diffLabels[p.difficulty.toLowerCase()] || { t: 'text-zinc-400', b: 'border-[#202736]', bg: 'bg-[#202736]/30', icon: 'bg-zinc-500', shadow: 'group-hover:shadow-[0_4px_20px_rgba(0,0,0,0.2)]' };
-
-                                    return (
-                                        <div key={p.id} onClick={async () => {
-                                            setLoadingCode(true);
-                                            try {
-                                                const sol = await api.getSavedSolution(p.id);
-                                                if (sol.submitted_query) setViewingCode({ title: p.title, query: sol.submitted_query });
-                                            } catch { /* silent */ } finally { setLoadingCode(false); }
-                                        }} className={`p-5 rounded-[24px] bg-[#0b101c]/60 hover:bg-[#131924] border border-[#202736] hover:border-[#4DD4C4]/20 flex flex-col gap-4 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group ${st.shadow}`}>
-                                            <div className="flex justify-between items-start gap-4">
-                                                <div className="flex items-start gap-3">
-                                                    <div className="mt-1">
-                                                        <div className={`w-2 h-2 rounded-full ${st.icon} shadow-[0_0_8px_${st.icon.replace('bg-', '')}]`}></div>
+                                        <div className="flex flex-col gap-5 w-full">
+                                            {[
+                                                { id: "Easy", key: "easy", val: stats.easy.solved, max: stats.easy.total, color: "#1f9e8e", text: "text-[#1f9e8e]" },
+                                                { id: "Medium", key: "medium", val: stats.medium.solved, max: stats.medium.total, color: "#f59e0b", text: "text-amber-600 dark:text-amber-300" },
+                                                { id: "Hard", key: "advanced", val: stats.advanced.solved, max: stats.advanced.total, color: "#ef4444", text: "text-rose-600 dark:text-rose-300" }
+                                            ].map((s) => (
+                                                <div
+                                                    key={s.key}
+                                                    className="w-full cursor-pointer"
+                                                    onMouseEnter={() => setHoveredSegment(s.key)}
+                                                    onMouseLeave={() => setHoveredSegment(null)}
+                                                >
+                                                    <div className="flex justify-between items-baseline mb-1.5">
+                                                        <span className={`text-xs font-bold font-mono ${s.text}`}>{s.id}</span>
+                                                        <span className="font-mono text-xs">
+                                                            <span className={`font-bold ${HEADING}`}>{s.val}</span>
+                                                            <span className={SUBTLE}> / {s.max}</span>
+                                                        </span>
                                                     </div>
-                                                    <span className="text-[14px] font-semibold text-zinc-200 line-clamp-2 leading-snug group-hover:text-white transition-colors">{p.title}</span>
+                                                    <div className="w-full h-2 rounded-full overflow-hidden bg-[var(--ls-surface-container)]">
+                                                        <div
+                                                            className="h-full rounded-full transition-all duration-700 ease-out"
+                                                            style={{ width: `${s.max ? (s.val / s.max) * 100 : 0}%`, backgroundColor: s.color }}
+                                                        />
+                                                    </div>
                                                 </div>
-                                                <span className={`text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-[8px] border ${st.b} ${st.t} ${st.bg} shrink-0`}>
-                                                    {p.difficulty}
-                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Activity map */}
+                                <div className={`${CARD} p-5 sm:p-6`}>
+                                    <div className="flex flex-wrap justify-between items-start gap-3 mb-5">
+                                        <div>
+                                            <h3 className={`text-sm font-bold font-mono tracking-tight ${HEADING}`}>Activity</h3>
+                                            <p className={`text-[11px] mt-1 ${MUTED}`}>
+                                                <span className={`font-semibold ${HEADING}`}>{heat.totalSolves}</span> solves ·{" "}
+                                                <span className={`font-semibold ${HEADING}`}>{heat.activeDays}</span> active days · longest run{" "}
+                                                <span className={`font-semibold ${HEADING}`}>{heat.longest}</span> day{heat.longest === 1 ? "" : "s"}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-[11px] font-mono font-semibold uppercase px-2.5 py-1 rounded-md border border-[var(--ls-outline)] bg-[var(--ls-surface-container)] ${MUTED}`}>
+                                                {heat.rangeLabel}
+                                            </span>
+                                            <select
+                                                className={`bg-[var(--ls-surface)] border border-[var(--ls-outline)] text-xs font-semibold rounded-md px-2.5 py-1 outline-none focus:border-[#1f9e8e] cursor-pointer font-mono ${HEADING}`}
+                                                value={selectedYear}
+                                                onChange={(e) => setSelectedYear(e.target.value)}
+                                            >
+                                                <option value="last_12">Last year</option>
+                                                <option value={String(currentYear)}>{currentYear}</option>
+                                                <option value={String(currentYear - 1)}>{currentYear - 1}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div ref={heatScrollRef} className="w-full overflow-x-auto pb-2 flex justify-start sm:justify-center">
+                                        <div className="min-w-fit flex flex-col gap-2">
+                                            <div className="relative h-[14px] w-full">
+                                                {heat.labels.map((lbl, idx) => {
+                                                    if (idx > 0 && lbl.colIndex - heat.labels[idx - 1].colIndex < 3) return null;
+                                                    return (
+                                                        <span
+                                                            key={idx}
+                                                            className={`absolute text-[10px] font-mono font-bold uppercase tracking-wider ${SUBTLE}`}
+                                                            style={{ left: `${lbl.colIndex * 15}px` }}
+                                                        >
+                                                            {lbl.name}
+                                                        </span>
+                                                    );
+                                                })}
                                             </div>
-                                            <div className="flex justify-between items-center mt-auto pt-2 border-t border-[#202736]/50">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                                    <span className="text-[11px] font-medium text-zinc-500">
-                                                        {p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Solved'}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 text-[10px] font-medium text-zinc-500 group-hover:text-[#4DD4C4] transition-colors">
-                                                    <Code size={11} /> View Code
-                                                </div>
+
+                                            <div className="flex gap-[4px]">
+                                                {heat.weeks.map((week, wIdx) => (
+                                                    <div key={wIdx} className="flex flex-col gap-[4px]">
+                                                        {week.map((cell) => {
+                                                            if (cell.kind === "pad") return <div key={cell.key} className="w-[11px] h-[11px]" />;
+                                                            return (
+                                                                <div
+                                                                    key={cell.key}
+                                                                    className={`w-[11px] h-[11px] rounded-[3px] transition-transform duration-150 hover:scale-125 ${HEAT_LEVELS[heatLevel(cell.count)]} ${cell.kind === "future" ? "opacity-40" : ""}`}
+                                                                    title={
+                                                                        cell.kind === "future"
+                                                                            ? cell.key
+                                                                            : `${cell.count} solve${cell.count === 1 ? "" : "s"} on ${cell.key}`
+                                                                    }
+                                                                />
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <div className={`flex items-center justify-end gap-1.5 mt-1 text-[10px] font-mono ${SUBTLE}`}>
+                                                Less
+                                                {HEAT_LEVELS.map((cls, i) => (
+                                                    <span key={i} className={`w-[11px] h-[11px] rounded-[3px] ${cls}`} />
+                                                ))}
+                                                More
                                             </div>
                                         </div>
-                                    );
-                                })}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* ===== SUBMISSIONS ===== */}
+                        {tab === "submissions" && (
+                            <div className={`${CARD} p-5 sm:p-6`}>
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
+                                    <h3 className={`text-sm font-bold font-mono tracking-tight ${HEADING}`}>
+                                        Solved problems <span className={`font-normal ${SUBTLE}`}>({filteredSubmissions.length})</span>
+                                    </h3>
+                                    <div className="relative w-full sm:w-64">
+                                        <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${SUBTLE}`} />
+                                        <input
+                                            type="text"
+                                            placeholder="Search solved problems..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className={`w-full bg-[var(--ls-surface-low)] border border-[var(--ls-outline)] text-xs rounded-xl py-2 pl-9 pr-3 outline-none focus:border-[#1f9e8e] transition-all placeholder:text-[var(--ls-on-surface-subtle)] ${HEADING}`}
+                                        />
+                                    </div>
+                                </div>
+
+                                {filteredSubmissions.length === 0 ? (
+                                    <div className="py-14 text-center space-y-3">
+                                        <p className={`text-xs font-mono ${SUBTLE}`}>
+                                            {submissions.length === 0 ? "You haven't solved anything yet." : "No solved problems match your search."}
+                                        </p>
+                                        {submissions.length === 0 && (
+                                            <Link href="/practice/daily" className="inline-flex px-4 py-2 rounded-xl bg-[#1f9e8e] text-white text-xs font-bold hover:bg-[#177a6d] transition-colors">
+                                                Start today&apos;s set
+                                            </Link>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-[var(--ls-outline)] max-h-[560px] overflow-y-auto -mx-2 px-2">
+                                        {filteredSubmissions.map((p) => {
+                                            const diff = (p.difficulty || "").toLowerCase();
+                                            const badge =
+                                                diff === "easy"
+                                                    ? "bg-[#1f9e8e]/10 text-[#1f9e8e] border-[#1f9e8e]/30"
+                                                    : diff === "medium"
+                                                    ? "bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-300"
+                                                    : "bg-rose-500/10 text-rose-700 border-rose-500/30 dark:text-rose-300";
+                                            return (
+                                                <button
+                                                    key={p.id}
+                                                    onClick={async () => {
+                                                        setLoadingCode(true);
+                                                        try {
+                                                            const sol = await api.getSavedSolution(p.id);
+                                                            if (sol.submitted_query) setViewingCode({ title: p.title, query: sol.submitted_query });
+                                                        } catch {
+                                                            /* silent */
+                                                        } finally {
+                                                            setLoadingCode(false);
+                                                        }
+                                                    }}
+                                                    className="w-full flex items-center gap-3 py-3 text-left group rounded-lg hover:bg-[var(--ls-surface-low)] px-2 transition-colors"
+                                                >
+                                                    <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`text-xs font-semibold truncate group-hover:text-[#1f9e8e] transition-colors ${HEADING}`}>{p.title}</p>
+                                                        <p className={`text-[11px] mt-0.5 ${SUBTLE}`}>
+                                                            {p.created_at
+                                                                ? new Date(p.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })
+                                                                : "Solved"}
+                                                        </p>
+                                                    </div>
+                                                    <span className={`text-[10px] font-bold font-mono uppercase tracking-wider px-2 py-0.5 rounded border shrink-0 ${badge}`}>
+                                                        {p.difficulty}
+                                                    </span>
+                                                    <span className={`hidden sm:inline-flex items-center gap-1 text-[11px] font-medium shrink-0 ${MUTED} group-hover:text-[#1f9e8e] transition-colors`}>
+                                                        {loadingCode ? <Loader2 size={12} className="animate-spin" /> : <Code size={12} />} View code
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ===== LEADERBOARD ===== */}
+                        {tab === "leaderboard" && (
+                            <div className={`${CARD} p-5 sm:p-6`}>
+                                <div className="flex items-center gap-2.5 mb-4">
+                                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                                        <Trophy size={16} className="text-amber-600 dark:text-amber-300" />
+                                    </div>
+                                    <div>
+                                        <h3 className={`text-sm font-bold font-mono tracking-tight ${HEADING}`}>Leaderboard</h3>
+                                        <p className={`text-[11px] ${MUTED}`}>Top solvers across DailySQL</p>
+                                    </div>
+                                </div>
+
+                                {leaderboard.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-12 gap-2">
+                                        <Trophy size={24} className={SUBTLE} />
+                                        <p className={`text-xs font-mono ${SUBTLE}`}>No data yet</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-1.5">
+                                        {[...leaderboardTop.map((e, i) => ({ e, rank: i + 1 })), ...(youOutsideTop ? [{ e: youOutsideTop, rank: myRank as number }] : [])].map(({ e: entry, rank }) => {
+                                            const isYou = entry.user_id === profile.user_id;
+                                            const medals = ["bg-amber-400/20 text-amber-700 border-amber-400/50 dark:text-amber-300", "bg-slate-400/20 text-slate-600 border-slate-400/50 dark:text-slate-300", "bg-orange-400/20 text-orange-700 border-orange-400/50 dark:text-orange-300"];
+                                            return (
+                                                <div
+                                                    key={entry.user_id}
+                                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-xs transition-colors ${
+                                                        isYou
+                                                            ? "bg-[#1f9e8e]/10 border-[#1f9e8e]/40"
+                                                            : "border-transparent hover:bg-[var(--ls-surface-low)]"
+                                                    }`}
+                                                >
+                                                    <div
+                                                        className={`w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold font-mono border shrink-0 ${
+                                                            rank <= 3 ? medals[rank - 1] : `border-[var(--ls-outline)] ${MUTED}`
+                                                        }`}
+                                                    >
+                                                        {rank}
+                                                    </div>
+                                                    <div className="w-7 h-7 rounded-lg bg-[var(--ls-surface-container)] flex items-center justify-center overflow-hidden shrink-0">
+                                                        {entry.avatar_url ? (
+                                                            <img src={entry.avatar_url} alt={entry.full_name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <User size={13} className={SUBTLE} />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                                                        {entry.username ? (
+                                                            <Link href={`/u/${entry.username}`} className={`truncate font-semibold hover:underline ${isYou ? "text-[#1f9e8e]" : HEADING}`}>
+                                                                {entry.full_name}
+                                                            </Link>
+                                                        ) : (
+                                                            <span className={`truncate font-semibold ${isYou ? "text-[#1f9e8e]" : HEADING}`}>{entry.full_name}</span>
+                                                        )}
+                                                        {isYou && (
+                                                            <span className="text-[9px] font-bold text-[#1f9e8e] bg-[#1f9e8e]/10 px-1.5 py-0.5 rounded border border-[#1f9e8e]/20 shrink-0">YOU</span>
+                                                        )}
+                                                    </div>
+                                                    {entry.current_streak > 0 && (
+                                                        <div className="flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-300 shrink-0">
+                                                            <Flame size={12} className="fill-amber-500 text-amber-500" />
+                                                            {entry.current_streak}
+                                                        </div>
+                                                    )}
+                                                    <div className={`font-mono font-bold shrink-0 ${HEADING}`}>
+                                                        {entry.total_solved}
+                                                        <span className={`text-[9px] font-normal ml-0.5 ${SUBTLE}`}>solved</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ---------- Side column ---------- */}
+                    <aside className="lg:col-span-4 flex flex-col gap-5 min-w-0">
+                        <SubscriptionStatus />
+
+                        <div className={`${CARD} p-5`}>
+                            <h3 className={`text-sm font-bold font-mono tracking-tight mb-3 ${HEADING}`}>Keep going</h3>
+                            <div className="flex flex-col gap-2">
+                                <Link
+                                    href="/practice/daily"
+                                    className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl bg-[#1f9e8e]/10 border border-[#1f9e8e]/25 hover:border-[#1f9e8e]/60 transition-colors group"
+                                >
+                                    <span className="flex items-center gap-2.5 min-w-0">
+                                        <Target size={16} className="text-[#1f9e8e] shrink-0" />
+                                        <span className="min-w-0">
+                                            <span className={`block text-xs font-bold ${HEADING}`}>Today&apos;s daily set</span>
+                                            <span className={`block text-[11px] ${MUTED}`}>{activeToday ? "You've solved today — go again" : "Solve one to keep your streak"}</span>
+                                        </span>
+                                    </span>
+                                    <ChevronRight size={14} className="text-[#1f9e8e] group-hover:translate-x-0.5 transition-transform shrink-0" />
+                                </Link>
+                                <Link
+                                    href="/problems"
+                                    className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl border border-[var(--ls-outline)] hover:bg-[var(--ls-surface-low)] transition-colors group"
+                                >
+                                    <span className={`text-xs font-semibold ${HEADING}`}>Browse all problems</span>
+                                    <ChevronRight size={14} className={`${MUTED} group-hover:translate-x-0.5 transition-transform`} />
+                                </Link>
                             </div>
                         </div>
-                    </div>
+                    </aside>
                 </div>
-
             </div>
-        </div>
 
-        {/* Code Viewer Modal */}
-        {viewingCode && (
-            <div
-                className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                onClick={() => setViewingCode(null)}
-            >
+            {/* Code Viewer Modal */}
+            {viewingCode && (
                 <div
-                    className="bg-[#0d121c] border border-[#202736] rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden"
-                    onClick={e => e.stopPropagation()}
+                    className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4"
+                    onClick={() => setViewingCode(null)}
                 >
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-[#202736] bg-[#131924] shrink-0">
-                        <div className="flex items-center gap-3">
-                            <div className="w-7 h-7 rounded-lg bg-[#4DD4C4]/10 border border-[#4DD4C4]/20 flex items-center justify-center">
-                                <Code size={14} className="text-[#4DD4C4]" />
+                    <div
+                        className="border border-[var(--ls-outline)] bg-[var(--ls-surface)] rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-xl overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ls-outline)] bg-[var(--ls-surface-low)] shrink-0">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-7 h-7 rounded-lg bg-[#1f9e8e]/10 border border-[#1f9e8e]/30 flex items-center justify-center shrink-0">
+                                    <Code size={14} className="text-[#1f9e8e]" />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className={`text-[10px] font-mono uppercase tracking-wider ${MUTED}`}>Submitted solution</p>
+                                    <h3 className={`text-sm font-bold leading-tight line-clamp-1 ${HEADING}`}>{viewingCode.title}</h3>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider">Submitted Solution</p>
-                                <h3 className="text-sm font-bold text-white leading-tight line-clamp-1">{viewingCode?.title}</h3>
-                            </div>
+                            <button
+                                onClick={() => setViewingCode(null)}
+                                className={`transition-colors p-1.5 rounded-lg hover:bg-[var(--ls-surface-container)] ${MUTED}`}
+                                aria-label="Close"
+                            >
+                                <X size={16} />
+                            </button>
                         </div>
-                        <button
-                            onClick={() => setViewingCode(null)}
-                            className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-[#202736]"
-                        >
-                            <X size={18} />
-                        </button>
-                    </div>
-                    <div className="flex-1 overflow-auto p-6 bg-[#0b101c]">
-                        <pre className="text-[13px] text-[#4DD4C4] font-mono leading-relaxed whitespace-pre-wrap break-words">
-                            {viewingCode?.query}
-                        </pre>
-                    </div>
-                    <div className="px-6 py-3 border-t border-[#202736] bg-[#0d121c] flex justify-between items-center shrink-0">
-                        <span className="text-[10px] text-zinc-600 font-mono">PostgreSQL</span>
-                        <button
-                            onClick={() => navigator.clipboard.writeText(viewingCode?.query ?? '')}
-                            className="text-[11px] font-medium text-zinc-400 hover:text-[#4DD4C4] transition-colors"
-                        >
-                            Copy to clipboard
-                        </button>
+                        <div className="flex-1 overflow-auto p-5 bg-[#1c1c1e]">
+                            <pre className="text-xs text-emerald-400 font-mono leading-relaxed whitespace-pre-wrap break-words">{viewingCode.query}</pre>
+                        </div>
+                        <div className="px-5 py-3 border-t border-[var(--ls-outline)] bg-[var(--ls-surface-low)] flex justify-between items-center shrink-0">
+                            <span className={`text-[10px] font-mono ${MUTED}`}>SQL / PostgreSQL</span>
+                            <button
+                                onClick={() => navigator.clipboard.writeText(viewingCode.query ?? "")}
+                                className="text-xs font-bold text-[#1f9e8e] hover:text-[#177a6d] transition-colors dark:hover:text-[#4DD4C4]"
+                            >
+                                Copy to clipboard
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        )}
+            )}
 
-        {/* ══ Auth Toast ══ */}
-        {toast && (
-            <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[1000] animate-in slide-in-from-bottom-5 duration-300">
-                <div className={`bg-[#0d121c] border-2 ${toast.type === 'error' ? 'border-red-500/50 shadow-[0_0_40px_rgba(239,68,68,0.2)]' : 'border-[#4DD4C4]/50 shadow-[0_0_40px_rgba(77,212,196,0.2)]'} rounded-2xl p-4 flex flex-col gap-3 min-w-[320px] backdrop-blur-md`}>
-                    <div className="flex items-start gap-4">
-                        <div className={`w-12 h-12 rounded-xl ${toast.type === 'error' ? 'bg-red-500/10 border border-red-500/20' : 'bg-[#4DD4C4]/10 border border-[#4DD4C4]/20'} flex items-center justify-center shrink-0`}>
-                            {toast.type === 'error' ? (
-                                <AlertCircle className="text-red-500" size={24} />
-                            ) : (
-                                <CheckCircle2 className="text-[#4DD4C4]" size={24} />
-                            )}
+            {/* Toast */}
+            {toast && (
+                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1000] animate-in slide-in-from-bottom-5 duration-200">
+                    <div
+                        className={`border bg-[var(--ls-surface)] rounded-xl p-4 flex items-center gap-3 shadow-lg min-w-[320px] ${
+                            toast.type === "error" ? "border-rose-300 dark:border-rose-500/30" : "border-emerald-300 dark:border-emerald-500/30"
+                        }`}
+                    >
+                        <div
+                            className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                                toast.type === "error" ? "bg-rose-500/10 text-rose-600 dark:text-rose-300" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+                            }`}
+                        >
+                            {toast.type === "error" ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
                         </div>
-                        <div className="flex-1 pt-1">
-                            <h3 className="text-white font-bold text-sm text-left">{toast.type === 'error' ? 'Upload Failed' : 'Success'}</h3>
-                            <p className={`${toast.type === 'error' ? 'text-red-400' : 'text-zinc-400'} text-xs mt-1 text-left leading-relaxed`}>{toast.message}</p>
+                        <div className="flex-1 text-left">
+                            <h4 className={`font-bold text-xs ${HEADING}`}>{toast.type === "error" ? "Action failed" : "Success"}</h4>
+                            <p className={`text-xs mt-0.5 ${MUTED}`}>{toast.message}</p>
                         </div>
-                        <button onClick={() => setToast(null)} className="text-zinc-500 hover:text-white transition-colors pt-1">
-                            <X size={16} />
+                        <button onClick={() => setToast(null)} className={MUTED} aria-label="Dismiss">
+                            <X size={14} />
                         </button>
                     </div>
                 </div>
-            </div>
-        )}
-        </>
+            )}
+        </div>
     );
 }
-
-//redep

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { Code2, Heart, Zap, Terminal, Cpu, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Zap, Terminal, Cpu, Users, Sparkles, ArrowRight, Mail } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -13,92 +13,130 @@ export const metadata: Metadata = {
 
 export default function TeamPage() {
   return (
-    <main className="min-h-screen bg-[#09090b]">
+    <main className="landing-light min-h-screen bg-[#fafafa] text-zinc-900 font-sans selection:bg-[#1f9e8e]/20 selection:text-[#1f9e8e]">
       {/* Hero Section */}
-      <section className="relative py-32 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        {/* Background Glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-brand-base/10 rounded-full blur-[120px] pointer-events-none" />
-
-        <div className="max-w-4xl mx-auto text-center relative z-10 space-y-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-base/10 border border-brand-base/20 text-brand-base text-sm font-medium mb-4">
-            <Terminal size={16} />
+      <section className="relative py-24 md:py-32 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div className="max-w-4xl mx-auto text-center relative z-10 space-y-6">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#e6f7f5] border border-[#1f9e8e]/30 text-[#1f9e8e] text-xs font-mono font-bold tracking-wide">
+            <Terminal size={14} />
             <span>Behind the Code</span>
           </div>
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white">
+
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold font-mono tracking-tight text-zinc-900 leading-[1.1]">
             Built for Developers <br />
-            <span className="text-brand-base">by Developers</span>
+            <span className="text-[#1f9e8e]">by Practitioners</span>
           </h1>
-          <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl mx-auto">
-            We are a small team of engineers and educators obsessed with making SQL mastery
-            accessible, consistent, and actually enjoyable.
+
+          <p className="text-base sm:text-lg text-zinc-600 leading-relaxed max-w-2xl mx-auto">
+            We are a focused team of engineers and educators obsessed with making SQL, Python, and PySpark mastery accessible, consistent, and genuinely rewarding.
           </p>
+
+          <div className="pt-2 flex justify-center">
+            <div className="relative w-36 h-36 md:w-44 md:h-44">
+              <Image
+                src="/mascot-complete-bg-removed.png"
+                alt="Daily SQL Team Mascot"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Mission / Values Grid */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 border-t border-white/5 bg-[#0c0c0e]">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 border-t border-[#dedee2] bg-white">
         <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
+            <h2 className="text-2xl sm:text-3xl font-bold font-mono text-zinc-900 tracking-tight">
+              Our Core Principles
+            </h2>
+            <p className="text-sm text-zinc-600">
+              The foundational values that guide how we design curriculum, build developer tools, and shape community.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
             {/* Value 1 */}
-            <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-brand-base/30 transition-colors group">
-              <div className="w-12 h-12 rounded-lg bg-brand-base/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Cpu className="text-brand-base" size={24} />
+            <div className="p-8 rounded-2xl bg-zinc-50/70 border border-[#dedee2] hover:border-[#1f9e8e]/40 transition-all hover:shadow-xs group flex flex-col justify-between dark:bg-white/5">
+              <div>
+                <div className="w-12 h-12 rounded-xl bg-[#e6f7f5] border border-[#1f9e8e]/30 flex items-center justify-center mb-6 text-[#1f9e8e] group-hover:scale-105 transition-transform">
+                  <Cpu size={24} />
+                </div>
+                <h3 className="text-lg font-bold font-mono text-zinc-900 mb-3">Craftsmanship</h3>
+                <p className="text-sm text-zinc-600 leading-relaxed">
+                  We sweat the details. From responsive syntax execution to real-time schema validation, developer tools should feel instantaneous and reliable.
+                </p>
               </div>
-              <h3 className="text-xl font-bold text-white mb-3">Craftsmanship</h3>
-              <p className="text-zinc-400 leading-relaxed">
-                We sweat the details. From the syntax highlighting to the query execution speed,
-                we believe developer tools should feel premium and responsive.
-              </p>
             </div>
 
             {/* Value 2 */}
-            <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-brand-base/30 transition-colors group">
-              <div className="w-12 h-12 rounded-lg bg-brand-base/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Zap className="text-brand-base" size={24} />
+            <div className="p-8 rounded-2xl bg-zinc-50/70 border border-[#dedee2] hover:border-[#1f9e8e]/40 transition-all hover:shadow-xs group flex flex-col justify-between dark:bg-white/5">
+              <div>
+                <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center mb-6 text-amber-600 group-hover:scale-105 transition-transform dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
+                  <Zap size={24} />
+                </div>
+                <h3 className="text-lg font-bold font-mono text-zinc-900 mb-3">Consistency</h3>
+                <p className="text-sm text-zinc-600 leading-relaxed">
+                  We believe in daily compounding. Intensity fades, but solving one thoughtful problem every single day builds unshakeable confidence and mastery.
+                </p>
               </div>
-              <h3 className="text-xl font-bold text-white mb-3">Consistency</h3>
-              <p className="text-zinc-400 leading-relaxed">
-                We believe in the power of habit. Intensity is overrated; consistency is where
-                real mastery happens. We build for the long game.
-              </p>
             </div>
 
             {/* Value 3 */}
-            <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-brand-base/30 transition-colors group">
-              <div className="w-12 h-12 rounded-lg bg-brand-base/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Users className="text-brand-base" size={24} />
+            <div className="p-8 rounded-2xl bg-zinc-50/70 border border-[#dedee2] hover:border-[#1f9e8e]/40 transition-all hover:shadow-xs group flex flex-col justify-between dark:bg-white/5">
+              <div>
+                <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mb-6 text-emerald-600 group-hover:scale-105 transition-transform dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-300">
+                  <Users size={24} />
+                </div>
+                <h3 className="text-lg font-bold font-mono text-zinc-900 mb-3">Community</h3>
+                <p className="text-sm text-zinc-600 leading-relaxed">
+                  Learning shouldn&apos;t feel isolated. We&apos;re building a peer environment where analysts and engineers compare solutions, share optimizations, and grow together.
+                </p>
               </div>
-              <h3 className="text-xl font-bold text-white mb-3">Community</h3>
-              <p className="text-zinc-400 leading-relaxed">
-                Learning is hard when you're alone. We're building a space where data professionals
-                can challenge, support, and grow with each other.
-              </p>
             </div>
           </div>
         </div>
       </section>
 
       {/* Join the Team CTA */}
-      <section className="py-32 px-4 sm:px-6 lg:px-8 border-t border-white/5 relative overflow-hidden">
-        <div className="absolute inset-0 bg-brand-base/5" />
-        <div className="max-w-4xl mx-auto text-center relative z-10 space-y-8">
-          <h2 className="text-3xl md:text-5xl font-bold text-white">
+      <section className="py-24 px-4 sm:px-6 lg:px-8 border-t border-[#dedee2] relative overflow-hidden bg-[#fafafa]">
+        <div className="max-w-4xl mx-auto text-center relative z-10 space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#e6f7f5] border border-[#1f9e8e]/20 text-[#1f9e8e] text-xs font-mono font-bold">
+            <Sparkles size={13} />
+            <span>Join Our Mission</span>
+          </div>
+
+          <h2 className="text-3xl md:text-4xl font-bold font-mono text-zinc-900 tracking-tight">
             Want to build with us?
           </h2>
-          <p className="text-lg text-zinc-400 max-w-xl mx-auto">
-            We're always looking for talented engineers and content creators to help us define the future of technical education.
+
+          <p className="text-sm sm:text-base text-zinc-600 max-w-xl mx-auto leading-relaxed">
+            We are always excited to collaborate with passionate curriculum writers, database instructors, and full-stack builders.
           </p>
-          <div className="flex items-center justify-center gap-4">
-            <Button asChild size="lg" className="bg-white text-black hover:bg-zinc-200">
-              <Link href="mailto:careers@dailysql.in">Email Us</Link>
-            </Button>
-            <Button asChild variant="outline" size="lg" className="border-white/10 text-white hover:bg-white/10">
-              <a href="https://twitter.com/dailysqlin" target="_blank" rel="noopener noreferrer">Follow @dailysqlin</a>
-            </Button>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <a
+              href="mailto:careers@dailysql.in"
+              className="px-6 py-3 bg-[#1f9e8e] hover:bg-[#177a6d] text-white rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 shadow-2xs"
+            >
+              <Mail size={14} />
+              <span>Email Us</span>
+            </a>
+
+            <a
+              href="https://twitter.com/dailysqlin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3 bg-white border border-[#dedee2] hover:bg-zinc-50 text-zinc-800 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-2 shadow-2xs"
+            >
+              <span>Follow @dailysqlin</span>
+              <ArrowRight size={13} />
+            </a>
           </div>
         </div>
       </section>
     </main>
   );
 }
-

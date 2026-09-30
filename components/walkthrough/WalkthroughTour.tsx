@@ -41,10 +41,10 @@ function getRect(id: string | null): DOMRect | null {
 function TooltipArrow({ position }: { position: string }) {
   const base = "absolute w-0 h-0";
   const styles: Record<string, string> = {
-    top: `${base} bottom-[-8px] left-1/2 -translate-x-1/2 border-l-[8px] border-r-[8px] border-t-[8px] border-l-transparent border-r-transparent border-t-[#1a2332]`,
-    bottom: `${base} top-[-8px] left-1/2 -translate-x-1/2 border-l-[8px] border-r-[8px] border-b-[8px] border-l-transparent border-r-transparent border-b-[#1a2332]`,
-    left: `${base} right-[-8px] top-1/2 -translate-y-1/2 border-t-[8px] border-b-[8px] border-l-[8px] border-t-transparent border-b-transparent border-l-[#1a2332]`,
-    right: `${base} left-[-8px] top-1/2 -translate-y-1/2 border-t-[8px] border-b-[8px] border-r-[8px] border-t-transparent border-b-transparent border-r-[#1a2332]`,
+    top: `${base} bottom-[-8px] left-1/2 -translate-x-1/2 border-l-[8px] border-r-[8px] border-t-[8px] border-l-transparent border-r-transparent border-t-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.08)]`,
+    bottom: `${base} top-[-8px] left-1/2 -translate-x-1/2 border-l-[8px] border-r-[8px] border-b-[8px] border-l-transparent border-r-transparent border-b-white drop-shadow-[0_-2px_2px_rgba(0,0,0,0.08)]`,
+    left: `${base} right-[-8px] top-1/2 -translate-y-1/2 border-t-[8px] border-b-[8px] border-l-[8px] border-t-transparent border-b-transparent border-l-white drop-shadow-[2px_0_2px_rgba(0,0,0,0.08)]`,
+    right: `${base} left-[-8px] top-1/2 -translate-y-1/2 border-t-[8px] border-b-[8px] border-r-[8px] border-t-transparent border-b-transparent border-r-white drop-shadow-[-2px_0_2px_rgba(0,0,0,0.08)]`,
     center: "",
   };
   return <div className={styles[position] || ""} />;
@@ -211,22 +211,22 @@ export function WalkthroughTour({
 
   return (
     <>
-      {/* Dark overlay using 4 panels (curtain effect) */}
+      {/* Dimmed overlay using 4 panels (curtain effect) */}
       {sp ? (
         <>
           {/* Top */}
           <div
-            className="fixed inset-x-0 top-0 bg-black/75 z-[10000] pointer-events-none transition-all duration-300"
+            className="fixed inset-x-0 top-0 bg-black/45 z-[10000] pointer-events-none transition-all duration-300"
             style={{ height: Math.max(0, spTop) }}
           />
           {/* Bottom */}
           <div
-            className="fixed inset-x-0 bottom-0 bg-black/75 z-[10000] pointer-events-none transition-all duration-300"
+            className="fixed inset-x-0 bottom-0 bg-black/45 z-[10000] pointer-events-none transition-all duration-300"
             style={{ top: Math.max(0, spTop + spH) }}
           />
           {/* Left */}
           <div
-            className="fixed left-0 bg-black/75 z-[10000] pointer-events-none transition-all duration-300"
+            className="fixed left-0 bg-black/45 z-[10000] pointer-events-none transition-all duration-300"
             style={{
               top: Math.max(0, spTop),
               height: spH,
@@ -235,7 +235,7 @@ export function WalkthroughTour({
           />
           {/* Right */}
           <div
-            className="fixed right-0 bg-black/75 z-[10000] pointer-events-none transition-all duration-300"
+            className="fixed right-0 bg-black/45 z-[10000] pointer-events-none transition-all duration-300"
             style={{
               top: Math.max(0, spTop),
               height: spH,
@@ -244,7 +244,7 @@ export function WalkthroughTour({
           />
           {/* Spotlight border ring */}
           <div
-            className="fixed z-[10000] pointer-events-none rounded-xl border-2 border-[#4DD4C4]/60 shadow-[0_0_0_4px_rgba(77,212,196,0.12)] transition-all duration-300"
+            className="fixed z-[10000] pointer-events-none rounded-xl border-2 border-[#1f9e8e] shadow-[0_0_0_4px_rgba(31,158,142,0.25)] transition-all duration-300"
             style={{
               top: spTop,
               left: spLeft,
@@ -255,7 +255,7 @@ export function WalkthroughTour({
         </>
       ) : (
         /* Full overlay for centered modal */
-        <div className="fixed inset-0 bg-black/75 z-[10000] pointer-events-none" />
+        <div className="fixed inset-0 bg-black/45 z-[10000] pointer-events-none" />
       )}
 
       {/* Click-capture overlay (prevents interacting with underlying content) */}
@@ -272,32 +272,32 @@ export function WalkthroughTour({
         className="animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative bg-[#1a2332] border border-[#4DD4C4]/30 rounded-2xl shadow-[0_0_40px_rgba(77,212,196,0.15)] overflow-hidden">
+        <div className="relative bg-white border border-[#dedee2] rounded-2xl shadow-[0_12px_40px_rgba(31,158,142,0.18)] overflow-hidden">
           {/* Top accent */}
-          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#4DD4C4] to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#1f9e8e] to-transparent" />
 
           <div className="p-5">
             {/* Header */}
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="flex items-center gap-2.5">
                 {step.icon && (
-                  <div className="p-1.5 rounded-lg bg-[#4DD4C4]/10 border border-[#4DD4C4]/20 text-[#4DD4C4] shrink-0">
+                  <div className="p-1.5 rounded-lg bg-[#e6f7f5] border border-[#1f9e8e]/30 text-[#1f9e8e] shrink-0">
                     {step.icon}
                   </div>
                 )}
-                <h3 className="text-sm font-black text-white tracking-tight">
+                <h3 className="text-sm font-bold font-mono text-zinc-900 tracking-tight">
                   {step.title}
                 </h3>
               </div>
               <button
                 onClick={onSkip}
-                className="text-zinc-500 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5 shrink-0"
+                className="text-zinc-400 hover:text-zinc-700 transition-colors p-1 rounded-lg hover:bg-zinc-100 shrink-0"
               >
                 <X size={14} />
               </button>
             </div>
 
-            <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+            <p className="text-xs text-zinc-600 leading-relaxed mb-4">
               {step.description}
             </p>
 
@@ -311,8 +311,8 @@ export function WalkthroughTour({
                     onClick={() => setCurrentStep(i)}
                     className={`rounded-full transition-all duration-200 ${
                       i === currentStep
-                        ? "w-4 h-1.5 bg-[#4DD4C4]"
-                        : "w-1.5 h-1.5 bg-[#202736] hover:bg-zinc-500"
+                        ? "w-4 h-1.5 bg-[#1f9e8e]"
+                        : "w-1.5 h-1.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-700"
                     }`}
                   />
                 ))}
@@ -322,7 +322,7 @@ export function WalkthroughTour({
                 {!isFirstStep && (
                   <button
                     onClick={() => setCurrentStep((s) => s - 1)}
-                    className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-zinc-400 hover:text-white bg-[#0b101c] border border-[#202736] rounded-lg transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold text-zinc-700 hover:text-zinc-900 bg-zinc-50 border border-zinc-200 rounded-lg hover:bg-zinc-100 transition-colors"
                   >
                     <ArrowLeft size={12} /> Back
                   </button>
@@ -330,14 +330,14 @@ export function WalkthroughTour({
                 {isLastStep ? (
                   <button
                     onClick={onComplete}
-                    className="flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-black text-[#080c16] bg-[#4DD4C4] hover:bg-[#3dbdb0] rounded-lg transition-all shadow-[0_0_15px_rgba(77,212,196,0.3)]"
+                    className="flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-bold text-white bg-[#1f9e8e] hover:bg-[#177a6d] rounded-lg transition-all shadow-[0_2px_8px_rgba(31,158,142,0.25)]"
                   >
                     <Sparkles size={12} /> Let's go!
                   </button>
                 ) : (
                   <button
                     onClick={() => setCurrentStep((s) => s + 1)}
-                    className="flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-black text-[#080c16] bg-[#4DD4C4] hover:bg-[#3dbdb0] rounded-lg transition-all shadow-[0_0_15px_rgba(77,212,196,0.3)]"
+                    className="flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-bold text-white bg-[#1f9e8e] hover:bg-[#177a6d] rounded-lg transition-all shadow-[0_2px_8px_rgba(31,158,142,0.25)]"
                   >
                     Next <ArrowRight size={12} />
                   </button>
@@ -349,7 +349,7 @@ export function WalkthroughTour({
             <div className="mt-3 text-center">
               <button
                 onClick={onSkip}
-                className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors"
+                className="text-[10px] text-zinc-400 hover:text-zinc-600 transition-colors"
               >
                 Skip tour (Esc)
               </button>

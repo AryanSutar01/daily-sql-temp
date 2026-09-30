@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { WaitlistForm } from "@/components/waitlist/waitlist-form";
 import { WaitlistFormData } from "@/types/waitlist";
-import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
+import { CheckCircle2, ArrowRight, Loader2, Sparkles, UserCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function OnboardingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,8 +48,8 @@ export default function OnboardingPage() {
 
       setIsSuccess(true);
       setTimeout(() => {
-        router.push("/profile?setup=true");
-      }, 2000);
+        router.push("/practice/daily");
+      }, 1500);
     } catch (err: any) {
       console.error("Onboarding error:", err);
       setError(err.message || "Something went wrong. Please try again.");
@@ -59,23 +60,30 @@ export default function OnboardingPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#080c16] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#4DD4C4]" />
+      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#1f9e8e]" />
       </div>
     );
   }
 
   if (isSuccess) {
     return (
-      <main className="min-h-screen bg-[#080c16] flex items-center justify-center px-4 py-24">
-        <div className="max-w-md w-full bg-[#121826] border border-[#4DD4C4]/20 p-10 rounded-2xl text-center space-y-6 shadow-2xl animate-in zoom-in-95 duration-500">
-          <div className="w-20 h-20 bg-[#4DD4C4]/10 rounded-full flex items-center justify-center mx-auto border border-[#4DD4C4]/20">
-            <CheckCircle2 className="text-[#4DD4C4]" size={40} />
+      <main className="landing-light min-h-screen bg-[#fafafa] flex items-center justify-center px-4 py-24 font-sans">
+        <div className="max-w-md w-full bg-white border border-[#dedee2] p-10 rounded-3xl text-center space-y-6 shadow-sm animate-in zoom-in-95 duration-500">
+          <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
+            <img
+              src="/mascot-complete-bg-removed.png"
+              alt="DailySQL Mascot"
+              className="w-20 h-20 object-contain animate-bounce"
+            />
           </div>
           <div className="space-y-2">
-            <h2 className="text-3xl font-bold text-white italic tracking-tight">You're all set!</h2>
-            <p className="text-zinc-400 leading-relaxed">
-              Welcome to the community. Redirecting you to the practice arena...
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30">
+              <CheckCircle2 size={14} /> Profile Complete
+            </div>
+            <h2 className="text-2xl font-bold text-zinc-900 tracking-tight">You're all set!</h2>
+            <p className="text-zinc-500 text-sm leading-relaxed">
+              Welcome to the community. Redirecting you to today's practice arena...
             </p>
           </div>
         </div>
@@ -84,51 +92,76 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#080c16] flex flex-col items-center justify-center px-4 py-24 relative overflow-hidden">
-      {/* Background Decor */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#4DD4C4]/5 rounded-full blur-[120px] -mr-64 -mt-64" />
-      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#4DD4C4]/5 rounded-full blur-[120px] -ml-64 -mb-64" />
+    <main className="landing-light min-h-screen bg-[#fafafa] flex flex-col items-center justify-center px-4 py-16 relative overflow-hidden font-sans text-zinc-900 antialiased selection:bg-[#1f9e8e]/20 selection:text-[#1f9e8e]">
+      
+      <div className="absolute top-4 right-4 z-20">
+        <ThemeToggle />
+      </div>
 
-      <div className="max-w-xl w-full space-y-10 relative z-10">
-        <div className="text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#4DD4C4]/10 border border-[#4DD4C4]/20 text-[#4DD4C4] text-[10px] font-black uppercase tracking-widest mb-4">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4DD4C4] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#4DD4C4]"></span>
-            </span>
-            Step into the arena
+      {/* Background Subtle Ambience */}
+      <div className="absolute inset-0 bg-dot-light opacity-50 pointer-events-none" />
+      <div
+        className="absolute top-0 right-0 w-96 h-96 rounded-full pointer-events-none opacity-30 blur-3xl"
+        style={{ background: "radial-gradient(circle, rgba(31,158,142,0.2) 0%, transparent 70%)" }}
+      />
+
+      <div className="max-w-xl w-full space-y-8 relative z-10">
+        
+        {/* Brand Logo & Progress Header */}
+        <div className="text-center space-y-3">
+          <Link href="/" className="inline-flex items-center gap-3 group mb-2">
+            <img
+              src="/dailysql-logo-bg-removed.png"
+              alt="DailySQL Logo"
+              className="h-9 w-auto object-contain transition-transform group-hover:scale-105"
+            />
+            <img
+              src="/dailysql-wordmark-bg-removed.png"
+              alt="DailySQL"
+              className="dark:invert h-7 w-auto object-contain transition-opacity group-hover:opacity-90"
+            />
+          </Link>
+
+          <div className="flex justify-center">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold tracking-wider uppercase bg-[#e6f7f5] text-[#1f9e8e] border border-[#1f9e8e]/30 shadow-2xs">
+              <Sparkles className="w-3 h-3" />
+              Quick Setup · 1 Minute
+            </div>
           </div>
-          <h1 className="text-4xl md:text-5xl font-black text-white italic tracking-tighter">
-            Finish your <span className="text-[#4DD4C4]">onboarding.</span>
+
+          <h1
+            style={{
+              fontFamily: "'Overused Grotesk', system-ui, sans-serif",
+              fontSize: "clamp(1.75rem, 3.5vw, 2.35rem)",
+              fontWeight: 800,
+              lineHeight: 1.15,
+              letterSpacing: "-0.03em",
+            }}
+            className="text-zinc-900"
+          >
+            Personalize your practice profile
           </h1>
-          <p className="text-zinc-400 text-lg max-w-md mx-auto leading-relaxed">
-            Join the community and start your daily SQL ritual.
+          <p className="text-zinc-500 text-sm max-w-md mx-auto leading-relaxed">
+            Tell us about your background so we can calibrate your practice benchmarks.
           </p>
-
-          {/* Progress Stepper */}
-          <div className="flex items-center justify-center gap-4 mt-8">
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-[#4DD4C4] text-[#080c16] flex items-center justify-center font-black text-xs shadow-[0_0_15px_rgba(77,212,196,0.3)]">1</div>
-              <span className="text-[10px] font-bold text-[#4DD4C4] uppercase tracking-widest">Basics</span>
-            </div>
-            <div className="w-12 h-px bg-[#202736]"></div>
-            <div className="flex flex-col items-center gap-2 opacity-30">
-              <div className="w-8 h-8 rounded-full bg-[#121826] border border-[#202736] text-zinc-500 flex items-center justify-center font-black text-xs">2</div>
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Profile</span>
-            </div>
-          </div>
         </div>
 
-        <div className="p-8 rounded-2xl border border-white/5 bg-[#121826]/50 backdrop-blur-xl shadow-2xl">
+        {/* Form Container Card */}
+        <div className="p-8 sm:p-10 rounded-3xl border border-[#dedee2] bg-white shadow-sm">
           {error && (
-            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium animate-in fade-in duration-300">
+            <div className="mb-6 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium animate-in fade-in duration-300 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300">
               {error}
             </div>
           )}
           <WaitlistForm onSubmit={handleFormSubmit} isLoading={isSubmitting} />
         </div>
+
+        {/* Footer Note */}
+        <p className="text-center text-xs text-zinc-400">
+          Your information is private and used only for community leaderboard and problem calibration.
+        </p>
+
       </div>
     </main>
   );
 }
-

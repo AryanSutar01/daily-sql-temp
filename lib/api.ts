@@ -1,4 +1,4 @@
-import { getToken } from '@/lib/auth';
+import { getToken, clearToken } from '@/lib/auth';
 import { Attempt, DailyPractice, Dataset, ExecutionResponse, Problem, Streak } from '@/types/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
@@ -22,6 +22,9 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
     });
     if (!res.ok) {
         const errorBody = await res.json().catch(() => ({}));
+        if (res.status === 401 && typeof errorBody.detail === 'string' && (errorBody.detail.includes('token') || errorBody.detail.includes('Signature'))) {
+            clearToken();
+        }
         throw new Error(errorBody.detail || `API Error: ${res.status}`);
     }
     const text = await res.text();
@@ -109,5 +112,29 @@ export const api = {
             method: 'POST',
             body: JSON.stringify(data),
         }),
+
+    // Subscriptions & Payments
+    getMySubscription: () => fetchApi<any>('/api/payments/my-subscription'),
+    cancelSubscription: () =>
+        fetchApi<any>('/api/payments/cancel', {
+            method: 'POST',
+            body: JSON.stringify({ reason: 'User requested' }),
+        }),
+    createPaymentOrder: (plan_id: string) =>
+        fetchApi<any>('/api/payments/create-order', {
+            method: 'POST',
+            body: JSON.stringify({ plan_id }),
+        }),
+    verifyPaymentOrder: (order_id: string) =>
+        fetchApi<any>(`/api/payments/verify-order/${order_id}`),
+
+    // Coupons & Launch Status
+    redeemCoupon: (code: string) =>
+        fetchApi<any>('/api/coupons/redeem', {
+            method: 'POST',
+            body: JSON.stringify({ code }),
+        }),
+    checkCoupon: (code: string) => fetchApi<any>(`/api/coupons/check/${code}`),
+    getLaunchStatus: () => fetchApi<any>('/api/coupons/launch-status'),
 };
-//dep
+

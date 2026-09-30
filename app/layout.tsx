@@ -4,12 +4,15 @@ import "./globals.css";
 import { ConditionalNavbar } from "@/components/layout/conditional-navbar";
 import { ConditionalFooter } from "@/components/layout/conditional-footer";
 import { OnboardingCheck } from "@/components/auth/onboarding-check";
-import Script from "next/script";
+import { ThemeProvider } from "@/components/theme-provider";
+import { GoogleAnalytics } from "@/components/legal/google-analytics";
+import { CookieConsentBanner } from "@/components/legal/cookie-consent-banner";
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
 });
+
 
 const OG_IMAGE_URL = 'https://res.cloudinary.com/dfkbfv9op/image/upload/c_pad,w_1600,h_900,b_rgb:0a0f1e/v1788882180/dailysql/dailysql-og-image.jpg';
 
@@ -47,29 +50,31 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-93XK08X7L0"
-          strategy="afterInteractive"
+        {/* Overused Grotesk — not in Next.js font catalog, load via CDN */}
+        <link rel="preconnect" href="https://fonts.bunny.net" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.bunny.net/css?family=overused-grotesk:300,400,500,600,700&display=swap"
         />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-
-            gtag('config', 'G-93XK08X7L0');
-          `}
-        </Script>
       </head>
       <body
         className={`${inter.variable} font-sans antialiased`}
       >
-        <OnboardingCheck />
-        <ConditionalNavbar />
-        {children}
-        <ConditionalFooter />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange={false}
+        >
+          <OnboardingCheck />
+          <ConditionalNavbar />
+          {children}
+          <ConditionalFooter />
+          <CookieConsentBanner />
+        </ThemeProvider>
+        <GoogleAnalytics />
       </body>
     </html>
   );

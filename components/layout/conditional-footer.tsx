@@ -6,12 +6,17 @@ import { Footer } from "./footer";
 export function ConditionalFooter() {
     const pathname = usePathname();
     
-    // Hide footer on practice and profile pages
-    const hideFooter = pathname.startsWith("/practice") || pathname.startsWith("/profile") || pathname.startsWith("/admin") || pathname === "/login" || pathname === "/signup";
+    // Hide footer on practice editor, admin, auth, and profile pages
+    const hideFooter = pathname.startsWith("/practice/daily") || pathname.startsWith("/profile") || pathname.startsWith("/admin") || pathname === "/login" || pathname === "/signup";
     
     if (hideFooter) {
         return null;
     }
     
-    return <Footer />;
+    // Apply landing-light scope so footer inherits identical --ls-* tokens and styling
+    return (
+        <div className="landing-light">
+            <Footer />
+        </div>
+    );
 }
