@@ -424,9 +424,14 @@ export function DailySetClient() {
             } else {
                 const firstDsName = datasets?.[0]?.table_name || 'table_name';
                 if (isDsa) {
-                    if (p?.starter_code) {
-                        // Admin defined a full stub with params — use it directly
-                        setCode(`from typing import List, Optional\n\n${p.starter_code}\n    # Write your solution here\n    pass\n`);
+                    if (p?.starter_code?.trim()) {
+                        const trimmedStarter = p.starter_code.trim();
+                        const hasPassOrBody = trimmedStarter.includes('pass') || /\n\s+[^\s#]/.test(trimmedStarter);
+                        const body = hasPassOrBody ? trimmedStarter : `${trimmedStarter}\n    # Write your solution here\n    pass`;
+                        const typingImport = (body.includes('List') || body.includes('Optional') || body.includes('Dict')) && !body.includes('from typing')
+                            ? 'from typing import List, Optional, Dict\n\n'
+                            : '';
+                        setCode(`${typingImport}${body}\n`);
                     } else {
                         // Fall back: build a minimal stub from function_name or description regex
                         const fnName = p?.function_name
