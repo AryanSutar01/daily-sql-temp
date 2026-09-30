@@ -17,8 +17,19 @@ import {
     Server
 } from "lucide-react";
 
-export function PricingPageContent() {
-    const [currency, setCurrency] = useState<"INR" | "USD">("INR");
+export function PricingPageContent({ initialCurrency = "INR" }: { initialCurrency?: "INR" | "USD" }) {
+    const [currency, setCurrencyState] = useState<"INR" | "USD">(initialCurrency);
+    // A manual toggle is an explicit choice: remember it so it sticks on the next visit instead
+    // of being silently overwritten by geolocation again (middleware only sets the cookie when
+    // it isn't already present).
+    const setCurrency = (next: "INR" | "USD") => {
+        setCurrencyState(next);
+        try {
+            document.cookie = `dsql_currency=${next}; path=/; max-age=${60 * 60 * 24 * 180}; SameSite=Lax`;
+        } catch {
+            /* cookies blocked — the in-page toggle still works for this visit */
+        }
+    };
     const [openFaq, setOpenFaq] = useState<number | null>(0); // First open by default
     const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -147,7 +158,9 @@ export function PricingPageContent() {
     const faqs = [
         {
             q: "What plans and pricing options are available?",
-            a: "We offer four straightforward tiers: Free Tier (₹0 forever for daily habit building), Monthly Pro (₹899/month for targeted interview sprints), Yearly Pro (₹1,499/year at just ₹125/month for comprehensive year-round mastery), and Lifetime VIP (₹4,999 one-time payment for permanent unlimited access with zero renewals forever)."
+            a: isINR
+                ? "We offer four straightforward tiers: Free Tier (₹0 forever for daily habit building), Monthly Pro (₹899/month for targeted interview sprints), Yearly Pro (₹1,499/year at just ₹125/month for comprehensive year-round mastery), and Lifetime VIP (₹4,999 one-time payment for permanent unlimited access with zero renewals forever)."
+                : "We offer four straightforward tiers: Free Tier ($0 forever for daily habit building), Monthly Pro ($12.99/month for targeted interview sprints), Yearly Pro ($29/year at just $2.41/month for comprehensive year-round mastery), and Lifetime VIP ($79 one-time payment for permanent unlimited access with zero renewals forever)."
         },
         {
             q: "What disciplines and skills does DailySQL cover?",
@@ -159,11 +172,15 @@ export function PricingPageContent() {
         },
         {
             q: "What does the Lifetime Plan include?",
-            a: "Lifetime gives you access to the complete DailySQL platform for ₹4,999 paid once, for as long as we operate it. This includes every current problem track, the new problems and tracks we add to the platform, and the VIP community role, with no renewal fees. Separately priced products or add-ons are not included. See the Terms of Service for details."
+            a: isINR
+                ? "Lifetime gives you access to the complete DailySQL platform for ₹4,999 paid once, for as long as we operate it. This includes every current problem track, the new problems and tracks we add to the platform, and the VIP community role, with no renewal fees. Separately priced products or add-ons are not included. See the Terms of Service for details."
+                : "Lifetime gives you access to the complete DailySQL platform for $79 paid once, for as long as we operate it. This includes every current problem track, the new problems and tracks we add to the platform, and the VIP community role, with no renewal fees. Separately priced products or add-ons are not included. See the Terms of Service for details."
         },
         {
             q: "Do Free, Monthly, Yearly, and Lifetime unlock different content?",
-            a: "Free Tier (₹0) includes 3 SQL questions every day (today's daily set) and the first 30 SQL questions of the archive, plus leaderboard rank, streak tracking, and community discussions. All paid plans (Monthly ₹899, Yearly ₹1,499, and Lifetime ₹4,999) unlock every question across SQL, Python, PySpark and DSA, plus step-by-step editorial solutions and execution breakdowns."
+            a: isINR
+                ? "Free Tier (₹0) includes 3 SQL questions every day (today's daily set) and the first 30 SQL questions of the archive, plus leaderboard rank, streak tracking, and community discussions. All paid plans (Monthly ₹899, Yearly ₹1,499, and Lifetime ₹4,999) unlock every question across SQL, Python, PySpark and DSA, plus step-by-step editorial solutions and execution breakdowns."
+                : "Free Tier ($0) includes 3 SQL questions every day (today's daily set) and the first 30 SQL questions of the archive, plus leaderboard rank, streak tracking, and community discussions. All paid plans (Monthly $12.99, Yearly $29, and Lifetime $79) unlock every question across SQL, Python, PySpark and DSA, plus step-by-step editorial solutions and execution breakdowns."
         },
         {
             q: "How much time do I need each day?",
@@ -468,7 +485,7 @@ export function PricingPageContent() {
                                     <div className="text-left sm:text-right">
                                         <div className="flex items-baseline sm:justify-end gap-1">
                                             <span className="text-2xl font-extrabold font-mono text-zinc-900">
-                                                ₹0
+                                                {isINR ? "₹0" : "$0"}
                                             </span>
                                             <span className="text-xs text-zinc-500 font-medium">
                                                 / forever
