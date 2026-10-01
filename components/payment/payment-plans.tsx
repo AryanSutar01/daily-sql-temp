@@ -101,6 +101,8 @@ export function PaymentPlans() {
   const [selectedPlanId, setSelectedPlanId] = useState<PlanId | null>(null);
   const [userSubscription, setUserSubscription] = useState<any>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [needsPhone, setNeedsPhone] = useState(false);
+  const [phone, setPhone] = useState("");
   const [paymentResult, setPaymentResult] = useState<{
     status: "PAID" | "PENDING" | "FAILED" | "EXPIRED" | "TEST_MODE_WARNING";
     orderId?: string;
@@ -168,6 +170,15 @@ export function PaymentPlans() {
       return;
     }
 
+    const phoneDigits = phone.replace(/\D/g, "");
+    if (needsPhone && phoneDigits.length < 10) {
+      setPaymentResult({
+        status: "FAILED",
+        message: "Please enter a valid 10-digit phone number for your payment receipt.",
+      });
+      return;
+    }
+
     setLoadingPlan(plan.id);
     setPaymentResult(null);
 
@@ -184,7 +195,10 @@ export function PaymentPlans() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ plan_id: plan.id }),
+        body: JSON.stringify({
+          plan_id: plan.id,
+          ...(needsPhone && phoneDigits ? { customer_phone: phoneDigits } : {}),
+        }),
       });
 
       const data = await response.json();
@@ -194,6 +208,16 @@ export function PaymentPlans() {
           status: "PAID",
           planName: plan.name,
           message: "You already have an active subscription for this account.",
+        });
+        setLoadingPlan(null);
+        return;
+      }
+
+      if (response.status === 400 && (data?.detail === "phone_required" || data?.detail === "invalid_phone")) {
+        setNeedsPhone(true);
+        setPaymentResult({
+          status: "FAILED",
+          message: "Please enter your phone number below (needed for the payment receipt), then click Pay again.",
         });
         setLoadingPlan(null);
         return;
@@ -258,6 +282,24 @@ export function PaymentPlans() {
               <span className="font-bold">Sandbox Mode:</span> Test payments safely with Cashfree test cards (Card: <code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200 dark:bg-[#0F1419]/80">4706131211212123</code> / OTP: <code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200 dark:bg-[#0F1419]/80">111000</code>) or Test UPI (<code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200 dark:bg-[#0F1419]/80">testsuccess@gocash</code>).
             </div>
           </div>
+        </div>
+      )}
+
+      {needsPhone && (
+        <div className="max-w-4xl mx-auto bg-white border border-zinc-200 rounded-2xl p-4 shadow-2xs dark:bg-[#0F1419] dark:border-[#20283C]">
+          <label htmlFor="billing-phone" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
+            Phone number (for your payment receipt)
+          </label>
+          <input
+            id="billing-phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="e.g. 9876543210"
+            className="w-full px-4 py-2.5 rounded-lg border border-zinc-300 text-sm text-zinc-900 focus:outline-none focus:border-[#1f9e8e] dark:bg-[#080C16] dark:border-[#20283C] dark:text-white"
+          />
         </div>
       )}
 
