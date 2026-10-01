@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { getToken } from "@/lib/auth";
 import { isPlanId, takePendingPlan, type PlanId } from "@/lib/pending-plan";
+import { DEFAULT_PLANS, fetchPlans, formatINR, type PlanMap } from "@/lib/plans";
 
 declare global {
   interface Window {
@@ -33,8 +34,6 @@ const API_BASE_URL =
 interface Plan {
   id: "monthly" | "yearly" | "lifetime";
   name: string;
-  price: string;
-  numericPrice: number;
   period: string;
   tagline: string;
   badge?: string;
@@ -46,8 +45,6 @@ const PLANS: Plan[] = [
   {
     id: "monthly",
     name: "Monthly Pro",
-    price: "₹899",
-    numericPrice: 899,
     period: "/month",
     tagline: "Flexible short-term interview preparation.",
     features: [
@@ -61,8 +58,6 @@ const PLANS: Plan[] = [
   {
     id: "yearly",
     name: "Yearly Pro",
-    price: "₹1,499",
-    numericPrice: 1499,
     period: "/year",
     tagline: "Most popular choice for consistent career growth.",
     badge: "Best Value",
@@ -76,8 +71,6 @@ const PLANS: Plan[] = [
   {
     id: "lifetime",
     name: "Lifetime VIP",
-    price: "₹4,999",
-    numericPrice: 4999,
     period: "one-time",
     tagline: "One payment, lifetime access, zero renewals.",
     badge: "VIP Deal",
@@ -101,6 +94,7 @@ export function PaymentPlans() {
   const [selectedPlanId, setSelectedPlanId] = useState<PlanId | null>(null);
   const [userSubscription, setUserSubscription] = useState<any>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [livePlans, setLivePlans] = useState<PlanMap>(DEFAULT_PLANS);
   const [needsPhone, setNeedsPhone] = useState(false);
   const [phone, setPhone] = useState("");
   const [paymentResult, setPaymentResult] = useState<{
@@ -146,6 +140,10 @@ export function PaymentPlans() {
         .then((d) => setUserSubscription(d))
         .catch(() => {});
     }
+  }, []);
+
+  useEffect(() => {
+    fetchPlans({ cache: "no-store" }).then(setLivePlans);
   }, []);
 
   // Preselect the plan chosen on /pricing (?plan=…) or remembered through signup/login
@@ -285,6 +283,13 @@ export function PaymentPlans() {
         </div>
       )}
 
+      <div className="max-w-4xl mx-auto flex items-start gap-2 text-xs text-zinc-600 bg-white border border-zinc-200 rounded-2xl p-4 shadow-2xs dark:bg-[#0F1419] dark:border-[#20283C] dark:text-zinc-400">
+        <span>🌐</span>
+        <span>
+          All prices are in INR. <strong>Outside India?</strong> Choose PayPal at checkout. PayPal converts the INR amount to your currency at its own exchange rate, so the final amount may differ slightly.
+        </span>
+      </div>
+
       {needsPhone && (
         <div className="max-w-4xl mx-auto bg-white border border-zinc-200 rounded-2xl p-4 shadow-2xs dark:bg-[#0F1419] dark:border-[#20283C]">
           <label htmlFor="billing-phone" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
@@ -371,7 +376,7 @@ export function PaymentPlans() {
                 <h3 className="text-xl font-bold font-mono text-zinc-900 mb-2">{plan.name}</h3>
                 <div className="flex items-baseline gap-1">
                   <span className="text-4xl font-extrabold font-mono text-zinc-900 tracking-tight">
-                    {plan.price}
+                    {formatINR(livePlans[plan.id].price)}
                   </span>
                   <span className="text-zinc-500 text-xs font-medium">
                     {plan.period}
@@ -382,7 +387,10 @@ export function PaymentPlans() {
 
               <div className="flex-1 py-4 border-t border-zinc-100">
                 <ul className="space-y-3">
-                  {plan.features.map((feature, idx) => (
+                  {plan.features.map((rawFeature, idx) => {
+                    const savePct = Math.max(0, Math.round((1 - livePlans.yearly.price / (livePlans.monthly.price * 12)) * 100));
+                    const feature = rawFeature.replace(/Save \d+%/, `Save ${savePct}%`);
+                    return (
                     <li
                       key={idx}
                       className="flex items-start gap-2.5 text-xs text-zinc-700 leading-snug font-medium"
@@ -390,7 +398,8 @@ export function PaymentPlans() {
                       <Check className="w-4 h-4 text-[#1f9e8e] shrink-0 mt-0.5 stroke-[2.5]" />
                       <span>{feature}</span>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               </div>
 
@@ -416,7 +425,7 @@ export function PaymentPlans() {
                       <Loader2 className="w-4 h-4 animate-spin" /> Preparing Checkout...
                     </span>
                   ) : (
-                    `Pay ${plan.price}`
+                    `Pay ${formatINR(livePlans[plan.id].price)}`
                   )}
                 </Button>
                 <p className="text-[11px] text-zinc-400 text-center flex items-center justify-center gap-1 font-mono">

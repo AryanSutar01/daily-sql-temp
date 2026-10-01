@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { isLoggedIn as hasSessionToken } from "@/lib/auth";
+import { DEFAULT_PLANS, formatINR, type PlanMap } from "@/lib/plans";
 import {
     Check,
     ArrowRight,
@@ -17,19 +18,7 @@ import {
     Server
 } from "lucide-react";
 
-export function PricingPageContent({ initialCurrency = "INR" }: { initialCurrency?: "INR" | "USD" }) {
-    const [currency, setCurrencyState] = useState<"INR" | "USD">(initialCurrency);
-    // A manual toggle is an explicit choice: remember it so it sticks on the next visit instead
-    // of being silently overwritten by geolocation again (middleware only sets the cookie when
-    // it isn't already present).
-    const setCurrency = (next: "INR" | "USD") => {
-        setCurrencyState(next);
-        try {
-            document.cookie = `dsql_currency=${next}; path=/; max-age=${60 * 60 * 24 * 180}; SameSite=Lax`;
-        } catch {
-            /* cookies blocked — the in-page toggle still works for this visit */
-        }
-    };
+export function PricingPageContent({ plans = DEFAULT_PLANS }: { plans?: PlanMap }) {
     const [openFaq, setOpenFaq] = useState<number | null>(0); // First open by default
     const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -47,28 +36,28 @@ export function PricingPageContent({ initialCurrency = "INR" }: { initialCurrenc
         setOpenFaq(openFaq === index ? null : index);
     };
 
-    const isINR = currency === "INR";
-
+    const { monthly, yearly, lifetime } = plans;
+    const fmt = formatINR;
     const prices = {
         lifetime: {
-            original: isINR ? "₹9,999" : "$149",
-            discounted: isINR ? "₹4,999" : "$79",
+            original: lifetime.original_price ? fmt(lifetime.original_price) : "",
+            discounted: fmt(lifetime.price),
             billing: "paid once",
             note: "One payment, no renewal · Full access forever"
         },
         annual: {
-            original: isINR ? "₹3,499" : "$59",
-            discounted: isINR ? "₹1,499" : "$29",
+            original: yearly.original_price ? fmt(yearly.original_price) : "",
+            discounted: fmt(yearly.price),
             period: "/year",
-            monthlyEquivalent: isINR ? "just ₹125/mo" : "$2.41/mo",
-            todayText: isINR ? "₹1,499 one-time · 12 months of access" : "$29 one-time · 12 months of access"
+            monthlyEquivalent: `just ${fmt(Math.round(yearly.price / 12))}/mo`,
+            todayText: `${fmt(yearly.price)} one-time · 12 months of access`
         },
         monthly: {
-            original: isINR ? "₹1,299" : "$19",
-            discounted: isINR ? "₹899" : "$12.99",
+            original: monthly.original_price ? fmt(monthly.original_price) : "",
+            discounted: fmt(monthly.price),
             period: "/month",
             monthlyEquivalent: "",
-            todayText: isINR ? "₹899 one-time · 30 days of access" : "$12.99 one-time · 30 days of access"
+            todayText: `${fmt(monthly.price)} one-time · 30 days of access`
         }
     };
 
@@ -158,9 +147,7 @@ export function PricingPageContent({ initialCurrency = "INR" }: { initialCurrenc
     const faqs = [
         {
             q: "What plans and pricing options are available?",
-            a: isINR
-                ? "We offer four straightforward tiers: Free Tier (₹0 forever for daily habit building), Monthly Pro (₹899/month for targeted interview sprints), Yearly Pro (₹1,499/year at just ₹125/month for comprehensive year-round mastery), and Lifetime VIP (₹4,999 one-time payment for permanent unlimited access with zero renewals forever)."
-                : "We offer four straightforward tiers: Free Tier ($0 forever for daily habit building), Monthly Pro ($12.99/month for targeted interview sprints), Yearly Pro ($29/year at just $2.41/month for comprehensive year-round mastery), and Lifetime VIP ($79 one-time payment for permanent unlimited access with zero renewals forever)."
+            a: `We offer four straightforward tiers: Free Tier (₹0 forever for daily habit building), Monthly Pro (${fmt(monthly.price)}/month for targeted interview sprints), Yearly Pro (${fmt(yearly.price)}/year at just ${fmt(Math.round(yearly.price / 12))}/month for comprehensive year-round mastery), and Lifetime VIP (${fmt(lifetime.price)} one-time payment for permanent unlimited access with zero renewals forever). Prices are in INR; customers outside India can pay with PayPal at checkout.`,
         },
         {
             q: "What disciplines and skills does DailySQL cover?",
@@ -172,23 +159,19 @@ export function PricingPageContent({ initialCurrency = "INR" }: { initialCurrenc
         },
         {
             q: "What does the Lifetime Plan include?",
-            a: isINR
-                ? "Lifetime gives you access to the complete DailySQL platform for ₹4,999 paid once, for as long as we operate it. This includes every current problem track, the new problems and tracks we add to the platform, and the VIP community role, with no renewal fees. Separately priced products or add-ons are not included. See the Terms of Service for details."
-                : "Lifetime gives you access to the complete DailySQL platform for $79 paid once, for as long as we operate it. This includes every current problem track, the new problems and tracks we add to the platform, and the VIP community role, with no renewal fees. Separately priced products or add-ons are not included. See the Terms of Service for details."
+            a: `Lifetime gives you access to the complete DailySQL platform for ${fmt(lifetime.price)} paid once, for as long as we operate it. This includes every current problem track, the new problems and tracks we add to the platform, and the VIP community role, with no renewal fees. Separately priced products or add-ons are not included. See the Terms of Service for details.`,
         },
         {
             q: "Do Free, Monthly, Yearly, and Lifetime unlock different content?",
-            a: isINR
-                ? "Free Tier (₹0) includes 3 SQL questions every day (today's daily set) and the first 30 SQL questions of the archive, plus leaderboard rank, streak tracking, and community discussions. All paid plans (Monthly ₹899, Yearly ₹1,499, and Lifetime ₹4,999) unlock every question across SQL, Python, PySpark and DSA, plus step-by-step editorial solutions and execution breakdowns."
-                : "Free Tier ($0) includes 3 SQL questions every day (today's daily set) and the first 30 SQL questions of the archive, plus leaderboard rank, streak tracking, and community discussions. All paid plans (Monthly $12.99, Yearly $29, and Lifetime $79) unlock every question across SQL, Python, PySpark and DSA, plus step-by-step editorial solutions and execution breakdowns."
+            a: `Free Tier (₹0) includes 3 SQL questions every day (today's daily set) and the first 30 SQL questions of the archive, plus leaderboard rank, streak tracking, and community discussions. All paid plans (Monthly ${fmt(monthly.price)}, Yearly ${fmt(yearly.price)}, and Lifetime ${fmt(lifetime.price)}) unlock every question across SQL, Python, PySpark and DSA, plus step-by-step editorial solutions and execution breakdowns.`,
         },
         {
             q: "How much time do I need each day?",
             a: "Just 15 minutes. DailySQL is intentionally structured to build strong, consistent problem-solving habits for busy working professionals and students without causing burnout or cramming fatigue."
         },
         {
-            q: "How does purchasing power parity (PPP) pricing work?",
-            a: "We automatically detect your region and provide localized pricing for India and international practitioners to ensure high-quality technical interview preparation is universally accessible."
+            q: "I'm outside India. How do I pay?",
+            a: "All prices are in Indian rupees (INR). If you are outside India, choose PayPal at checkout: PayPal converts the INR amount to your currency at its own exchange rate, so the amount shown in your currency can differ slightly from day to day."
         },
         {
             q: "Can I expense DailySQL through my company's learning budget?",
@@ -224,39 +207,13 @@ export function PricingPageContent({ initialCurrency = "INR" }: { initialCurrenc
                 </div>
             </div>
 
-            {/* 2. CONTROLS BAR (PPP & Currency Toggle) */}
+            {/* 2. INTERNATIONAL PAYMENT NOTE */}
             <div className="max-w-[1340px] mx-auto px-4 sm:px-6 mb-4">
-                <div className="flex flex-wrap items-center justify-between gap-4 py-3 px-5 bg-white rounded-xl border border-[#dedee2] shadow-2xs">
-
-                    {/* Left: PPP indicator */}
-                    <div className="flex items-center gap-2 text-xs text-zinc-700 font-medium">
-                        <span className="text-sm">🌐</span>
-                        <span>Purchasing power pricing for <strong>{isINR ? "India" : "International"}</strong> applied {!isINR && <span className="text-[11px] text-zinc-500 font-normal">(Billed in INR equivalent at checkout via international cards)</span>}</span>
-                        <span className="text-zinc-400 cursor-help" title="International cards (Visa, Mastercard, Amex) are accepted at checkout">ⓘ</span>
-                    </div>
-
-                    {/* Right: Currency Toggle */}
-                    <div className="inline-flex p-0.5 bg-zinc-100 rounded-lg border border-zinc-200 text-xs font-semibold">
-                        <button
-                            onClick={() => setCurrency("INR")}
-                            className={`px-3 py-1 rounded-md transition-all ${currency === "INR"
-                                ? "bg-white text-zinc-900 shadow-2xs font-bold"
-                                : "text-zinc-600 hover:text-zinc-900"
-                                }`}
-                        >
-                            Local (₹)
-                        </button>
-                        <button
-                            onClick={() => setCurrency("USD")}
-                            className={`px-3 py-1 rounded-md transition-all ${currency === "USD"
-                                ? "bg-white text-zinc-900 shadow-2xs font-bold"
-                                : "text-zinc-600 hover:text-zinc-900"
-                                }`}
-                        >
-                            USD ($)
-                        </button>
-                    </div>
-
+                <div className="flex items-center gap-2 py-3 px-5 bg-white rounded-xl border border-[#dedee2] shadow-2xs text-xs text-zinc-700 font-medium">
+                    <span className="text-sm">🌐</span>
+                    <span>
+                        All prices are in INR. <strong>Outside India?</strong> Pay with PayPal at checkout. PayPal converts the INR amount to your currency at its own rate, so the final amount in your currency may differ slightly.
+                    </span>
                 </div>
             </div>
 
@@ -485,7 +442,7 @@ export function PricingPageContent({ initialCurrency = "INR" }: { initialCurrenc
                                     <div className="text-left sm:text-right">
                                         <div className="flex items-baseline sm:justify-end gap-1">
                                             <span className="text-2xl font-extrabold font-mono text-zinc-900">
-                                                {isINR ? "₹0" : "$0"}
+                                                ₹0
                                             </span>
                                             <span className="text-xs text-zinc-500 font-medium">
                                                 / forever
