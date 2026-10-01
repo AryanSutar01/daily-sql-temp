@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -104,7 +104,29 @@ export function PaymentPlans() {
     planName?: string;
     message?: string;
     details?: any;
+    scrollTo?: "phone" | "terms";
   } | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  const phoneBoxRef = useRef<HTMLDivElement>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const termsRef = useRef<HTMLLabelElement>(null);
+
+  // Bring every notice into view: the result card sits below the plans, so without this a failed
+  // click on "Pay" looks like nothing happened.
+  useEffect(() => {
+    if (!paymentResult) return;
+    const frame = requestAnimationFrame(() => {
+      if (paymentResult.scrollTo === "phone" && phoneBoxRef.current) {
+        phoneBoxRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        phoneInputRef.current?.focus({ preventScroll: true });
+      } else if (paymentResult.scrollTo === "terms" && termsRef.current) {
+        termsRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        resultRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [paymentResult]);
 
   // Dynamically load Cashfree.js SDK and fetch user subscription state
   useEffect(() => {
@@ -164,6 +186,7 @@ export function PaymentPlans() {
       setPaymentResult({
         status: "FAILED",
         message: "Please agree to the Terms of Service, Privacy Policy and Refund Policy before paying.",
+        scrollTo: "terms",
       });
       return;
     }
@@ -173,6 +196,7 @@ export function PaymentPlans() {
       setPaymentResult({
         status: "FAILED",
         message: "Please enter a valid 10-digit phone number for your payment receipt.",
+        scrollTo: "phone",
       });
       return;
     }
@@ -216,6 +240,7 @@ export function PaymentPlans() {
         setPaymentResult({
           status: "FAILED",
           message: "Please enter your phone number below (needed for the payment receipt), then click Pay again.",
+          scrollTo: "phone",
         });
         setLoadingPlan(null);
         return;
@@ -291,12 +316,13 @@ export function PaymentPlans() {
       </div>
 
       {needsPhone && (
-        <div className="max-w-4xl mx-auto bg-white border border-zinc-200 rounded-2xl p-4 shadow-2xs dark:bg-[#0F1419] dark:border-[#20283C]">
+        <div ref={phoneBoxRef} className="max-w-4xl mx-auto bg-white border border-zinc-200 rounded-2xl p-4 shadow-2xs dark:bg-[#0F1419] dark:border-[#20283C]">
           <label htmlFor="billing-phone" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
             Phone number (for your payment receipt)
           </label>
           <input
             id="billing-phone"
+            ref={phoneInputRef}
             type="tel"
             inputMode="tel"
             autoComplete="tel"
@@ -309,7 +335,7 @@ export function PaymentPlans() {
       )}
 
       {/* Terms Acceptance — required before any plan can be paid for */}
-      <label className="max-w-4xl mx-auto flex items-start gap-3 bg-white border border-zinc-200 rounded-2xl p-4 shadow-2xs cursor-pointer dark:bg-[#0F1419] dark:border-[#20283C]">
+      <label ref={termsRef} className="max-w-4xl mx-auto flex items-start gap-3 bg-white border border-zinc-200 rounded-2xl p-4 shadow-2xs cursor-pointer dark:bg-[#0F1419] dark:border-[#20283C]">
         <input
           type="checkbox"
           checked={agreedToTerms}
@@ -464,7 +490,7 @@ export function PaymentPlans() {
 
       {/* Payment Result Status Dialog */}
       {paymentResult && (
-        <div className="max-w-xl mx-auto rounded-2xl border border-zinc-300 bg-white p-6 shadow-xl space-y-4">
+        <div ref={resultRef} className="max-w-xl mx-auto rounded-2xl border border-zinc-300 bg-white p-6 shadow-xl space-y-4">
           <div className="flex items-center gap-3">
             {paymentResult.status === "PAID" ? (
               <CheckCircle2 className="w-7 h-7 text-emerald-600 shrink-0 dark:text-emerald-300" />
