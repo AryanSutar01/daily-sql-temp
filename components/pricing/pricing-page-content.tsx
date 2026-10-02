@@ -151,7 +151,7 @@ export function PricingPageContent({ plans = DEFAULT_PLANS }: { plans?: PlanMap 
         },
         {
             q: "What disciplines and skills does DailySQL cover?",
-            a: "DailySQL covers the three indispensable technical pillars of modern data engineering and analytics: SQL (PostgreSQL), Python with Pandas/NumPy, and distributed PySpark. Every morning, you get 9 curated problems — 3 per discipline in Easy, Medium, and Advanced difficulties."
+            a: "DailySQL covers the three indispensable technical pillars of modern data engineering and analytics: SQL, Python with Pandas/NumPy, and distributed PySpark. Every morning, you get 9 curated problems — 3 per discipline in Easy, Medium, and Advanced difficulties."
         },
         {
             q: "How does the in-browser sandbox code execution work?",
@@ -189,7 +189,7 @@ export function PricingPageContent({ plans = DEFAULT_PLANS }: { plans?: PlanMap 
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-2.5">
                     {[
-                        { label: "SQL (POSTGRESQL)", icon: Database },
+                        { label: "SQL", icon: Database },
                         { label: "PYTHON (PANDAS)", icon: Code2 },
                         { label: "PYSPARK", icon: Server },
                     ].map((badge, idx) => {
