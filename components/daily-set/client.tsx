@@ -2348,7 +2348,7 @@ export function DailySetClient() {
                                                                             {ds.sample_rows.map((row: any, i: number) => (
                                                                                 <tr key={i} className="hover:bg-[#e6f7f5]/30 transition-colors group">
                                                                                     {colOrder.map((col: string) => (
-                                                                                        <td key={col} className="px-4 py-2 text-zinc-700 font-mono border-r last:border-r-0 border-[#dedee2]/60 group-hover:text-zinc-950 transition-colors">{row[col]?.toString() ?? ''}</td>
+                                                                                        <td key={col} className="px-4 py-2 text-zinc-700 font-mono border-r last:border-r-0 border-[#dedee2]/60 group-hover:text-zinc-950 transition-colors">{row[col] === null || row[col] === undefined ? <span className="italic text-zinc-400">null</span> : row[col].toString()}</td>
                                                                                     ))}
                                                                                 </tr>
                                                                             ))}
@@ -2379,7 +2379,7 @@ export function DailySetClient() {
                                                                         <tbody className="divide-y divide-[#dedee2]">
                                                                             {output.rows.map((row: any, i: number) => (
                                                                                 <tr key={i} className="hover:bg-emerald-50/50 transition-colors group dark:hover:bg-emerald-500/5">
-                                                                                    {row.map((cell: any, j: number) => <td key={j} className="px-4 py-2 text-emerald-700 font-mono border-r last:border-r-0 border-[#dedee2] group-hover:text-emerald-900 transition-colors dark:text-emerald-300 dark:group-hover:text-emerald-200">{cell?.toString()}</td>)}
+                                                                                    {row.map((cell: any, j: number) => <td key={j} className="px-4 py-2 text-emerald-700 font-mono border-r last:border-r-0 border-[#dedee2] group-hover:text-emerald-900 transition-colors dark:text-emerald-300 dark:group-hover:text-emerald-200">{cell === null || cell === undefined ? <span className="italic text-zinc-400">null</span> : cell.toString()}</td>)}
                                                                                 </tr>
                                                                             ))}
                                                                         </tbody>
@@ -2870,7 +2870,7 @@ export function DailySetClient() {
                                                             {executionResult.user.rows.map((row: any[], i: number) => (
                                                                 <tr key={i} className="hover:bg-[#f8fafc] transition-colors group">
                                                                     {row.map((cell: any, j: number) => (
-                                                                        <td key={j} className="px-4 py-2.5 text-zinc-800 font-mono group-hover:text-black transition-colors whitespace-nowrap border-r last:border-r-0 border-[#dedee2]">{cell?.toString()}</td>
+                                                                        <td key={j} className="px-4 py-2.5 text-zinc-800 font-mono group-hover:text-black transition-colors whitespace-nowrap border-r last:border-r-0 border-[#dedee2]">{cell === null || cell === undefined ? <span className="italic text-zinc-400">null</span> : cell.toString()}</td>
                                                                     ))}
                                                                 </tr>
                                                             ))}
