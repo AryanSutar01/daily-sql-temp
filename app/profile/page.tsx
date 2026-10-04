@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import {
     ArrowLeft,
@@ -24,7 +24,8 @@ import {
     Target,
     CalendarDays,
     Mail,
-    ChevronRight
+    ChevronRight,
+    ChevronLeft
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -105,7 +106,12 @@ function ProfileContent() {
     const [loadingCode, setLoadingCode] = useState(false);
     const currentYear = appToday().getUTCFullYear();
     const [selectedYear, setSelectedYear] = useState<string>("last_12");
+    const LEADERBOARD_PAGE_SIZE = 20;
     const [leaderboard, setLeaderboard] = useState<any[]>([]);
+    const [leaderboardTotal, setLeaderboardTotal] = useState(0);
+    const [leaderboardPage, setLeaderboardPage] = useState(1);
+    const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+    const [myRank, setMyRank] = useState<{ rank: number; total_solved: number; current_streak: number } | null>(null);
     const { navigateAndStart } = useWalkthrough();
 
     const [formData, setFormData] = useState({
@@ -148,20 +154,20 @@ function ProfileContent() {
             try {
                 // The profile itself is required; everything else is optional so one failing
                 // widget never turns the whole page into "session expired".
-                const [data, s, sub, h, lb, st] = await Promise.all([
+                const [data, s, sub, h, st, rank] = await Promise.all([
                     api.getProfile(),
                     api.getStats().catch(() => null),
                     api.getRecentSubmissions().catch(() => []),
                     api.getHeatmap().catch(() => ({})),
-                    api.getLeaderboard().catch(() => []),
-                    api.getStreak().catch(() => null)
+                    api.getStreak().catch(() => null),
+                    api.getMyLeaderboardRank().catch(() => null)
                 ]);
 
                 setProfile(data);
                 setRealStats(s);
                 setSubmissions(sub || []);
                 setHeatmapData(h || {});
-                setLeaderboard(lb || []);
+                setMyRank(rank);
                 if (st) {
                     setStreakCount(st.current_streak || 0);
                     setActiveToday(!!st.active_today);
@@ -189,6 +195,28 @@ function ProfileContent() {
         }
         loadProfile();
     }, []);
+
+    const loadLeaderboardPage = useCallback(async (page: number) => {
+        setLeaderboardLoading(true);
+        try {
+            const res = await api.getLeaderboard(LEADERBOARD_PAGE_SIZE, (page - 1) * LEADERBOARD_PAGE_SIZE);
+            setLeaderboard(res.entries || []);
+            setLeaderboardTotal(res.total || 0);
+        } catch (err) {
+            console.error("Failed to load leaderboard", err);
+        } finally {
+            setLeaderboardLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadLeaderboardPage(leaderboardPage);
+    }, [leaderboardPage, loadLeaderboardPage]);
+
+    const jumpToMyRank = () => {
+        if (!myRank) return;
+        setLeaderboardPage(Math.ceil(myRank.rank / LEADERBOARD_PAGE_SIZE));
+    };
 
     // Set editing mode if in setup mode
     useEffect(() => {
@@ -297,12 +325,6 @@ function ProfileContent() {
     ];
 
     const filteredSubmissions = submissions.filter((p) => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    const myRank = useMemo(() => {
-        if (!profile) return null;
-        const idx = leaderboard.findIndex((e) => e.user_id === profile.user_id);
-        return idx >= 0 ? idx + 1 : null;
-    }, [leaderboard, profile]);
 
     // ── Activity map (app-day / IST clock, UTC date math so the browser timezone never shifts a cell) ──
     const heat = useMemo(() => {
@@ -669,8 +691,7 @@ function ProfileContent() {
     const displayName = profile.full_name || "Member";
     const roleLabel = profile.job_role || (profile.occupation ? profile.occupation.charAt(0).toUpperCase() + profile.occupation.slice(1) : "Practitioner");
     const initial = displayName.charAt(0).toUpperCase();
-    const leaderboardTop = leaderboard.slice(0, 10);
-    const youOutsideTop = myRank && myRank > 10 ? leaderboard[myRank - 1] : null;
+    const leaderboardTotalPages = Math.max(1, Math.ceil(leaderboardTotal / LEADERBOARD_PAGE_SIZE));
 
     const TABS: { id: typeof tab; label: string; count?: number }[] = [
         { id: "overview", label: "Overview" },
@@ -702,7 +723,7 @@ function ProfileContent() {
         },
         {
             label: "Leaderboard",
-            value: myRank ? `#${myRank}` : "—",
+            value: myRank ? `#${myRank.rank}` : "—",
             sub: myRank ? "current rank" : "not ranked yet",
             icon: <Trophy size={16} />,
             tone: "text-violet-600 bg-violet-500/10 dark:text-violet-300"
@@ -1132,24 +1153,41 @@ function ProfileContent() {
                         {/* ===== LEADERBOARD ===== */}
                         {tab === "leaderboard" && (
                             <div className={`${CARD} p-5 sm:p-6`}>
-                                <div className="flex items-center gap-2.5 mb-4">
-                                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                                        <Trophy size={16} className="text-amber-600 dark:text-amber-300" />
+                                <div className="flex items-center justify-between gap-2.5 mb-4">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                                            <Trophy size={16} className="text-amber-600 dark:text-amber-300" />
+                                        </div>
+                                        <div>
+                                            <h3 className={`text-sm font-bold font-mono tracking-tight ${HEADING}`}>Leaderboard</h3>
+                                            <p className={`text-[11px] ${MUTED}`}>
+                                                {leaderboardTotal > 0 ? `${leaderboardTotal} solvers ranked` : "Top solvers across DailySQL"}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h3 className={`text-sm font-bold font-mono tracking-tight ${HEADING}`}>Leaderboard</h3>
-                                        <p className={`text-[11px] ${MUTED}`}>Top solvers across DailySQL</p>
-                                    </div>
+                                    {myRank && (
+                                        <button
+                                            onClick={jumpToMyRank}
+                                            className="text-[11px] font-bold font-mono text-[#1f9e8e] bg-[#1f9e8e]/10 hover:bg-[#1f9e8e]/20 border border-[#1f9e8e]/30 rounded-lg px-2.5 py-1.5 transition-colors shrink-0"
+                                        >
+                                            Jump to my rank (#{myRank.rank})
+                                        </button>
+                                    )}
                                 </div>
 
-                                {leaderboard.length === 0 ? (
+                                {leaderboardLoading ? (
+                                    <div className="flex items-center justify-center py-12">
+                                        <Loader2 size={20} className={`animate-spin ${SUBTLE}`} />
+                                    </div>
+                                ) : leaderboard.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-12 gap-2">
                                         <Trophy size={24} className={SUBTLE} />
                                         <p className={`text-xs font-mono ${SUBTLE}`}>No data yet</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-1.5">
-                                        {[...leaderboardTop.map((e, i) => ({ e, rank: i + 1 })), ...(youOutsideTop ? [{ e: youOutsideTop, rank: myRank as number }] : [])].map(({ e: entry, rank }) => {
+                                        {leaderboard.map((entry) => {
+                                            const rank = entry.rank;
                                             const isYou = entry.user_id === profile.user_id;
                                             const medals = ["bg-amber-400/20 text-amber-700 border-amber-400/50 dark:text-amber-300", "bg-slate-400/20 text-slate-600 border-slate-400/50 dark:text-slate-300", "bg-orange-400/20 text-orange-700 border-orange-400/50 dark:text-orange-300"];
                                             return (
@@ -1200,6 +1238,35 @@ function ProfileContent() {
                                                 </div>
                                             );
                                         })}
+
+                                        {/* Pagination */}
+                                        <div className="flex items-center justify-between pt-3 mt-2 border-t border-[var(--ls-outline)]">
+                                            <button
+                                                onClick={() => setLeaderboardPage((p) => Math.max(1, p - 1))}
+                                                disabled={leaderboardPage <= 1}
+                                                className={`flex items-center gap-1 text-[11px] font-bold font-mono px-2.5 py-1.5 rounded-lg border transition-colors ${
+                                                    leaderboardPage <= 1
+                                                        ? `border-transparent ${SUBTLE} opacity-40 cursor-not-allowed`
+                                                        : `border-[var(--ls-outline)] ${HEADING} hover:bg-[var(--ls-surface-low)]`
+                                                }`}
+                                            >
+                                                <ChevronLeft size={13} /> Prev
+                                            </button>
+                                            <span className={`text-[11px] font-mono ${MUTED}`}>
+                                                Page {leaderboardPage} of {leaderboardTotalPages}
+                                            </span>
+                                            <button
+                                                onClick={() => setLeaderboardPage((p) => Math.min(leaderboardTotalPages, p + 1))}
+                                                disabled={leaderboardPage >= leaderboardTotalPages}
+                                                className={`flex items-center gap-1 text-[11px] font-bold font-mono px-2.5 py-1.5 rounded-lg border transition-colors ${
+                                                    leaderboardPage >= leaderboardTotalPages
+                                                        ? `border-transparent ${SUBTLE} opacity-40 cursor-not-allowed`
+                                                        : `border-[var(--ls-outline)] ${HEADING} hover:bg-[var(--ls-surface-low)]`
+                                                }`}
+                                            >
+                                                Next <ChevronRight size={13} />
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                             </div>

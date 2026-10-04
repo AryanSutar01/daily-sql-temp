@@ -6,7 +6,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 // We only return the fields needed for the landing page preview (top 5).
 export async function GET() {
   try {
-    const res = await fetch(`${API_URL}/leaderboard`, {
+    const res = await fetch(`${API_URL}/leaderboard?limit=5&offset=0`, {
       // Cache for 5 minutes on the server — leaderboard doesn't need real-time updates
       next: { revalidate: 300 },
     });
@@ -15,11 +15,11 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to fetch leaderboard" }, { status: res.status });
     }
 
-    const data: any[] = await res.json();
+    const data: { entries: any[] } = await res.json();
 
     // Only expose safe public fields — never forward email, user_id, or internal fields
-    const safe = data.slice(0, 5).map((entry, idx) => ({
-      rank: idx + 1,
+    const safe = (data.entries ?? []).map((entry) => ({
+      rank: entry.rank,
       username: entry.username ?? null,
       full_name: entry.full_name ?? "Anonymous",
       avatar_url: entry.avatar_url ?? null,

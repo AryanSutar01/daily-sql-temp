@@ -39,8 +39,8 @@ export default function PublicProfileClient({ profile: initialProfile }: { profi
     useEffect(() => {
         async function loadLeaderboard() {
             try {
-                const lb = await api.getLeaderboard().catch(() => []);
-                setLeaderboard(lb || []);
+                const lb = await api.getLeaderboard(10, 0).catch(() => ({ entries: [] }));
+                setLeaderboard(lb.entries || []);
             } catch (err) {
                 console.error("Failed to load leaderboard", err);
             }
@@ -257,11 +257,18 @@ export default function PublicProfileClient({ profile: initialProfile }: { profi
 
                     {/* Leaderboard Card */}
                     <div className="bg-white border border-[#dedee2] rounded-2xl p-5 shadow-xs flex flex-col text-zinc-900">
-                        <div className="flex items-center gap-2.5 mb-4">
-                            <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center border border-amber-200 shrink-0 dark:bg-amber-500/10 dark:border-amber-500/30">
-                                <Trophy size={14} className="text-amber-600 dark:text-amber-300" />
+                        <div className="flex items-center justify-between gap-2.5 mb-4">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center border border-amber-200 shrink-0 dark:bg-amber-500/10 dark:border-amber-500/30">
+                                    <Trophy size={14} className="text-amber-600 dark:text-amber-300" />
+                                </div>
+                                <h3 className="text-sm font-bold font-mono tracking-tight">Platform Leaderboard</h3>
                             </div>
-                            <h3 className="text-sm font-bold font-mono tracking-tight">Platform Leaderboard</h3>
+                            {profile.leaderboard_rank && (
+                                <span className="text-[11px] font-bold font-mono text-[#1f9e8e] bg-[#1f9e8e]/10 border border-[#1f9e8e]/30 rounded-lg px-2 py-1 shrink-0">
+                                    Rank #{profile.leaderboard_rank}
+                                </span>
+                            )}
                         </div>
 
                         <div className="space-y-1.5 overflow-y-auto max-h-[300px] pr-1">
@@ -290,12 +297,12 @@ export default function PublicProfileClient({ profile: initialProfile }: { profi
                                         >
                                             <div
                                                 className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold font-mono border shrink-0 ${
-                                                    idx < 3
-                                                        ? rankBadges[idx]
+                                                    entry.rank <= 3
+                                                        ? rankBadges[entry.rank - 1]
                                                         : "bg-white border-zinc-200 text-zinc-500"
                                                 }`}
                                             >
-                                                {idx + 1}
+                                                {entry.rank}
                                             </div>
 
                                             <div className="w-6 h-6 rounded-md bg-zinc-200 flex items-center justify-center overflow-hidden shrink-0 dark:bg-zinc-700">

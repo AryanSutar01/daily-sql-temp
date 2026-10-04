@@ -64,7 +64,12 @@ export const api = {
     getRecentSubmissions: () => fetchApi<any[]>('/me/submissions'),
     getHeatmap: () => fetchApi<Record<string, number>>('/me/heatmap'),
     getSolvedIds: () => fetchApi<{ solved_ids: string[] }>('/me/solved-ids'),
-    getLeaderboard: () => fetchApi<any[]>('/leaderboard'),
+    getLeaderboard: (limit = 20, offset = 0) =>
+        fetchApi<{ entries: any[]; total: number; limit: number; offset: number }>(
+            `/leaderboard?limit=${limit}&offset=${offset}`
+        ),
+    getMyLeaderboardRank: () =>
+        fetchApi<{ rank: number; total_solved: number; current_streak: number }>('/leaderboard/me'),
     getCloudinarySignature: () => fetchApi<{
         signature: string;
         timestamp: number;
