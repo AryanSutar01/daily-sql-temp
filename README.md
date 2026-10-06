@@ -107,4 +107,5 @@ The waitlist table stores:
 ## License
 
 Private project. and liscensed under a startup
-Making sure 
+Making sure everything works fine remerge
+
