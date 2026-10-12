@@ -14,12 +14,16 @@ declare global {
 interface Config {
     key_id: string;
     mode: "test" | "live" | "unset";
-    max_inr: number;
+    max_amount: Record<Currency, number>;
     ip_allowlist: boolean;
     key_secret_set: boolean;
     webhook_secret_set: boolean;
     webhook_url: string;
 }
+
+type Currency = "INR" | "USD";
+const SYMBOL: Record<Currency, string> = { INR: "₹", USD: "$" };
+const PRESETS: Record<Currency, string[]> = { INR: ["1", "899", "1499", "4999"], USD: ["1", "5", "10", "20"] };
 
 interface LogEvent {
     id: number;
@@ -50,6 +54,7 @@ export default function RazorpayTestClient() {
     const [error, setError] = useState<string | null>(null);
 
     const [amount, setAmount] = useState("1");
+    const [currency, setCurrency] = useState<Currency>("INR");
     const [busy, setBusy] = useState(false);
     const [lastOrderId, setLastOrderId] = useState<string | null>(null);
     const [lastResult, setLastResult] = useState<any>(null);
@@ -123,7 +128,7 @@ export default function RazorpayTestClient() {
             if (!(await loadCheckoutScript())) throw new Error("Could not load checkout.js");
             const order = await api("/create-order", {
                 method: "POST",
-                body: JSON.stringify({ amount_inr: Number(amount) }),
+                body: JSON.stringify({ amount: Number(amount), currency }),
             });
             setLastOrderId(order.order_id);
 
@@ -249,7 +254,7 @@ export default function RazorpayTestClient() {
 
                 {config?.mode === "live" && (
                     <div className="bg-red-500/10 border border-red-500/40 text-red-200 text-sm rounded p-3">
-                        LIVE keys — payments move real money. Amount capped at ₹{config.max_inr}. Refund test payments from the log (↩ refund).
+                        LIVE keys — payments move real money. Amount capped at ₹{config.max_amount.INR} / ${config.max_amount.USD}. Refund test payments from the log (↩ refund).
                     </div>
                 )}
 
@@ -260,8 +265,17 @@ export default function RazorpayTestClient() {
                     <section className="bg-[#131924] border border-[#202736] rounded-lg p-5 space-y-4">
                         <h2 className="font-semibold text-white">1. Payment</h2>
                         <div className="flex gap-2">
+                            <div className="flex border border-[#202736] rounded overflow-hidden text-xs">
+                                {(["INR", "USD"] as Currency[]).map((c) => (
+                                    <button
+                                        key={c}
+                                        onClick={() => { setCurrency(c); setAmount("1"); }}
+                                        className={`px-3 ${currency === c ? "bg-[#4DD4C4] text-black font-semibold" : "hover:bg-[#0B0F17]"}`}
+                                    >{c}</button>
+                                ))}
+                            </div>
                             <div className="relative flex-1">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">₹</span>
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">{SYMBOL[currency]}</span>
                                 <input
                                     type="number" min="1" step="0.01"
                                     value={amount}
@@ -271,15 +285,18 @@ export default function RazorpayTestClient() {
                             </div>
                             <button
                                 onClick={pay}
-                                disabled={busy || !config || Number(amount) < 1 || Number(amount) > (config?.max_inr ?? 0)}
+                                disabled={busy || !config || Number(amount) < 1 || Number(amount) > (config?.max_amount[currency] ?? 0)}
                                 className="bg-[#4DD4C4] text-black font-semibold rounded px-5 py-2 text-sm disabled:opacity-40"
                             >{busy ? "Processing…" : "Pay"}</button>
                         </div>
                         <div className="flex flex-wrap gap-2 text-xs">
-                            {["1", "899", "1499", "4999"].filter((v) => !config || Number(v) <= config.max_inr).map((v) => (
-                                <button key={v} onClick={() => setAmount(v)} className="px-2 py-1 border border-[#202736] rounded hover:bg-[#0B0F17]">₹{v}</button>
+                            {PRESETS[currency].filter((v) => !config || Number(v) <= config.max_amount[currency]).map((v) => (
+                                <button key={v} onClick={() => setAmount(v)} className="px-2 py-1 border border-[#202736] rounded hover:bg-[#0B0F17]">{SYMBOL[currency]}{v}</button>
                             ))}
                         </div>
+                        {currency === "USD" && (
+                            <p className="text-xs text-amber-300">USD needs International Payments enabled on the Razorpay account, and is paid with an international test card.</p>
+                        )}
                         {lastOrderId && (
                             <div className="text-xs space-y-2">
                                 <div>Last order: <span className="font-mono text-[#4DD4C4]">{lastOrderId}</span></div>
