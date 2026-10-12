@@ -46,8 +46,8 @@ export const refundSections: Section[] = [
     id: "how-plans-work",
     title: "How payments and plans work",
     blocks: [
-      { type: "p", text: "Payments are collected through Cashfree Payments, a licensed payment aggregator. Checkout accepts the methods shown on the payment screen, such as UPI, net banking and cards. Your card, UPI and bank details are entered on the payment provider's secure screen and are never stored on our servers." },
-      { type: "p", text: "All amounts are charged in Indian Rupees (INR). If you pay with a card issued outside India, your bank may convert the amount and charge its own fees. Those charges are between you and your bank." },
+      { type: "p", text: "Payments are collected through Razorpay, a licensed payment aggregator. Checkout accepts the methods shown on the payment screen, such as UPI, net banking and cards. Your card, UPI and bank details are entered on the payment provider's secure screen and are never stored on our servers." },
+      { type: "p", text: "Amounts are charged in the currency you choose at checkout: Indian Rupees (INR) or US Dollars (USD). Refunds are made in the currency you paid in. If your card is in a different currency, your bank may convert the amount and charge its own fees. Those charges are between you and your bank." },
       { type: "p", text: "Digital access is provided immediately after a successful payment. Because you receive the digital service straight away, refunds are limited as set out in this Policy." },
     ],
   },

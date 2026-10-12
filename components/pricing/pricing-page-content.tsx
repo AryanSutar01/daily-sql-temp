@@ -4,7 +4,15 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { isLoggedIn as hasSessionToken } from "@/lib/auth";
-import { DEFAULT_PLANS, formatINR, type PlanMap } from "@/lib/plans";
+import {
+    DEFAULT_PLANS,
+    formatPrice,
+    planOriginalPrice,
+    planPrice,
+    saveCurrencyCookie,
+    type Currency,
+    type PlanMap,
+} from "@/lib/plans";
 import {
     Check,
     ArrowRight,
@@ -18,7 +26,20 @@ import {
     Server
 } from "lucide-react";
 
-export function PricingPageContent({ plans = DEFAULT_PLANS }: { plans?: PlanMap }) {
+export function PricingPageContent({
+    plans = DEFAULT_PLANS,
+    initialCurrency = "INR",
+}: {
+    plans?: PlanMap;
+    initialCurrency?: Currency;
+}) {
+    const [currency, setCurrencyState] = useState<Currency>(initialCurrency);
+    // A manual toggle is an explicit choice: remember it so it sticks on the next visit (and on /payment)
+    // instead of being overwritten by geolocation again (middleware only sets the cookie when it is absent).
+    const setCurrency = (next: Currency) => {
+        setCurrencyState(next);
+        saveCurrencyCookie(next);
+    };
     const [openFaq, setOpenFaq] = useState<number | null>(0); // First open by default
     const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -36,28 +57,40 @@ export function PricingPageContent({ plans = DEFAULT_PLANS }: { plans?: PlanMap 
         setOpenFaq(openFaq === index ? null : index);
     };
 
-    const { monthly, yearly, lifetime } = plans;
-    const fmt = formatINR;
+    const isINR = currency === "INR";
+    const fmt = (n: number) => formatPrice(n, currency);
+    // A plan without a USD price (not set in the CMS) falls back to INR rather than showing nothing.
+    const price = (key: keyof PlanMap) => planPrice(plans[key], currency) ?? plans[key].price;
+    const original = (key: keyof PlanMap) => {
+        const o = planOriginalPrice(plans[key], currency);
+        return o ? fmt(o) : "";
+    };
+    const perMonth = (yearlyPrice: number) =>
+        isINR ? Math.round(yearlyPrice / 12) : Math.round((yearlyPrice / 12) * 100) / 100;
+    const monthlyPrice = price("monthly");
+    const yearlyPrice = price("yearly");
+    const lifetimePrice = price("lifetime");
+    const zero = fmt(0);
     const prices = {
         lifetime: {
-            original: lifetime.original_price ? fmt(lifetime.original_price) : "",
-            discounted: fmt(lifetime.price),
+            original: original("lifetime"),
+            discounted: fmt(lifetimePrice),
             billing: "paid once",
             note: "One payment, no renewal · Full access forever"
         },
         annual: {
-            original: yearly.original_price ? fmt(yearly.original_price) : "",
-            discounted: fmt(yearly.price),
+            original: original("yearly"),
+            discounted: fmt(yearlyPrice),
             period: "/year",
-            monthlyEquivalent: `just ${fmt(Math.round(yearly.price / 12))}/mo`,
-            todayText: `${fmt(yearly.price)} one-time · 12 months of access`
+            monthlyEquivalent: `just ${fmt(perMonth(yearlyPrice))}/mo`,
+            todayText: `${fmt(yearlyPrice)} one-time · 12 months of access`
         },
         monthly: {
-            original: monthly.original_price ? fmt(monthly.original_price) : "",
-            discounted: fmt(monthly.price),
+            original: original("monthly"),
+            discounted: fmt(monthlyPrice),
             period: "/month",
             monthlyEquivalent: "",
-            todayText: `${fmt(monthly.price)} one-time · 30 days of access`
+            todayText: `${fmt(monthlyPrice)} one-time · 30 days of access`
         }
     };
 
@@ -147,7 +180,7 @@ export function PricingPageContent({ plans = DEFAULT_PLANS }: { plans?: PlanMap 
     const faqs = [
         {
             q: "What plans and pricing options are available?",
-            a: `We offer four straightforward tiers: Free Tier (₹0 forever for daily habit building), Monthly Pro (${fmt(monthly.price)}/month for targeted interview sprints), Yearly Pro (${fmt(yearly.price)}/year at just ${fmt(Math.round(yearly.price / 12))}/month for comprehensive year-round mastery), and Lifetime VIP (${fmt(lifetime.price)} one-time payment for permanent unlimited access with zero renewals forever). Prices are in INR; customers outside India can pay with PayPal at checkout.`,
+            a: `We offer four straightforward tiers: Free Tier (${zero} forever for daily habit building), Monthly Pro (${fmt(monthlyPrice)}/month for targeted interview sprints), Yearly Pro (${fmt(yearlyPrice)}/year at just ${fmt(perMonth(yearlyPrice))}/month for comprehensive year-round mastery), and Lifetime VIP (${fmt(lifetimePrice)} one-time payment for permanent unlimited access with zero renewals forever). Prices are shown in ${isINR ? "Indian rupees (INR)" : "US dollars (USD)"}; use the currency switch above to change.`,
         },
         {
             q: "What disciplines and skills does DailySQL cover?",
@@ -159,19 +192,19 @@ export function PricingPageContent({ plans = DEFAULT_PLANS }: { plans?: PlanMap 
         },
         {
             q: "What does the Lifetime Plan include?",
-            a: `Lifetime gives you access to the complete DailySQL platform for ${fmt(lifetime.price)} paid once, for as long as we operate it. This includes every current problem track, the new problems and tracks we add to the platform, and the VIP community role, with no renewal fees. Separately priced products or add-ons are not included. See the Terms of Service for details.`,
+            a: `Lifetime gives you access to the complete DailySQL platform for ${fmt(lifetimePrice)} paid once, for as long as we operate it. This includes every current problem track, the new problems and tracks we add to the platform, and the VIP community role, with no renewal fees. Separately priced products or add-ons are not included. See the Terms of Service for details.`,
         },
         {
             q: "Do Free, Monthly, Yearly, and Lifetime unlock different content?",
-            a: `Free Tier (₹0) includes 3 SQL questions every day (today's daily set) and the first 30 SQL questions of the archive, plus leaderboard rank, streak tracking, and community discussions. All paid plans (Monthly ${fmt(monthly.price)}, Yearly ${fmt(yearly.price)}, and Lifetime ${fmt(lifetime.price)}) unlock every question across SQL, Python, PySpark and DSA, plus step-by-step editorial solutions and execution breakdowns.`,
+            a: `Free Tier (${zero}) includes 3 SQL questions every day (today's daily set) and the first 30 SQL questions of the archive, plus leaderboard rank, streak tracking, and community discussions. All paid plans (Monthly ${fmt(monthlyPrice)}, Yearly ${fmt(yearlyPrice)}, and Lifetime ${fmt(lifetimePrice)}) unlock every question across SQL, Python, PySpark and DSA, plus step-by-step editorial solutions and execution breakdowns.`,
         },
         {
             q: "How much time do I need each day?",
             a: "Just 15 minutes. DailySQL is intentionally structured to build strong, consistent problem-solving habits for busy working professionals and students without causing burnout or cramming fatigue."
         },
         {
-            q: "I'm outside India. How do I pay?",
-            a: "All prices are in Indian rupees (INR). If you are outside India, choose PayPal at checkout: PayPal converts the INR amount to your currency at its own exchange rate, so the amount shown in your currency can differ slightly from day to day."
+            q: "Which currencies can I pay in?",
+            a: "You can pay in Indian rupees (INR) or US dollars (USD) — pick one with the currency switch on this page or on the checkout page. INR checkout supports UPI, netbanking and cards; USD checkout takes international cards (Visa, Mastercard, Amex). If your card is in another currency, your bank converts the USD amount at its own rate."
         },
         {
             q: "Can I expense DailySQL through my company's learning budget?",
@@ -207,13 +240,36 @@ export function PricingPageContent({ plans = DEFAULT_PLANS }: { plans?: PlanMap 
                 </div>
             </div>
 
-            {/* 2. INTERNATIONAL PAYMENT NOTE */}
+            {/* 2. CONTROLS BAR (Currency Toggle) */}
             <div className="max-w-[1340px] mx-auto px-4 sm:px-6 mb-4">
-                <div className="flex items-center gap-2 py-3 px-5 bg-white rounded-xl border border-[#dedee2] shadow-2xs text-xs text-zinc-700 font-medium">
-                    <span className="text-sm">🌐</span>
-                    <span>
-                        All prices are in INR. <strong>Outside India?</strong> Pay with PayPal at checkout. PayPal converts the INR amount to your currency at its own rate, so the final amount in your currency may differ slightly.
-                    </span>
+                <div className="flex flex-wrap items-center justify-between gap-4 py-3 px-5 bg-white rounded-xl border border-[#dedee2] shadow-2xs">
+
+                    {/* Left: currency note */}
+                    <div className="flex items-center gap-2 text-xs text-zinc-700 font-medium">
+                        <span className="text-sm">🌐</span>
+                        <span>
+                            Prices in <strong>{isINR ? "Indian rupees (INR)" : "US dollars (USD)"}</strong>
+                            {!isINR && <span className="text-[11px] text-zinc-500 font-normal"> · charged in USD to international cards</span>}
+                        </span>
+                    </div>
+
+                    {/* Right: Currency Toggle */}
+                    <div className="inline-flex p-0.5 bg-zinc-100 rounded-lg border border-zinc-200 text-xs font-semibold" role="group" aria-label="Currency">
+                        {(["INR", "USD"] as const).map((c) => (
+                            <button
+                                key={c}
+                                onClick={() => setCurrency(c)}
+                                aria-pressed={currency === c}
+                                className={`px-3 py-1 rounded-md transition-all ${currency === c
+                                    ? "bg-white text-zinc-900 shadow-2xs font-bold"
+                                    : "text-zinc-600 hover:text-zinc-900"
+                                    }`}
+                            >
+                                {c === "INR" ? "INR (₹)" : "USD ($)"}
+                            </button>
+                        ))}
+                    </div>
+
                 </div>
             </div>
 
@@ -442,7 +498,7 @@ export function PricingPageContent({ plans = DEFAULT_PLANS }: { plans?: PlanMap 
                                     <div className="text-left sm:text-right">
                                         <div className="flex items-baseline sm:justify-end gap-1">
                                             <span className="text-2xl font-extrabold font-mono text-zinc-900">
-                                                ₹0
+                                                {zero}
                                             </span>
                                             <span className="text-xs text-zinc-500 font-medium">
                                                 / forever
@@ -486,7 +542,7 @@ export function PricingPageContent({ plans = DEFAULT_PLANS }: { plans?: PlanMap 
                             </div>
 
                             <p className="text-[11px] text-zinc-400 leading-relaxed mb-4">
-                                Full catalogue on every plan, no usage limits. Checkout supports UPI, Netbanking, and domestic & international cards (Visa, Mastercard, Amex).
+                                Full catalogue on every plan, no usage limits. INR checkout supports UPI, Netbanking, and cards; USD checkout supports international cards (Visa, Mastercard, Amex).
                             </p>
 
                             {/* Expensing Box */}

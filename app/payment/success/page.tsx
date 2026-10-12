@@ -106,7 +106,7 @@ function SuccessContent() {
           <div className="bg-white border border-[#dedee2] rounded-2xl p-8 text-center shadow-xs">
             <Loader2 className="w-10 h-10 animate-spin text-[#1f9e8e] mx-auto mb-4" />
             <h2 className="text-lg font-bold font-mono text-zinc-900">Verifying Payment...</h2>
-            <p className="text-zinc-500 text-xs mt-1.5 font-mono">Confirming transaction with Cashfree Gateway</p>
+            <p className="text-zinc-500 text-xs mt-1.5 font-mono">Confirming transaction with Razorpay</p>
           </div>
         )}
 
@@ -115,7 +115,7 @@ function SuccessContent() {
             <div className="w-12 h-12 border-3 border-amber-200 border-t-amber-500 rounded-full animate-spin mx-auto mb-4 dark:border-amber-500/30" />
             <h2 className="text-lg font-bold font-mono text-zinc-900">Payment is being confirmed…</h2>
             <p className="text-zinc-500 text-xs mt-2 leading-relaxed">
-              Waiting for confirmation from Cashfree. Please keep this tab open.
+              Waiting for confirmation from Razorpay. Please keep this tab open.
             </p>
           </div>
         )}

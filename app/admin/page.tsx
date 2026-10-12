@@ -530,14 +530,17 @@ export default function AdminDashboard() {
             showToast('error', 'No subscriptions to export');
             return;
         }
-        const headers = ["Email", "Username", "Plan", "Amount Paid (INR)", "Status", "Order ID", "Started At", "Expires At"];
+        const headers = ["Email", "Username", "Plan", "Amount Paid", "Currency", "Gateway", "Status", "Order ID", "Gateway Order ID", "Started At", "Expires At"];
         const rows = subscriptions.map(s => [
             `"${s.email || ''}"`,
             `"${s.username || ''}"`,
             `"${s.plan_name || s.plan_id || ''}"`,
             s.amount_paid || 0,
+            `"${s.currency || 'INR'}"`,
+            `"${s.payment_gateway || ''}"`,
             `"${s.status || ''}"`,
             `"${s.cashfree_order_id || ''}"`,
+            `"${s.razorpay_order_id || ''}"`,
             `"${s.starts_at || ''}"`,
             `"${s.is_lifetime ? 'Never (Lifetime)' : s.expires_at || 'Never'}"`,
         ].join(',')).join('\n');
@@ -3219,7 +3222,10 @@ export default function AdminDashboard() {
                                 <Metric className="text-emerald-400 font-bold text-3xl mt-2 font-mono">
                                     ₹{(subAnalytics?.overview?.total_revenue || 0).toLocaleString('en-IN')}
                                 </Metric>
-                                <Text className="text-zinc-500 text-[10px] mt-1">All verified payments through Cashfree</Text>
+                                <Text className="text-emerald-300/80 font-mono text-sm mt-1">
+                                    + ${(subAnalytics?.overview?.total_revenue_usd || 0).toLocaleString('en-US')}
+                                </Text>
+                                <Text className="text-zinc-500 text-[10px] mt-1">All verified payments (INR and USD kept separate)</Text>
                             </Card>
 
                             <Card className="bg-[#121826] border-[#202736] ring-0 p-6">
@@ -3258,13 +3264,14 @@ export default function AdminDashboard() {
                             <div className="bg-[#121826] border border-blue-500/20 rounded-xl p-5 relative overflow-hidden">
                                 <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl pointer-events-none" />
                                 <div className="flex justify-between items-center mb-2">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-blue-400">Monthly Pro (₹899)</span>
+                                    <span className="text-xs font-bold uppercase tracking-wider text-blue-400">Monthly Pro</span>
                                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/30">
                                         {subAnalytics?.plan_breakdown?.monthly?.count || 0} active
                                     </span>
                                 </div>
                                 <div className="text-2xl font-bold font-mono text-white mt-1">
                                     ₹{(subAnalytics?.plan_breakdown?.monthly?.revenue || 0).toLocaleString('en-IN')}
+                                    <span className="text-sm text-zinc-400"> + ${(subAnalytics?.plan_breakdown?.monthly?.revenue_usd || 0).toLocaleString('en-US')}</span>
                                 </div>
                                 <div className="text-[11px] text-zinc-500 mt-1">30-day recurring period</div>
                             </div>
@@ -3272,13 +3279,14 @@ export default function AdminDashboard() {
                             <div className="bg-[#121826] border border-emerald-500/20 rounded-xl p-5 relative overflow-hidden">
                                 <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
                                 <div className="flex justify-between items-center mb-2">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Yearly Pro (₹1,499)</span>
+                                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Yearly Pro</span>
                                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
                                         {subAnalytics?.plan_breakdown?.yearly?.count || 0} active
                                     </span>
                                 </div>
                                 <div className="text-2xl font-bold font-mono text-white mt-1">
                                     ₹{(subAnalytics?.plan_breakdown?.yearly?.revenue || 0).toLocaleString('en-IN')}
+                                    <span className="text-sm text-zinc-400"> + ${(subAnalytics?.plan_breakdown?.yearly?.revenue_usd || 0).toLocaleString('en-US')}</span>
                                 </div>
                                 <div className="text-[11px] text-zinc-500 mt-1">365-day annual pass</div>
                             </div>
@@ -3296,12 +3304,13 @@ export default function AdminDashboard() {
 
                                 <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
                                     <div className="bg-[#0b101c] p-2.5 rounded-lg border border-amber-500/20">
-                                        <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider block">💰 Paid (₹4,999)</span>
+                                        <span className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider block">💰 Paid</span>
                                         <span className="text-sm font-bold font-mono text-white">
                                             {subAnalytics?.lifetime_metrics?.paid_lifetime_count ?? (subAnalytics?.plan_breakdown?.lifetime?.count || 0)} users
                                         </span>
                                         <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">
                                             ₹{(subAnalytics?.lifetime_metrics?.paid_lifetime_revenue ?? (subAnalytics?.plan_breakdown?.lifetime?.revenue || 0)).toLocaleString('en-IN')}
+                                            {' + $'}{(subAnalytics?.lifetime_metrics?.paid_lifetime_revenue_usd || 0).toLocaleString('en-US')}
                                         </span>
                                     </div>
                                     <div className="bg-[#0b101c] p-2.5 rounded-lg border border-amber-500/20">
@@ -3376,7 +3385,7 @@ export default function AdminDashboard() {
                                             <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Started At</TableHeaderCell>
                                             <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Expires At</TableHeaderCell>
                                             <TableHeaderCell className="text-zinc-500 text-[10px] uppercase text-center bg-[#121826]">Status</TableHeaderCell>
-                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Cashfree Order ID</TableHeaderCell>
+                                            <TableHeaderCell className="text-zinc-500 text-[10px] uppercase bg-[#121826]">Order ID</TableHeaderCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
@@ -3415,7 +3424,9 @@ export default function AdminDashboard() {
                                                             </span>
                                                         </TableCell>
                                                         <TableCell className="text-right text-zinc-200 font-mono text-xs font-bold">
-                                                            ₹{Number(s.amount_paid || 0).toLocaleString('en-IN')}
+                                                            {s.currency === 'USD'
+                                                                ? `$${Number(s.amount_paid || 0).toLocaleString('en-US')}`
+                                                                : `₹${Number(s.amount_paid || 0).toLocaleString('en-IN')}`}
                                                         </TableCell>
                                                         <TableCell className="text-zinc-400 text-xs font-mono">
                                                             {s.starts_at ? new Date(s.starts_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
