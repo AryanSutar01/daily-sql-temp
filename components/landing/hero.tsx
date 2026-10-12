@@ -322,7 +322,7 @@ export function Hero() {
             marginBottom: "2.5rem",
           }}
         >
-          9 curated problems every day — SQL, Python (Pandas), and PySpark,
+          9 curated problems every day — SQL, Python, and PySpark,
           each in Easy, Medium, and Advanced. 15 minutes. Real execution.
         </p>
 

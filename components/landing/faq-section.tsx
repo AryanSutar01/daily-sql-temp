@@ -6,7 +6,7 @@ import { ChevronDown } from "lucide-react";
 const FAQS = [
   {
     question: "What disciplines does Daily SQL cover?",
-    answer: "Daily SQL covers three core data skills: SQL (PostgreSQL), Python with Pandas, and PySpark. Every day you get 9 problems total — 3 per discipline — each available in Easy, Medium, and Advanced difficulty. The Free Tier includes the 3 SQL problems; paid plans unlock the Python and PySpark problems and the full archive.",
+    answer: "Daily SQL covers three core data skills: SQL, Python with Pandas, and PySpark. Every day you get 9 problems total — 3 per discipline — each available in Easy, Medium, and Advanced difficulty. The Free Tier includes the 3 SQL problems; paid plans unlock the Python and PySpark problems and the full archive.",
   },
   {
     question: "Is this for beginners or experienced professionals?",
@@ -18,7 +18,7 @@ const FAQS = [
   },
   {
     question: "How is code executed? Is it safe?",
-    answer: "Every submission runs in an isolated sandbox. SQL runs in a temporary PostgreSQL schema created and dropped per request. Python and PySpark run in Docker containers with restricted builtins — no internet access, no OS calls.",
+    answer: "Every submission runs in an isolated sandbox. SQL runs in a temporary database schema created and dropped per request. Python and PySpark run in Docker containers with restricted builtins — no internet access, no OS calls.",
   },
   {
     question: "Is Daily SQL free?",

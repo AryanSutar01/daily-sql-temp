@@ -60,7 +60,7 @@ export function BentoGrid() {
   const features = [
     {
       title: "SQL + Python + PySpark",
-      description: "One platform for all three core data skills. SQL in PostgreSQL, Python via Pandas, and PySpark with a warm SparkSession — each running in real isolated sandboxes.",
+      description: "One platform for all three core data skills. SQL, Python via Pandas, and PySpark with a warm SparkSession — each running in real isolated sandboxes.",
       icon: Database,
       accent: "text-sky-400",
       accentBg: "bg-sky-400/10",

@@ -74,7 +74,7 @@ export function AuthLayout({ children, type }: AuthLayoutProps) {
           </h1>
 
           <p className="text-base text-zinc-600 leading-relaxed mb-8">
-            9 curated problems every morning across SQL (PostgreSQL), Python (Pandas), and distributed PySpark. Build streaks, isolate execution in the browser, and stay interview-ready.
+            9 curated problems every morning across SQL, Python (Pandas), and distributed PySpark. Build streaks, isolate execution in the browser, and stay interview-ready.
           </p>
 
           {/* Feature Highlights Stack */}
@@ -108,7 +108,7 @@ export function AuthLayout({ children, type }: AuthLayoutProps) {
             <span className="font-medium text-zinc-700">10,000+ data practitioners learning daily</span>
           </div>
           <div className="flex items-center gap-1 font-mono text-[11px] text-zinc-400">
-            <span>Postgres 16</span> · <span>Spark 3.5</span>
+            <span>SQL</span> · <span>Spark 3.5</span>
           </div>
         </div>
 
