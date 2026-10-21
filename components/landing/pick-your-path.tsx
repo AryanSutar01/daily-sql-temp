@@ -29,7 +29,7 @@ const PATHS: PathCard[] = [
     id: "sql",
     icon: Database,
     eyebrow: "SQL PATH",
-    title: "SQL\n(Postgres)",
+    title: "SQL",
     description:
       "Window functions, CTEs, retention queries, date maths, and query optimisation — everything a data pro needs daily.",
     topics: [

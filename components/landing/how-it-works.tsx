@@ -101,7 +101,7 @@ export function HowItWorks() {
                   <div className="w-6 h-6 rounded-md bg-sky-50 text-sky-600 flex items-center justify-center dark:bg-sky-500/10 dark:text-sky-300">
                     <Database className="w-3.5 h-3.5" />
                   </div>
-                  <span className="text-xs font-medium text-zinc-800">SQL (Postgres)</span>
+                  <span className="text-xs font-medium text-zinc-800">SQL</span>
                 </div>
                 <span className="text-[11px] font-mono font-semibold text-sky-600 bg-sky-50 px-2 py-0.5 rounded dark:text-sky-300 dark:bg-sky-500/10">
                   3 Problems
@@ -181,7 +181,7 @@ export function HowItWorks() {
                 className="text-sm leading-relaxed mb-6"
                 style={{ color: "var(--ls-on-surface-muted)" }}
               >
-                Write code in the editor. Your submission runs in an isolated sandbox — real PostgreSQL, real Python, real Spark. Instant feedback.
+                Write code in the editor. Your submission runs in an isolated sandbox — real SQL, real Python, real Spark. Instant feedback.
               </p>
             </div>
 
@@ -214,7 +214,7 @@ export function HowItWorks() {
                 <span className="text-emerald-400 font-medium flex items-center gap-1">
                   ✓ Output Match (14ms)
                 </span>
-                <span className="text-zinc-500 text-[10px]">Real Postgres 16</span>
+                <span className="text-zinc-500 text-[10px]">Real SQL engine</span>
               </div>
             </div>
           </div>

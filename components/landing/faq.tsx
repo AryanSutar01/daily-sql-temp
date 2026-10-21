@@ -23,7 +23,7 @@ export function FAQ() {
     },
     {
       question: "What SQL dialects and languages are supported?",
-      answer: "We support PostgreSQL, Python (Pandas/Polars data manipulation), and Apache PySpark. The concepts you practice transfer directly across Snowflake, BigQuery, Redshift, and Databricks.",
+      answer: "We support SQL, Python (Pandas/Polars data manipulation), and Apache PySpark. The concepts you practice transfer directly across Snowflake, BigQuery, Redshift, and Databricks.",
     },
     {
       question: "Can I practice past sets?",

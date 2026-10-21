@@ -155,7 +155,7 @@ export function PricingPageContent({ plans = DEFAULT_PLANS }: { plans?: PlanMap 
         },
         {
             q: "How does the in-browser sandbox code execution work?",
-            a: "Every submission runs in a secure, isolated sandbox. SQL runs against a real PostgreSQL instance with temporary schemas created and torn down automatically. Python and PySpark run inside dedicated compute containers with zero latency and instant automated test validation."
+            a: "Every submission runs in a secure, isolated sandbox. SQL runs against a real database with temporary schemas created and torn down automatically. Python and PySpark run inside dedicated compute containers with zero latency and instant automated test validation."
         },
         {
             q: "What does the Lifetime Plan include?",
@@ -190,7 +190,7 @@ export function PricingPageContent({ plans = DEFAULT_PLANS }: { plans?: PlanMap 
                 <div className="flex flex-wrap items-center justify-center gap-2.5">
                     {[
                         { label: "SQL", icon: Database },
-                        { label: "PYTHON (PANDAS)", icon: Code2 },
+                        { label: "PYTHON", icon: Code2 },
                         { label: "PYSPARK", icon: Server },
                     ].map((badge, idx) => {
                         const Icon = badge.icon;
