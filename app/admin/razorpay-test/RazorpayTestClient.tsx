@@ -163,7 +163,10 @@ export default function RazorpayTestClient() {
                 logClient("checkout_failed", {
                     order_id: order.order_id,
                     payment_id: e.metadata?.payment_id,
-                    message: `${e.code}: ${e.description} (${e.reason})`,
+                    // A cancellation comes without code/reason: only show the parts Razorpay actually sent.
+                    message: [e.code && `${e.code}:`, e.description || "Payment failed", e.reason && `(${e.reason})`]
+                        .filter(Boolean)
+                        .join(" "),
                     payload: e,
                 });
                 setLastResult({ outcome: "failed", ...e });
