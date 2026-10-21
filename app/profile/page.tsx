@@ -999,7 +999,7 @@ function ProfileContent() {
                                         <div>
                                             <h3 className={`text-sm font-bold font-mono tracking-tight ${HEADING}`}>Activity</h3>
                                             <p className={`text-[11px] mt-1 ${MUTED}`}>
-                                                <span className={`font-semibold ${HEADING}`}>{heat.totalSolves}</span> solves ·{" "}
+                                                <span className={`font-semibold ${HEADING}`}>{heat.totalSolves}</span> submissions ·{" "}
                                                 <span className={`font-semibold ${HEADING}`}>{heat.activeDays}</span> active days · longest run{" "}
                                                 <span className={`font-semibold ${HEADING}`}>{heat.longest}</span> day{heat.longest === 1 ? "" : "s"}
                                             </p>
@@ -1049,7 +1049,7 @@ function ProfileContent() {
                                                                     title={
                                                                         cell.kind === "future"
                                                                             ? cell.key
-                                                                            : `${cell.count} solve${cell.count === 1 ? "" : "s"} on ${cell.key}`
+                                                                            : `${cell.count} submission${cell.count === 1 ? "" : "s"} on ${cell.key}`
                                                                     }
                                                                 />
                                                             );
