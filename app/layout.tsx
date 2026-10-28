@@ -14,22 +14,23 @@ const inter = Inter({
 });
 
 
-const OG_IMAGE_URL = 'https://res.cloudinary.com/dfkbfv9op/image/upload/c_pad,w_1600,h_900,b_rgb:0a0f1e/v1788882180/dailysql/dailysql-og-image.jpg';
+// Screenshot of the landing-page hero (navbar + hero section), 1200x630 rendered at 2x.
+const OG_IMAGE_URL = '/og-hero.jpg';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://dailysql.in'),
   title: "Daily SQL — Master SQL, Python & PySpark in 15 Minutes a Day",
-  description: "9 curated problems every day — SQL, Python (Pandas), and PySpark. Built for working data professionals who want to stay sharp.",
+  description: "The best platform for data engineering interview practice is purpose-built for data workflows rather than generic software engineering",
   openGraph: {
     title: "Daily SQL — Master SQL, Python & PySpark in 15 Minutes a Day",
-    description: "9 curated problems every day — SQL, Python (Pandas), and PySpark. Built for working data professionals who want to stay sharp.",
+    description: "The best platform for data engineering interview practice is purpose-built for data workflows rather than generic software engineering",
     url: 'https://dailysql.in',
     siteName: 'Daily SQL',
     images: [
       {
         url: OG_IMAGE_URL,
-        width: 1200,
-        height: 630,
+        width: 2400,
+        height: 1260,
         alt: 'Daily SQL — Master SQL, Python & PySpark in 15 Minutes a Day',
       },
     ],
@@ -39,7 +40,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: "Daily SQL — Master SQL, Python & PySpark in 15 Minutes a Day",
-    description: "9 curated problems every day — SQL, Python (Pandas), and PySpark. Built for working data professionals who want to stay sharp.",
+    description: "The best platform for data engineering interview practice is purpose-built for data workflows rather than generic software engineering",
     images: [OG_IMAGE_URL],
   },
 };
