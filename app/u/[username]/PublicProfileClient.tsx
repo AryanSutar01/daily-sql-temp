@@ -26,6 +26,14 @@ function describeArc(x: number, y: number, r: number, startAngle: number, endAng
     return ["M", start.x, start.y, "A", r, r, 0, largeArcFlag, 1, end.x, end.y].join(" ");
 }
 
+const HEAT_LEVELS = [
+    "bg-[var(--ls-surface-container)] border border-[var(--ls-outline)]",
+    "bg-[#99f6e4] border border-[#5eead4] dark:bg-[#115e59] dark:border-[#0f766e]",
+    "bg-[#2dd4bf] border border-[#14b8a6] dark:bg-[#14b8a6] dark:border-[#2dd4bf]",
+    "bg-[#0f766e] border border-[#115e59] dark:bg-[#5eead4] dark:border-[#99f6e4]"
+];
+const heatLevel = (n: number) => (n <= 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : 3);
+
 export default function PublicProfileClient({ profile: initialProfile }: { profile: any }) {
     const [searchQuery, setSearchQuery] = useState("");
     const [hoveredSegment, setHoveredSegment] = useState<string | null>(null);
@@ -529,21 +537,28 @@ export default function PublicProfileClient({ profile: initialProfile }: { profi
                                         <div key={wIdx} className="flex flex-col gap-[4px]">
                                             {week.map((dayCount, dIdx) => {
                                                 if (dayCount === -1) return <div key={`${wIdx}-${dIdx}`} className="w-[11px] h-[11px]" />;
-                                                let cellColor = "bg-zinc-100 border border-zinc-200/80";
-                                                if (dayCount === 1) cellColor = "bg-[#99f6e4] border border-[#5eead4]";
-                                                else if (dayCount === 2) cellColor = "bg-[#2dd4bf] border border-[#14b8a6]";
-                                                else if (dayCount >= 3) cellColor = "bg-[#0f766e] border border-[#115e59]";
+                                                const level = heatLevel(dayCount);
 
                                                 return (
                                                     <div
                                                         key={`${wIdx}-${dIdx}`}
-                                                        className={`w-[11px] h-[11px] rounded-[3px] ${cellColor} transition-all duration-150 cursor-pointer hover:scale-125`}
+                                                        className={`w-[11px] h-[11px] rounded-[3px] ${HEAT_LEVELS[level]} transition-all duration-150 cursor-pointer hover:scale-125`}
                                                         title={`${dayCount} submissions`}
                                                     />
                                                 );
                                             })}
                                         </div>
                                     ))}
+                                </div>
+
+                                {/* Heatmap Legend */}
+                                <div className="flex items-center justify-end gap-1.5 mt-2 text-[10px] text-zinc-400 font-mono">
+                                    <span>Less</span>
+                                    <div className={`w-[10px] h-[10px] rounded-[2px] ${HEAT_LEVELS[0]}`} />
+                                    <div className={`w-[10px] h-[10px] rounded-[2px] ${HEAT_LEVELS[1]}`} />
+                                    <div className={`w-[10px] h-[10px] rounded-[2px] ${HEAT_LEVELS[2]}`} />
+                                    <div className={`w-[10px] h-[10px] rounded-[2px] ${HEAT_LEVELS[3]}`} />
+                                    <span>More</span>
                                 </div>
                             </div>
                         </div>
