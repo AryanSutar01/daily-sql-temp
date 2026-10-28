@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   Check,
   Shield,
-  Star,
   Zap,
   Sparkles,
   Loader2,
@@ -15,21 +14,32 @@ import {
   Crown,
   Gift,
   ArrowRight,
-  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getToken } from "@/lib/auth";
 import { isPlanId, takePendingPlan, type PlanId } from "@/lib/pending-plan";
-import { DEFAULT_PLANS, fetchPlans, formatINR, type PlanMap } from "@/lib/plans";
+import {
+  DEFAULT_PLANS,
+  fetchPlanCatalog,
+  formatPrice,
+  isCurrency,
+  planPrice,
+  readCurrencyCookie,
+  saveCurrencyCookie,
+  type Currency,
+  type PlanMap,
+} from "@/lib/plans";
 
 declare global {
   interface Window {
-    Cashfree?: any;
+    Razorpay?: any;
   }
 }
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+const CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
 
 interface Plan {
   id: "monthly" | "yearly" | "lifetime";
@@ -83,43 +93,53 @@ const PLANS: Plan[] = [
   },
 ];
 
-// Only "production" turns on live payments; anything else (unset, "sandbox", a typo) stays
-// sandboxed — the same fail-safe direction as the Cashfree SDK's own `mode` default below.
-const IS_SANDBOX = process.env.NEXT_PUBLIC_CASHFREE_ENV !== "production";
+function loadCheckoutScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${CHECKOUT_SRC}"]`);
+    const script = existing ?? document.createElement("script");
+    script.addEventListener("load", () => resolve(!!window.Razorpay));
+    script.addEventListener("error", () => resolve(false));
+    if (!existing) {
+      script.src = CHECKOUT_SRC;
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  });
+}
 
 export function PaymentPlans() {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
-  const [cashfreeLoaded, setCashfreeLoaded] = useState(false);
-  const [cashfreeInstance, setCashfreeInstance] = useState<any>(null);
+  const [checkoutReady, setCheckoutReady] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<PlanId | null>(null);
   const [userSubscription, setUserSubscription] = useState<any>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [livePlans, setLivePlans] = useState<PlanMap>(DEFAULT_PLANS);
-  const [needsPhone, setNeedsPhone] = useState(false);
-  const [phone, setPhone] = useState("");
+  const [isTestMode, setIsTestMode] = useState(false);
+  const [currency, setCurrencyState] = useState<Currency>("INR");
   const [paymentResult, setPaymentResult] = useState<{
-    status: "PAID" | "PENDING" | "FAILED" | "EXPIRED" | "TEST_MODE_WARNING";
+    status: "PAID" | "PENDING" | "FAILED";
     orderId?: string;
     amount?: number;
+    currency?: Currency;
     planName?: string;
     message?: string;
-    details?: any;
-    scrollTo?: "phone" | "terms";
+    scrollTo?: "terms";
   } | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
-  const phoneBoxRef = useRef<HTMLDivElement>(null);
-  const phoneInputRef = useRef<HTMLInputElement>(null);
   const termsRef = useRef<HTMLLabelElement>(null);
+
+  const setCurrency = (next: Currency) => {
+    setCurrencyState(next);
+    saveCurrencyCookie(next);
+  };
 
   // Bring every notice into view: the result card sits below the plans, so without this a failed
   // click on "Pay" looks like nothing happened.
   useEffect(() => {
     if (!paymentResult) return;
     const frame = requestAnimationFrame(() => {
-      if (paymentResult.scrollTo === "phone" && phoneBoxRef.current) {
-        phoneBoxRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-        phoneInputRef.current?.focus({ preventScroll: true });
-      } else if (paymentResult.scrollTo === "terms" && termsRef.current) {
+      if (paymentResult.scrollTo === "terms" && termsRef.current) {
         termsRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
       } else {
         resultRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -128,30 +148,9 @@ export function PaymentPlans() {
     return () => cancelAnimationFrame(frame);
   }, [paymentResult]);
 
-  // Dynamically load Cashfree.js SDK and fetch user subscription state
+  // Load Razorpay Checkout and fetch user subscription state
   useEffect(() => {
-    if (window.Cashfree) {
-      setCashfreeLoaded(true);
-      setCashfreeInstance(
-        window.Cashfree({
-          mode: process.env.NEXT_PUBLIC_CASHFREE_ENV || "sandbox",
-        })
-      );
-    } else {
-      const script = document.createElement("script");
-      script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
-      script.async = true;
-      script.onload = () => {
-        setCashfreeLoaded(true);
-        if (window.Cashfree) {
-          const cf = window.Cashfree({
-            mode: process.env.NEXT_PUBLIC_CASHFREE_ENV || "sandbox",
-          });
-          setCashfreeInstance(cf);
-        }
-      };
-      document.body.appendChild(script);
-    }
+    loadCheckoutScript().then(setCheckoutReady);
 
     const token = getToken();
     if (token) {
@@ -165,21 +164,32 @@ export function PaymentPlans() {
   }, []);
 
   useEffect(() => {
-    fetchPlans({ cache: "no-store" }).then(setLivePlans);
+    fetchPlanCatalog({ cache: "no-store" }).then(({ plans, paymentMode }) => {
+      setLivePlans(plans);
+      setIsTestMode(paymentMode === "test");
+    });
   }, []);
 
-  // Preselect the plan chosen on /pricing (?plan=…) or remembered through signup/login
+  // Preselect the plan chosen on /pricing (?plan=…) or remembered through signup/login, and the currency
+  // (?currency=…, else the choice remembered from /pricing or the visitor's region)
   useEffect(() => {
-    const fromUrl = new URLSearchParams(window.location.search).get("plan");
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get("plan");
     const chosen = isPlanId(fromUrl) ? fromUrl : takePendingPlan();
     if (isPlanId(fromUrl)) takePendingPlan(); // drop any stale remembered pick
     if (chosen) setSelectedPlanId(chosen);
+
+    const currencyParam = params.get("currency")?.toUpperCase();
+    const initial = isCurrency(currencyParam) ? currencyParam : readCurrencyCookie();
+    if (initial) setCurrencyState(initial);
   }, []);
 
   useEffect(() => {
     if (!selectedPlanId) return;
     document.getElementById(`plan-${selectedPlanId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [selectedPlanId]);
+
+  const priceOf = (planId: PlanId) => planPrice(livePlans[planId], currency);
 
   const handlePayment = async (plan: Plan) => {
     if (!agreedToTerms) {
@@ -191,24 +201,14 @@ export function PaymentPlans() {
       return;
     }
 
-    const phoneDigits = phone.replace(/\D/g, "");
-    if (needsPhone && phoneDigits.length < 10) {
-      setPaymentResult({
-        status: "FAILED",
-        message: "Please enter a valid 10-digit phone number for your payment receipt.",
-        scrollTo: "phone",
-      });
+    const token = getToken();
+    if (!token) {
+      window.location.href = `/login?plan=${plan.id}&redirect=${encodeURIComponent(`/payment?plan=${plan.id}&currency=${currency}`)}`;
       return;
     }
 
     setLoadingPlan(plan.id);
     setPaymentResult(null);
-
-    const token = getToken();
-    if (!token) {
-      window.location.href = `/login?plan=${plan.id}&redirect=${encodeURIComponent(`/payment?plan=${plan.id}`)}`;
-      return;
-    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/payments/create-order`, {
@@ -217,10 +217,7 @@ export function PaymentPlans() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          plan_id: plan.id,
-          ...(needsPhone && phoneDigits ? { customer_phone: phoneDigits } : {}),
-        }),
+        body: JSON.stringify({ plan_id: plan.id, currency }),
       });
 
       const data = await response.json();
@@ -235,18 +232,7 @@ export function PaymentPlans() {
         return;
       }
 
-      if (response.status === 400 && (data?.detail === "phone_required" || data?.detail === "invalid_phone")) {
-        setNeedsPhone(true);
-        setPaymentResult({
-          status: "FAILED",
-          message: "Please enter your phone number below (needed for the payment receipt), then click Pay again.",
-          scrollTo: "phone",
-        });
-        setLoadingPlan(null);
-        return;
-      }
-
-      if (!response.ok || !data.success || !data.payment_session_id) {
+      if (!response.ok || !data.success || !data.razorpay_order_id) {
         const errDetail = data?.detail?.error || data?.detail?.message || data?.detail;
         throw new Error(
           typeof errDetail === "string"
@@ -255,84 +241,136 @@ export function PaymentPlans() {
         );
       }
 
-      const { payment_session_id, order_id } = data;
-
-      if (!cashfreeInstance) {
-        throw new Error("Cashfree Web SDK is not ready yet. Please try again.");
+      if (!window.Razorpay && !(await loadCheckoutScript())) {
+        throw new Error("Razorpay Checkout could not be loaded. Please check your connection and try again.");
       }
 
-      const result = await cashfreeInstance.checkout({
-        paymentSessionId: payment_session_id,
-        redirectTarget: "_modal",
+      const orderId: string = data.order_id;
+      const orderCurrency: Currency = data.currency;
+      let settled = false;
+
+      const rzp = new window.Razorpay({
+        key: data.key_id,
+        order_id: data.razorpay_order_id,
+        amount: data.amount,
+        currency: orderCurrency,
+        name: "DailySQL",
+        description: data.plan_name,
+        prefill: data.prefill,
+        notes: { dsql_order_id: orderId },
+        theme: { color: "#1f9e8e" },
+        handler: async (resp: {
+          razorpay_order_id: string;
+          razorpay_payment_id: string;
+          razorpay_signature: string;
+        }) => {
+          settled = true;
+          try {
+            const verifyRes = await fetch(`${API_BASE_URL}/api/payments/verify-payment`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ order_id: orderId, ...resp }),
+            });
+            const verified = await verifyRes.json().catch(() => ({}));
+            if (verifyRes.ok && verified.order_status === "FAILED") {
+              setPaymentResult({
+                status: "FAILED",
+                orderId,
+                planName: plan.name,
+                message: "We could not confirm this payment. If money was deducted, contact support with your order ID.",
+              });
+              setLoadingPlan(null);
+              return;
+            }
+          } catch {
+            /* the success page re-checks the order with Razorpay, so a network blip here is harmless */
+          }
+          window.location.href = `/payment/success?order_id=${orderId}`;
+        },
+        modal: {
+          ondismiss: () => {
+            setLoadingPlan(null);
+            if (!settled) {
+              setPaymentResult((prev) => prev ?? {
+                status: "FAILED",
+                orderId,
+                planName: plan.name,
+                message: "Payment window was closed before the payment was completed.",
+              });
+            }
+          },
+        },
       });
 
-      if (result.error) {
+      rzp.on("payment.failed", (resp: { error?: { description?: string } }) => {
+        // Checkout lets the user retry inside the same window; this records the last failure reason.
         setPaymentResult({
           status: "FAILED",
-          orderId: order_id,
+          orderId,
+          amount: data.order_amount,
+          currency: orderCurrency,
           planName: plan.name,
-          message:
-            result.error.message ||
-            "Payment window was closed or interrupted before completion.",
+          message: resp?.error?.description || "The payment failed. You can try again with another method.",
         });
-        return;
-      }
+      });
 
-      if (result.paymentDetails) {
-        window.location.href = `/payment/success?order_id=${order_id}`;
-      }
+      rzp.open();
     } catch (err: any) {
       setPaymentResult({
         status: "FAILED",
         message: err.message || "An unexpected error occurred during payment.",
       });
-    } finally {
       setLoadingPlan(null);
     }
   };
 
   const isCurrentPlan = (planId: string) => userSubscription?.plan === planId && userSubscription?.is_paid;
 
+  const monthlyNow = priceOf("monthly");
+  const yearlyNow = priceOf("yearly");
+  const savePct = monthlyNow && yearlyNow ? Math.max(0, Math.round((1 - yearlyNow / (monthlyNow * 12)) * 100)) : null;
+
   return (
     <div className="space-y-10 text-zinc-900">
-      {/* Test Sandbox Alert Banner — sandbox/dev only; must never show real customers a "use this
-          fake card" message once NEXT_PUBLIC_CASHFREE_ENV=production is set and deployed. */}
-      {IS_SANDBOX && (
+      {/* Test-mode notice — shown only while the backend runs Razorpay test keys, so real customers never
+          see a "use this test card" message once live keys are deployed. */}
+      {isTestMode && (
         <div className="bg-[#e6f7f5] border border-[#1f9e8e]/30 rounded-2xl p-4 max-w-4xl mx-auto flex items-center justify-between text-xs sm:text-sm text-[#135d54] shadow-2xs">
           <div className="flex items-center gap-3">
             <CreditCard className="w-5 h-5 shrink-0 text-[#1f9e8e]" />
             <div>
-              <span className="font-bold">Sandbox Mode:</span> Test payments safely with Cashfree test cards (Card: <code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200 dark:bg-[#0F1419]/80">4706131211212123</code> / OTP: <code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200 dark:bg-[#0F1419]/80">111000</code>) or Test UPI (<code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200 dark:bg-[#0F1419]/80">testsuccess@gocash</code>).
+              <span className="font-bold">Test Mode:</span> No real money is charged. Pay with Razorpay test UPI (<code className="font-mono text-zinc-900 bg-white/80 px-1 py-0.5 rounded border border-zinc-200 dark:bg-[#0F1419]/80">success@razorpay</code>) or any Razorpay test card from their docs (international test cards for USD).
             </div>
           </div>
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto flex items-start gap-2 text-xs text-zinc-600 bg-white border border-zinc-200 rounded-2xl p-4 shadow-2xs dark:bg-[#0F1419] dark:border-[#20283C] dark:text-zinc-400">
-        <span>🌐</span>
-        <span>
-          All prices are in INR. <strong>Outside India?</strong> Choose PayPal at checkout. PayPal converts the INR amount to your currency at its own exchange rate, so the final amount may differ slightly.
+      {/* Currency */}
+      <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-600 bg-white border border-zinc-200 rounded-2xl p-4 shadow-2xs dark:bg-[#0F1419] dark:border-[#20283C] dark:text-zinc-400">
+        <span className="flex items-center gap-2">
+          <span>🌐</span>
+          <span>
+            Paying in <strong>{currency === "INR" ? "Indian rupees (INR)" : "US dollars (USD)"}</strong>
+            {currency === "INR" ? " · UPI, netbanking & cards" : " · international cards"}
+          </span>
         </span>
-      </div>
-
-      {needsPhone && (
-        <div ref={phoneBoxRef} className="max-w-4xl mx-auto bg-white border border-zinc-200 rounded-2xl p-4 shadow-2xs dark:bg-[#0F1419] dark:border-[#20283C]">
-          <label htmlFor="billing-phone" className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
-            Phone number (for your payment receipt)
-          </label>
-          <input
-            id="billing-phone"
-            ref={phoneInputRef}
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="e.g. 9876543210"
-            className="w-full px-4 py-2.5 rounded-lg border border-zinc-300 text-sm text-zinc-900 focus:outline-none focus:border-[#1f9e8e] dark:bg-[#080C16] dark:border-[#20283C] dark:text-white"
-          />
+        <div className="inline-flex p-0.5 bg-zinc-100 rounded-lg border border-zinc-200 font-semibold dark:bg-[#080C16] dark:border-[#20283C]" role="group" aria-label="Currency">
+          {(["INR", "USD"] as const).map((c) => (
+            <button
+              key={c}
+              onClick={() => setCurrency(c)}
+              disabled={!!loadingPlan}
+              aria-pressed={currency === c}
+              className={`px-3 py-1 rounded-md transition-all ${currency === c
+                ? "bg-white text-zinc-900 shadow-2xs font-bold dark:bg-[#0F1419] dark:text-white"
+                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
+                }`}
+            >
+              {c === "INR" ? "INR (₹)" : "USD ($)"}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
       {/* Terms Acceptance — required before any plan can be paid for */}
       <label ref={termsRef} className="max-w-4xl mx-auto flex items-start gap-3 bg-white border border-zinc-200 rounded-2xl p-4 shadow-2xs cursor-pointer dark:bg-[#0F1419] dark:border-[#20283C]">
@@ -365,6 +403,8 @@ export function PaymentPlans() {
           const isLoading = loadingPlan === plan.id;
           const isOwned = isCurrentPlan(plan.id);
           const isSelected = selectedPlanId === plan.id;
+          const amount = priceOf(plan.id);
+          const available = amount !== null;
           // When the visitor arrived with a chosen plan, that card leads; otherwise the default "Best Value" one does
           const emphasized = selectedPlanId ? isSelected : !!plan.highlighted;
 
@@ -402,7 +442,7 @@ export function PaymentPlans() {
                 <h3 className="text-xl font-bold font-mono text-zinc-900 mb-2">{plan.name}</h3>
                 <div className="flex items-baseline gap-1">
                   <span className="text-4xl font-extrabold font-mono text-zinc-900 tracking-tight">
-                    {formatINR(livePlans[plan.id].price)}
+                    {available ? formatPrice(amount, currency) : "—"}
                   </span>
                   <span className="text-zinc-500 text-xs font-medium">
                     {plan.period}
@@ -414,8 +454,7 @@ export function PaymentPlans() {
               <div className="flex-1 py-4 border-t border-zinc-100">
                 <ul className="space-y-3">
                   {plan.features.map((rawFeature, idx) => {
-                    const savePct = Math.max(0, Math.round((1 - livePlans.yearly.price / (livePlans.monthly.price * 12)) * 100));
-                    const feature = rawFeature.replace(/Save \d+%/, `Save ${savePct}%`);
+                    const feature = savePct !== null ? rawFeature.replace(/Save \d+%/, `Save ${savePct}%`) : rawFeature;
                     return (
                     <li
                       key={idx}
@@ -432,7 +471,7 @@ export function PaymentPlans() {
               <div className="mt-6 pt-5 border-t border-zinc-100 space-y-2.5">
                 <Button
                   onClick={() => handlePayment(plan)}
-                  disabled={isLoading || !cashfreeLoaded || isOwned || !agreedToTerms}
+                  disabled={isLoading || !!loadingPlan || !checkoutReady || isOwned || !agreedToTerms || !available}
                   title={!agreedToTerms && !isOwned ? "Please agree to the Terms of Service, Privacy Policy and Refund Policy first" : undefined}
                   className={`w-full h-11 text-xs font-bold rounded-xl transition-all ${
                     isOwned
@@ -450,12 +489,14 @@ export function PaymentPlans() {
                     <span className="flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" /> Preparing Checkout...
                     </span>
+                  ) : available ? (
+                    `Pay ${formatPrice(amount, currency)}`
                   ) : (
-                    `Pay ${formatINR(livePlans[plan.id].price)}`
+                    `Not available in ${currency}`
                   )}
                 </Button>
                 <p className="text-[11px] text-zinc-400 text-center flex items-center justify-center gap-1 font-mono">
-                  <Shield className="w-3 h-3 text-[#1f9e8e]" /> 256-bit encrypted • Cashfree Gateway
+                  <Shield className="w-3 h-3 text-[#1f9e8e]" /> 256-bit encrypted • Razorpay Secure
                 </p>
               </div>
             </div>
@@ -517,9 +558,9 @@ export function PaymentPlans() {
                   <span className="text-zinc-400">Plan:</span> {paymentResult.planName}
                 </div>
               )}
-              {paymentResult.amount && (
+              {paymentResult.amount && paymentResult.currency && (
                 <div>
-                  <span className="text-zinc-400">Amount:</span> ₹{paymentResult.amount}
+                  <span className="text-zinc-400">Amount:</span> {formatPrice(paymentResult.amount, paymentResult.currency)}
                 </div>
               )}
             </div>
@@ -542,7 +583,7 @@ export function PaymentPlans() {
           <Zap className="w-3.5 h-3.5 text-[#1f9e8e]" /> Safe & Instant Activation
         </h4>
         <p className="text-xs text-zinc-500 leading-relaxed max-w-xl mx-auto">
-          Payments are processed securely via Cashfree Payments Payment Gateway. Instant automated order verification and real-time membership activation.
+          Payments are processed securely by Razorpay. Instant automated order verification and real-time membership activation.
         </p>
       </div>
     </div>

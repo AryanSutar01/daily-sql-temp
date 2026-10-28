@@ -112,9 +112,9 @@ export const termsSections: Section[] = [
     title: "Prices, payment and taxes",
     blocks: [
       { type: "ul", items: [
-        "Prices are shown in Indian Rupees (INR). The price shown at checkout is the amount you pay.",
+        "Prices are shown in Indian Rupees (INR) or US Dollars (USD), as you select. The price shown at checkout, in the currency shown, is the amount you pay.",
         `${L.brand} is not currently registered for GST, so no GST is charged. If we become liable to charge tax, we will show it clearly at checkout, and it will apply only to purchases made after that date.`,
-        "Payments are processed by Cashfree Payments and the banks and networks it uses. We do not store your card, UPI or bank details. By paying, you authorise the payment and confirm that you are entitled to use the chosen method.",
+        "Payments are processed by Razorpay and the banks and networks it uses. We do not store your card, UPI or bank details. By paying, you authorise the payment and confirm that you are entitled to use the chosen method.",
         "Payments are one-time. There is no automatic renewal, and we will not charge you again unless you place a new order.",
         "We may change prices or offers at any time. A change does not affect a purchase you have already made.",
         "If a price is clearly wrong because of a technical or typing error, we may cancel the order and refund you in full, or ask you to complete the purchase at the correct price.",
@@ -200,7 +200,7 @@ export const termsSections: Section[] = [
     id: "third-parties",
     title: "Third-party services and links",
     blocks: [
-      { type: "p", text: "The Platform uses or links to services run by others, such as Cashfree Payments, Google, Vercel, Cloudinary, Supabase, community platforms and social networks. We do not control them and are not responsible for their content, availability, security or practices. Your use of them is at your own risk and under their own terms." },
+      { type: "p", text: "The Platform uses or links to services run by others, such as Razorpay, Google, Vercel, Cloudinary, Supabase, community platforms and social networks. We do not control them and are not responsible for their content, availability, security or practices. Your use of them is at your own risk and under their own terms." },
     ],
   },
   {
