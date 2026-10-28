@@ -326,7 +326,7 @@ function ProfileContent() {
 
     const filteredSubmissions = submissions.filter((p) => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    // ── Activity map (app-day / IST clock, UTC date math so the browser timezone never shifts a cell) ──
+    // ── Activity map (app-day / UTC clock, UTC date math so the browser timezone never shifts a cell) ──
     const heat = useMemo(() => {
         const today = appToday();
         let start: Date;

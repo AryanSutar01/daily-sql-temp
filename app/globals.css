@@ -675,6 +675,7 @@
 
 /* ── Border remaps ── */
 .dark .landing-light [class*="border-[#dedee2]"],
+.dark .landing-light [class*="border-zinc-200"],
 .dark .landing-light .border-zinc-200,
 .dark .landing-light .border-zinc-300 {
   border-color: #20283C !important;

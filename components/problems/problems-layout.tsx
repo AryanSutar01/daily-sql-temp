@@ -229,7 +229,7 @@ export function ProblemsLayout() {
     return problems.filter((p) => solvedIds.has(p.id)).length;
   }, [problems, solvedIds]);
 
-  // Streak calendar: real solve days from the backend heat-map, on the app-day (IST) clock
+  // Streak calendar: real solve days from the backend heat-map, on the app-day (UTC) clock
   const calendar = useMemo(() => {
     const today = appToday();
     const first = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + monthOffset, 1));
